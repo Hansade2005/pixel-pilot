@@ -3,6 +3,7 @@ import { createMistral } from '@ai-sdk/mistral';
 import { createCohere } from '@ai-sdk/cohere';
 import { createXai } from '@ai-sdk/xai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createAnthropic } from '@ai-sdk/anthropic';
 
 // Custom a0.dev provider implementation (no API key required)
 function createA0Dev(options: { apiKey?: string } = {}) {
@@ -168,6 +169,12 @@ const openrouterProvider = createOpenAICompatible({
   apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
 });
 
+// Create OpenRouter Anthropic provider instance with custom base URL
+const openrouterAnthropicProvider = createAnthropic({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
+});
+
 const zenmuxProvider = createOpenAICompatible({
   name: 'zenmux',
   baseURL: 'https://zenmux.ai/api/v1',
@@ -203,41 +210,117 @@ function openrouterProviderWithReasoning(modelId: string) {
     'deepseek/deepseek-chat-v3.1'
   ];
 
+  // Enable prompt caching for all OpenRouter models
+  const cacheControl = {
+    type: 'ephemeral'
+  };
+
   if (reasoningModels.includes(modelId)) {
-    // Return a wrapped provider that enables reasoning
+    // Return a wrapped provider that enables reasoning and caching
     return {
       ...baseProvider,
-      // Override the doGenerate and doStream methods to include reasoning options
+      // Override the doGenerate and doStream methods to include reasoning options and cache control
       async doGenerate(options: any) {
-        const reasoningOptions = {
+        const enhancedOptions = {
           ...options,
           providerOptions: {
             ...options.providerOptions,
             openrouter: {
               ...options.providerOptions?.openrouter,
-              reasoningEffort: 'medium' // Enable medium reasoning effort
+              reasoningEffort: 'medium', // Enable medium reasoning effort
+              cache_control: cacheControl // Enable prompt caching
             }
           }
         };
-        return baseProvider.doGenerate(reasoningOptions);
+        return baseProvider.doGenerate(enhancedOptions);
       },
       async doStream(options: any) {
-        const reasoningOptions = {
+        const enhancedOptions = {
           ...options,
           providerOptions: {
             ...options.providerOptions,
             openrouter: {
               ...options.providerOptions?.openrouter,
-              reasoningEffort: 'medium' // Enable medium reasoning effort
+              reasoningEffort: 'medium', // Enable medium reasoning effort
+              cache_control: cacheControl // Enable prompt caching
             }
           }
         };
-        return baseProvider.doStream(reasoningOptions);
+        return baseProvider.doStream(enhancedOptions);
       }
     };
   }
 
-  return baseProvider;
+  // For non-reasoning models, still enable caching
+  return {
+    ...baseProvider,
+    // Override the doGenerate and doStream methods to include cache control
+    async doGenerate(options: any) {
+      const enhancedOptions = {
+        ...options,
+        providerOptions: {
+          ...options.providerOptions,
+          openrouter: {
+            ...options.providerOptions?.openrouter,
+            cache_control: cacheControl // Enable prompt caching
+          }
+        }
+      };
+      return baseProvider.doGenerate(enhancedOptions);
+    },
+    async doStream(options: any) {
+      const enhancedOptions = {
+        ...options,
+        providerOptions: {
+          ...options.providerOptions,
+          openrouter: {
+            ...options.providerOptions?.openrouter,
+            cache_control: cacheControl // Enable prompt caching
+          }
+        }
+      };
+      return baseProvider.doStream(enhancedOptions);
+    }
+  };
+}
+
+// Custom OpenRouter Anthropic provider with caching and reasoning support
+function openrouterAnthropicProviderWithFeatures(modelId: string) {
+  const baseProvider = openrouterAnthropicProvider(modelId);
+
+  // Return a wrapped provider that enables caching and reasoning
+  return {
+    ...baseProvider,
+    // Override the doGenerate and doStream methods to include caching and reasoning options
+    async doGenerate(options: any) {
+      const enhancedOptions = {
+        ...options,
+        providerOptions: {
+          ...options.providerOptions,
+          anthropic: {
+            ...options.providerOptions?.anthropic,
+            cacheControl: { type: 'ephemeral' }, // Enable prompt caching
+            thinking: { type: 'enabled', budgetTokens: 12000 } // Enable reasoning with 12K token budget
+          }
+        }
+      };
+      return baseProvider.doGenerate(enhancedOptions);
+    },
+    async doStream(options: any) {
+      const enhancedOptions = {
+        ...options,
+        providerOptions: {
+          ...options.providerOptions,
+          anthropic: {
+            ...options.providerOptions?.anthropic,
+            cacheControl: { type: 'ephemeral' }, // Enable prompt caching
+            thinking: { type: 'enabled', budgetTokens: 12000 } // Enable reasoning with 12K token budget
+          }
+        }
+      };
+      return baseProvider.doStream(enhancedOptions);
+    }
+  };
 }
 
 // Debug function to check environment variables
@@ -340,6 +423,7 @@ const modelProviders: Record<string, any> = {
   // OpenRouter Claude Models
   'claude-sonnet-4.5': openrouterProviderWithReasoning('anthropic/claude-sonnet-4.5'),
   'claude-sonnet-4': openrouterProviderWithReasoning('anthropic/claude-sonnet-4'),
+  'claude-haiku-4.5': openrouterAnthropicProviderWithFeatures('claude-3-5-haiku-20241022'),
 
   // OpenRouter Advanced Models (with reasoning support)
   'deepseek-v3.2-exp': openrouterProviderWithReasoning('deepseek/deepseek-v3.2-exp'),
@@ -379,7 +463,9 @@ export {
   cohereProvider as cohere,
   xaiProvider as xai,
   openrouterProvider as openrouter,
+  openrouterAnthropicProvider as openrouterAnthropic,
   zenmuxProvider as zenmux,
   codestral,
   createOpenAICompatible,
+  createAnthropic,
 };

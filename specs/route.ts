@@ -42,6 +42,534 @@ const getMistralPixtralModel = () => {
   }
 }
 
+// JSON File Operation Interface for Memory System
+interface JSONFileOperation {
+  jsonTool: 'write_file' | 'edit_file' | 'delete_file'
+  filePath: string
+  fileName: string
+  purpose: string
+  changeSummary: string
+  contentPreview?: string
+  searchReplacePattern?: {
+    search: string
+    replace: string
+  }
+  searchReplaceBlocks?: Array<{
+    oldCode: string
+    newCode: string
+  }>
+  timestamp: string
+  extractedFromResponse: boolean
+  toolCallId?: string
+}
+
+// Enhanced Memory System for AI Context Awareness (JSON-Based)
+interface AIStreamMemory {
+  id: string
+  timestamp: string
+  projectId: string
+  userId: string
+  userMessage: string
+  aiResponse?: string
+  jsonOperations: JSONFileOperation[]
+  conversationContext: {
+    semanticSummary: string
+    keyInsights: string[]
+    technicalPatterns: string[]
+    architecturalDecisions: string[]
+    nextLogicalSteps: string[]
+    potentialImprovements: string[]
+    relevanceScore: number
+    contextForFuture: string
+  }
+  patterns: {
+    duplicateActions: string[]
+    fileAccessPatterns: string[]
+    userIntentPatterns: string[]
+    jsonToolPatterns: string[]
+  }
+  actionSummary: {
+    filesCreated: string[]
+    filesModified: string[]
+    filesDeleted: string[]
+    mainPurpose: string
+    keyChanges: string[]
+  }
+}
+
+// Memory Storage for streaming API
+const aiStreamMemoryStore = new Map<string, AIStreamMemory[]>() // projectId -> memory array
+
+// Extract pre-tool-call descriptions and JSON operations from AI response
+function extractContextAndOperationsFromResponse(aiResponse: string, toolCalls?: any[]): {
+  operations: JSONFileOperation[]
+  preToolDescriptions: string[]
+  overallPurpose: string
+} {
+  const operations: JSONFileOperation[] = []
+  const preToolDescriptions: string[] = []
+  const timestamp = new Date().toISOString()
+
+  // Extract text before JSON tool calls - this contains the AI's description of what it will do
+  const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/gi
+  let lastIndex = 0
+  let match
+
+  while ((match = jsonBlockRegex.exec(aiResponse)) !== null) {
+    // Extract text before this JSON block
+     const textBeforeBlock = aiResponse.substring(lastIndex, match.index).trim()
+    if (textBeforeBlock) {
+      // Clean up the description - remove excessive whitespace and normalize
+      const cleanDescription = textBeforeBlock
+        .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with 2
+        .replace(/^\s*[-*+]\s*/gm, '') // Remove list markers
+        .replace(/^\s*\d+\.\s*/gm, '') // Remove numbered list markers
+        .trim()
+
+      if (cleanDescription.length > 10) { // Only include substantial descriptions
+        preToolDescriptions.push(cleanDescription)
+      }
+    }
+    lastIndex = match.index + match[0].length
+  }
+
+  // Extract overall purpose from the beginning of the response (before any tool calls)
+  const overallPurpose = aiResponse.split(/```json/)[0]?.trim() || 'Development work'
+
+  // If we have actual tool calls from the AI stream, use those
+  if (toolCalls && toolCalls.length > 0) {
+    toolCalls.forEach((toolCall, index) => {
+      if (toolCall.toolName && ['write_file', 'edit_file', 'delete_file'].includes(toolCall.toolName)) {
+        const args = toolCall.args || {}
+        const filePath = args.path || ''
+
+        if (filePath) {
+          // Use pre-tool description as purpose if available
+          const descriptionIndex = Math.min(index, preToolDescriptions.length - 1)
+          const purposeFromDescription = preToolDescriptions[descriptionIndex] ||
+            inferPurposeFromTool(toolCall.toolName, args, filePath)
+
+          const operation: JSONFileOperation = {
+            jsonTool: toolCall.toolName as 'write_file' | 'edit_file' | 'delete_file',
+            filePath,
+            fileName: filePath.split('/').pop() || filePath,
+            purpose: purposeFromDescription,
+            changeSummary: generateChangeSummary(toolCall.toolName, filePath, args),
+            timestamp,
+            extractedFromResponse: false,
+            toolCallId: toolCall.toolCallId
+          }
+
+          // Add content preview for write/edit operations
+          if (args.content) {
+            operation.contentPreview = args.content.substring(0, 200) + (args.content.length > 200 ? '...' : '')
+          }
+
+          // Add search/replace patterns for edit operations
+          if (toolCall.toolName === 'edit_file' && args.searchReplaceBlocks) {
+            operation.searchReplaceBlocks = args.searchReplaceBlocks.map((block: any) => ({
+              oldCode: block.oldCode || block.search || '',
+              newCode: block.newCode || block.replace || ''
+            }))
+          }
+
+          operations.push(operation)
+        }
+      }
+    })
+  }
+
+  // Fallback: Parse JSON tool calls from response text (for backward compatibility)
+  if (operations.length === 0) {
+    // Look for JSON code blocks that contain tool calls
+    const jsonBlocks = aiResponse.match(/```json\s*\n([\s\S]*?)\n```/gi)
+    if (jsonBlocks) {
+      jsonBlocks.forEach((block, index) => {
+        try {
+          const jsonContent = block.replace(/```json\s*\n?/, '').replace(/\n?```/, '').trim()
+          const parsed = JSON.parse(jsonContent)
+
+          if (parsed.tool && ['write_file', 'edit_file', 'delete_file'].includes(parsed.tool) && parsed.path) {
+            // Use pre-tool description as purpose if available
+            const descriptionIndex = Math.min(index, preToolDescriptions.length - 1)
+            const purposeFromDescription = preToolDescriptions[descriptionIndex] ||
+              inferPurposeFromTool(parsed.tool, parsed, parsed.path)
+
+            operations.push({
+              jsonTool: parsed.tool as 'write_file' | 'edit_file' | 'delete_file',
+              filePath: parsed.path,
+              fileName: parsed.path.split('/').pop() || parsed.path,
+              purpose: purposeFromDescription,
+              changeSummary: generateChangeSummary(parsed.tool, parsed.path, parsed),
+              contentPreview: parsed.content ? parsed.content.substring(0, 200) + (parsed.content.length > 200 ? '...' : '') : undefined,
+              searchReplaceBlocks: parsed.searchReplaceBlocks,
+              timestamp,
+              extractedFromResponse: true
+            })
+          }
+        } catch (error) {
+          // Ignore invalid JSON blocks
+        }
+      })
+    }
+  }
+
+  return {
+    operations,
+    preToolDescriptions,
+    overallPurpose
+  }
+}
+
+// Legacy function for backward compatibility
+function extractJSONOperationsFromResponse(aiResponse: string, toolCalls?: any[]): JSONFileOperation[] {
+  return extractContextAndOperationsFromResponse(aiResponse, toolCalls).operations
+}
+
+// Helper function to infer purpose from JSON tool
+function inferPurposeFromTool(toolName: string, args: any, filePath: string): string {
+  const fileExt = filePath.split('.').pop()?.toLowerCase()
+  
+  switch (toolName) {
+    case 'write_file':
+      const content = args.content || ''
+      // Analyze content for patterns
+      if (content.includes('export default') || content.includes('export function')) {
+        return `Create/update ${fileExt} component or utility`
+      }
+      if (content.includes('interface ') || content.includes('type ')) {
+        return `Define TypeScript types and interfaces`
+      }
+      if (content.includes('useState') || content.includes('useEffect')) {
+        return `Create React component with hooks`
+      }
+      if (content.includes('API') || content.includes('fetch') || content.includes('POST')) {
+        return `Implement API functionality`
+      }
+      if (content.includes('style') || content.includes('className')) {
+        return `Add styling and UI elements`
+      }
+      return `Create/update ${fileExt} file`
+      
+    case 'edit_file':
+      const blocks = args.searchReplaceBlocks || []
+      if (blocks.length > 0) {
+        const firstBlock = blocks[0]
+        const oldCode = firstBlock.oldCode || firstBlock.search || ''
+        const newCode = firstBlock.newCode || firstBlock.replace || ''
+        
+        if (oldCode.includes('function') && newCode.includes('function')) {
+          return `Modify function logic in ${filePath}`
+        }
+        if (oldCode.includes('import') || newCode.includes('import')) {
+          return `Update imports in ${filePath}`
+        }
+        if (oldCode.includes('interface') || newCode.includes('interface')) {
+          return `Update type definitions in ${filePath}`
+        }
+        if (oldCode.includes('style') || newCode.includes('className')) {
+          return `Update styling in ${filePath}`
+        }
+      }
+      return `Edit content in ${filePath}`
+      
+    case 'delete_file':
+      return `Delete file: ${filePath}`
+      
+    default:
+      return `Update ${fileExt} file`
+  }
+}
+
+// Helper function to generate change summary
+function generateChangeSummary(toolName: string, filePath: string, args: any): string {
+  const fileName = filePath.split('/').pop() || filePath
+  
+  switch (toolName) {
+    case 'write_file':
+      const content = args.content || ''
+      const lines = content.split('\n').length
+      return `Create/update ${fileName} (${lines} lines)`
+      
+    case 'edit_file':
+      const blocks = args.searchReplaceBlocks || []
+      if (blocks.length > 0) {
+        const summary = blocks.map((block: any, i: number) => {
+          const oldCode = (block.oldCode || block.search || '').substring(0, 50)
+          const newCode = (block.newCode || block.replace || '').substring(0, 50)
+          return `${i + 1}: ${oldCode}... → ${newCode}...`
+        }).join('; ')
+        return `Edit ${fileName}: ${summary}`
+      }
+      return `Edit ${fileName}`
+      
+    case 'delete_file':
+      return `Delete ${fileName}`
+      
+    default:
+      return `${toolName} ${fileName}`
+  }
+}
+
+// Simplified Memory Processing - No AI dependency, just track user message and files affected
+function processStreamMemorySimple(
+  userMessage: string,
+  jsonOperations: JSONFileOperation[]
+): {
+  semanticSummary: string
+  keyInsights: string[]
+  technicalPatterns: string[]
+  architecturalDecisions: string[]
+  nextLogicalSteps: string[]
+  potentialImprovements: string[]
+  relevanceScore: number
+  contextForFuture: string
+  duplicateActions: string[]
+  fileAccessPatterns: string[]
+  mainPurpose: string
+  keyChanges: string[]
+} {
+  // Simple format: just track what user said and files affected
+  const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
+
+  const semanticSummary = filesAffected.length > 0
+    ? `UserMessage in last request: ${userMessage}
+
+Note: Changes you made and files you modified  to compleett the request are listed below
+filesAffected: [
+${filesAffected.map(f => `  "${f}"`).join(',\n')}
+]`
+    : `UserMessage in last request: ${userMessage}
+
+Note: No files were affected in the last request`
+
+  const keyChanges = jsonOperations.map(op => op.changeSummary)
+
+  return {
+    semanticSummary,
+    keyInsights: ['Simple memory tracking - no AI analysis'],
+    technicalPatterns: ['Direct file operation tracking'],
+    architecturalDecisions: ['Simplified memory system'],
+    nextLogicalSteps: [],
+    potentialImprovements: [],
+    relevanceScore: 1.0,
+    contextForFuture: semanticSummary,
+    duplicateActions: [],
+    fileAccessPatterns: filesAffected,
+    mainPurpose: userMessage,
+    keyChanges: keyChanges
+  }
+}
+
+// Function to store memory and provide context awareness
+async function storeStreamMemory(
+  projectId: string,
+  userId: string,
+  userMessage: string,
+  aiResponse: string,
+  projectContext: string
+): Promise<AIStreamMemory> {
+  // Extract JSON operations AND pre-tool-call descriptions from AI response only
+  // Note: Tools are executed on frontend during streaming, so we only track from AI response text
+  const { operations: jsonOperations, preToolDescriptions, overallPurpose } = extractContextAndOperationsFromResponse(aiResponse)
+
+  // Process memory with simple tracking - no AI dependency
+  const memoryAnalysis = processStreamMemorySimple(
+    userMessage,
+    jsonOperations
+  )
+
+  // Create memory record
+  const memory: AIStreamMemory = {
+    id: `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+    projectId,
+    userId,
+    userMessage,
+    aiResponse,
+    jsonOperations,
+    conversationContext: {
+      semanticSummary: memoryAnalysis.semanticSummary,
+      keyInsights: memoryAnalysis.keyInsights,
+      technicalPatterns: memoryAnalysis.technicalPatterns,
+      architecturalDecisions: memoryAnalysis.architecturalDecisions,
+      nextLogicalSteps: memoryAnalysis.nextLogicalSteps,
+      potentialImprovements: memoryAnalysis.potentialImprovements,
+      relevanceScore: memoryAnalysis.relevanceScore,
+      contextForFuture: memoryAnalysis.contextForFuture
+    },
+    patterns: {
+      duplicateActions: memoryAnalysis.duplicateActions,
+      fileAccessPatterns: memoryAnalysis.fileAccessPatterns,
+      userIntentPatterns: [extractUserIntentPattern(userMessage)],
+      jsonToolPatterns: jsonOperations.map((op: JSONFileOperation) => `${op.jsonTool}:${op.fileName}`)
+    },
+    actionSummary: {
+      filesCreated: jsonOperations.filter((op: JSONFileOperation) => op.jsonTool === 'write_file').map((op: JSONFileOperation) => op.filePath),
+      filesModified: jsonOperations.filter((op: JSONFileOperation) => op.jsonTool === 'edit_file').map((op: JSONFileOperation) => op.filePath),
+      filesDeleted: jsonOperations.filter((op: JSONFileOperation) => op.jsonTool === 'delete_file').map((op: JSONFileOperation) => op.filePath),
+      mainPurpose: memoryAnalysis.mainPurpose,
+      keyChanges: memoryAnalysis.keyChanges
+    }
+  }
+
+  // Store memory
+  const memories = aiStreamMemoryStore.get(projectId) || []
+  memories.push(memory)
+
+  // Keep only last 50 memories to prevent memory bloat
+  if (memories.length > 50) {
+    memories.splice(0, memories.length - 50)
+  }
+
+  aiStreamMemoryStore.set(projectId, memories)
+
+  return memory
+}// Helper function to extract user intent pattern
+function extractUserIntentPattern(userMessage: string): string {
+  const message = userMessage.toLowerCase()
+  
+  if (message.includes('create') || message.includes('build') || message.includes('make')) {
+    return 'creation_intent'
+  }
+  if (message.includes('fix') || message.includes('bug') || message.includes('error')) {
+    return 'fix_intent'
+  }
+  if (message.includes('update') || message.includes('modify') || message.includes('change')) {
+    return 'modification_intent'
+  }
+  if (message.includes('delete') || message.includes('remove')) {
+    return 'deletion_intent'
+  }
+  if (message.includes('help') || message.includes('how') || message.includes('?')) {
+    return 'help_intent'
+  }
+  
+  return 'general_intent'
+}
+
+// Function to get context for preventing duplicates
+function getStreamContextForRequest(projectId: string, userMessage: string): {
+  previousActions: string[]
+  suggestedApproach: string
+  potentialDuplicates: string[]
+  relevantMemories: AIStreamMemory[]
+  currentProjectState: {
+    filesCreated: string[]
+    filesModified: string[]
+    filesDeleted: string[]
+    recentChanges: string[]
+    totalOperations: number
+  }
+} {
+  const memories = aiStreamMemoryStore.get(projectId) || []
+  const recentMemories = memories.slice(-10) // Last 10 interactions
+
+  // Check for potential duplicates
+  const currentIntent = extractUserIntentPattern(userMessage)
+  const potentialDuplicates: string[] = []
+  const previousActions: string[] = []
+
+  // Track current project state
+  const filesCreated = new Set<string>()
+  const filesModified = new Set<string>()
+  const filesDeleted = new Set<string>()
+  const recentChanges: string[] = []
+  let totalOperations = 0
+
+  recentMemories.forEach(memory => {
+    // Check for similar intents
+    if (memory.patterns.userIntentPatterns.includes(currentIntent)) {
+      potentialDuplicates.push(`Similar ${currentIntent} request: "${memory.userMessage}"`)
+    }
+
+    // Collect detailed previous actions with clear context
+    memory.jsonOperations.forEach(op => {
+      const actionDetail = `**${op.jsonTool.toUpperCase()}**: ${op.filePath}
+      **Purpose**: ${op.purpose}
+      **What was changed**: ${op.changeSummary}${op.contentPreview ? `\n      **Content**: ${op.contentPreview}` : ''}`
+      previousActions.push(actionDetail)
+
+      // Track project state
+      if (op.jsonTool === 'write_file') {
+        filesCreated.add(op.filePath)
+      } else if (op.jsonTool === 'edit_file') {
+        filesModified.add(op.filePath)
+      } else if (op.jsonTool === 'delete_file') {
+        filesDeleted.add(op.filePath)
+      }
+
+      totalOperations++
+    })
+
+    // Add recent changes summary
+    if (memory.actionSummary.mainPurpose) {
+      recentChanges.push(`${memory.timestamp}: ${memory.actionSummary.mainPurpose} (${memory.jsonOperations.length} operations)`)
+    }
+  })
+
+  // Generate suggested approach
+  const suggestedApproach = potentialDuplicates.length > 0
+    ? `Consider reviewing previous similar work before proceeding: ${potentialDuplicates[0]}`
+    : 'Proceed with implementation based on request'
+
+  return {
+    previousActions: [...new Set(previousActions)], // Remove duplicates
+    suggestedApproach,
+    potentialDuplicates,
+    relevantMemories: recentMemories.filter(m => m.conversationContext.relevanceScore > 0.6),
+    currentProjectState: {
+      filesCreated: Array.from(filesCreated),
+      filesModified: Array.from(filesModified),
+      filesDeleted: Array.from(filesDeleted),
+      recentChanges: recentChanges.slice(-5), // Last 5 changes
+      totalOperations
+    }
+  }
+}
+
+// Helper function to view memory state (for debugging)
+export function getMemoryState(projectId: string): {
+  totalMemories: number
+  recentMemories: AIStreamMemory[]
+  memoryStats: {
+    totalJSONOperations: number
+    filesCreated: number
+    filesModified: number
+    filesDeleted: number
+    averageRelevanceScore: number
+  }
+} {
+  const memories = aiStreamMemoryStore.get(projectId) || []
+  const recentMemories = memories.slice(-10)
+  
+  let totalJSONOperations = 0
+  let filesCreated = 0
+  let filesModified = 0
+  let filesDeleted = 0
+  let totalRelevanceScore = 0
+  
+  memories.forEach(memory => {
+    totalJSONOperations += memory.jsonOperations.length
+    filesCreated += memory.actionSummary.filesCreated.length
+    filesModified += memory.actionSummary.filesModified.length
+    filesDeleted += memory.actionSummary.filesDeleted.length
+    totalRelevanceScore += memory.conversationContext.relevanceScore
+  })
+  
+  return {
+    totalMemories: memories.length,
+    recentMemories,
+    memoryStats: {
+      totalJSONOperations,
+      filesCreated,
+      filesModified,
+      filesDeleted,
+      averageRelevanceScore: memories.length > 0 ? totalRelevanceScore / memories.length : 0
+    }
+  }
+}
+
 // Add Tavily API configuration with environment variable support
 const tavilyConfig = {
   apiKeys: [
@@ -113,7 +641,7 @@ async function searchWeb(query: string) {
         search_depth: "basic",
         include_answer: false,
         include_raw_content: true,
-        max_results: 5
+        max_results: 3
       })
     });
 
@@ -401,78 +929,313 @@ async function executeDeleteFile(projectId: string, path: string, userId: string
   }
 }
 
-// Enhanced project context builder with selective full content
-async function buildEnhancedProjectContext(projectId: string, storageManager: any) {
+// ENHANCED: File tree context builder with selective full content
+async function buildOptimizedProjectContext(projectId: string, storageManager: any, userIntent?: any) {
   try {
     const files = await storageManager.getFiles(projectId)
     
-    // Get current timestamp in Cline's format
+    // Get current time and working directory for context
     const currentTime = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric', 
+      timeZone: 'Africa/Douala',
       year: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric',
-      hour12: true
-    }) + ' (UTC)'
-    
-    // Sort files alphabetically like Cline does
-    const sortedFiles = files
-      .map((f: any) => f.path)
-      .sort()
-    
-    // Get directories structure
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'long'
+    })
+
+    // Filter out shadcn UI components and common excluded files
+    const filteredFiles = files.filter((file: any) => {
+      const path = file.path.toLowerCase()
+      // Exclude shadcn UI components
+      if (path.includes('components/ui/') && (
+        path.includes('button.tsx') ||
+        path.includes('input.tsx') ||
+        path.includes('dialog.tsx') ||
+        path.includes('card.tsx') ||
+        path.includes('badge.tsx') ||
+        path.includes('alert.tsx') ||
+        path.includes('accordion.tsx') ||
+        path.includes('avatar.tsx') ||
+        path.includes('checkbox.tsx') ||
+        path.includes('dropdown-menu.tsx') ||
+        path.includes('form.tsx') ||
+        path.includes('label.tsx') ||
+        path.includes('select.tsx') ||
+        path.includes('sheet.tsx') ||
+        path.includes('tabs.tsx') ||
+        path.includes('textarea.tsx') ||
+        path.includes('toast.tsx') ||
+        path.includes('tooltip.tsx') ||
+        path.includes('separator.tsx') ||
+        path.includes('skeleton.tsx') ||
+        path.includes('scroll-area.tsx') ||
+        path.includes('progress.tsx') ||
+        path.includes('popover.tsx') ||
+        path.includes('navigation-menu.tsx') ||
+        path.includes('menubar.tsx') ||
+        path.includes('hover-card.tsx') ||
+        path.includes('command.tsx') ||
+        path.includes('calendar.tsx') ||
+        path.includes('table.tsx') ||
+        path.includes('switch.tsx') ||
+        path.includes('slider.tsx') ||
+        path.includes('radio-group.tsx')
+      )) {
+        return false
+      }
+      
+      // Exclude node_modules, .git, build outputs
+      if (path.includes('node_modules') || 
+          path.includes('.git/') || 
+          path.includes('dist/') || 
+          path.includes('build/') ||
+          path.includes('.next/')) {
+        return false
+      }
+      
+      return true
+    })
+
+    // Detect project type (Vite or Next.js)
+    const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
+    const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
+
+    // Build file tree structure
+    const fileTree: string[] = []
     const directories = new Set<string>()
-    sortedFiles.forEach((path: string) => {
-      const parts = path.split('/')
-      let currentPath = ''
-      for (let i = 0; i < parts.length - 1; i++) {
-        currentPath += (currentPath ? '/' : '') + parts[i]
-        directories.add(currentPath + '/')
+    
+    // Sort files for better organization
+    const sortedFiles = filteredFiles.sort((a: any, b: any) => {
+      return a.path.localeCompare(b.path)
+    })
+
+    // Collect all directories
+    sortedFiles.forEach((file: any) => {
+      const pathParts = file.path.split('/')
+      if (pathParts.length > 1) {
+        // Add all parent directories
+        for (let i = 1; i < pathParts.length; i++) {
+          const dirPath = pathParts.slice(0, i).join('/')
+          if (dirPath) {
+            directories.add(dirPath)
+          }
+        }
       }
     })
-    
+
+    // Add root files first
+    const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
+    rootFiles.forEach((file: any) => {
+      fileTree.push(file.path)
+    })
+
+    // Add directories and their files
     const sortedDirectories = Array.from(directories).sort()
-    
-    // Build context exactly like Cline's format
-    let context = `<environment_details>
-# VSCode Visible Files
-${sortedFiles.length > 0 ? sortedFiles[0] : 'No files visible'}
+    sortedDirectories.forEach((dir: string) => {
+      fileTree.push(`${dir}/`)
+      
+      // Add files in this directory
+      const dirFiles = sortedFiles.filter((file: any) => {
+        const filePath = file.path
+        const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+        return fileDir === dir
+      })
+      
+      dirFiles.forEach((file: any) => {
+        fileTree.push(file.path)
+      })
+    })
 
-# VSCode Open Tabs
-${sortedFiles.slice(0, 10).join('\n')}${sortedFiles.length > 10 ? '\n...' : ''}
+    // Files that should include full content (template-specific)
+    const fullContentFiles = projectType === 'nextjs' ? [
+      'package.json',
+      'src/app/page.tsx',
+      'src/app/layout.tsx',
+      'next.config.js',
+      'next.config.mjs',
+      'tailwind.config.js',
+      'tsconfig.json'
+    ] : [
+      'package.json',
+      'src/App.tsx',
+      'src/main.tsx',
+      'App.tsx',
+      'main.tsx',
+      'index.tsx',
+      'vite.config.ts',
+      'tailwind.config.js',
+      'tsconfig.json'
+    ]
 
-# Current Time
+    // Build the context
+    let context = `# Current Time
 ${currentTime}
 
-# Current Working Directory (${projectId}) Files
-${sortedFiles.join('\n')}
+# Project Type
+${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : 'Unknown'}
 
-${sortedDirectories.length > 0 ? `# Directories
-${sortedDirectories.join('\n')}` : ''}
+${projectType === 'nextjs' ? `## Next.js Project Structure
+- **src/app/** - App Router pages and layouts
+- **src/components/** - React components  
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **API Routes:** Create in src/app/api/[name]/route.ts` : 
+`## Vite Project Structure
+- **src/** - Source code directory
+- **src/components/** - React components
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **api/** - Serverless functions (Vercel)`}
 
-(File list${sortedFiles.length > 50 ? ' truncated' : ' complete'}. Use list_files on specific subdirectories if you need to explore further.)
+# Current Project Structure
+${fileTree.join('\n')}
+# Important Files Content
+---`
 
-# Current Mode
-AGENT MODE
-</environment_details>`
-    
+    // Add full content for important files
+    for (const filePath of fullContentFiles) {
+      const file = files.find((f: any) => f.path === filePath || f.path.endsWith(`/${filePath}`))
+      if (file && file.content) {
+        context += `
+
+## ${file.path}
+\`\`\`${getFileExtension(file.path)}
+${file.content}
+\`\`\``
+      }
+    }
+
+    console.log(`[CONTEXT] Built file tree with ${fileTree.length} files, ${fullContentFiles.length} with full content`)
     return context
+
   } catch (error) {
-    console.error('Error building enhanced project context:', error)
-    return `<environment_details>
-# Error
-Failed to build project context: ${error instanceof Error ? error.message : 'Unknown error'}
+    console.error('Error building project context:', error)
+    return `# Current Time
+${new Date().toLocaleString()}
 
-# Fallback Instructions  
-- Use list_files tool to see current files in the project
-- Use read_file tool to read specific files when needed
-- Use write_file tool to create or modify files
+# Project Context Error
+Unable to load project structure. Use list_files tool to explore the project.`
+  }
+}
 
-# Current Mode
-AGENT MODE
-</environment_details>`
+// SMART CONTEXT PROVIDER: Use Mistral Pixtral to select relevant files and produce a src patch
+async function buildSmartContextForA0(projectId: string, userMessage: string, storageManager: any) {
+  try {
+    // Load files and limit candidate set
+    const allFiles = await storageManager.getFiles(projectId)
+    // Prioritize src/ files and recently modified files
+    const candidateFiles = allFiles
+      .filter((f: any) => (f.path.startsWith('src/') || f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path.endsWith('.js') || f.path.endsWith('.jsx')) && !f.path.startsWith('src/components/ui/') && !f.path.startsWith('components/ui/') && !f.path.startsWith('hooks/'))
+      .slice(-200) // cap candidates
+
+    // Read small previews for the model to analyze
+    const filePreviews: string[] = []
+    for (const f of candidateFiles) {
+      try {
+        const fileObj = await storageManager.getFile(projectId, f.path)
+        if (fileObj && fileObj.content) {
+          // Limit per-file content to avoid huge prompts
+          const snippet = fileObj.content.substring(0, 2000)
+          filePreviews.push(`File: ${f.path}\n${snippet}`)
+        }
+      } catch (e) {
+        // ignore read errors
+      }
+    }
+
+    const mistralPixtral = getMistralPixtralModel()
+
+    const selectionPrompt = `You are a code-context selector. Given the user's request and a list of project file previews, choose up to 10 files most relevant to the user's request. Return JSON: { "selected": [{"path":"...","reason":"short reason"}], "srcPatch": "text description of src structure changes (if any)" }\n\nUser Request: ${userMessage}\n\nFILES:\n${filePreviews.join('\n\n---\n\n')}`
+
+    const selection = await generateText({
+      model: mistralPixtral,
+      messages: [
+        { role: 'system', content: 'You are an assistant that selects most relevant project files for a code-edit request.' },
+        { role: 'user', content: selectionPrompt }
+      ],
+      temperature: 0.0
+    })
+
+    // Parse selection JSON from response
+    let parsed: any = { selected: [], srcPatch: '' }
+    try {
+      let text = selection.text || ''
+      if (text.includes('```json')) {
+        text = text.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      } else if (text.includes('```')) {
+        text = text.replace(/```\s*/, '').replace(/\s*```$/, '')
+      }
+      text = text.trim()
+      const start = text.indexOf('{')
+      const end = text.lastIndexOf('}')
+      if (start !== -1 && end !== -1) {
+        const jsonText = text.substring(start, end + 1)
+        parsed = JSON.parse(jsonText)
+      }
+    } catch (e) {
+      console.warn('[SMART-CONTEXT] Failed to parse selection JSON, falling back to simple heuristic')
+    }
+
+    // Build final selectedFiles with content
+    const selectedFiles: Array<any> = []
+    const maxSelected = 10
+    const paths = (parsed.selected || []).slice(0, maxSelected).map((s: any) => s.path)
+    for (const p of paths) {
+      try {
+        const fileObj = await storageManager.getFile(projectId, p)
+        if (fileObj) selectedFiles.push({ path: p, content: fileObj.content || '' })
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return {
+      selectedFiles,
+      srcPatch: parsed.srcPatch || ''
+    }
+  } catch (error) {
+    console.error('[SMART-CONTEXT] Error building smart context:', error)
+    return { selectedFiles: [], srcPatch: '' }
+  }
+}
+
+// Helper function to get file extension for syntax highlighting
+function getFileExtension(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'tsx':
+    case 'jsx':
+      return 'typescript'
+    case 'ts':
+      return 'typescript'
+    case 'js':
+      return 'javascript'
+    case 'json':
+      return 'json'
+    case 'css':
+      return 'css'
+    case 'scss':
+    case 'sass':
+      return 'scss'
+    case 'html':
+      return 'html'
+    case 'md':
+      return 'markdown'
+    case 'yml':
+    case 'yaml':
+      return 'yaml'
+    case 'sql':
+      return 'sql'
+    case 'cjs':
+      return 'javascript'
+    case 'env':
+      return 'text'
+    default:
+      return ext || 'text'
   }
 }
 
@@ -548,7 +1311,7 @@ Focus on extracting meaningful patterns, decisions, and insights that will be va
         nextLogicalSteps: parsed.nextLogicalSteps || [],
         potentialImprovements: parsed.potentialImprovements || [],
         relevanceScore: parsed.relevanceScore || 0.8,
-        contextForFuture: parsed.contextForFuture || 'Standard development patterns used'
+        contextForFuture: parsed.contextForFuture || 'Standard development patterns used',
         }
       } else {
         // Handle non-JSON responses (plain text)
@@ -593,38 +1356,29 @@ Focus on extracting meaningful patterns, decisions, and insights that will be va
   }
 }
 
-// Smart Memory Retrieval with AI
+// ULTRA-COMPACT: Memory retrieval (80% token reduction)
 async function findRelevantMemories(
   userQuery: string,
   projectContext: string,
   conversationMemory: any
 ) {
   try {
+    // OPTIMIZATION: Compress conversation memory to essential info only
+    const compressedMemory = conversationMemory?.messages?.slice(-10).map((m: any) =>
+      `${m.role[0]}:${m.content.substring(0, 100)}`
+    ).join('|') || ''
+
+    // OPTIMIZATION: Compact prompt format
+    const compactQuery = `${userQuery.substring(0, 200)}|${compressedMemory}`
+
     const mistralPixtral = getMistralPixtralModel()
-    
     const relevantMemories = await generateText({
       model: mistralPixtral,
       messages: [
-        { role: 'system', content: 'You are an AI assistant that finds relevant information from development memory.' },
-        { role: 'user', content: `Find the most relevant information from this development memory for the user's current request:
-
-User Query: "${userQuery}"
-Project Context: ${projectContext}
-Conversation Memory: ${JSON.stringify(conversationMemory?.messages?.slice(-30) || [])}
-
-Analyze and provide a JSON response with the most relevant information:
-{
-  "relevantContext": "Most relevant information for the current request",
-  "keyRelevantFiles": ["file1", "file2"],
-  "relevantDecisions": ["decision1", "decision2"],
-  "applicablePatterns": ["pattern1", "pattern2"],
-  "relevanceScore": 0.0-1.0,
-  "whyRelevant": "Explanation of why this information is relevant"
-}
-
-Focus on finding information that directly helps with the current request.` }
+        { role: 'system', content: 'JSON: {"context":"", "files":[], "score":0.5}' },
+        { role: 'user', content: compactQuery }
       ],
-      temperature: 0.3
+      temperature: 0.3,
     })
 
     try {
@@ -713,24 +1467,25 @@ async function learnFromPatterns(
         role: msg.role,
         content: (msg.content || '').substring(0, 100) + (msg.content?.length > 100 ? '...' : '')
       }))
-    
-    // OPTIMIZATION 4: Ultra-compact prompt to stay under 200 tokens total
-    const promptContent = `Recent: ${JSON.stringify(recentMessages)}
-Files: ${JSON.stringify(truncatedFiles)}
-JSON: {"style":"brief","patterns":["p1"],"tech":["t1"],"score":0.7,"recs":["r1"]}`
-    
-    // Debug: Estimate token usage (rough approximation: 4 chars = 1 token)
-    const estimatedTokens = Math.ceil((promptContent.length + 60) / 4) // +60 for system message
-    console.log(`[DEBUG] learn_patterns optimized token estimate: ${estimatedTokens} tokens`)
-    
+    // ULTRA-COMPACT: 100-token optimization with type safety
+    const messagesSummary = recentMessages.map((m: { role: string, content: string }) => 
+      `${m.role[0]}:${m.content.substring(0, 50)}`
+    ).join('|')
+    const filesSummary = truncatedFiles.map((f: { path: string, type: string }) => 
+      `${f.path.split('/').pop()}:${f.type}`
+    ).join(',')
+    const promptContent = `${messagesSummary}|${filesSummary}`
+
+    const estimatedTokens = Math.ceil(promptContent.length / 4)
+    console.log(`[ULTRA-COMPACT] Token estimate: ${estimatedTokens}`)
+
     const learningInsights = await generateText({
       model: mistralPixtral,
       messages: [
-        { role: 'system', content: 'Analyze dev patterns from minimal context. Respond with compact JSON.' },
+        { role: 'system', content: 'JSON output only: {"patterns":[], "tech":[], "score":0.0}' },
         { role: 'user', content: promptContent }
       ],
-      temperature: 0.1
-      // Note: maxTokens not available in this AI SDK version, relying on prompt engineering
+      temperature: 0.1,
     })
 
     try {
@@ -841,13 +1596,205 @@ function isReportingCodeIssues(userMessage: string, intentData?: any): boolean {
 
 // Helper function to create file operation tools based on AI mode
 function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent', conversationMemory: any[] = [], userId?: string, intentData?: any, userMessage?: string) {
-  const tools: any = {}
+  const tools: Record<string, any> = {}
 
   // Check if user is reporting code issues - only include advanced tools then
   const userReportingIssues = userMessage ? isReportingCodeIssues(userMessage, intentData) : false
 
   // Check if web tools are explicitly needed based on intent detection
   const needsWebTools = intentData?.required_tools?.includes('web_search') || intentData?.required_tools?.includes('web_extract')
+
+  // ASK MODE: Include read-only tools for codebase exploration and analysis
+  if (aiMode === 'ask') {
+    // Always include read and analysis tools for ask mode
+    tools.read_file = tool({
+      description: 'Read and analyze file contents for codebase discussion and questions',
+      inputSchema: z.object({
+        path: z.string().describe('File path to read for analysis')
+      }),
+      execute: async ({ path }, { abortSignal, toolCallId }) => {
+        if (abortSignal?.aborted) {
+          throw new Error('Operation cancelled')
+        }
+
+        try {
+          console.log('[DEBUG] Executing read_file tool:', { path, projectId })
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+
+          const file = await storageManager.getFile(projectId, path)
+          console.log('[DEBUG] read_file result:', { path, fileFound: !!file, fileSize: file?.size })
+          
+          if (!file) {
+            return {
+              success: false,
+              error: `File not found: ${path}`,
+              toolCallId
+            }
+          }
+
+          return {
+            success: true,
+            message: `📖 Analyzed file: ${path}`,
+            path,
+            content: file.content,
+            size: file.size,
+            type: file.type,
+            toolCallId
+          }
+        } catch (error) {
+          console.error('[DEBUG] read_file error:', error)
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          return {
+            success: false,
+            error: `Failed to read file: ${errorMessage}`,
+            toolCallId
+          }
+        }
+      }
+    })
+
+  // List files tool - available in both modes  
+  tools.list_files = tool({
+    description: 'List files and directories in a specific folder path',
+    inputSchema: z.object({
+      path: z.string().describe('Directory path to list (use "/" for root)')
+    }),
+    execute: async ({ path }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return { 
+            success: false, 
+            error: `Invalid directory path provided`,
+            path,
+            toolCallId
+          }
+        }
+        
+        // Get all files from the project
+        const allFiles = await storageManager.getFiles(projectId)
+        
+        // Filter files based on the requested path
+        let filteredFiles;
+        if (path === '/' || path === '') {
+          // Root directory - show all files at root level
+          filteredFiles = allFiles.filter(f => {
+            const pathParts = f.path.split('/').filter(p => p.length > 0)
+            return pathParts.length === 1 // Only top-level files
+          })
+        } else {
+          // Specific directory - show files in that directory
+          const normalizedPath = path.startsWith('/') ? path.slice(1) : path
+          const searchPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/'
+          
+          filteredFiles = allFiles.filter(f => {
+            return f.path.startsWith(searchPath) && 
+                   f.path.slice(searchPath.length).indexOf('/') === -1 // Only direct children
+          })
+        }
+
+        return { 
+          success: true, 
+          message: `✅ Listed ${filteredFiles.length} items in directory: ${path}`,
+          path,
+          files: filteredFiles.map(f => ({
+            name: f.name,
+            path: f.path,
+            type: f.type,
+            size: f.size,
+            isDirectory: f.isDirectory,
+            createdAt: f.createdAt
+          })),
+          count: filteredFiles.length,
+          action: 'list',
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[ERROR] list_files failed for ${path}:`, error)
+        
+        return { 
+          success: false, 
+          error: `Failed to list directory ${path}: ${errorMessage}`,
+          path,
+          toolCallId
+        }
+      }
+    }
+  })
+
+    // Include analysis tools for ask mode
+    tools.analyze_dependencies = tool({
+      description: 'Analyze project dependencies and provide insights for codebase understanding',
+      inputSchema: z.object({
+        filePath: z.string().optional().describe('Specific file to analyze (optional)')
+      }),
+      execute: async ({ filePath }, { abortSignal, toolCallId }) => {
+        if (abortSignal?.aborted) {
+          throw new Error('Operation cancelled')
+        }
+
+        try {
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+
+          const files = await storageManager.getFiles(projectId)
+
+          // Analyze package.json if available
+          const packageJson = files.find(f => f.path === 'package.json')
+
+          let analysis = {
+            totalFiles: files.length,
+            fileTypes: {} as Record<string, number>,
+            dependencies: {} as Record<string, string>,
+            scripts: {} as Record<string, string>,
+            analysis: [] as string[]
+          }
+
+          if (packageJson) {
+            try {
+              const pkg = JSON.parse(packageJson.content)
+              analysis.dependencies = pkg.dependencies || {}
+              analysis.scripts = pkg.scripts || {}
+              analysis.analysis.push(`📦 Found ${Object.keys(analysis.dependencies).length} dependencies`)
+              analysis.analysis.push(`🎯 Found ${Object.keys(analysis.scripts).length} npm scripts`)
+            } catch (e) {
+              analysis.analysis.push('⚠️ Could not parse package.json')
+            }
+          }
+
+          // Count file types
+          files.forEach(f => {
+            const ext = f.path.split('.').pop() || 'no-ext'
+            analysis.fileTypes[ext] = (analysis.fileTypes[ext] || 0) + 1
+          })
+
+          return {
+            success: true,
+            message: '🔍 Completed dependency and project analysis',
+            analysis,
+            toolCallId
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          return {
+            success: false,
+            error: `Analysis failed: ${errorMessage}`,
+            toolCallId
+          }
+        }
+      }
+    })
+
+  }
 
   // Debug logging to verify web tools are conditionally included
   console.log('[DEBUG] Web Tools Conditional Logic:', {
@@ -920,7 +1867,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         let aiEnhancedContext = null
         if (useAIEnhancement && conversationMemory) {
           try {
-            const projectContext = await buildEnhancedProjectContext(projectId, storageManager)
+            const projectContext = await buildOptimizedProjectContext(projectId, storageManager, conversationMemory)
             aiEnhancedContext = await findRelevantMemories(
               'What is most important to remember from our development work?',
               projectContext,
@@ -986,52 +1933,195 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
   // Only include when user is reporting code issues
   if (userReportingIssues) {
     tools.search_knowledge = tool({
-    description: 'Get a specific knowledge item by ID',
-    inputSchema: z.object({
-      id: z.string().describe('ID of the knowledge item to retrieve')
-    }),
-    execute: async ({ id }, { abortSignal, toolCallId }) => {
-      if (abortSignal?.aborted) {
-        throw new Error('Operation cancelled')
-      }
-      
-      try {
-        // Import knowledge base service
-        const { KnowledgeBase } = await import('@/lib/knowledge-base')
-        
-        const item = KnowledgeBase.getById(id)
-        
-        if (!item) {
-          // If item not found, provide a helpful response with available IDs
+      description: 'Advanced knowledge search with semantic matching, content categorization, and relevance ranking',
+      inputSchema: z.object({
+        query: z.string().optional().describe('Search query or keywords for semantic search'),
+        id: z.string().optional().describe('Specific ID to retrieve (alternative to query)'),
+        category: z.string().optional().describe('Filter by category'),
+        tags: z.array(z.string()).optional().describe('Filter by tags'),
+        semantic: z.boolean().optional().describe('Use semantic search (default: true)'),
+        maxResults: z.number().optional().describe('Maximum results to return (default: 5)'),
+        sortBy: z.enum(['relevance', 'date', 'title']).optional().describe('Sort results by (default: relevance)')
+      }),
+      execute: async ({ query, id, category, tags, semantic = true, maxResults = 5, sortBy = 'relevance' }, { abortSignal, toolCallId }) => {
+        if (abortSignal?.aborted) {
+          throw new Error('Operation cancelled')
+        }
+
+        try {
+          // Import knowledge base service
+          const { KnowledgeBase } = await import('@/lib/knowledge-base')
+
+          // If specific ID provided, use direct lookup
+          if (id) {
+            const item = KnowledgeBase.getById(id)
+
+            if (!item) {
+              const allItems = KnowledgeBase.getAll()
+              const availableIds = allItems.map((item: any) => item.id).slice(0, 10).join(', ')
+
+              return {
+                success: false,
+                error: `Knowledge item with ID '${id}' not found. Available IDs: ${availableIds}...`,
+                availableItems: allItems.slice(0, 5).map((item: any) => ({
+                  id: item.id,
+                  title: item.title,
+                  category: item.category
+                })),
+                toolCallId
+              }
+            }
+
+            return {
+              success: true,
+              message: `Retrieved knowledge item: ${item.title}`,
+              item: {
+                id: item.id,
+                title: item.title,
+                content: item.content,
+                category: item.category,
+                tags: item.tags,
+                createdAt: item.createdAt,
+                updatedAt: item.createdAt // Use createdAt as fallback since updatedAt doesn't exist
+              },
+              toolCallId
+            }
+          }
+
+          // Semantic search functionality
+          if (!query && !category && !tags) {
+            return {
+              success: false,
+              error: 'Please provide either a query, category, or tags to search',
+              toolCallId
+            }
+          }
+
           const allItems = KnowledgeBase.getAll()
-          const availableIds = allItems.map((item: any) => item.id).join(', ')
-          
+
+          // Filter by category and tags first
+          let filteredItems = allItems
+
+          if (category) {
+            filteredItems = filteredItems.filter((item: any) =>
+              item.category?.toLowerCase().includes(category.toLowerCase())
+            )
+          }
+
+          if (tags && tags.length > 0) {
+            filteredItems = filteredItems.filter((item: any) =>
+              tags.some((tag: string) =>
+                item.tags?.some((itemTag: string) =>
+                  itemTag.toLowerCase().includes(tag.toLowerCase())
+                )
+              )
+            )
+          }
+
+          // Semantic search scoring
+          let scoredItems = filteredItems.map((item: any) => {
+            let score = 0
+            const title = item.title?.toLowerCase() || ''
+            const content = item.content?.toLowerCase() || ''
+            const itemTags = item.tags?.join(' ').toLowerCase() || ''
+            const itemCategory = item.category?.toLowerCase() || ''
+
+            if (query) {
+              const searchTerms = query.toLowerCase().split(' ')
+
+              // Title matches (highest weight)
+              searchTerms.forEach(term => {
+                if (title.includes(term)) score += 10
+                if (title.startsWith(term)) score += 5
+              })
+
+              // Content matches
+              searchTerms.forEach(term => {
+                const contentCount = (content.match(new RegExp(term, 'g')) || []).length
+                score += contentCount * 2
+              })
+
+              // Tag matches
+              searchTerms.forEach(term => {
+                if (itemTags.includes(term)) score += 7
+              })
+
+              // Category matches
+              searchTerms.forEach(term => {
+                if (itemCategory.includes(term)) score += 6
+              })
+            } else {
+              score = 5 // Base score for filtered items
+            }
+
+            return { ...item, relevanceScore: score }
+          })
+
+          // Sort by relevance or other criteria
+          switch (sortBy) {
+            case 'date':
+              scoredItems.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+              break
+            case 'title':
+              scoredItems.sort((a, b) => a.title.localeCompare(b.title))
+              break
+            default: // relevance
+              scoredItems.sort((a, b) => b.relevanceScore - a.relevanceScore)
+          }
+
+          // Limit results
+          const results = scoredItems.slice(0, maxResults)
+
+          // Group by categories for better organization
+          const categories = [...new Set(results.map(item => item.category).filter(Boolean))]
+          const categoryGroups = categories.map(cat => ({
+            category: cat,
+            items: results.filter(item => item.category === cat).map(item => ({
+              id: item.id,
+              title: item.title,
+              relevanceScore: item.relevanceScore,
+              tags: item.tags,
+              preview: item.content?.substring(0, 100) + '...'
+            }))
+          }))
+
+          return {
+            success: true,
+            message: `Found ${results.length} knowledge items${query ? ` for query "${query}"` : ''}`,
+            results: results.map(item => ({
+              id: item.id,
+              title: item.title,
+              category: item.category,
+              tags: item.tags,
+              relevanceScore: item.relevanceScore,
+              contentLength: item.content?.length || 0,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt
+            })),
+            categoryGroups,
+            totalAvailable: allItems.length,
+            searchCriteria: {
+              query,
+              category,
+              tags,
+              semantic,
+              maxResults,
+              sortBy
+            },
+            toolCallId
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.error('[ERROR] search_knowledge failed:', error)
+
           return {
             success: false,
-            error: `Knowledge item with ID '${id}' not found. Available IDs: ${availableIds}`,
+            error: `Knowledge search failed: ${errorMessage}`,
             toolCallId
           }
         }
-        
-        return {
-          success: true,
-          message: `Retrieved knowledge item: ${item.title}`,
-          content: item.content,
-          toolCallId
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('[ERROR] search_knowledge failed:', error)
-        
-        // Provide fallback response instead of failing
-        return { 
-          success: false, 
-          error: `Failed to retrieve knowledge item: ${errorMessage}.`,
-          toolCallId
-        }
       }
-    }
-  })
+    })
 
   } // End conditional for search_knowledge
 
@@ -1088,94 +2178,6 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
 
   } // End conditional for get_knowledge_item
 
-  // Tool Results Summary - generates interactive assistant message bubble with emojis
-  tools.tool_results_summary = tool({
-    description: 'Generate an interactive summary of changes made, displayed in assistant message bubble with emojis',
-    inputSchema: z.object({
-      description: z.string().describe('Description of the changes that were made')
-    }),
-    execute: async ({ description }, { abortSignal, toolCallId }) => {
-      if (abortSignal?.aborted) {
-        throw new Error('Operation cancelled')
-      }
-
-      try {
-        // Generate timestamp for the summary
-        const timestamp = new Date().toISOString()
-
-        // Generate AI-powered summary formatted for assistant message bubble
-        try {
-          const currentModel = getModel('auto')
-
-          const summaryPrompt = `Create a friendly, engaging summary of the following changes for display in a chat assistant message bubble. Use relevant emojis throughout to make it interactive and visually appealing:
-
-Changes: ${description}
-
-Format as a natural assistant response with emojis that would appear in a chat bubble. Keep it to 2-3 sentences maximum. Be conversational and helpful.`
-
-          const summaryResult = await generateText({
-            model: currentModel,
-            messages: [
-              { role: 'system', content: 'You are a friendly chat assistant creating engaging summaries with emojis for display in message bubbles. Make it conversational and visually appealing with relevant emojis.' },
-              { role: 'user', content: summaryPrompt }
-            ],
-            temperature: 0.4
-          })
-
-          const assistantMessage = summaryResult.text?.trim() || ''
-
-          // Return formatted response for assistant message bubble display
-          return {
-            success: true,
-            message: assistantMessage,
-            displayType: 'assistant_bubble',
-            summary: assistantMessage,
-            timestamp,
-            toolCallId,
-            // Additional metadata for proper display
-            formatted: true,
-            emojiEnhanced: true,
-            bubbleStyle: 'summary'
-          }
-        } catch (aiError) {
-          console.error('[ERROR] Failed to generate AI summary:', aiError)
-
-          // Fallback to basic assistant message format
-          const fallbackMessage = `📝 I've processed the changes you mentioned! ${description} Everything looks good and has been updated accordingly.`
-
-          return {
-            success: true,
-            message: fallbackMessage,
-            displayType: 'assistant_bubble',
-            summary: fallbackMessage,
-            timestamp,
-            toolCallId,
-            formatted: true,
-            emojiEnhanced: true,
-            bubbleStyle: 'summary'
-          }
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('[ERROR] tool_results_summary failed:', error)
-
-        // Error fallback with proper assistant message formatting
-        const errorFallback = `⚠️ I encountered an issue while summarizing the changes, but here's what I can tell you: ${description || 'Some changes were made to the project.'}`
-
-        return {
-          success: true,
-          message: errorFallback,
-          displayType: 'assistant_bubble',
-          summary: errorFallback,
-          timestamp: new Date().toISOString(),
-          toolCallId,
-          formatted: true,
-          emojiEnhanced: true,
-          bubbleStyle: 'summary'
-        }
-      }
-    }
-  })
   
   // Read and list tools - available in both modes
   tools.read_file = tool({
@@ -1207,7 +2209,7 @@ Format as a natural assistant response with emojis that would appear in a chat b
         if (!file) {
           return { 
             success: false, 
-            error: `File not found: ${path}. Use list_files to see available files.`,
+            error: `File not found: ${path}. Use list_files with path parameter to see available files in directories.`,
             path,
             toolCallId
           }
@@ -1238,57 +2240,6 @@ Format as a natural assistant response with emojis that would appear in a chat b
     }
   })
 
-  // List files tool
-  // Only include when user is reporting code issues
-  if (userReportingIssues) {
-    tools.list_files = tool({
-    description: 'List all files in the project',
-    inputSchema: z.object({}),
-    execute: async ({}, { abortSignal, toolCallId }) => {
-      if (abortSignal?.aborted) {
-        throw new Error('Operation cancelled')
-      }
-      
-      try {
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-        
-        const files = await storageManager.getFiles(projectId)
-
-        return { 
-          success: true, 
-          message: `✅ Found ${files.length} files in project.`,
-          files: files.map(f => ({
-            path: f.path,
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            isDirectory: f.isDirectory,
-            createdAt: f.createdAt
-          })),
-          count: files.length,
-          action: 'list',
-          toolCallId
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('[ERROR] list_files failed:', error)
-        
-        // Provide fallback response instead of failing
-        return { 
-          success: true, 
-          message: `File listing completed with some issues: ${errorMessage}. Returning empty file list.`,
-          files: [],
-          count: 0,
-          action: 'list',
-          toolCallId
-        }
-      }
-    }
-  })
-
-  } // End conditional for list_files
-
   // Write and delete tools - only available in Agent mode
   if (aiMode === 'agent') {
     tools.write_file = tool({
@@ -1297,14 +2248,15 @@ Format as a natural assistant response with emojis that would appear in a chat b
         path: z.string().describe('File path relative to project root'),
         content: z.string().describe('File content to write')
       }),
-      execute: async ({ path, content },
-         { abortSignal, toolCallId }) => {
+      execute: async ({ path, content }, { abortSignal, toolCallId }) => {
         // Check for cancellation
         if (abortSignal?.aborted) {
           throw new Error('Operation cancelled')
         }
         
         try {
+          console.log('[DEBUG] Executing write_file tool:', { path, contentLength: content?.length, projectId })
+          
           // Validate inputs
           if (!path || typeof path !== 'string') {
             return { 
@@ -1330,10 +2282,12 @@ Format as a natural assistant response with emojis that would appear in a chat b
           
           // Check if file already exists
           const existingFile = await storageManager.getFile(projectId, path)
+          console.log('[DEBUG] write_file file check:', { path, fileExists: !!existingFile })
 
           if (existingFile) {
             // Update existing file
             await storageManager.updateFile(projectId, path, { content })
+            console.log('[DEBUG] write_file updated existing file:', path)
             return { 
               success: true, 
               message: `✅ File ${path} updated successfully.`,
@@ -1354,6 +2308,7 @@ Format as a natural assistant response with emojis that would appear in a chat b
               isDirectory: false
             })
             
+            console.log('[DEBUG] write_file created new file:', path, newFile.id)
             return { 
               success: true, 
               message: `✅ File ${path} created successfully.`,
@@ -1365,8 +2320,8 @@ Format as a natural assistant response with emojis that would appear in a chat b
           }
         } catch (error) {
           // Enhanced error handling
+          console.error(`[DEBUG] write_file error for ${path}:`, error)
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-          console.error(`[ERROR] write_file failed for ${path}:`, error)
           
           return { 
             success: false, 
@@ -1450,6 +2405,7 @@ Format as a natural assistant response with emojis that would appear in a chat b
       }
     })
 
+    // Package management tools - only available in Agent mode
     tools.edit_file = tool({
       description: 'Edit an existing file using precise search/replace operations. Provide the search and replace blocks directly as parameters.',
       inputSchema: z.object({
@@ -1553,6 +2509,17 @@ Format as a natural assistant response with emojis that would appear in a chat b
 
           // Phase 1: Dry run validation (always performed)
           console.log(`[DEBUG] Starting validation phase for ${searchReplaceBlocks.length} blocks`);
+
+          // Check for duplicate operations within the same request
+          const operationSignatures = new Set<string>();
+          for (let i = 0; i < searchReplaceBlocks.length; i++) {
+            const block = searchReplaceBlocks[i];
+            const signature = `${block.search}|${block.replace}`;
+            if (operationSignatures.has(signature)) {
+              console.warn(`[EDIT_FILE WARNING] Duplicate operation detected in block ${i}: ${signature}`);
+            }
+            operationSignatures.add(signature);
+          }
           
           let tempContent = originalContent;
           const validationResults: Array<{
@@ -1572,6 +2539,15 @@ Format as a natural assistant response with emojis that would appear in a chat b
 
             // Count occurrences in current temp content
             const occurrences = (tempContent.match(new RegExp(escapeRegExp(searchText), 'g')) || []).length;
+
+            // Check for potential duplicate imports (common issue)
+            const isImportAddition = replaceText.includes('import ') && searchText.includes('import ');
+            if (isImportAddition) {
+              const importPattern = replaceText.match(/import\s+.*?\s+from\s+['"`][^'"`]+['"`]/);
+              if (importPattern && tempContent.includes(importPattern[0])) {
+                console.warn(`[EDIT_FILE WARNING] Potential duplicate import detected: ${importPattern[0]}`);
+              }
+            }
             
             let canApply = true;
             let reason = '';
@@ -1753,10 +2729,14 @@ Format as a natural assistant response with emojis that would appear in a chat b
           // Enhanced error handling
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
           console.error(`[ERROR] edit_file failed for ${path}:`, error)
+
+          // Add fallback suggestion for repeated failures
+          const fallbackSuggestion = `Consider using write_file tool instead: read the file first, then use write_file to create the complete updated content.`
           
           return { 
             success: false, 
             error: `Failed to edit file ${path}: ${errorMessage}`,
+            fallbackSuggestion,
             path,
             toolCallId
           }
@@ -1939,26 +2919,36 @@ Format as a natural assistant response with emojis that would appear in a chat b
   // Only include when user is reporting code issues
   if (aiMode === 'agent' && userReportingIssues) { // Re-enabled with strict optimizations
   tools.learn_patterns = tool({
-    description: 'Analyze development patterns from recent messages and src files (optimized, <200 tokens)',
+    description: 'Advanced pattern analysis with code metrics, complexity analysis, and actionable recommendations',
     inputSchema: z.object({
-      analysisType: z.enum(['coding_style', 'component_patterns', 'technical_decisions', 'optimization_areas']).optional().describe('Type of analysis to perform (default: all)'),
+      analysisType: z.enum(['coding_style', 'component_patterns', 'technical_decisions', 'optimization_areas', 'code_metrics', 'all']).optional().describe('Type of analysis to perform (default: all)'),
       includeRecommendations: z.boolean().optional().describe('Include improvement recommendations (default: true)'),
-      projectScope: z.enum(['current', 'all_projects', 'recent']).optional().describe('Scope of analysis (default: current)')
+      includeMetrics: z.boolean().optional().describe('Include code complexity metrics (default: true)'),
+      focusAreas: z.array(z.enum(['performance', 'maintainability', 'security', 'best_practices', 'testing', 'documentation'])).optional().describe('Specific areas to focus on'),
+      generateActionItems: z.boolean().optional().describe('Generate specific action items (default: true)'),
+      depth: z.enum(['basic', 'detailed', 'comprehensive']).optional().describe('Analysis depth (default: detailed)')
     }),
-    execute: async ({ analysisType = 'coding_style', includeRecommendations = true, projectScope = 'current' }, { abortSignal, toolCallId }) => {
+    execute: async ({
+      analysisType = 'all',
+      includeRecommendations = true,
+      includeMetrics = true,
+      focusAreas,
+      generateActionItems = true,
+      depth = 'detailed'
+    }, { abortSignal, toolCallId }) => {
       if (abortSignal?.aborted) {
         throw new Error('Operation cancelled')
       }
-      
+
       try {
         // Import storage manager
         const { storageManager } = await import('@/lib/storage-manager')
         await storageManager.init()
-        
+
         // Get conversation memory and project files
         const conversationMemory = await storageManager.getConversationMemory(projectId, global.currentUserId || 'current-user')
         const projectFiles = await storageManager.getFiles(projectId)
-        
+
         if (!conversationMemory) {
           return {
             success: false,
@@ -1966,88 +2956,296 @@ Format as a natural assistant response with emojis that would appear in a chat b
             toolCallId
           }
         }
-        
-        // Use AI to analyze patterns and learn from development history
+
+        // Enhanced code metrics analysis
+        const codeMetrics = includeMetrics ? await (async (projectFiles: any[]) => {
+          const metrics = {
+            totalFiles: 0,
+            totalLines: 0,
+            averageFileSize: 0,
+            largestFile: { path: '', size: 0 },
+            languageDistribution: {} as Record<string, number>,
+            complexityIndicators: {
+              largeFiles: 0, // > 500 lines
+              complexFiles: 0, // > 1000 lines
+              testCoverage: 0 // estimated
+            },
+            maintainability: {
+              score: 0,
+              factors: [] as string[]
+            },
+            patterns: {
+              hooks: 0,
+              components: 0,
+              utilities: 0,
+              tests: 0,
+              configs: 0
+            }
+          }
+
+          let totalSize = 0
+
+          for (const file of projectFiles) {
+            if (file.isDirectory) continue
+
+            metrics.totalFiles++
+            const fileSize = file.size || 0
+            totalSize += fileSize
+
+            // Track largest file
+            if (fileSize > metrics.largestFile.size) {
+              metrics.largestFile = { path: file.path, size: fileSize }
+            }
+
+            // Language distribution
+            const ext = file.path.split('.').pop()?.toLowerCase() || 'unknown'
+            metrics.languageDistribution[ext] = (metrics.languageDistribution[ext] || 0) + 1
+
+            // Complexity indicators
+            if (fileSize > 1000) {
+              metrics.complexityIndicators.complexFiles++
+            } else if (fileSize > 500) {
+              metrics.complexityIndicators.largeFiles++
+            }
+
+            // Pattern detection
+            const path = file.path.toLowerCase()
+            if (path.includes('test') || path.includes('spec')) {
+              metrics.patterns.tests++
+            } else if (path.includes('hook')) {
+              metrics.patterns.hooks++
+            } else if (path.includes('component') || path.includes('.tsx') || path.includes('.jsx')) {
+              metrics.patterns.components++
+            } else if (path.includes('util') || path.includes('helper')) {
+              metrics.patterns.utilities++
+            } else if (path.includes('config') || path.includes('.json') || path.includes('.config')) {
+              metrics.patterns.configs++
+            }
+          }
+
+          metrics.totalLines = Math.round(totalSize / 50) // Rough estimation: ~50 chars per line
+          metrics.averageFileSize = Math.round(totalSize / metrics.totalFiles)
+
+          // Calculate maintainability score (0-100)
+          const maintainabilityFactors = []
+          let maintainabilityScore = 100
+
+          if (metrics.complexityIndicators.complexFiles > metrics.totalFiles * 0.1) {
+            maintainabilityScore -= 20
+            maintainabilityFactors.push('Many complex files')
+          }
+
+          if (metrics.averageFileSize > 2000) {
+            maintainabilityScore -= 15
+            maintainabilityFactors.push('Large average file size')
+          }
+
+          if (metrics.patterns.tests < metrics.totalFiles * 0.1) {
+            maintainabilityScore -= 10
+            maintainabilityFactors.push('Low test coverage')
+          }
+
+          metrics.maintainability.score = Math.max(0, maintainabilityScore)
+          metrics.maintainability.factors = maintainabilityFactors
+
+          return metrics
+        })(projectFiles) : null
+
+        // Use AI to analyze patterns with enhanced context
         const learningInsights = await learnFromPatterns(
           projectId,
           global.currentUserId || 'current-user',
           conversationMemory,
           projectFiles
         )
-        
-        // Generate analysis report based on requested type
-        let analysisReport = ''
-        let keyInsights: any[] = []
-        
-        switch (analysisType) {
-          case 'coding_style':
-            analysisReport = `## Coding Style Analysis\n\n**Your Preferred Style:** ${learningInsights.codingStyle}\n\n**Component Patterns:** ${learningInsights.componentPatterns.join(', ')}\n\n**Styling Preferences:** ${learningInsights.stylingPreferences.join(', ')}`
-            keyInsights = [learningInsights.codingStyle, ...learningInsights.componentPatterns, ...learningInsights.stylingPreferences]
-            break
-            
-          case 'component_patterns':
-            analysisReport = `## Component Pattern Analysis\n\n**Established Patterns:** ${learningInsights.componentPatterns.join(', ')}\n\n**Technical Decisions:** ${learningInsights.technicalDecisions.join(', ')}\n\n**Common Approaches:** ${learningInsights.commonApproaches.join(', ')}`
-            keyInsights = [...learningInsights.componentPatterns, ...learningInsights.technicalDecisions, ...learningInsights.commonApproaches]
-            break
-            
-          case 'technical_decisions':
-            analysisReport = `## Technical Decision Analysis\n\n**Architecture Choices:** ${learningInsights.technicalDecisions.join(', ')}\n\n**Common Approaches:** ${learningInsights.commonApproaches.join(', ')}\n\n**Learning Score:** ${Math.round(learningInsights.learningScore * 100)}%`
-            keyInsights = [...learningInsights.technicalDecisions, ...learningInsights.commonApproaches]
-            break
-            
-          case 'optimization_areas':
-            analysisReport = `## Optimization Analysis\n\n**Areas for Improvement:** ${learningInsights.optimizationAreas.join(', ')}\n\n**Recommendations:** ${learningInsights.recommendations.join(', ')}\n\n**Learning Score:** ${Math.round(learningInsights.learningScore * 100)}%`
-            keyInsights = [...learningInsights.optimizationAreas, ...learningInsights.recommendations]
-            break
-            
-          default:
-            analysisReport = `## Complete Pattern Analysis\n\n**Coding Style:** ${learningInsights.codingStyle}\n\n**Component Patterns:** ${learningInsights.componentPatterns.join(', ')}\n\n**Technical Decisions:** ${learningInsights.technicalDecisions.join(', ')}\n\n**Optimization Areas:** ${learningInsights.optimizationAreas.join(', ')}\n\n**Recommendations:** ${learningInsights.recommendations.join(', ')}\n\n**Learning Score:** ${Math.round(learningInsights.learningScore * 100)}%`
-            keyInsights = [
-              learningInsights.codingStyle,
-              ...learningInsights.componentPatterns,
-              ...learningInsights.technicalDecisions,
-              ...learningInsights.optimizationAreas,
-              ...learningInsights.recommendations
-            ]
-        }
-        
+
+        // Generate comprehensive analysis report
+        const analysisReport = await (async (analysisType: string, insights: any, metrics: any, focusAreas: string[] | undefined, depth: string) => {
+          let report = `# Advanced Pattern Analysis Report\n\n**Analysis Type:** ${analysisType}\n**Depth:** ${depth}\n**Focus Areas:** ${focusAreas?.join(', ') || 'All'}\n\n`
+
+          if (metrics && (analysisType === 'code_metrics' || analysisType === 'all')) {
+            report += `## 📊 Code Metrics\n\n`
+            report += `- **Total Files:** ${metrics.totalFiles}\n`
+            report += `- **Total Lines:** ~${metrics.totalLines}\n`
+            report += `- **Average File Size:** ${metrics.averageFileSize} bytes\n`
+            report += `- **Largest File:** ${metrics.largestFile.path} (${metrics.largestFile.size} bytes)\n`
+            report += `- **Maintainability Score:** ${metrics.maintainability.score}/100\n`
+
+            if (metrics.maintainability.factors.length > 0) {
+              report += `- **Maintainability Factors:** ${metrics.maintainability.factors.join(', ')}\n`
+            }
+
+            report += `\n### Language Distribution\n`
+            Object.entries(metrics.languageDistribution).forEach(([lang, count]) => {
+              report += `- ${lang}: ${count} files\n`
+            })
+
+            report += `\n### Pattern Distribution\n`
+            Object.entries(metrics.patterns).forEach(([pattern, count]) => {
+              report += `- ${pattern}: ${count} files\n`
+            })
+
+            report += `\n### Complexity Indicators\n`
+            report += `- Large Files (>500 lines): ${metrics.complexityIndicators.largeFiles}\n`
+            report += `- Complex Files (>1000 lines): ${metrics.complexityIndicators.complexFiles}\n`
+          }
+
+          if (analysisType === 'coding_style' || analysisType === 'all') {
+            report += `\n## 🎨 Coding Style Analysis\n\n`
+            report += `**Your Preferred Style:** ${insights.codingStyle}\n\n`
+            report += `**Component Patterns:** ${insights.componentPatterns.join(', ')}\n\n`
+            report += `**Styling Preferences:** ${insights.stylingPreferences.join(', ')}\n`
+          }
+
+          if (analysisType === 'component_patterns' || analysisType === 'all') {
+            report += `\n## 🧩 Component Pattern Analysis\n\n`
+            report += `**Established Patterns:** ${insights.componentPatterns.join(', ')}\n\n`
+            report += `**Technical Decisions:** ${insights.technicalDecisions.join(', ')}\n\n`
+            report += `**Common Approaches:** ${insights.commonApproaches.join(', ')}\n`
+          }
+
+          if (analysisType === 'technical_decisions' || analysisType === 'all') {
+            report += `\n## 🏗️ Technical Decision Analysis\n\n`
+            report += `**Architecture Choices:** ${insights.technicalDecisions.join(', ')}\n\n`
+            report += `**Common Approaches:** ${insights.commonApproaches.join(', ')}\n\n`
+            report += `**Learning Score:** ${Math.round(insights.learningScore * 100)}%\n`
+          }
+
+          if (analysisType === 'optimization_areas' || analysisType === 'all') {
+            report += `\n## ⚡ Optimization Analysis\n\n`
+            report += `**Areas for Improvement:** ${insights.optimizationAreas.join(', ')}\n\n`
+            report += `**Recommendations:** ${insights.recommendations.join(', ')}\n`
+          }
+
+          return report
+        })(analysisType, learningInsights, codeMetrics, focusAreas, depth)
+
+        // Generate actionable recommendations
+        const recommendations = includeRecommendations ?
+          await (async (insights: any, metrics: any, focusAreas: string[] | undefined) => {
+            const recommendations = []
+
+            // Code quality recommendations
+            if (metrics?.maintainability?.score < 70) {
+              recommendations.push('Consider breaking down large files into smaller, more manageable modules')
+              recommendations.push('Implement comprehensive testing to improve maintainability')
+            }
+
+            if (metrics?.complexityIndicators?.complexFiles > 0) {
+              recommendations.push(`Refactor ${metrics.complexityIndicators.complexFiles} complex files (>1000 lines) into smaller components`)
+            }
+
+            // Pattern-based recommendations
+            if (insights.componentPatterns?.includes('class components')) {
+              recommendations.push('Consider migrating class components to functional components with hooks')
+            }
+
+            if (insights.stylingPreferences?.includes('inline styles')) {
+              recommendations.push('Move inline styles to CSS modules or styled-components for better maintainability')
+            }
+
+            // Focus area specific recommendations
+            if (focusAreas?.includes('performance')) {
+              recommendations.push('Implement code splitting for better performance')
+              recommendations.push('Consider lazy loading for components')
+            }
+
+            if (focusAreas?.includes('testing')) {
+              recommendations.push('Increase test coverage, especially for complex business logic')
+              recommendations.push('Implement integration tests for critical user flows')
+            }
+
+            if (focusAreas?.includes('security')) {
+              recommendations.push('Review and sanitize user inputs')
+              recommendations.push('Implement proper error boundaries')
+            }
+
+            return recommendations
+          })(learningInsights, codeMetrics, focusAreas) : []
+
+        // Generate specific action items
+        const actionItems = generateActionItems ?
+          await (async (insights: any, metrics: any, focusAreas: string[] | undefined) => {
+            const actionItems = []
+
+            // High-priority action items
+            if (metrics?.largestFile?.size > 5000) {
+              actionItems.push({
+                priority: 'high',
+                category: 'refactoring',
+                description: `Break down ${metrics.largestFile.path} (${metrics.largestFile.size} bytes) into smaller modules`,
+                estimatedEffort: '4-6 hours',
+                impact: 'high'
+              })
+            }
+
+            // Medium-priority items
+            if (metrics?.maintainability?.score < 50) {
+              actionItems.push({
+                priority: 'medium',
+                category: 'testing',
+                description: 'Implement unit tests for complex functions',
+                estimatedEffort: '2-3 hours',
+                impact: 'medium'
+              })
+            }
+
+            // Low-priority items
+            if (insights.componentPatterns?.length < 3) {
+              actionItems.push({
+                priority: 'low',
+                category: 'documentation',
+                description: 'Document established component patterns and conventions',
+                estimatedEffort: '1-2 hours',
+                impact: 'low'
+              })
+            }
+
+            return actionItems
+          })(learningInsights, codeMetrics, focusAreas) : []
+
         return {
           success: true,
-          message: `Pattern analysis completed successfully for ${analysisType}`,
+          message: `Advanced pattern analysis completed for ${analysisType} (${depth} depth)`,
           analysis: {
             type: analysisType,
+            depth,
             report: analysisReport,
-            insights: keyInsights,
+            insights: learningInsights,
+            metrics: codeMetrics,
+            recommendations,
+            actionItems,
             learningScore: learningInsights.learningScore,
-            recommendations: includeRecommendations ? learningInsights.recommendations : []
+            focusAreas: focusAreas || ['all'],
+            generatedAt: new Date().toISOString()
           },
           toolCallId
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('[ERROR] learn_patterns failed:', error)
-        
-        return { 
-          success: false, 
-          error: `Pattern analysis failed: ${errorMessage}`,
+
+        return {
+          success: false,
+          error: `Advanced pattern analysis failed: ${errorMessage}`,
           toolCallId
         }
       }
     }
   })
+
   } // End learn_patterns conditional
 
   // AI Dependency Analyzer - Validates imports and auto-adds missing dependencies
-  // Only include when user is reporting code issues
-  if (userReportingIssues) {
+  // ALWAYS INCLUDE - Critical for production-ready code generation
     tools.analyze_dependencies = tool({
-    description: 'Analyze file imports, validate against package.json, and automatically add missing dependencies with latest versions',
-    inputSchema: z.object({
-      filePath: z.string().describe('Path of the file to analyze'),
-      fileContent: z.string().describe('Content of the file to analyze'),
-      autoFix: z.boolean().optional().describe('Automatically suggest package.json updates (default: true)')
-    }),
-    execute: async ({ filePath, fileContent, autoFix = true }, { abortSignal, toolCallId }) => {
+      description: 'Analyze project dependencies from all src/app/components/lib/hooks files, validate against package.json, and identify only real npm packages (excludes local UI components)',
+      inputSchema: z.object({
+        includePackageJson: z.boolean().optional().describe('Include package.json content in analysis (default: true)'),
+        autoFix: z.boolean().optional().describe('Automatically suggest package.json updates (default: true)'),
+        excludeUI: z.boolean().optional().describe('Exclude UI components from analysis (default: true)')
+      }),
+      execute: async ({ includePackageJson = true, autoFix = true, excludeUI = true }, { abortSignal, toolCallId }) => {
       if (abortSignal?.aborted) {
         throw new Error('Operation cancelled')
       }
@@ -2056,7 +3254,7 @@ Format as a natural assistant response with emojis that would appear in a chat b
         // Import storage manager
         const { storageManager } = await import('@/lib/storage-manager')
         await storageManager.init()
-        
+
         // Get package.json
         const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
         if (!packageJsonFile) {
@@ -2066,7 +3264,7 @@ Format as a natural assistant response with emojis that would appear in a chat b
             toolCallId
           }
         }
-        
+
         let packageJson: any = {}
         try {
           packageJson = JSON.parse(packageJsonFile.content)
@@ -2077,51 +3275,121 @@ Format as a natural assistant response with emojis that would appear in a chat b
             toolCallId
           }
         }
-        
-        // Use AI to analyze imports and get latest package versions
+
+        // Get all project files for comprehensive analysis
+        const allFiles = await storageManager.getFiles(projectId)
+
+        // Filter relevant files from src, app, components, lib, hooks directories
+        const relevantFiles = allFiles.filter(file => {
+          if (file.isDirectory) return false
+
+          const path = file.path.toLowerCase()
+          const isRelevantDir = path.startsWith('src/') ||
+                               path.startsWith('app/') ||
+                               path.startsWith('components/') ||
+                               path.startsWith('lib/') ||
+                               path.startsWith('hooks/') ||
+                               path.includes('page.json') ||
+                               path.includes('middleware.')
+
+          // Exclude UI components if requested
+          if (excludeUI && (
+            path.includes('components/ui/') ||
+            path.includes('/ui/') ||
+            path.includes('shadcn') ||
+            path.includes('radix-ui')
+          )) {
+            return false
+          }
+
+          return isRelevantDir
+        })
+
+        // Include package.json content if requested (already have it from earlier, but include in analysis)
+        let packageJsonContent = ''
+        if (includePackageJson && packageJsonFile) {
+          packageJsonContent = packageJsonFile.content
+        }
+
+        // Extract all imports from relevant files
+        const allImports: string[] = []
+        const fileContents: string[] = []
+
+        for (const file of relevantFiles.slice(0, 20)) { // Limit to prevent token overflow
+          try {
+            const fileData = await storageManager.getFile(projectId, file.path)
+            if (fileData && fileData.content) {
+              const content = fileData.content
+
+              // Extract import statements
+              const importMatches = content.match(/import\s+.*?from\s+['"]([^'"]+)['"]/g) || []
+              const imports = importMatches.map(match => {
+                const fromMatch = match.match(/from\s+['"]([^'"]+)['"]/)
+                return fromMatch ? fromMatch[1] : ''
+              }).filter(Boolean)
+
+              allImports.push(...imports)
+              fileContents.push(`File: ${file.path}\n${content.substring(0, 1000)}`)
+            }
+          } catch (error) {
+            console.warn(`Failed to read ${file.path}:`, error)
+          }
+        }
+
+        // Use AI to analyze all imports and identify only npm packages
         const mistralPixtral = getMistralPixtralModel()
-        
-        const analysisPrompt = `Analyze this file for import statements and validate against package.json dependencies.
 
-File: ${filePath}
-Content: ${fileContent.substring(0, 2000)}${fileContent.length > 2000 ? '...' : ''}
+        const analysisPrompt = `Analyze all import statements from project files and identify ONLY real npm packages.
 
-Current package.json dependencies:
+PROJECT FILES ANALYZED:
+${fileContents.join('\n\n---\n\n')}
+
+${packageJsonContent ? `PACKAGE.JSON CONTENT:\n${packageJsonContent}\n\n` : ''}
+
+CURRENT PACKAGE.JSON DEPENDENCIES:
 ${JSON.stringify({
   dependencies: packageJson.dependencies || {},
   devDependencies: packageJson.devDependencies || {}
 }, null, 2)}
 
-Find all import statements and identify missing packages. For missing packages, provide the latest stable version.
+INSTRUCTIONS:
+1. Extract ALL import statements from the provided files
+2. Identify ONLY real npm packages - NEVER suggest local files as missing packages
+3. Exclude UI components (Button, Card, Modal, etc.) - these are local components, not npm packages
+4. Exclude relative imports (./, ../) - these are local files
+5. Exclude path aliases (@/, ~/) - these resolve to local files
+6. Only suggest real npm packages like: react, axios, lodash, moment, framer-motion, etc.
 
-Common package versions (use these if found):
-- axios: "^1.6.0", lodash: "^4.17.21", moment: "^2.29.4"
-- @types/react: "^18.2.0", @types/node: "^20.0.0"
-- framer-motion: "^10.16.0", react-router-dom: "^6.20.0"
-- tailwindcss: "^3.4.0", @headlessui/react: "^1.7.0"
+REAL NPM PACKAGES EXAMPLES:
+✅ axios, lodash, moment, react-router-dom, framer-motion
+✅ @types/react, @types/node, @headlessui/react
+✅ tailwindcss, clsx, zod, date-fns, uuid
+❌ Button, Card, Modal, Input, Select (these are UI components)
+❌ ./utils, ../hooks, @/components (these are local files)
 
 Respond with JSON:
 {
-  "imports": [{"package": "react", "statement": "import React from 'react'", "exists": true}],
-  "missingDeps": [{"package": "axios", "version": "^1.6.0", "type": "dependency"}],
-  "valid": true/false,
-  "summary": "Brief analysis"
-}
+  "imports": [
+    {"package": "axios", "statement": "import axios from 'axios'", "exists": false},
+    {"package": "react", "statement": "import React from 'react'", "exists": true}
+  ],
+  "missingDeps": [
+    {"package": "axios", "version": "^1.6.0", "type": "dependency"}
+  ],
+  "valid": true,
+  "summary": "Found X imports, Y missing npm packages",
+  "excluded": ["Button", "Card", "Modal"] // List of excluded local components
+}`
 
-Dependency types:
-- Runtime packages (axios, lodash, framer-motion) → "dependency"  
-- Type definitions (@types/*) → "devDependency"
-- Build tools, testing, linting → "devDependency"`
-        
         const analysis = await generateText({
           model: mistralPixtral,
           messages: [
-            { role: 'system', content: 'You are a dependency analyzer. Extract import statements and validate against package.json. Respond with compact JSON only.' },
+            { role: 'system', content: 'You are an expert dependency analyzer. Only identify real npm packages, never local files or UI components.' },
             { role: 'user', content: analysisPrompt }
           ],
           temperature: 0.1
         })
-        
+
         // Parse AI response
         let analysisResult: any = {}
         try {
@@ -2132,14 +3400,14 @@ Dependency types:
             jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
           }
           jsonText = jsonText.trim()
-          
+
           // Find JSON object bounds
           const startIndex = jsonText.indexOf('{')
           const endIndex = jsonText.lastIndexOf('}')
           if (startIndex !== -1 && endIndex !== -1) {
             jsonText = jsonText.substring(startIndex, endIndex + 1)
           }
-          
+
           analysisResult = JSON.parse(jsonText)
         } catch (parseError) {
           console.warn('Failed to parse dependency analysis, using fallback')
@@ -2147,7 +3415,8 @@ Dependency types:
             imports: [],
             missingDeps: [],
             valid: true,
-            summary: 'Analysis completed with fallback parsing'
+            summary: 'Analysis completed with fallback parsing',
+            excluded: []
           }
         }
         
@@ -2204,29 +3473,42 @@ Dependency types:
         }
         
         // Build response
+        const analyzedFilesCount = relevantFiles.length
+        const totalImports = analysisResult.imports?.length || 0
+        const missingDepsCount = analysisResult.missingDeps?.length || 0
+        const excludedComponents = analysisResult.excluded?.length || 0
+
         const result = {
           success: true,
-          message: packageJsonUpdated ? 
-            `Dependencies auto-added to package.json for ${filePath}: ${addedDependencies.join(', ')}` :
-            `Dependency analysis completed for ${filePath}`,
+          message: packageJsonUpdated ?
+            `Dependencies auto-added to package.json: ${addedDependencies.join(', ')}` :
+            `Dependency analysis completed: ${analyzedFilesCount} files analyzed, ${totalImports} imports found, ${missingDepsCount} missing packages, ${excludedComponents} local components excluded`,
           analysis: {
-            filePath,
+            analyzedFiles: analyzedFilesCount,
+            filesList: relevantFiles.slice(0, 10).map(f => f.path), // Show first 10 files
             imports: analysisResult.imports || [],
             missingDependencies: analysisResult.missingDeps || [],
+            excludedComponents: analysisResult.excluded || [],
             isValid: analysisResult.valid !== false || packageJsonUpdated,
             summary: analysisResult.summary || 'Dependencies validated',
             autoFixed: packageJsonUpdated,
             addedDependencies: addedDependencies,
-            suggestions: packageJsonUpdated ? 
+            suggestions: packageJsonUpdated ?
               [`Run 'npm install' to install the newly added dependencies`] :
-              (analysisResult.missingDeps?.map((dep: any) => `npm install ${dep.package}`) || [])
+              (analysisResult.missingDeps?.map((dep: any) => `npm install ${dep.package}`) || []),
+            packageJsonIncluded: includePackageJson && packageJsonContent !== '',
+            uiComponentsExcluded: excludeUI
           },
           toolCallId
         }
         
         // Log issues if any
         if (analysisResult.missingDeps?.length > 0) {
-          console.warn(`[DEPENDENCY WARNING] Missing dependencies in ${filePath}:`, analysisResult.missingDeps)
+          console.warn(`[DEPENDENCY WARNING] Missing npm packages across ${analyzedFilesCount} files:`, analysisResult.missingDeps)
+        }
+
+        if (excludedComponents > 0) {
+          console.log(`[DEPENDENCY INFO] Excluded ${excludedComponents} local components from npm package detection:`, analysisResult.excluded)
         }
         
         return result
@@ -2244,19 +3526,19 @@ Dependency types:
     }
   })
 
-  } // End conditional for analyze_dependencies
-
   // AI Code Scanner - Validates import/export relationships between project files
   // Only include when user is reporting code issues
   if (userReportingIssues) {
     tools.scan_code_imports = tool({
-    description: 'Scan file imports/exports and validate relationships between project files to prevent runtime errors',
+    description: 'Advanced code scanner with comprehensive project context - validates imports/exports, provides file relationships, and project structure analysis',
     inputSchema: z.object({
       filePath: z.string().describe('Path of the file to scan'),
-      fileContent: z.string().describe('Content of the file to scan'),
-      validateExports: z.boolean().optional().describe('Validate export/import relationships (default: true)')
+      fileContent: z.string().describe('Complete content of the file to scan'),
+      includeProjectContext: z.boolean().optional().describe('Include comprehensive project src directory context (default: true)'),
+      validateExports: z.boolean().optional().describe('Validate export/import relationships (default: true)'),
+      analyzeDependencies: z.boolean().optional().describe('Analyze file dependencies and relationships (default: true)')
     }),
-    execute: async ({ filePath, fileContent, validateExports = true }, { abortSignal, toolCallId }) => {
+    execute: async ({ filePath, fileContent, includeProjectContext = true, validateExports = true, analyzeDependencies = true }, { abortSignal, toolCallId }) => {
       if (abortSignal?.aborted) {
         throw new Error('Operation cancelled')
       }
@@ -2266,78 +3548,338 @@ Dependency types:
         const { storageManager } = await import('@/lib/storage-manager')
         await storageManager.init()
         
-        // Get all project files for reference validation
+        // Get all project files for comprehensive analysis
         const allProjectFiles = await storageManager.getFiles(projectId)
         
-        // Filter to only project files (exclude node_modules)
-        const projectFiles = allProjectFiles.filter(file => 
-          !file.path.includes('node_modules') && 
-          !file.isDirectory &&
-          (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx'))
-        )
-        
-        // Create truncated file map with only import/export sections
-        const fileExportMap: any = {}
-        for (const file of projectFiles) {
-          if (file.content) {
-            // Extract only import and export sections to save tokens
-            const lines = file.content.split('\n')
-            const importLines = lines.filter(line => 
-              line.trim().startsWith('import ') || 
-              line.trim().startsWith('export ')
+        // FILE CONTEXT ANALYSIS
+        const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+        const fileName = filePath.split('/').pop() || ''
+        const fileExtension = fileName.split('.').pop() || ''
+
+        // Helper function to extract top-level and key definitions from files
+        const extractDefinitions = (content: string, filePath: string): string[] => {
+          const definitions: string[] = []
+
+          if (filePath.endsWith('.ts') || filePath.endsWith('.tsx') || filePath.endsWith('.js') || filePath.endsWith('.jsx')) {
+            // Extract exports (functions, classes, constants, types)
+            const exportMatches = content.match(/export\s+(?:const|let|var|function|class|interface|type|enum)\s+(\w+)/g) || []
+            exportMatches.forEach(match => {
+              const name = match.replace(/export\s+(?:const|let|var|function|class|interface|type|enum)\s+/, '')
+              definitions.push(`export ${name}`)
+            })
+
+            // Extract named exports
+            const namedExportMatches = content.match(/export\s*{\s*([^}]+)\s*}/g) || []
+            namedExportMatches.forEach(match => {
+              const exports = match.match(/{([^}]+)}/)?.[1]?.split(',').map(e => e.trim()) || []
+              exports.forEach(exp => definitions.push(`export ${exp}`))
+            })
+
+            // Extract default export
+            if (content.includes('export default')) {
+              definitions.push('export default')
+            }
+
+            // Extract function declarations (non-exported)
+            const functionMatches = content.match(/(?:^|\n)\s*(?:function|const|let|var)\s+(\w+)\s*[=(]/g) || []
+            functionMatches.forEach(match => {
+              const name = match.replace(/(?:^|\n)\s*(?:function|const|let|var)\s+/, '').replace(/\s*[=(].*/, '')
+              if (!definitions.includes(`export ${name}`) && !definitions.includes(name)) {
+                definitions.push(`function ${name}`)
+              }
+            })
+
+            // Extract React components
+            const componentMatches = content.match(/(?:export\s+)?(?:const|function)\s+(\w+)\s*(?:\([^)]*\)\s*)?[:=]\s*(?:\([^)]*\)\s*=>\s*)?\{/g) || []
+            componentMatches.forEach(match => {
+              const name = match.replace(/(?:export\s+)?(?:const|function)\s+/, '').replace(/\s*(?:\([^)]*\)\s*)?[:=].*/, '')
+              if (name && name[0] === name[0].toUpperCase() && !definitions.includes(`export ${name}`)) {
+                definitions.push(`component ${name}`)
+              }
+            })
+          }
+
+          return definitions.slice(0, 10) // Limit to prevent token overflow
+        }
+
+        // DIRECTORY STRUCTURE ANALYSIS - Focus on relevant directories
+        const directoryStructure: Record<string, Array<{name: string, type: string, size: number, definitions?: string[]}>> = {}
+        const relevantFiles: any[] = []
+
+        // Relevant directories to scan for definitions
+        const relevantDirectories = [
+          'app/', 'components/', 'lib/', 'hooks/',
+          'pages/', 'src/', './src/', 'layouts/', 'middleware.'
+        ]
+
+        // Build comprehensive project structure focusing on relevant files
+        for (const file of allProjectFiles) {
+          await (async () => {
+          if (!file.isDirectory &&
+          !file.path.includes('node_modules') &&
+              !file.path.includes('.shadcn') &&
+              !file.path.includes('shadcn-ui') &&
+              !file.path.includes('components/ui/') &&
+              !file.path.includes('public/') &&
+              !file.path.includes('styles/') &&
+              !file.path.includes('scripts/') &&
+              !file.path.includes('templates/') &&
+              !file.path.includes('supabase/migrations/') &&
+              !file.path.includes('__tests__/')) {
+
+            // Check if file is in relevant directories
+            const isRelevant = relevantDirectories.some(dir =>
+              file.path.startsWith(dir) ||
+              (dir.endsWith('.') && file.path.includes(dir))
             )
-            
-            fileExportMap[file.path] = {
-              imports: importLines.filter(line => line.trim().startsWith('import ')).slice(0, 10), // Max 10 imports
-              exports: importLines.filter(line => line.trim().startsWith('export ')).slice(0, 10), // Max 10 exports
-              hasDefaultExport: file.content.includes('export default'),
-              hasNamedExports: file.content.includes('export {') || file.content.includes('export const') || file.content.includes('export function')
+
+            if (isRelevant) {
+              // Categorize files by directory
+              const dirPath = file.path.substring(0, file.path.lastIndexOf('/')) || '/'
+              if (!directoryStructure[dirPath]) {
+                directoryStructure[dirPath] = []
+              }
+
+              // Extract top-level and key definitions
+              let definitions: string[] = []
+              try {
+                const currentFile = await storageManager.getFile(projectId, file.path)
+                if (currentFile && currentFile.content) {
+                  definitions = extractDefinitions(currentFile.content, file.path)
+                } else {
+                  definitions = ['file not found']
+                }
+              } catch (error) {
+                definitions = ['error reading file']
+              }
+
+              directoryStructure[dirPath].push({
+                name: file.path.split('/').pop() || 'unknown',
+                type: file.path.split('.').pop() || 'unknown',
+                size: file.size,
+                definitions: definitions
+              })
+
+              // Collect relevant files with definitions
+              relevantFiles.push({
+                path: file.path,
+                name: file.path.split('/').pop() || 'unknown',
+                type: file.path.split('.').pop() || 'unknown',
+                size: file.size,
+                isRelevant: true,
+                definitions: definitions,
+                directory: dirPath
+              })
             }
           }
+          })()
         }
-        
-        // Use AI to analyze import/export relationships
+
+        // ENHANCED PROJECT CONTEXT
+        const projectContext = {
+          totalFiles: allProjectFiles.filter(f => !f.isDirectory).length,
+          relevantFiles: relevantFiles.length,
+          directories: Object.keys(directoryStructure).length,
+          structure: directoryStructure,
+          relevantFileList: relevantFiles.slice(0, 50), // Limit for token efficiency
+          targetFile: {
+            path: filePath,
+            directory: fileDir,
+            name: fileName,
+            extension: fileExtension,
+            size: fileContent.length,
+            definitions: extractDefinitions(fileContent, filePath)
+          }
+        }
+
+        // ADVANCED IMPORT/EXPORT ANALYSIS
+        const importExportAnalysis: any = {}
+
+        // Extract imports from current file
+        const importMatches = fileContent.match(/import\s+.*?from\s+['"]([^'"]+)['"]/g) || []
+        const currentFileImports = importMatches.map(match => {
+          const fromMatch = match.match(/from\s+['"]([^'"]+)['"]/)
+          return fromMatch ? fromMatch[1] : ''
+        }).filter(Boolean)
+
+        // Analyze each import
+        for (const importPath of currentFileImports) {
+          const analysis: any = {
+            rawImport: importPath,
+            resolvedPath: '',
+            exists: false,
+            type: 'unknown',
+            suggestions: []
+          }
+
+          // Resolve relative imports
+          if (importPath.startsWith('./') || importPath.startsWith('../')) {
+            let resolvedPath = importPath
+            if (importPath.startsWith('./')) {
+              resolvedPath = fileDir + '/' + importPath.substring(2)
+            } else if (importPath.startsWith('../')) {
+              const parentDir = fileDir.substring(0, fileDir.lastIndexOf('/'))
+              resolvedPath = parentDir + '/' + importPath.substring(3)
+            }
+
+            // Try different extensions
+            const possiblePaths = [
+              resolvedPath,
+              resolvedPath + '.ts',
+              resolvedPath + '.tsx',
+              resolvedPath + '.js',
+              resolvedPath + '.jsx',
+              resolvedPath + '/index.ts',
+              resolvedPath + '/index.tsx',
+              resolvedPath + '/index.js',
+              resolvedPath + '/index.jsx'
+            ]
+
+            for (const possiblePath of possiblePaths) {
+              const foundFile = allProjectFiles.find(f =>
+                !f.isDirectory && f.path === possiblePath
+              )
+              if (foundFile) {
+                analysis.resolvedPath = possiblePath
+                analysis.exists = true
+                analysis.type = 'relative'
+                break
+              }
+            }
+          } else {
+            // Absolute imports - check if they exist in project
+            const foundFile = allProjectFiles.find(f =>
+              !f.isDirectory && f.path === importPath
+            )
+            if (foundFile) {
+              analysis.resolvedPath = importPath
+              analysis.exists = true
+              analysis.type = 'absolute'
+            } else {
+              analysis.type = 'external'
+              analysis.exists = true // Assume external dependencies exist
+            }
+          }
+
+          importExportAnalysis[importPath] = analysis
+        }
+
+        // Use AI for advanced analysis with comprehensive context
         const mistralPixtral = getMistralPixtralModel()
         
-        const scanPrompt = `Analyze this file's imports and validate against project file exports.
+        const enhancedScanPrompt = `🔍 **ADVANCED CODE SCANNER** - Comprehensive Import/Export Analysis
 
-Target File: ${filePath}
-Content (first 1000 chars): ${fileContent.substring(0, 1000)}${fileContent.length > 1000 ? '...' : ''}
+📄 **CURRENT FILE ANALYSIS:**
+Path: ${filePath}
+Directory: ${fileDir}
+Name: ${fileName}
+Extension: ${fileExtension}
+Size: ${fileContent.length} characters
+Definitions: ${projectContext.targetFile.definitions?.join(', ') || 'None found'}
 
-Project Files Export Map (truncated for efficiency):
-${JSON.stringify(fileExportMap, null, 2)}
+📝 **COMPLETE FILE CONTENT:**
+\`\`\`${fileExtension}
+${fileContent}
+\`\`\`
 
-Validate:
-1. All imported files exist in project
-2. Imported exports exist in target files  
-3. Import syntax matches export type (default vs named)
+🏗️ **PROJECT CONTEXT:**
+${includeProjectContext ? `
+Total Files: ${projectContext.totalFiles}
+Relevant Files: ${projectContext.relevantFiles}
+Directories: ${projectContext.directories}
 
-Respond with compact JSON:
+📂 **RELEVANT FILES STRUCTURE (app/, components/, lib/, hooks/):**
+${JSON.stringify(projectContext.relevantFileList.slice(0, 20), null, 2)}
+
+📁 **DIRECTORY BREAKDOWN WITH DEFINITIONS:**
+${Object.entries(directoryStructure).slice(0, 10).map(([dir, files]: [string, Array<{name: string, type: string, size: number, definitions?: string[]}>]) =>
+  `${dir}: ${files.length} files\n${files.slice(0, 3).map(f => `  - ${f.name} (${f.definitions?.join(', ') || 'no definitions'})`).join('\n')}`
+).join('\n\n')}
+
+` : 'Project context excluded for focused analysis'}
+
+🔍 **IMPORT ANALYSIS:**
+${Object.entries(importExportAnalysis).map(([importPath, analysis]: [string, any]) =>
+  `${importPath}:
+  - Resolved: ${analysis.resolvedPath || 'Not found'}
+  - Exists: ${analysis.exists}
+  - Type: ${analysis.type}
+  - Suggestions: ${analysis.suggestions.join(', ') || 'None'}`
+).join('\n\n')}
+
+🎯 **VALIDATION REQUIREMENTS:**
+1. **File Existence**: Verify all imported files exist in project
+2. **Path Resolution**: Confirm relative paths resolve correctly
+3. **Export Matching**: Validate imports match actual exports
+4. **Syntax Correctness**: Check import/export syntax validity
+5. **Dependency Chain**: Analyze import dependency relationships
+${analyzeDependencies ? '6. **Circular Dependencies**: Detect potential circular import issues' : ''}
+
+📊 **RESPONSE FORMAT:**
+\`\`\`json
 {
-  "imports": [{"from": "./Button", "imports": ["Button"], "exists": true, "exportsMatch": true}],
-  "issues": [{"type": "missing_file", "import": "./Missing", "message": "File not found"}],
-  "valid": true/false,
-  "summary": "Brief scan result"
-}`
+  "fileAnalysis": {
+    "path": "${filePath}",
+    "imports": ${JSON.stringify(Object.keys(importExportAnalysis))},
+    "exports": [],
+    "complexity": "simple|medium|complex"
+  },
+  "importValidation": [
+    {
+      "import": "./Component",
+      "resolved": "src/components/Component.tsx",
+      "exists": true,
+      "exportType": "default|named|both",
+      "valid": true,
+      "issues": []
+    }
+  ],
+  "projectInsights": {
+    "relevantFiles": ${projectContext.relevantFiles},
+    "directoryCount": ${projectContext.directories},
+    "importPatterns": [],
+    "potentialIssues": []
+  },
+  "recommendations": [
+    "Consider using absolute imports for better maintainability",
+    "Missing type definitions for external dependencies"
+  ],
+  "valid": true,
+  "summary": "Comprehensive analysis completed with detailed findings"
+}
+\`\`\`
+
+**Focus Areas:**
+- Import resolution accuracy
+- Export/import type matching
+- Project structure optimization
+- Dependency relationship analysis
+- Code organization recommendations`
         
         const scanResult = await generateText({
           model: mistralPixtral,
           messages: [
-            { role: 'system', content: 'You are a code scanner. Validate import/export relationships. Respond with compact JSON only.' },
-            { role: 'user', content: scanPrompt }
+            { role: 'system', content: 'You are an advanced code analysis expert. Provide comprehensive import/export validation with project context awareness. Respond with detailed JSON analysis.' },
+            { role: 'user', content: enhancedScanPrompt }
           ],
           temperature: 0.1
         })
         
-        // Parse AI response
+        // Enhanced AI response parsing
         let scanAnalysis: any = {}
         try {
           let jsonText = scanResult.text || '{}'
+
+          // Extract JSON from various formats
           if (jsonText.includes('```json')) {
             jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
           } else if (jsonText.includes('```')) {
-            jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+            const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
+            if (jsonMatch) {
+              jsonText = jsonMatch[1]
           }
+          }
+
           jsonText = jsonText.trim()
           
           // Find JSON object bounds
@@ -2349,46 +3891,80 @@ Respond with compact JSON:
           
           scanAnalysis = JSON.parse(jsonText)
         } catch (parseError) {
-          console.warn('Failed to parse code scan analysis, using fallback')
+          console.warn('Failed to parse enhanced code scan analysis, using fallback')
           scanAnalysis = {
-            imports: [],
-            issues: [],
+            fileAnalysis: {
+              path: filePath,
+              imports: Object.keys(importExportAnalysis),
+              exports: [],
+              complexity: 'unknown'
+            },
+            importValidation: Object.entries(importExportAnalysis).map(([importPath, analysis]: [string, any]) => ({
+              import: importPath,
+              resolved: analysis.resolvedPath,
+              exists: analysis.exists,
+              exportType: 'unknown',
+              valid: analysis.exists,
+              issues: analysis.exists ? [] : [`File not found: ${analysis.resolvedPath || importPath}`]
+            })),
+            projectInsights: {
+              relevantFiles: projectContext.relevantFiles,
+              directoryCount: projectContext.directories,
+              importPatterns: [],
+              potentialIssues: ['Analysis parsing failed - using basic validation']
+            },
+            recommendations: ['Consider running full analysis with project context enabled'],
             valid: true,
-            summary: 'Scan completed with fallback parsing'
+            summary: 'Enhanced scan completed with fallback parsing'
           }
         }
         
-        // Build comprehensive response
+        // Build comprehensive response with rich context
         const result = {
           success: true,
-          message: `Code scan completed for ${filePath}`,
+          message: `🔍 Enhanced code scan completed for ${filePath}`,
           analysis: {
-            filePath,
-            imports: scanAnalysis.imports || [],
-            issues: scanAnalysis.issues || [],
+            fileAnalysis: scanAnalysis.fileAnalysis || {},
+            importValidation: scanAnalysis.importValidation || [],
+            projectInsights: scanAnalysis.projectInsights || {},
+            recommendations: scanAnalysis.recommendations || [],
             isValid: scanAnalysis.valid !== false,
-            summary: scanAnalysis.summary || 'Code scan completed',
-            totalProjectFiles: projectFiles.length,
-            scannedImports: scanAnalysis.imports?.length || 0,
-            foundIssues: scanAnalysis.issues?.length || 0
+            summary: scanAnalysis.summary || 'Enhanced code scan completed',
+            contextUsed: {
+              projectFiles: projectContext.totalFiles,
+              relevantFiles: projectContext.relevantFiles,
+              directoriesAnalyzed: projectContext.directories,
+              importsAnalyzed: Object.keys(importExportAnalysis).length
+            }
           },
           toolCallId
         }
+
+        // Enhanced logging with context
+        console.log(`[ENHANCED CODE SCAN] Completed for ${filePath}:`, {
+          importsAnalyzed: Object.keys(importExportAnalysis).length,
+          relevantFiles: projectContext.relevantFiles,
+          directories: projectContext.directories,
+          isValid: scanAnalysis.valid !== false,
+          issuesFound: scanAnalysis.importValidation?.filter((v: any) => !v.valid).length || 0
+        })
         
         // Log issues if any
-        if (scanAnalysis.issues?.length > 0) {
-          console.warn(`[CODE SCAN WARNING] Issues found in ${filePath}:`, scanAnalysis.issues)
+        if (scanAnalysis.importValidation?.some((v: any) => !v.valid)) {
+          console.warn(`[CODE SCAN WARNING] Import issues found in ${filePath}:`,
+            scanAnalysis.importValidation.filter((v: any) => !v.valid)
+          )
         }
         
         return result
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('[ERROR] scan_code_imports failed:', error)
+        console.error('[ERROR] Enhanced scan_code_imports failed:', error)
         
         return { 
           success: false, 
-          error: `Code scan failed: ${errorMessage}`,
+          error: `Enhanced code scan failed: ${errorMessage}`,
           toolCallId
         }
       }
@@ -2399,6 +3975,7 @@ Respond with compact JSON:
 
   // Debug logging to show which tools are included
   const toolNames = Object.keys(tools)
+
   console.log('[DEBUG] Final Tool Set:', {
     totalTools: toolNames.length,
     toolNames: toolNames.sort(),
@@ -2412,10 +3989,6 @@ Respond with compact JSON:
   return tools
 }
 
-
-
-
-
 // NLP Intent Detection using Mistral Pixtral
 async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[]) {
   try {
@@ -2425,7 +3998,7 @@ async function detectUserIntent(userMessage: string, projectContext: string, con
 
 🚨 CRITICAL RULES - READ FIRST:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
 - Web tools are FORBIDDEN for basic development tasks
 - If user wants to add products, edit files, or modify code, use file operations only
 
@@ -2434,50 +4007,93 @@ User Message: "${userMessage}"
 Project Context: ${projectContext}
 
 Recent Conversation History (last 5 exchanges):
-${conversationHistory.slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).join('\n')}
+${(conversationHistory || []).slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).join('\n')}
 
 Based on the user's request, determine:
 1. **Primary Intent**: What does the user want to accomplish?
-2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, edit_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
+2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
 3. **File Operations**: What files need to be created, modified, or deleted?
 4. **Complexity Level**: Simple, Medium, or Complex task?
 5. **Action Plan**: Step-by-step plan to accomplish the task
+6. **Architecture Impact**: Does this require layout.tsx changes? (Next.js only)
 
 📝 **TOOL SELECTION RULES:**
-- File operations (add products, edit code) → use read_file + write_file/edit_file
+- File operations (add products, edit code) → use read_file + write_file
 - Web research (search online, external content) → use web_search + web_extract
 - When in doubt, choose file operations over web tools
 
+🏗️ **ARCHITECTURE AWARENESS:**
+**Next.js Projects** (detect by next.config.js):
+- Check if feature needs global providers → layout.tsx modification required
+- Check if feature needs metadata updates → layout.tsx modification required
+- Check if feature needs global state → layout.tsx modification required
+- Check if feature is component-only → NO layout.tsx changes needed
+
+**Examples:**
+- "Add authentication" → layout.tsx needs AuthProvider wrapper
+- "Add dark mode" → layout.tsx needs ThemeProvider wrapper
+- "Add new product page" → NO layout.tsx changes, just create new route
+- "Add analytics" → layout.tsx needs global analytics script
+- "Create contact form" → NO layout.tsx changes, just component work
+
+**Vite Projects** (detect by vite.config.ts):
+- Check if feature needs global providers → main.tsx modification required
+- Check if feature needs routes → App.tsx modification required
+- Component-only features → NO entry file changes
+
 📋 **EXAMPLE SCENARIOS:**
-- User: "add more products" → required_tools: ["read_file", "edit_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
+- User: "add more products" → required_tools: ["read_file", "write_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
 - User: "search for jewelry trends online" → required_tools: ["web_search", "web_extract"], tool_usage_rules: "Web research requested - use web tools appropriately."
+- User: "add authentication" → required_tools: ["read_file", "write_file"], affected_files: ["src/app/layout.tsx", "src/components/auth/..."], architecture_note: "Requires layout.tsx modification for AuthProvider"
+- User: "create a new product card" → affected_files: ["src/components/ProductCard.tsx"], architecture_note: "Component-only, no layout changes needed"
 
 Respond in JSON format:
 {
   "intent": "string",
   "required_tools": ["tool1", "tool2"],
   "file_operations": ["create", "modify", "delete"],
+  "affected_files": ["layout.tsx", "page.tsx"],
+  "layout_modification_needed": true,
+  "layout_modification_reason": "string",
   "complexity": "simple|medium|complex",
   "action_plan": ["step1", "step2"],
   "confidence": 0.95,
   "tool_usage_rules": "string",
-  "enforcement_notes": "string"
+  "enforcement_notes": "string",
+  "architecture_impact": "string"
 }
 
 Include these fields:
+- "affected_files": List of specific files that will be modified
+- "layout_modification_needed": Boolean indicating if layout.tsx/main.tsx needs changes
+- "layout_modification_reason": Explanation of why layout modification is needed
+- "architecture_impact": How this feature affects the app's architecture
 - "tool_usage_rules": Specific rules about when to use each tool type
 - "enforcement_notes": Critical reminders about web tool restrictions`
 
     const intentResult = await generateText({
       model: mistralPixtralModel,
       messages: [
-          { role: 'system', content: `You are an AI intent detection specialist. Analyze user requests and provide structured intent analysis.
+          { role: 'system', content: `You are an AI intent detection specialist with deep understanding of React application architecture. Analyze user requests and provide structured intent analysis.
 
 🚨 CRITICAL RULES:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
 - Web tools are FORBIDDEN for basic development tasks
-- When in doubt, choose file operations over web tools` },
+- When in doubt, choose file operations over web tools
+
+🏗️ ARCHITECTURE EXPERTISE:
+- **Next.js App Router**: Understand layout.tsx hierarchy and when it needs modification
+- **Global State**: Identify when features need layout.tsx providers (auth, theme, state management)
+- **Metadata**: Recognize when layout.tsx metadata exports need updates
+- **Component-Only**: Distinguish between component-level and architecture-level changes
+- **Vite Projects**: Know when main.tsx/App.tsx needs modification vs component-only changes
+
+🎯 KEY DECISIONS YOU MAKE:
+1. Does this feature need global providers? → layout.tsx modification
+2. Does this feature need metadata updates? → layout.tsx modification
+3. Is this just a new page/component? → NO layout.tsx changes
+4. Does this need global fonts/scripts? → layout.tsx modification` },
         { role: 'user', content: intentPrompt }
       ],
       temperature: 0.3
@@ -2530,7 +4146,7 @@ Include these fields:
         complexity: 'medium',
         action_plan: ['Analyze current project state', 'Provide guidance'],
         confidence: 0.7,
-        tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
+        tool_usage_rules: 'Use list_files, read_file, write_file for file operations. Avoid web tools unless explicitly requested.',
         enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
       }
     }
@@ -2543,17 +4159,691 @@ Include these fields:
       complexity: 'medium',
       action_plan: ['Analyze current project state', 'Provide guidance'],
       confidence: 0.5,
-      tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
+      tool_usage_rules: 'Use list_files, read_file, write_file for file operations. Avoid web tools unless explicitly requested.',
       enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
     }
   }
 }
 
+// Focused System Prompts for Two-Phase Architecture
+function getPreprocessingSystemPrompt(): string {
+  return `🔍 **PIXEL FORGE - INFORMATION GATHERING PHASE**
+
+You are a specialized code analysis assistant in the preprocessing phase. Your role is to intelligently gather information to understand the current codebase state.
+
+**🎯 PRIMARY OBJECTIVES:**
+- Read and analyze files to understand current implementation
+- List directories to understand project structure  
+- Search for information when requested
+- Extract and analyze dependencies
+- Gather comprehensive context for the implementation phase
+- **Identify framework architecture** (Next.js vs Vite) and critical entry files
+- **Assess architecture impact** of requested features (does it need layout.tsx/main.tsx changes?)
+- When users report errors pointing to specific files, thoroughly use the read_file tool to read all the multiple files.
+
+**📂 PATH RESOLUTION RULES:**
+- User logs showing **/project/src/** → actual path is **src/** (we're in project root)
+- NO need to add /project/ prefix to paths
+- Always use relative paths from project root
+
+**🏗️ ARCHITECTURE-AWARE CONTEXT GATHERING:**
+When gathering context, identify:
+1. **Framework Type**: Check for next.config.js (Next.js) or vite.config.ts (Vite)
+2. **Entry Files**: Read layout.tsx (Next.js) or main.tsx (Vite) if feature needs global changes
+3. **Feature Scope**: Determine if component-only or requires architecture-level changes
+4. **Provider Needs**: Check if feature needs global providers (auth, theme, state)
+5. **Metadata Needs**: Check if feature needs SEO/metadata updates (layout.tsx)
+
+**🛠️ AVAILABLE TOOLS:**
+- read_file: Read file contents for analysis
+- web_search: Search for external information when needed
+- web_extract: Extract content from web resources
+
+**🚫 RESTRICTIONS:**
+- Do NOT attempt to write, edit, or delete files
+- Do NOT provide implementation solutions yet
+- Focus ONLY on information gathering and analysis
+- Provide thorough understanding of current state
+
+**📊 RESPONSE REQUIREMENTS:**
+- Be thorough and comprehensive in your analysis
+- Identify relevant files, patterns, and structures
+- Note any potential issues or areas of interest
+- Prepare detailed context for the implementation phase
+- Use clear, organized formatting with proper markdown
+
+**🎪 ANALYSIS APPROACH:**
+- Start with broad structure understanding (list_files)
+- Read specific files for detailed implementation analysis
+- Identify patterns, conventions, and architectural decisions
+- Note dependencies and external integrations
+- Document current state comprehensively
+
+**🏗️ FRAMEWORK-SPECIFIC ANALYSIS:**
+
+**For Next.js Projects (check for next.config.js):**
+- **src/app/layout.tsx**: Root layout wrapping all pages - contains providers, metadata, fonts
+- **src/app/page.tsx**: Home page entry point
+- **App Router Structure**: File-system based routing in src/app/
+- **Layout Hierarchy**: Nested layouts for route groups
+- **Key Files to Check**: layout.tsx files when analyzing new features that may need global state
+
+**For Vite Projects (check for vite.config.ts):**
+- **src/main.tsx**: Application entry point
+- **src/App.tsx**: Root component
+- **Client-Side Routing**: React Router DOM for navigation
+- **Key Files to Check**: main.tsx and App.tsx for provider setup
+
+**🔍 WHEN ANALYZING FEATURE REQUESTS:**
+1. Identify if feature needs **global state/providers** (→ check layout.tsx/main.tsx)
+2. Identify if feature needs **new routes** (→ App Router vs React Router patterns)
+3. Identify if feature needs **metadata updates** (→ layout.tsx metadata exports)
+4. Identify if feature is **component-level** (→ no layout changes needed)
+
+Remember: This is the INFORMATION GATHERING phase. Your job is to understand and analyze, not to implement. Pay special attention to the project's framework architecture when analyzing where changes need to be made.`
+}
+
+
+function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs', conversationHistory?: string): string {
+  // Determine if this is a Next.js project
+  const isNextJS = template === 'nextjs'
+
+  return `<instructions>
+You are PiPilot, a senior software engineer with 10+ years of experience across full-stack development, systems architecture, and polyglot programming. You possess deep expertise in building production-grade applications, solving complex technical challenges, and delivering pixel-perfect, fully functional features autonomously ,making changes to their code through JSON tool commands that execute immediately during our conversation.
+
+**Core Principles:**
+- Always use the write_file tool for file creation and updates
+- Make efficient and effective changes to codebases while following best practices for maintainability and readability
+- Take pride in keeping things simple and elegant
+- Be friendly and helpful, always aiming to provide clear explanations
+- Understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through JSON commands
+
+**Available Tools: write_file, delete_file, add_package, remove_package**
+- 🚨 **CRITICAL**: Never use any other JSON tool apart from the four mentioned above
+
+</instructions>
+
+<planning_instructions>
+Use emoji check ticks (✅) VERY frequently to plan and track task progress.
+
+### When to Create Planning Checklists:
+- ✅ **Complex multi-step work** requiring planning and tracking
+- ✅ **User provides multiple tasks** or numbered/comma-separated requests
+- ✅ **After receiving new instructions** that require multiple steps
+- ✅ **BEFORE starting work** on any task
+- ✅ **When breaking down larger tasks** into smaller actionable steps
+- ✅ **To give users visibility** into progress and planning
+
+### When NOT to Use Planning Checklists:
+- ❌ **Single, trivial tasks** that can be completed in one step
+- ❌ **Purely conversational/informational requests**
+- ❌ **When just reading files** or performing simple searches
+
+### Planning Workflow:
+- ✅ **Create checklist** with specific, actionable task items using emoji boxes
+- ✅ **Mark tasks as in-progress** by changing  ☐ to 🔄 when starting work
+- ✅ **Work through tasks** systematically
+- ✅ **Batch completion** - when all tasks are done, mark ALL as completed (✅) at once
+- ✅ **Update checklist** to show final completed state
+
+### Checklist Format:
+- **Use emoji boxes**: ☐ (not started), 🔄 (in progress), ✅ (completed)
+- **Bold task titles** for clarity
+- **Detailed descriptions** with file paths and requirements
+- **Logical ordering** with clear dependencies
+
+### Example Checklist:
+- ☐ **Setup project structure** - Create src/, components/, lib/ directories
+- ☐ **Install dependencies** - Add React, TypeScript, Tailwind packages
+- ☐ **Create main component** - Build App.tsx with basic layout
+- ☐ **Add styling** - Implement responsive design with Tailwind
+- ☐ **Test functionality** - Verify all features work correctly
+
+**Note**: Use batch completion - mark all tasks as ✅ simultaneously when the entire work is finished.
+</planning_instructions>
+
+### Critical Rules - NO EXCEPTIONS
+**❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:**
+- **FORBIDDEN**: \`<!-- Any HTML-style comment -->\` - These cause syntax errors!
+- **USE INSTEAD**: \`// JavaScript single-line comments\` or \`/* JavaScript multi-line comments */\`
+- **JSX COMMENTS**: Use \`{/* JSX comment inside braces */}\` within JSX elements
+
+### TSX/TypeScript Essentials
+
+#### 1. File Structure & Extensions
+- \`.tsx\` → React components with JSX only
+- \`.ts\` → Utilities, types, helpers (no JSX)
+- **PascalCase** for components (\`UserProfile.tsx\`)
+- **camelCase** for utilities (\`formatDate.ts\`)
+
+#### 2. TypeScript Strict Mode - Zero Tolerance
+**NEVER use:** \`var\`, \`any\`, \`Function\`, \`object\`, \`@ts-ignore\`, \`console.*\` in production
+**ALWAYS use:** Explicit types, specific function signatures, interface/type definitions
+
+#### 3. Import/Export Standards
+\`\`\`typescript
+// ✅ CORRECT - No semicolons, single quotes, proper order
+import React from 'react'
+import { useState, useEffect } from 'react'
+import type { User } from './types'
+import { formatDate } from '@/utils'
+
+// ❌ WRONG
+import React from 'react';              // Has semicolon
+import * as lodash from 'lodash';       // Imports entire library
+import { useState } from "react"        // Double quotes
+\`\`\`
+
+**Import Rules:**
+- **NO semicolons** after import statements
+- **Single quotes** consistently
+- Order: React → Third-party → Local
+- \`import type\` for type-only imports
+- Named imports preferred over default
+- Remove all unused imports
+
+#### 4. JSX Syntax Rules - CRITICAL
+**Every tag MUST be properly closed and nested:**
+\`\`\`tsx
+// ✅ CORRECT
+<div className="container">
+  <img src="photo.jpg" alt="Photo" />
+  <input type="text" value={text} />
+  <span>{value}</span>
+</div>
+
+// ❌ WRONG
+<div class="container">           // Wrong: class not className
+  <img src="photo.jpg">            // Wrong: Not self-closed
+  <input type="text">              // Wrong: Not self-closed
+  <span>{value                     // Wrong: Unclosed brace and tag
+</div>
+\`\`\`
+
+#### 5. Event Handlers & State
+\`\`\`tsx
+const handleClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+  e.preventDefault()
+  console.log(e.currentTarget)
+}
+
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+  const value = e.target.value
+  setValue(value)
+}
+
+const [count, setCount] = useState<number>(0)
+const [text, setText] = useState<string>('')
+const [user, setUser] = useState<User | null>(null)
+\`\`\`
+
+#### 6. Conditional Rendering & Lists
+\`\`\`tsx
+{isLoggedIn ? <Dashboard /> : <Login />}
+{isVisible && <Modal />}
+{items.length > 0 && <List items={items} />}
+{items.map((item) => <li key={item.id}>{item.name}</li>)}
+\`\`\`
+
+#### 7. Fragments & Props
+\`\`\`tsx
+<>
+  <Header />
+  <Main />
+  <Footer />
+</>
+
+const Button = ({ label, onClick, disabled = false }: ButtonProps): JSX.Element => {
+  return <button onClick={onClick} disabled={disabled}>{label}</button>
+}
+\`\`\`
+
+#### 8. Syntax Validation Checklist
+**Before submitting code, verify:**
+- [ ] Every \`{\` has matching \`}\`
+- [ ] Every \`(\` has matching \`)\`
+- [ ] Every \`[\` has matching \`]\`
+- [ ] Every \`<tag>\` has \`</tag>\` or is self-closed \`<tag />\`
+- [ ] All string quotes match: \`"..."\`, \`'...'\`, or \`\`\`...\\\`\`\`
+- [ ] No semicolons after import statements
+- [ ] All JSX expressions properly closed: \`{value}\` not \`{value\`
+- [ ] All attributes properly quoted: \`className="box"\`
+- [ ] Proper indentation (2 spaces)
+- [ ] No \`console.*\` statements
+- [ ] All imports are used
+- [ ] All types explicitly defined
+
+#### 9. Code Block Standards
+When writing code in markdown, use proper language identifiers:
+\`\`\`typescript
+// Supported: typescript, tsx, javascript, jsx, sql, css, json, bash
+// Escape quotes in strings: \\\\\\' \\\\\\\\"
+\`\`\`
+
+**🎯 WHEN TO USE CODE BLOCKS:**
+- SQL queries, database schemas, and migrations
+- Complete function implementations
+- React component examples
+- Configuration file contents
+- Terminal commands and scripts
+- CSS styling examples
+- API endpoint definitions
+
+### Mandatory Design Requirements
+Every application MUST have a **stunning, modern, extra professional design** that wows users on first look.
+
+### Core Design Principles
+- **Modern Color Schemes**: Use sophisticated gradients, shadows, and color palettes
+- **Professional Typography**: Implement font hierarchies with proper weights and spacing
+- **Smooth Animations**: Add hover effects, transitions, and micro-interactions
+- **Perfect Spacing**: Use consistent margins, padding, and grid layouts
+- **Glass Morphism/Modern Effects**: Implement backdrop blur, subtle shadows, rounded corners
+- **Responsive Design**: Mobile-first approach with flawless cross-device experience
+
+### Implementation Approach
+**CRITICAL: Create UNIQUE, custom styling for each application - NO generic patterns!**
+
+- **Use pure Tailwind CSS classes** in className attributes for most styling needs
+- **Use inline styles** for dynamic values, calculations, or when Tailwind is insufficient
+- **Define styles directly in components** - no external CSS files or @apply directives
+
+### Required Elements
+- **Hero Sections**: Compelling headlines with gradient text effects
+- **Interactive Buttons**: 3D effects, hover animations, smooth transitions
+- **Modern Cards**: Glass morphism, subtle shadows, perfect spacing
+- **Loading States**: Skeleton loaders and smooth loading animations
+- **Empty States**: Beautiful illustrations and helpful messaging
+- **Error Handling**: Elegant error messages with recovery suggestions
+
+### Animation & Branding
+- **Page Transitions**: Smooth entry/exit animations using Framer Motion
+- **Component Animations**: Stagger animations for lists and grids
+- **Hover Effects**: Subtle scale, glow, and color transitions
+- **Color & Branding**: Modern palettes, consistent brand colors, dark/light theme support, proper contrast ratios
+
+### \${isNextJS ? 'NEXT.JS' :  'VERCEL   SERVERLESS'} Architecture - Critical   Rules
+ \${isNextJS ? \`**Next.js File Organization:**
+\`\`\`
+src/
+  app/           → App Router (pages and layouts)
+    page.tsx     → Home page
+    layout.tsx   → Root layout
+    api/         → API routes (serverless functions)
+      route.ts   → API endpoint handlers
+  components/    → React components
+  lib/          → Utilities and helpers
+  hooks/        → Custom React hooks
+public/         → Static assets
+\`\`\`
+
+**Next.js Specific Rules:**
+- **Server Components by default** - Use 'use client' directive only when needed
+- **API Routes**: Create in \\\`src/app/api/[name]/route.ts\\\` with GET, POST, PUT, DELETE exports
+- **Layouts**: Use \\\`layout.tsx\\\` for shared UI across routes
+- **Loading States**: Use \\\`loading.tsx\\\` for loading UI
+- **Error Handling**: Use \\\`error.tsx\\\` for error boundaries
+- **Environment Variables**: Prefix with \\\`NEXT_PUBLIC_\\\` for client-side access\` :
+
+\`**File Organization:**
+\`\`\`
+api/             → Serverless functions (Vercel)
+  constants.ts    → Server-only secrets & API keys
+  *.ts            → Serverless API endpoints
+src/             → Frontend React app
+  env.ts          → Frontend-safe constants & config
+  App.tsx         → React components
+\`\`\`\`}
+
+### Secrets Management
+- **Location**: \`api/constants.ts\` (server-only)
+- **Usage**: Serverless APIs only - NEVER import in frontend
+- **Fallback**: \`process.env.VARIABLE_NAME || "default-value"\`
+- **Rule**: Secrets stay server-side, frontend calls APIs
+
+### Serverless API Pattern
+- **Location**: \`api/*.ts\` files
+- **Runtime**: \`@vercel/node\` (already included)
+- **Purpose**: Handle all sensitive logic, secrets, external APIs
+- **Deployment**: Auto-deployed as serverless functions on Vercel
+
+### Frontend Constants
+- **Location**: \`src/env.ts\`
+- **Usage**: UI config, API URLs, public settings
+- **Fallback**: \`import.meta.env.VITE_PUBLIC_*\`
+- **Rule**: Safe to expose, never secrets
+
+### AI Implementation Rules
+1. **Secrets → Server-only**: \`api/constants.ts\` with \`process.env\` fallbacks
+2. **APIs → Serverless**: \`api/*.ts\` handles sensitive operations
+3. **Frontend → Safe config**: \`src/env.ts\` with \`VITE_PUBLIC_* \` fallbacks
+3. **Architecture**: Frontend calls serverless APIs, never imports secrets
+4. **Deployment**: Vercel auto-deploys \`api/*.ts\` as serverless functions
+
+### Core Frameworks
+\${isNextJS ? \`- **Next.js 14.0.4** - Full-stack React framework with App Router
+- **React 18.2.0** - Modern React with hooks, concurrent features
+- **React DOM 18.2.0** - React rendering for web
+- **TypeScript 5.2.2** - Full type safety and modern JS features\` :
+
+\`- **React 18.2.0** - Modern React with hooks, concurrent features
+- **React DOM 18.2.0** - React rendering for web
+- **React Router DOM 6.28.0** - Client-side routing
+- **TypeScript 5.2.2** - Full type safety and modern JS features
+- **Vite 5.0.8** - Fast build tool and dev server\`}
+
+### UI & Styling Libraries
+- **Tailwind CSS 3.3.6** - Utility-first CSS framework
+- **Framer Motion 12.23.12** - Animation library for React
+- **Lucide React 0.454.0** - Beautiful icon library
+- **Next Themes 0.4.6** - Dark/light theme management
+- **Sonner 1.7.4** - Toast notifications
+- **Vaúl 0.9.9** - Drawer/modal components
+
+### SHADCN/UI Components (ALL INSTALLED)
+- **Radix UI Primitives**: Accordion, Dialog, Dropdown, Tabs, Toast, Tooltip, etc.
+- **Form Components**: React Hook Form 7.60.0, Zod 3.25.67, Hookform Resolvers 3.10.0
+- **UI Utilities**: Class Variance Authority, CLSX, Tailwind Merge, CMDK
+
+### Data & Visualization
+- **Recharts 2.15.4** - Chart and graph components
+- **TanStack Table 8.20.5** - Advanced table/data grid
+- **React Markdown 10.1.0** - Markdown rendering
+- **Remark GFM 4.0.1** - GitHub Flavored Markdown support
+
+### Date & Time
+- **Date-fns 4.1.0** - Modern date utility library
+- **React Day Picker 9.8.0** - Date picker component
+
+### Critical File Safeguard - DO NOT MODIFY SENSITIVE FILES
+
+The following files are considered sensitive and MUST NOT be modified, overwritten, or deleted by the AI:
+- src/components/ui (shadcn ui components). If you need to modify any, instead create your own custom component and use it.
+\${isNextJS ? \`- src/app/layout.tsx (Root layout - modify with extreme caution)
+- next.config.js
+- tsconfig.json
+- postcss.config.js
+- .eslintrc.cjs\` :
+\`- main.tsx
+- vite.config.ts
+- tsconfig.json
+- tsconfig.node.json
+- postcss.config.js
+- .eslintrc.cjs\`}
+
+When building new features:
+\${isNextJS ? \`- Create new pages in src/app/ directory with page.tsx files
+- Always update README.md with app info and features
+- Update src/app/page.tsx (home page) to reflect latest features\` :
+\`- Only update index.html for app branding.
+- Always update README.md with app info and features.
+- Always update App.tsx to reflect the latest feature.\`}
+
+### Package.json Rules
+**When updating package.json, you MUST:**
+- Format as valid, minified JSON (no trailing commas, no comments, no extra whitespace)
+- Use double quotes for all keys and values
+- Preserve order: name, version, description, scripts, dependencies, devDependencies, peerDependencies, etc.
+- Use commas to separate packages (never omit or add extra trailing commas)
+- NEVER add comments, trailing commas, or duplicate keys
+- NEVER use single quotes, undefined, null, or empty keys
+- NEVER add unsupported fields (e.g., "private": true is allowed, but avoid custom fields)
+- ALWAYS validate JSON before writing
+- Ensure version strings are valid semver (e.g., "^1.0.0")
+- NEVER remove required fields (name, version, scripts, dependencies)
+- NEVER break JSON structure
+- ALWAYS escape special characters in strings
+- NEVER add duplicate dependencies or scripts
+- ALWAYS keep file valid for npm and Vite projects
+
+**🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
+
+${projectContext ? `
+
+## 🏗️ **PROJECT CONTEXT**
+${projectContext}
+
+---
+` : ''}
+
+${conversationHistory ? `
+
+## 📋 **FULL CONVERSATION HISTORY**
+${conversationHistory}
+
+---
+` : ''}
+</instructions>
+
+<toolUseInstructions>
+### Available Tools
+- **write_file**: For ALL file operations - creating new files, updating existing files, and modifying content
+- **delete_file**: For removing files from the project
+- **add_package**: For adding npm packages to package.json dependencies
+- **remove_package**: For removing npm packages from package.json dependencies
+
+### Tool Restrictions
+- **✅ ALLOWED**: write_file, delete_file, add_package, remove_package
+- **❌ FORBIDDEN**: NEVER use read_file, list_files, search_files, grep_search, web_search, web_extract, analyze_code, check_syntax, run_tests, create_directory, delete_directory, or ANY other tools
+
+### Tool Command Format
+Use JSON tool commands embedded in markdown code blocks:
+
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "import React from 'react'\\n\\nexport default function Component() {\\n  return <div>Hello</div>\\n}"                                                                                                                                        
+}
+\`\`\`
+
+\`\`\`json
+{
+  "tool": "add_package",
+  "name": "lodash",
+  "version": "^4.17.21",
+  "isDev": false
+}
+\`\`\`
+
+\`\`\`json
+{
+  "tool": "remove_package",
+  "name": "lodash",
+  "isDev": false
+}
+\`\`\`
+
+**Critical Formatting Rules:**
+- Wrap JSON tool commands in \\\`\\\`\\\`json code blocks
+- Use double quotes for all strings
+- Escape newlines as \\\\n and quotes as \\\\"
+- Each tool command must be a separate JSON code block
+</toolUseInstructions>
+
+<outputFormatting>
+### Markdown & Structure
+- Use proper headers (##, ###) with emoji prefixes for organization
+- Create clear bullet points (- ) and numbered lists (1. ) with consistent spacing
+- Use **bold** for key concepts, *italics* for emphasis, \`code\` for inline references
+- Use blockquotes (>) for important notes and warnings
+- Add blank lines between paragraphs and sections for readability
+
+### Emoji System
+- **Status**: ✅ success, ❌ errors, ⚠️ warnings, 🔄 in-progress
+- **Sections**: 🏗️ architecture, 💡 ideas, 🎨 UI/design, 🔧 implementation
+- **Actions**: 📝 documentation, 🔍 research, 📦 dependencies, 🚀 deployment
+🎯 target , goals  or task
+
+### Conversation Style
+- Be conversational yet professional with appropriate emojis
+- Explain technical concepts clearly with examples
+- Acknowledge user's previous work and build upon it
+</outputFormatting>
+
+`
+}
+
+// Enhanced Summarizer System Prompt for Codestral
+const ENHANCED_SUMMARIZER_PROMPT = `# 📋 
+Your task is to create a detailed summary of the conversation, preserving all technical details, decisions, and progress so work can continue seamlessly.
+
+---
+
+## 🕵️‍♂️ Recent Context
+Focus on the **latest agent actions and tool calls**, including:
+- **Commands:** Tools just executed (\`write_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`)
+- **Results:** Key tool outcomes (truncate long ones, keep essentials)
+- **State:** What was being worked on last
+- **Trigger:** Why summarization occurred (e.g., token limit reached)
+
+---
+
+## 🧩 Analysis Steps
+1. **Chronological Review:** Trace key phases and transitions.  
+2. **Intent Mapping:** Capture all user goals and expectations (with short quotes).  
+3. **Technical Inventory:** List all tools, frameworks, and decisions used.  
+4. **File Operations:** Extract and validate all JSON tool blocks.  
+   - Parse each block; log success or failure (with reason).  
+5. **Progress Summary:** Note completed vs. pending work.  
+6. **Recent Commands:** List latest tool calls and outcomes.
+
+---
+
+## 🚨 File Operation Validation
+This ensures continuity and detects failed file actions.
+
+1. **Scan** all assistant responses for JSON blocks using \`write_file\`, \`delete_file\`, \`add_package\`, or \`remove_package\`.  
+2. **Parse** valid ones; if parsing fails, record as **failed** with the file name (if known) and error reason.  
+3. **Log** invalid or unparsed blocks with short error details.
+---
+
+## ✨ Required Output Structure
+
+### 1. Conversation Overview
+- List user requests (with direct quotes) and assistant actions, in chronological order.
+
+### 2. File Operations Log
+Output a JSON array. For each file, include:
+- \`"path"\`: Relative file path (or \`"unknown"\` if undetermined).
+- \`"operations"\`: Chronological list of operations:
+    - For valid blocks:
+        - \`"type"\`: \`"created"\`, \`"updated"\`, \`"deleted"\`
+        - \`"content"\`: File content after operation (for \`created\`/\`updated\`)
+        - \`"reason"\`: Why this operation happened (with context)
+        - \`"status"\`: \`"success"\`
+    - For failed blocks:
+        - \`"type"\`: Attempted operation (e.g., \`"created"\`, \`"deleted"\`)
+        - \`"error"\`: Error message or parsing failure reason
+        - \`"raw_block"\`: The unparsed/invalid JSON block (truncated if long)
+        - \`"status"\`: \`"failed"\`
+- \`"final_state"\`: \`"present"\`, \`"deleted"\`, or \`"failed"\`
+
+### 3. Full File Snapshots  
+Include the **latest content** of all files with \`"final_state": "present"\` in code blocks, labeled by language and path.  
+
+### 4. Current Focus & Commands  
+- **Focus:** Describe what was being worked on last.  
+- **Commands:** List recent tool actions (with file paths and results).  
+
+### 5. Next Steps  
+Summarize any **unfinished tasks or user requests** and the **next actions** needed.  
+
+---
+
+### 🛠️ Guidelines  
+- Use exact filenames, variables, and technical terms.  
+- Include only context needed to resume seamlessly.  
+- Keep details accurate, clear, and logically ordered.  
+- Note any failed operations or errors.  
+
+---
+
+**The summary must function as a clear handoff — preserving all vital progress, context, and pending work.**
+`
+
+// Generate conversation summary using Mistral Pixtral (optimized approach)
+async function generateConversationSummary(
+  messages: Array<{ role: string; content: string }>,
+  projectId: string,
+  userId: string
+): Promise<any> {
+  try {
+    console.log('[SUMMARIZER] Using simple fullHistory approach...')
+
+    // Use last 10 messages with full content (no truncation)
+    const recentMessages = messages.slice(-10)
+    const fullHistory = recentMessages
+      .map((msg, idx) => `${msg.role[0].toUpperCase()}:${msg.content}`)
+      .join('|')
+
+    // Return simple summary with fullHistory
+    return {
+      conversationOverview: `Recent conversation: ${fullHistory}`
+    }
+
+  } catch (error) {
+    console.error('[SUMMARIZER] Error generating conversation summary:', error)
+    return {
+      conversationOverview: 'Summary generation failed',
+      activeWorkState: {
+        currentFocus: 'Unable to determine current focus',
+        recentCommands: []
+      },
+      fileOperationsLog: [],
+      pendingSteps: ['Retry summary generation']
+    }
+  }
+}
+
+// Helper functions for parsing summary
+function extractSection(text: string, sectionName: string, nextSection?: string): string {
+  const regex = new RegExp(`## ${sectionName}[\\s\\S]*?\\n([\\s\\S]*?)(?=\\n##${nextSection ? `|${nextSection}` : ''}|$)`)
+  const match = text.match(regex)
+  return match ? match[1].trim() : ''
+}
+
+function parseFileOperationsLog(text: string): any[] {
+  try {
+    // Look for JSON code block containing file operations
+    const jsonMatch = text.match(/```json\s*\n([\s\S]*?)\n```/)
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[1])
+    }
+  } catch (error) {
+    console.warn('[SUMMARIZER] Failed to parse file operations log:', error)
+  }
+  return []
+}
+
+function extractRecentCommands(text: string): string[] {
+  const commandsSection = extractSection(text, 'Recent Commands')
+  if (!commandsSection) return []
+  
+  // Extract bullet points or numbered items
+  const lines = commandsSection.split('\n')
+  return lines
+    .filter(line => line.trim().match(/^[-*•]\s+|^\d+\.\s+/))
+    .map(line => line.replace(/^[-*•]\s+|^\d+\.\s+/, '').trim())
+    .slice(0, 5) // Keep last 5 commands
+}
+
+function extractPendingSteps(text: string): string[] {
+  const pendingSection = extractSection(text, 'Pending and Next Steps')
+  if (!pendingSection) return []
+  
+  // Extract bullet points or numbered items
+  const lines = pendingSection.split('\n')
+  return lines
+    .filter(line => line.trim().match(/^[-*•]\s+|^\d+\.\s+/))
+    .map(line => line.replace(/^[-*•]\s+|^\d+\.\s+/, '').trim())
+}
+
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     // FORCE TOOLS TO BE ALWAYS ENABLED
-    let { messages, projectId, useTools = true, modelId, aiMode = 'agent' } = body
+    let { messages, projectId, useTools = true, modelId, aiMode = 'agent', generateTitle = false } = body
     
     // Ensure we always have a projectId - generate one if missing
     if (!projectId) {
@@ -2579,6 +4869,49 @@ export async function POST(req: Request) {
 
     // Set global user ID for tool access
     global.currentUserId = user.id
+
+    // Handle title generation requests
+    if (generateTitle) {
+      try {
+        const model = getMistralPixtralModel()
+        const result = await generateText({
+          model: model,
+          messages: messages,
+          temperature: 0.3
+        })
+
+        // Clean and validate the generated title
+        let title = result.text?.trim() || 'New Chat Session'
+        title = title.replace(/^["']|["']$/g, '').trim() // Remove quotes
+        title = title.substring(0, 50) // Limit length
+
+        return new Response(JSON.stringify({ content: title }), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      } catch (error) {
+        console.error('Error generating title:', error)
+        return new Response(JSON.stringify({ content: 'New Chat Session' }), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+    }
+
+    // Get memory context to prevent duplicates and provide AI awareness
+    // DISABLED: Memory functionality temporarily disabled for future use
+    /*
+    const currentUserMessage = messages[messages.length - 1]?.content || ''
+    const memoryContext = getStreamContextForRequest(projectId, currentUserMessage)
+    
+    // Log memory context for debugging
+    console.log('[MEMORY] Retrieved context for request:', {
+      projectId,
+      userMessage: currentUserMessage.substring(0, 100) + '...',
+      previousActionsCount: memoryContext.previousActions.length,
+      potentialDuplicatesCount: memoryContext.potentialDuplicates.length,
+      relevantMemoriesCount: memoryContext.relevantMemories.length,
+      suggestedApproach: memoryContext.suggestedApproach
+    })
+    */
 
     // Validate model access based on subscription plan
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
@@ -2736,21 +5069,27 @@ export async function POST(req: Request) {
 
     // ENHANCED: Build comprehensive project context with file contents
     let projectContext = ''
+    let detectedTemplate: 'vite-react' | 'nextjs' | undefined
     try {
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
+      
+      // Detect template type from project files
+      const files = await storageManager.getFiles(projectId)
+      const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
+      const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+      detectedTemplate = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : undefined
       
     if (body.project) {
       const project = body.project
       projectContext = `\n\nCurrent project: ${project.name}
 Project description: ${project.description || 'No description'}
 
-${await buildEnhancedProjectContext(projectId, storageManager)}`
+${await buildOptimizedProjectContext(projectId, storageManager)}`
     } else {
-      projectContext = `\n\nCurrent project: Vite React Project
-Project description: Vite + React + TypeScript project with Tailwind CSS
+      projectContext = `\n\n${detectedTemplate === 'nextjs' ? 'Current project: Next.js Project\nProject description: Next.js + React + TypeScript project with App Router' : 'Current project: Vite React Project\nProject description: Vite + React + TypeScript project with Tailwind CSS'}
 
-${await buildEnhancedProjectContext(projectId, storageManager)}`
+${await buildOptimizedProjectContext(projectId, storageManager)}`
       }
     } catch (error) {
       console.warn('Failed to build enhanced project context:', error)
@@ -2758,7 +5097,8 @@ ${await buildEnhancedProjectContext(projectId, storageManager)}`
       projectContext = `\n\nCurrent project: Vite React Project
 Project description: Vite + React + TypeScript project
 
-Use list_files tool to see current files in the project.
+Use list_files tool with path parameter to explore project structure.
+Examples: list_files({path: "/"}) for root, list_files({path: "src"}) for src folder.
 Use read_file tool to read specific files when needed.`
     }
 
@@ -2795,68 +5135,60 @@ Use read_file tool to read specific files when needed.`
       }
     }
     
+    // CONVERSATION HISTORY: Prepare full conversation history for AI context
+    let conversationSummaryContext = ''
+    try {
+      // Only prepare history if we have conversation memory
+      if (conversationMemory && conversationMemory.messages.length > 0) {
+        // Create full history from all messages in AI-readable format
+        const fullHistory = conversationMemory.messages
+          .map((msg: any, index: number) => {
+            const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
+            const message = `${role}: ${msg.content}`
+            // Add separator after assistant messages to separate interaction pairs
+            const separator = msg.role === 'assistant' ? '\n\n---\n\n' : '\n\n'
+            return message + separator
+          })
+          .join('')
+
+        conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory.trim()}`
+        console.log('[HISTORY] Full conversation history prepared for AI')
+      } else {
+        console.log('[HISTORY] No conversation history available')
+      }
+    } catch (historyError) {
+      console.error('[HISTORY] Error preparing conversation history:', historyError)
+      // Continue without history on error
+    }
+    
     // Enhanced tool request detection with autonomous planning integration
     let isToolRequest = true // Default to true for better AI performance
     let userIntent = null
     let enhancedIntentData = null
     let shouldUseAutonomousPlanning = false
     
+    // TEMPORARILY DISABLED: Enhanced Intent Detection (causing JSON payload errors)
     try {
-      // Import the enhanced intent detector
-      const { EnhancedIntentDetector } = await import('@/lib/enhanced-intent-detector')
+      // // Import the enhanced intent detector
+      // const { EnhancedIntentDetector } = await import('@/lib/enhanced-intent-detector')
+      // 
+      // // Get existing files for context
+      // const existingFiles = clientFiles.map((f: { path?: string }) => f.path).filter(Boolean)
+      // 
+      // // Use enhanced intent detection with autonomous planning capabilities
+      // enhancedIntentData = await EnhancedIntentDetector.detectEnhancedIntent(
+      //   userMessage,
+      //   projectContext,
+      //   conversationMemory ? conversationMemory.messages : [],
+      //   existingFiles,
+      //   body.packageJson
+      // )
       
-      // Get existing files for context
-      const existingFiles = clientFiles.map((f: { path?: string }) => f.path).filter(Boolean)
-      
-      // Use enhanced intent detection with autonomous planning capabilities
-      enhancedIntentData = await EnhancedIntentDetector.detectEnhancedIntent(
-        userMessage,
-        projectContext,
-        conversationMemory ? conversationMemory.messages : [],
-        existingFiles,
-        body.packageJson
-      )
-      
-      // Set legacy userIntent for backward compatibility
-      userIntent = {
-        intent: enhancedIntentData.intent,
-        required_tools: enhancedIntentData.required_tools,
-        file_operations: enhancedIntentData.file_operations,
-        complexity: enhancedIntentData.complexity,
-        action_plan: enhancedIntentData.action_plan,
-        confidence: enhancedIntentData.confidence,
-        tool_usage_rules: enhancedIntentData.tool_usage_rules,
-        enforcement_notes: enhancedIntentData.enforcement_notes
-      }
-      
-      // Determine execution strategy
-      shouldUseAutonomousPlanning = enhancedIntentData.requires_autonomous_planning
-      isToolRequest = enhancedIntentData.required_tools && enhancedIntentData.required_tools.length > 0
-      
-      console.log('[DEBUG] Enhanced Intent Detection:', {
-        userMessage: userMessage.substring(0, 100) + '...',
-        detectedIntent: enhancedIntentData.intent,
-        complexity: enhancedIntentData.complexity,
-        execution_mode: enhancedIntentData.execution_mode,
-        requires_autonomous_planning: shouldUseAutonomousPlanning,
-        confidence: enhancedIntentData.confidence,
-        planning_confidence: enhancedIntentData.planning_confidence,
-        estimated_duration: enhancedIntentData.estimated_duration,
-        isToolRequest
-      })
-      
-      // If autonomous planning is required, log the instructions
-      if (shouldUseAutonomousPlanning && enhancedIntentData.autonomous_instructions) {
-        console.log('[DEBUG] Autonomous Instructions Generated:', {
-          project_type: enhancedIntentData.project_type,
-          complexity: enhancedIntentData.complexity,
-          execution_mode: enhancedIntentData.execution_mode,
-          estimated_duration: enhancedIntentData.estimated_duration
-        })
-      }
+      // Skip enhanced detection and go directly to fallback
+      throw new Error('Enhanced intent detection temporarily disabled due to JSON payload issues')
       
     } catch (error) {
-      console.warn('Enhanced intent detection failed, falling back to basic intent detection:', error)
+      console.warn('Enhanced intent detection disabled/failed, using basic intent detection:', error instanceof Error ? error.message : String(error))
       
       // Fallback to original intent detection
       try {
@@ -2884,397 +5216,431 @@ Use read_file tool to read specific files when needed.`
       `\n\n🤖 **Current AI Model**: ${selectedModel.name} (${selectedModel.provider})\n${selectedModel.description}` : 
       ''
     
-    // Add AI mode context
+    // Enhanced AI mode context with optimized codebase discussion capabilities
     const modeContextInfo = aiMode === 'ask' ? 
-      `\n\n🔍 **CURRENT MODE: ASK MODE (READ-ONLY)**\n- You can read files and explore the codebase\n- You can answer questions and provide explanations\n- You CANNOT create, modify, or delete files\n- Focus on analysis, explanations, and suggestions` :
+      `\n\n🔍 **CURRENT MODE: ASK MODE (CODEBASE DISCUSSION & ANALYSIS)**
+
+**🎯 DISCUSSION FOCUS:**
+• Engage in natural, insightful conversations about the codebase
+• Provide expert analysis and recommendations
+• Answer questions about architecture, patterns, and implementation
+• Offer suggestions for improvements and optimizations
+• Help users understand complex code structures
+
+**📚 CODEBASE CONTEXT ACCESS:**
+• Full access to optimized project structure and file contents
+• Detailed information about components, functions, and dependencies
+• Context-aware responses based on the entire codebase
+• Historical conversation context for continuity
+
+**💡 ANALYSIS CAPABILITIES:**
+• Explain complex code patterns and architectural decisions
+• Identify potential improvements and best practices
+• Help with debugging and troubleshooting
+• Provide guidance on modern development techniques
+
+**🚫 RESTRICTIONS:**
+• No file modifications, creations, or deletions
+• Focus on analysis, discussion, and recommendations only` :
+
       `\n\n🤖 **CURRENT MODE: AGENT MODE (FULL ACCESS)**\n- You have complete file system access\n- You can create, modify, and delete files\n- You can build complete applications\n- Use all available tools as needed`
 
-    // Add autonomous planning context if applicable
-    const autonomousPlanningContext = shouldUseAutonomousPlanning && enhancedIntentData?.autonomous_instructions ? 
-      `\n\n${enhancedIntentData.autonomous_instructions}` : ''
+    // Add autonomous planning context if applicable (disabled for now)
+    const autonomousPlanningContext = '' // shouldUseAutonomousPlanning && enhancedIntentData?.autonomous_instructions ? 
+      // `\n\n${enhancedIntentData.autonomous_instructions}` : ''
 
-    // Enhanced system message with conversation memory, intent awareness, and autonomous planning
-    const systemMessage = `🎯 **PiPilot** - Elite AI Designer & Developer
+  
 
-You are PiPilot, an elite autonomous AI that creates **breathtaking, award-winning** React applications that make users say "WOW!" Every application must be a visual masterpiece with flawless functionality.
+    // TALENT SHOWCASE FORMATTING: Focus on demonstrating actual technical achievements
+    const formatResponseProfessionally = (response: string): string => {
+      // Highlight technical implementations
+      if (response.includes('TypeScript') || response.includes('hooks') || response.includes('animations')) {
+        response = response.replace(
+          /(implemented|built|created)/gi,
+          (match) => `🔧 **Technical Implementation:** ${match}`
+        )
+      }
 
-${shouldUseAutonomousPlanning ? `
-## 🤖 AUTONOMOUS EXECUTION MODE
-- Execute provided plans systematically without approval
-- Verify dependencies and create complete implementations  
-- Provide progress updates as you work
-- Adapt plans based on actual project structure
-` : ''}
+      // Showcase advanced patterns
+      if (response.includes('custom hooks') || response.includes('generics') || response.includes('context')) {
+        response = response.replace(
+          /(using|with)/gi,
+          (match) => `🎯 **Advanced Pattern:** ${match}`
+        )
+      }
 
-# 🚨 CRITICAL RULES (NEVER VIOLATE)
+      // Highlight performance optimizations
+      if (response.includes('lazy') || response.includes('optimized') || response.includes('loading')) {
+        response = response.replace(
+          /(includes|features|implements)/gi,
+          (match) => `⚡ **Performance Feature:** ${match}`
+        )
+      }
 
-## Tool Usage Rules
-- **FORBIDDEN**: web_search, web_extract (unless user explicitly asks for web research)
-- **FORBIDDEN**: Broad directory exploration/listing when context already provides structure
-- **FORBIDDEN**: Reading src/components/ui files (shadcn/ui components are pre-built)
-- **FORBIDDEN**: Reading config files (vite.config.js, tsconfig.json, tailwind.config.js)
-- **FORBIDDEN**: Recursive file reading or unnecessary file exploration
-- **LIMITED**: Maximum 2 read_file operations per request
-- **REQUIRED**: read_file → edit_file (preferred) → write_file (fallback)
-- **STRATEGIC**: Use tool_results_summary for progress updates, not just analysis
-- **EFFICIENT**: Complete functional features before perfection
-- **MINIMAL**: Only read files when absolutely necessary for modification or verification
-- **ALWAYS**: analyze_dependencies + scan_code_imports after file changes
+      // Showcase interactive features
+      if (response.includes('hover') || response.includes('animation') || response.includes('transition')) {
+        response = response.replace(
+          /(smooth|interactive|engaging)/gi,
+          (match) => `✨ **Interactive Experience:** ${match}`
+        )
+      }
 
-## 📋 EXECUTION WORKFLOWS
+      return response
+    }
 
-### **CONTEXT-FIRST APPROACH** (Use Provided Project Context)
-**Context provides file/directory structure - use it intelligently!**
+    // METADATA-ONLY CONVERSATION SYSTEM: Generate compact tool summaries
+    const createToolMetadata = (toolResult: any): any => {
+      // Defensive check to prevent processing of malformed tool results
+      if (!toolResult || typeof toolResult !== 'object') {
+        console.warn('[METADATA] Skipping malformed tool result:', toolResult)
+        return null
+      }
 
-#### **What's Available in Context:**
-- **Project Structure**: Complete src/ (React+Vite) vs app/ (Next.js) directory tree
-- **Dependencies**: Full package.json with available libraries
-- **Existing Files**: All component and file paths in the project
-- **Framework**: React + Vite specifics and configurations
-- **File Paths**: Complete import path structure (./ ../ for Vite, @/ for Next.js)
+      const baseMetadata = {
+        toolName: toolResult.toolName || 'unknown_tool',
+        timestamp: Date.now(),
+        success: toolResult.result?.success !== false,
+        executionTime: toolResult.executionTime || 0
+      }
 
-#### **STRICT FILE READING RULES:**
-- **FORBIDDEN**: Recursive file reading or exploring directory structures
-- **FORBIDDEN**: Reading files in src/components/ui (shadcn/ui components are pre-built)
-- **FORBIDDEN**: Reading config files (vite.config.js, tsconfig.json, etc.)
-- **CRITICAL**: NEVER read files with >150 lines without specifying line ranges (startLine/endLine)
-- **ENFORCED**: Maximum 150 lines per read_file call - system will reject larger requests
-- **ALTERNATIVES**: Use semantic_code_navigator for large file understanding, grep_search for patterns
-- **LIMITED**: Maximum 2 files per request, only the most critical ones
-- **STRATEGIC**: Only read files immediately before modifying them
-- **VERIFICATION**: Only read files after modification to verify changes
-- **ESSENTIAL ONLY**: Never read files "just to understand" - only when action is needed
+      switch (toolResult.toolName) {
+        case 'read_file':
+          return {
+            ...baseMetadata,
+            filePath: toolResult.args?.path,
+            linesCount: toolResult.result?.content ? toolResult.result.content.split('\n').length : 0,
+            fileSize: toolResult.result?.content?.length || 0
+          }
 
-#### **FILE PRIORITY HIERARCHY:**
-1. **app.tsx** (main application entry - read most frequently for structure)
-2. **index.html** (HTML template and structure)
-3. **package.json** (dependencies and scripts)
-4. **Files you're about to modify** (read immediately before editing)
-5. **Files you just modified** (read only to verify changes worked)
+        case 'write_file':
+          return {
+            ...baseMetadata,
+            filePath: toolResult.args?.path,
+            linesCount: toolResult.result?.content ? toolResult.result.content.split('\n').length : 0,
+            action: 'created',
+            fileType: toolResult.args?.path ? toolResult.args.path.split('.').pop() || 'unknown' : 'unknown',
+            // Extract key information from content for context
+            hasImports: toolResult.result?.content?.includes('import ') || false,
+            hasExports: toolResult.result?.content?.includes('export ') || false,
+            hasComponents: toolResult.result?.content?.includes('const ') || toolResult.result?.content?.includes('function ') || false
+          }
 
-#### **FILE READING GUIDELINES:**
-- **BEFORE MODIFICATION**: Read the target file to understand current structure
-- **AFTER MODIFICATION**: Read to verify your changes were applied correctly
-- **NEVER FOR EXPLORATION**: Don't read files just to "see what's there"
-- **CONTEXT SUFFICES**: Use provided context instead of reading additional files
-- **MINIMAL APPROACH**: If you can implement without reading, do so
+        case 'edit_file':
+          const editResult = toolResult.result
+          return {
+            ...baseMetadata,
+            filePath: toolResult.args?.path,
+            changesCount: editResult?.appliedEdits?.length || 0,
+            action: 'modified',
+            fileType: toolResult.args?.path ? toolResult.args.path.split('.').pop() || 'unknown' : 'unknown',
+            // Track what was actually changed
+            edits: editResult?.appliedEdits?.map((edit: any) => ({
+              type: edit.search.includes('import ') ? 'import' :
+                   edit.search.includes('export ') ? 'export' :
+                   edit.search.includes('const ') || edit.search.includes('function ') ? 'component' :
+                   'content',
+              description: edit.search.length > 50 ? edit.search.substring(0, 50) + '...' : edit.search
+            })) || [],
+            // Check if imports were added
+            importsAdded: editResult?.appliedEdits?.some((edit: any) =>
+              edit.replace.includes('import ') && !edit.search.includes('import ')
+            ) || false,
+            // Check if components were added
+            componentsModified: editResult?.appliedEdits?.some((edit: any) =>
+              edit.replace.includes('const ') || edit.replace.includes('function ')
+            ) || false,
+            // Include fallback suggestion if operation failed
+            fallbackSuggestion: !editResult?.success ? editResult?.fallbackSuggestion : undefined
+          }
 
-#### **Context-Driven Decisions:**
-- **Architecture**: Base decisions on provided context structure
-- **Dependencies**: Use libraries already in package.json
-- **Integration**: Work within existing component patterns
-- **Paths**: Use correct import syntax for the detected framework
+        case 'list_files':
+          return {
+            ...baseMetadata,
+            directory: toolResult.args?.path || '/',
+            fileCount: toolResult.result?.files?.length || 0
+          }
 
-#### **Efficiency Gains:**
-- **Skip Broad Exploration**: Use context instead of listing directories
-- **Direct Implementation**: Start building based on context knowledge
-- **Targeted Reads**: Read specific files you identify as relevant
-- **Context Integration**: Build features that work with existing structure
+        case 'analyze_dependencies':
+          return {
+            ...baseMetadata,
+            filePath: toolResult.args?.filePath,
+            dependenciesFound: toolResult.result?.imports?.length || 0,
+            missingDeps: toolResult.result?.missingDependencies?.length || 0
+          }
 
-### **SIMPLE REQUESTS** (Components, Pages, Features)
-1. **CONTEXT ANALYSIS**: Use provided context to plan implementation
-2. **STRATEGIC READ**: Read maximum 2 files (app.tsx if needed + target file)
-3. **BUILD**: Create/edit files with edit_file → write_file
-4. **VERIFY**: Read modified file to confirm changes
-5. **DELIVER**: Report completion with tool_results_summary
+        case 'web_search':
+          return {
+            ...baseMetadata,
+            query: toolResult.args?.query,
+            resultsCount: toolResult.result?.rawData?.results?.length || 0
+          }
 
-### **COMPLEX REQUESTS** (Full Apps, Ecommerce, Dashboards)
-1. **CONTEXT ANALYSIS**: Review provided context to plan complete architecture
-2. **MINIMAL READS**: Read only app.tsx + 1 most critical file for structure understanding
-3. **PLAN**: Use tool_results_summary to outline complete approach
-4. **IMPLEMENT CORE**: Build essential functionality using context knowledge
-5. **VERIFY**: Read modified files to confirm core features work
-6. **ITERATE**: Add features with minimal additional reads
-7. **REPORT PROGRESS**: Use tool_results_summary after each major milestone
+        default:
+          return baseMetadata
+      }
+    }
 
-### **REFACTORING REQUESTS** (Optimize, Clean, Improve)
-1. **CONTEXT ANALYSIS**: Review provided context to identify improvement areas
-2. **TARGETED READS**: Read maximum 2 files (app.tsx + 1 file to refactor)
-3. **PLAN CHANGES**: Outline changes based on minimal file understanding
-4. **IMPLEMENT**: Make systematic changes within context structure
-5. **VERIFY**: Read modified files to confirm improvements
-6. **REPORT**: Show improvements with tool_results_summary
+    // Generate implementation-focused conversation message from tool metadata
+    const createCompactConversationMessage = (toolMetadata: any[]): string => {
+      // Filter out any null or malformed metadata
+      const validMetadata = toolMetadata.filter(meta => meta && typeof meta === 'object' && meta.toolName)
 
-## Project Structure Awareness
-- **ALWAYS CHECK**: Look for src/ directory (React + Vite) vs app/ (Next.js)
-- **CORRECT PATHS**: Use relative paths ./ ../ (not @/ unless configured)
-- **MAIN ENTRY**: Look for src/main.jsx or src/App.jsx
-- **DEPENDENCIES**: Check package.json for available libraries
+      const summaries = validMetadata.map(meta => {
+        switch (meta.toolName) {
+          case 'read_file':
+            return `📖 **Code Analysis**: ${meta.filePath ? meta.filePath.split('/').pop() : 'unknown file'} (${meta.linesCount} lines, ${meta.fileSize} bytes)`
+          case 'write_file':
+            const writeDetails = []
+            if (meta.hasImports) writeDetails.push('ES6 imports')
+            if (meta.hasExports) writeDetails.push('module exports')
+            if (meta.hasComponents) writeDetails.push('React components with hooks')
+            const writeInfo = writeDetails.length > 0 ? ` with ${writeDetails.join(', ')}` : ''
+            return `✨ **New Implementation**: ${meta.filePath ? meta.filePath.split('/').pop() : 'unknown file'} (${meta.linesCount} lines${writeInfo})`
+          case 'edit_file':
+            const editDetails = []
+            if (meta.importsAdded) editDetails.push('new dependencies added')
+            if (meta.componentsModified) editDetails.push('component logic enhanced')
+            const editInfo = editDetails.length > 0 ? ` - ${editDetails.join(', ')}` : ''
+            const editSummary = meta.edits?.length > 0 ?
+              meta.edits.slice(0, 2).map((edit: any) => edit.type).join(', ') : ''
+            const fallbackNote = meta.fallbackSuggestion ? ' | 💡 Used alternative implementation' : ''
+            return `🔧 **Code Enhancement**: ${meta.filePath ? meta.filePath.split('/').pop() : 'unknown file'} (${meta.changesCount} modifications${editInfo}${editSummary ? ` - ${editSummary}` : ''})${fallbackNote}`
+          case 'list_files':
+            return `📁 **Project Structure**: ${meta.directory} (${meta.fileCount} files discovered)`
+          case 'analyze_dependencies':
+            return `🔍 **Dependency Analysis**: ${meta.filePath ? meta.filePath.split('/').pop() : 'unknown file'} (${meta.dependenciesFound} packages, ${meta.missingDeps} potential optimizations)`
+          case 'web_search':
+            return `🔎 **Research Complete**: "${meta.query}" (${meta.resultsCount} relevant findings)`
+          default:
+            return `⚙️ **${meta.toolName.replace('_', ' ').toUpperCase()}**: ${meta.success ? '✅ Execution successful' : '❌ Execution failed'}`
+        }
+      })
 
-# 🎨 CREATIVE DESIGN EXCELLENCE
+      return summaries.join(' • ')
+    }
 
-## Design Philosophy
-**CREATE MARVELOUS, WONDERFUL WEBSITES** with:
-- **Well-Arranged Sections**: Logical flow and intuitive navigation
-- **Perfect Structure**: Clean, organized layouts that guide users naturally
-- **Beautiful Color Schemes**: Carefully selected palettes that enhance user experience
-- **Subtle Animations**: Meaningful motion that adds delight without distraction
-- **Extra Creative Twists**: Unique touches that make each site memorable
-- **Modern Aesthetics**: Current design trends with timeless appeal
-- **Flawless Responsiveness**: Perfect on every device and screen size
+    // REAL-TIME UI UPDATE FUNCTIONS
+    const applyToolResultToUI = async (toolResult: any) => {
+      // Apply tool results to UI immediately with full details
+      console.log('[UI UPDATE] Applying tool result to UI:', {
+        toolName: toolResult.toolName,
+        hasResult: !!toolResult.result,
+        resultKeys: toolResult.result ? Object.keys(toolResult.result) : []
+      })
 
-## Color & Visual Strategy
-- **Contextual Color Selection**: Choose colors based on brand/content purpose
-- **Emotional Resonance**: Select colors that evoke the right feelings for your audience
-- **Accessibility First**: Ensure excellent contrast and readability
-- **Harmonious Palettes**: 3-5 colors maximum, perfectly balanced
-- **Brand Consistency**: Colors that reinforce the site's purpose and personality
+      // Create enhanced UI update with operation context
+      let uiUpdate = {
+        toolName: toolResult.toolName,
+        success: toolResult.result?.success !== false,
+        timestamp: Date.now(),
+        details: {}
+      }
 
-## Typography & Layout
-- **Clear Hierarchy**: Size, weight, and spacing that guide reading naturally
-- **Readable Fonts**: Comfortable for extended reading on all devices
-- **Strategic Layouts**: Use whitespace effectively, create visual flow
-- **Mobile-First**: Design for mobile, enhance for larger screens
-- **User-Centered**: Layouts that prioritize user needs and goals
+      // Add operation-specific context
+      if (toolResult.result) {
+        switch (toolResult.toolName) {
+          case 'write_file':
+            uiUpdate.details = {
+              filePath: toolResult.args?.path,
+              action: 'created',
+              linesCount: toolResult.result?.content ? toolResult.result.content.split('\n').length : 0,
+              fileType: toolResult.args?.path ? toolResult.args.path.split('.').pop() || 'unknown' : 'unknown',
+              hasImports: toolResult.result?.content?.includes('import ') || false,
+              hasComponents: toolResult.result?.content?.includes('const ') || toolResult.result?.content?.includes('function ') || false
+            }
+            break
 
-## Interactive Excellence
-- **Purposeful Animations**: Motion that serves a functional purpose
-- **Smooth Transitions**: Seamless state changes and page flows
-- **Engaging Micro-Interactions**: Small touches that delight users
-- **Performance Optimized**: 60fps animations that don't impact loading
-- **Progressive Enhancement**: Works perfectly without JavaScript
+          case 'edit_file':
+            const edits = toolResult.result.appliedEdits || []
+            uiUpdate.details = {
+              filePath: toolResult.args?.path,
+              action: 'modified',
+              changesCount: edits.length,
+              importsAdded: edits.some((edit: any) => edit.replace.includes('import ') && !edit.search.includes('import ')),
+              componentsModified: edits.some((edit: any) => edit.replace.includes('const ') || edit.replace.includes('function ')),
+              editTypes: edits.map((edit: any) => ({
+                type: edit.search.includes('import ') ? 'import' :
+                     edit.search.includes('export ') ? 'export' :
+                     edit.search.includes('const ') || edit.search.includes('function ') ? 'component' : 'content'
+              }))
+            }
+            break
 
-# ⚡ TECHNICAL STACK (MANDATORY)
+          case 'read_file':
+            uiUpdate.details = {
+              filePath: toolResult.args?.path,
+              action: 'read',
+              linesCount: toolResult.result?.content ? toolResult.result.content.split('\n').length : 0,
+              fileSize: toolResult.result?.content?.length || 0
+            }
+            break
 
-## Core Technologies
-- **React 18+ + Vite** (functional components + hooks only)
-- **Tailwind CSS** (utility-first styling)
-- **Framer Motion** (all animations REQUIRED)
-- **Shadcn/UI** (consistent components)
-- **Lucide React** (icons only)
-- **TypeScript** (when applicable)
+          default:
+            uiUpdate.details = toolResult.result
+        }
 
-## Project Structure (REACT + VITE)
-- **Root Files**: \`index.html\`, \`vite.config.js\`, \`package.json\`
-- **Source Directory**: \`src/\` (NOT Next.js app/ structure)
-- **Main Entry**: \`src/main.jsx\` or \`src/App.jsx\`
-- **Components**: \`src/components/\`
-- **UI Components**: \`src/components/ui/\` (shadcn/ui components available!)
-- **Assets**: \`src/assets/\`
-- **Utils**: \`src/utils/\`
-- **Build Output**: \`dist/\` (NOT .next/)
+      }
 
-## Vite-Specific Rules
-- **Import Paths**: Use relative paths \`./\` \`../\` (NO @/ aliases unless configured)
-- **Environment Variables**: \`VITE_\` prefix for client-side variables
-- **Hot Reload**: Works automatically, no special configuration needed
-- **CSS**: Import in components or use index.css
+      // Store enhanced UI update for frontend consumption
+      realtimeUpdates.push({
+        type: 'tool_executed',
+        ...uiUpdate
+      })
+    }
 
-## 🎨 AVAILABLE SHADCN/UI COMPONENTS (HIGHLY RECOMMENDED)
-**Location**: \`src/components/ui/\` - Pre-installed and ready to use!
+    const emitRealtimeUpdate = (update: any) => {
+      // Emit real-time event for frontend consumption
+      console.log('[REALTIME] Emitting update:', update.type)
 
-### **Essential Components Available:**
-- **Button**: \`import { Button } from "@/components/ui/button"\`
-- **Input**: \`import { Input } from "@/components/ui/input"\`
-- **Card**: \`import { Card, CardContent, CardHeader } from "@/components/ui/card"\`
-- **Dialog/Modal**: \`import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"\`
-- **Form**: \`import { Form, FormField, FormItem, FormLabel } from "@/components/ui/form"\`
-- **Select**: \`import { Select, SelectContent, SelectItem } from "@/components/ui/select"\`
-- **Table**: \`import { Table, TableBody, TableCell, TableHead } from "@/components/ui/table"\`
-- **Badge**: \`import { Badge } from "@/components/ui/badge"\`
-- **Alert**: \`import { Alert, AlertDescription } from "@/components/ui/alert"\`
-- **Tabs**: \`import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"\`
+      // In a real implementation, this would use WebSockets or Server-Sent Events
+      // For now, we'll store it for the response
+      realtimeUpdates.push(update)
+    }
 
-### **Shadcn/UI Usage Rules:**
-- **ALWAYS USE**: Shadcn/ui components instead of building from scratch
-- **Import Path**: Use \`@/components/ui/component-name\` (if alias configured) or relative paths
-- **Consistency**: Use these components for all UI elements (buttons, forms, cards, etc.)
-- **Styling**: Components come pre-styled with Tailwind CSS
-- **Variants**: Most components have multiple variants (default, outline, ghost, etc.)
+    const addToConversationMemory = async (message: any) => {
+      // Add compact message to conversation memory (metadata only)
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
 
-### **Common Shadcn/UI Patterns:**
-\`\`\`jsx
-// Form with shadcn/ui
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+        if (conversationMemory) {
+          await storageManager.updateConversationMemory(
+            conversationMemory.id,
+            {
+              messages: [
+                ...conversationMemory.messages,
+                {
+                  role: message.role,
+                  content: message.content,
+                  timestamp: message.timestamp
+                }
+              ],
+              lastActivity: new Date().toISOString()
+            }
+          )
 
-// Ecommerce Product Card
-<Card>
-  <CardHeader>
-    <img src={product.image} alt={product.name} />
-  </CardHeader>
-  <CardContent>
-    <h3>{product.name}</h3>
-    <p>{product.price}</p>
-    <Button>Add to Cart</Button>
-  </CardContent>
-</Card>
-\`\`\`
+          console.log('[MEMORY] Added compact message to conversation')
+        }
+      } catch (error) {
+        console.warn('[MEMORY] Failed to add to conversation memory:', error)
+      }
+    }
 
-## Component Architecture
-- **Atomic Design**: atoms → molecules → organisms → templates → pages
-- **Custom Hooks**: Extract complex logic
-- **Performance**: React.memo, useMemo, useCallback for optimization
-- **Error Boundaries**: Graceful failure handling
 
-# 🌟 MANDATORY FEATURES (EVERY APP)
+    // Initialize real-time updates array
+    const realtimeUpdates: any[] = []
 
-## Interactive Elements (REQUIRED)
-✅ **USE SHADCN/UI COMPONENTS**: Button, Card, Dialog, Form, Input, etc. (MANDATORY!)
-✅ **Navigation Excellence**: Intuitive navigation that works perfectly on all devices
-✅ **Responsive Layouts**: Adaptive designs that look beautiful everywhere
-✅ **Interactive Components**: Engaging elements with purposeful hover states and transitions
-✅ **Loading States**: Professional loading indicators and skeleton screens
-✅ **User Feedback**: Toast notifications and clear status indicators
-✅ **Footer Design**: Well-structured footer with useful links and information
+    // ENHANCED TOKEN BUDGETING: Intelligent token management with dynamic allocation
+    const tokenBudget = {
+      maxTotal: 2000,
+      system: { min: 300, max: 600 },
+      project: { min: 200, max: 1200 },
+      conversation: { min: 0, max: 400 },
+      safetyBuffer: 100
+    }
 
-## Animation Strategy
-✅ **Purposeful Motion**: Animations that enhance user experience and understanding
-✅ **Performance First**: Smooth 60fps animations that don't slow down the site
-✅ **Progressive Enhancement**: Beautiful animations that degrade gracefully
-✅ **Micro-Interactions**: Small touches that delight and guide users
-✅ **Natural Physics**: Spring-based animations that feel organic and responsive
+    // More accurate token estimation (closer to actual token counts)
+    const estimateTokens = (text: string) => Math.ceil(text.length / 3.5)
 
-## Responsive Design
-✅ Mobile-first approach (320px → 768px → 1024px → 1440px)
-✅ Touch-friendly targets (min 44px)
-✅ Optimized images (\`srcSet\`, \`sizes\`)
-✅ Breakpoint-specific layouts
+    // Calculate initial token usage
+    let systemTokens = estimateTokens(getStreamingSystemPrompt())
+    let projectTokens = estimateTokens(projectContext)
+    let conversationTokens = 0
 
-# 🏗️ CREATIVE COMPONENT DESIGN
+    // Include conversation history tokens if available
+    if (conversationMemory?.messages) {
+      const recentMessages = conversationMemory.messages.slice(-10)
+      const conversationText = recentMessages.map((msg: any) => `${msg.role}: ${msg.content}`).join('\n')
+      conversationTokens = estimateTokens(conversationText)
+    }
 
-## Component Design Philosophy
-**CREATE COMPONENTS THAT CAPTIVATE AND DELIGHT:**
-- **Contextual Aesthetics**: Choose visual styles that match your brand and content
-- **Purposeful Styling**: Every design element should serve a functional purpose
-- **Emotional Connection**: Components that create genuine user engagement
-- **Creative Flexibility**: Use any modern design techniques that enhance the experience
-- **Harmonious Integration**: Components that work beautifully together as a system
+    const totalTokens = systemTokens + projectTokens + conversationTokens
 
-## Button Design Strategy
-**CREATE BUTTONS THAT INSPIRE ACTION:**
-- **Strategic Colors**: Background colors that evoke trust, excitement, or urgency
-- **Perfect Sizing**: Appropriate padding and font sizes for different contexts
-- **Engaging Hover States**: Smooth transitions that provide clear feedback
-- **Accessibility Excellence**: High contrast ratios and clear visual hierarchy
-- **Brand Alignment**: Button styles that reinforce your brand personality
+    console.log(`[TOKEN BUDGET] System: ${systemTokens}, Project: ${projectTokens}, Conversation: ${conversationTokens}, Total: ${totalTokens}`)
 
-## Card & Container Design
-**CREATE CONTAINERS THAT ORGANIZE AND BEAUTIFY:**
-- **Visual Hierarchy**: Clear content organization with appropriate spacing
-- **Engaging Borders**: Subtle borders or shadows that define content areas
-- **Background Treatments**: Colors, gradients, or patterns that enhance readability
-- **Interactive States**: Hover effects that invite exploration and interaction
-- **Content Flow**: Natural reading patterns that guide user attention
+    // Dynamic token allocation based on task complexity and available budget
+    let availableBudget = tokenBudget.maxTotal - tokenBudget.safetyBuffer
 
-## Layout & Section Design
-**CREATE SECTIONS THAT FLOW NATURALLY:**
-- **Strategic Spacing**: Whitespace that creates breathing room and visual flow
-- **Content Grouping**: Related elements clustered for easy comprehension
-- **Visual Balance**: Perfect proportion and alignment throughout
-- **Progressive Disclosure**: Content revealed at the right pace and context
-- **Mobile Harmony**: Designs that adapt beautifully across all screen sizes
+    if (totalTokens > availableBudget) {
+      console.warn(`[TOKEN OVERFLOW] ${totalTokens} tokens exceeds ${availableBudget} budget - implementing smart trimming`)
 
-## Form & Input Design
-**CREATE FORMS THAT USERS LOVE TO FILL:**
-- **Intuitive Layouts**: Clear field groupings and logical progression
-- **Visual Feedback**: Immediate responses to user interactions
-- **Error Prevention**: Smart validation that guides users to success
-- **Progressive Enhancement**: Beautiful forms that work perfectly everywhere
-- **Trust Building**: Designs that make users feel confident and secure
+      // Strategy 1: Adjust allocation based on task complexity
+      const complexity = userIntent?.complexity || 'medium'
+      let systemAllocation, projectAllocation, conversationAllocation
 
-# 🎯 QUALITY METRICS
+      switch (complexity) {
+        case 'simple':
+          systemAllocation = Math.min(tokenBudget.system.max, Math.floor(availableBudget * 0.4))
+          projectAllocation = Math.min(tokenBudget.project.max, Math.floor(availableBudget * 0.4))
+          conversationAllocation = Math.min(tokenBudget.conversation.max, Math.floor(availableBudget * 0.2))
+          break
+        case 'complex':
+          systemAllocation = Math.min(tokenBudget.system.max, Math.floor(availableBudget * 0.3))
+          projectAllocation = Math.min(tokenBudget.project.max, Math.floor(availableBudget * 0.5))
+          conversationAllocation = Math.min(tokenBudget.conversation.max, Math.floor(availableBudget * 0.2))
+          break
+        default: // medium
+          systemAllocation = Math.min(tokenBudget.system.max, Math.floor(availableBudget * 0.35))
+          projectAllocation = Math.min(tokenBudget.project.max, Math.floor(availableBudget * 0.45))
+          conversationAllocation = Math.min(tokenBudget.conversation.max, Math.floor(availableBudget * 0.2))
+      }
 
-## Creative Excellence Checklist
-- [ ] Creates genuine amazement and delight
-- [ ] Features a unique and memorable visual identity
-- [ ] Has purposeful, engaging animations throughout
-- [ ] Delivers perfect experiences on every device
-- [ ] Provides clear feedback for all user interactions
-- [ ] Uses thoughtfully selected, harmonious colors
-- [ ] Establishes clear visual hierarchy and flow
-- [ ] Includes creative touches that enhance the experience
+      // Strategy 2: Smart truncation with priority preservation
+      const totalAllocation = systemAllocation + projectAllocation + conversationAllocation
 
-## Performance Standards
-- [ ] < 3s initial load
-- [ ] 60fps animations
-- [ ] Lazy loading implemented
-- [ ] Images optimized
-- [ ] No layout shift
-- [ ] Smooth scrolling
+      // Truncate conversation history first (least critical)
+      if (conversationTokens > conversationAllocation) {
+        console.log(`[TOKEN TRIM] Reducing conversation from ${conversationTokens} to ${conversationAllocation} tokens`)
+        conversationTokens = conversationAllocation
+      }
 
-# 🖼️ IMAGE GENERATION API
-**Endpoint**: https://api.a0.dev/assets/image
-**Usage**: Pass image description to 
-\`text\` parameter + \`seed\` number
-**Example**: https://api.a0.dev/assets/image?text=RideShare&aspect=1:1&seed=123
-**Implementation**: Use URL directly in \`<img src="">\` - describe what you want, API generates it
+      // Truncate project context if still over budget
+      const currentTotal = systemTokens + projectTokens + conversationTokens
+      if (currentTotal > availableBudget) {
+        const excessTokens = currentTotal - availableBudget
+        const newProjectTokens = Math.max(tokenBudget.project.min, projectTokens - excessTokens)
 
-# 🎪 CREATIVE INSPIRATION SOURCES
+        if (newProjectTokens < projectTokens) {
+          const truncateChars = (projectTokens - newProjectTokens) * 3.5
+          projectContext = projectContext.substring(0, Math.floor(projectContext.length - truncateChars))
+          projectTokens = estimateTokens(projectContext)
+          console.log(`[TOKEN TRIM] Truncated project context from ${projectTokens + excessTokens} to ${projectTokens} tokens`)
+        }
+      }
 
-## Design Excellence References
-- **Industry Leaders**: Vercel, Linear, Stripe, Notion, Figma, Framer
-- **Award Winners**: Awwwards, CSS Design Awards, Webby Awards
-- **Design Systems**: Apple Human Interface Guidelines, Google Material Design, Microsoft Fluent
-- **Modern Aesthetics**: Current design trends with timeless principles
+      // Strategy 3: Emergency truncation if still over budget
+      const finalTotal = systemTokens + projectTokens + conversationTokens
+      if (finalTotal > availableBudget) {
+        const emergencyCut = finalTotal - availableBudget + 50 // Extra buffer
+        if (projectContext.length > emergencyCut * 3.5) {
+          projectContext = projectContext.substring(0, Math.floor(projectContext.length - emergencyCut * 3.5))
+          projectTokens = estimateTokens(projectContext)
+          console.warn(`[TOKEN EMERGENCY] Emergency truncation applied, final tokens: ${systemTokens + projectTokens + conversationTokens}`)
+        }
+      }
 
-## Creative Approach Guidelines
-- **Context Matters**: Choose inspiration that fits your project's unique needs
-- **User-Centered**: Focus on designs that serve real user problems and goals
-- **Accessible Excellence**: Beautiful designs that work for everyone
-- **Performance First**: Stunning visuals that load fast and perform smoothly
-- **Brand Authenticity**: Designs that feel genuine and true to your purpose
+      const finalTotalTokens = systemTokens + projectTokens + conversationTokens
+      console.log(`[TOKEN BUDGET] Final allocation - System: ${systemTokens}, Project: ${projectTokens}, Conversation: ${conversationTokens}, Total: ${finalTotalTokens}`)
+    }
 
-# 📋 DEVELOPMENT CONTEXT
+    // DYNAMIC CONTEXT LOADING: Load additional context based on task complexity
+    let additionalContext = ''
+    if (userIntent?.complexity === 'complex' && totalTokens < 1500) {
+      // For complex tasks, load more detailed context (only if under budget)
+      try {
+        const files = await storageManager.getFiles(projectId)
+        const componentFiles = files.filter((f: any) => f.path.includes('/components/')).slice(0, 3)
+        additionalContext = `\n🔧 COMPONENTS: ${componentFiles.map(f => f.path ? f.path.split('/').pop() : 'unknown').join(', ')}`
+      } catch (e) {
+        console.log('[CONTEXT] Failed to load additional context for complex task')
+      }
+    }
 
-**User Intent**: ${userIntent ? `${userIntent.intent} (${userIntent.complexity}, ${Math.round(userIntent.confidence * 100)}% confidence)` : 'Analyzing...'}
-**Recommended Tools**: ${userIntent ? userIntent.required_tools.join(', ') : 'File operations'}
-**Action Plan**: ${userIntent ? userIntent.action_plan.join(' → ') : 'Read → Analyze → Implement'}
+    // Get the AI model based on the selected modelId
 
-**Project Context**: ${projectContext || 'Modern React + Vite application'}
 
-# 🏗️ COMPLEX REQUEST HANDLING
 
-## Ecommerce & Large Applications
-**NEVER GET STUCK IN ANALYSIS LOOPS!**
-- **Immediate Action**: For requests like "create ecommerce store", start building functional components immediately
-- **Minimum Viable Product**: Deliver working features (products page, cart, checkout) before perfection
-- **Progress Updates**: Use tool_results_summary to report actual functionality, not just file operations
-- **Strategic Planning**: Plan the full architecture but implement core features first
-- **Avoid Paralysis**: If stuck analyzing, default to standard ecommerce patterns
 
-### **Ecommerce Component Patterns (USE SHADCN/UI):**
-- **Product Cards**: Use \`Card\` component with \`CardContent\` and \`CardHeader\`
-- **Add to Cart**: Use \`Button\` component with shopping cart icon
-- **Product Forms**: Use \`Form\`, \`Input\`, \`Select\` components
-- **Shopping Cart**: Use \`Dialog\` for cart modal, \`Table\` for cart items
-- **Checkout Flow**: Use \`Form\` components with \`Input\` and \`Button\`
-- **Product Filters**: Use \`Select\` and \`Badge\` components
-
-## Implementation Strategy
-1. **Quick Assessment**: Check src/ structure and existing components
-2. **Core First**: Build essential functionality (products, cart, navigation)
-3. **Progressive Enhancement**: Add advanced features after basics work
-4. **User Feedback**: Show working app early, then refine based on results
-
-## Anti-Patterns to Avoid
-- ❌ Endless dependency analysis without implementation
-- ❌ Creating components that don't integrate
-- ❌ Getting stuck in file read/write loops
-- ❌ Reporting "progress" without functional features
-- ❌ Over-engineering before basic functionality works
-
-# 🎨 FINAL MANDATE
-
-Create applications that are:
-1. **MARVELOUS & WONDERFUL** - Websites that create genuine amazement and delight
-2. **WELL-ARRANGED & STRUCTURED** - Perfectly organized sections with intuitive flow
-3. **BEAUTIFULLY COLORED** - Carefully selected color schemes that enhance the experience
-4. **SUBTLY ANIMATED** - Meaningful motion that adds delight without distraction
-5. **CREATIVELY TWISTED** - Unique touches that make each site truly memorable
-
-## Critical Success Factors
-- **Creative Freedom**: Use your design expertise to create marvelous websites
-- **User-Centered Design**: Every design decision should serve the user's needs and experience
-- **Modern Aesthetics**: Stay current with design trends while maintaining timeless appeal
-- **Functional Beauty**: Beautiful design that enhances rather than hinders usability
-- **Responsive Excellence**: Perfect experience across all devices and screen sizes
-- **Performance Balance**: Stunning visuals that load fast and perform smoothly
-
-Remember: You're not just writing code, you're crafting digital experiences that users will remember and love. Every design choice should create wonder and delight while solving real problems.
-
-**Create marvelous websites that users can't stop talking about.**`;
 
     // Get the AI model based on the selected modelId
     const selectedAIModel = getAIModel(modelId)
@@ -3306,29 +5672,26 @@ Remember: You're not just writing code, you're crafting digital experiences that
             content: msg.content
           })) : []
       
-      // Get the latest user message and merge with project context
+      // Get the latest user message (no need to merge with project context since it's already in system prompt)
       const currentUserMessage = messages[messages.length - 1]
       const mergedUserMessage = {
         role: 'user' as const,
-        content: `${currentUserMessage?.content || ''}
-
-## Project Context
-
-${projectContext || 'No project context available'}
-
----
-
-Please respond to the user's request above, taking into account the project context provided.`
+        content: currentUserMessage?.content || ''
       }
       
-      // Prepare messages: system + conversation history + merged user message with context
-      const finalMessages = [
-        { role: 'system' as const, content: systemMessage },
-        // Include conversation history (excluding the latest user message since we're merging it)
-        ...validMemoryMessages.slice(0, -1), // Remove last message if it exists to avoid duplication
-        // Add the merged user message with project context
+      // Always use the comprehensive system prompt (includes project context and full conversation history)
+      const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate, conversationSummaryContext)
+
+      const finalMessages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+        {
+          role: 'system' as const,
+          content: streamingPrompt
+        },
+        // Add the merged user message
         mergedUserMessage
       ]
+
+      console.log('[SUMMARY] Using comprehensive system prompt with project context and full conversation history')
       
       console.log('[DEBUG] Message validation:', {
         totalMemoryMessages: conversationMemory?.messages?.length || 0,
@@ -3354,493 +5717,727 @@ Please respond to the user's request above, taking into account the project cont
         needsWebTools: userIntent?.required_tools?.includes('web_search') || userIntent?.required_tools?.includes('web_extract')
       })
 
-      const result = await generateText({
-        model: model,
-        messages: finalMessages,
-        temperature: 0.1, // Increased creativity while maintaining tool usage
-        stopWhen: stepCountIs(shouldUseAutonomousPlanning ? 12 : 8), // Reduced steps to prevent context explosion and timeouts
-        abortSignal: abortController.signal,
-        toolChoice: 'required', // Force tool usage first - AI MUST use tools before providing text responses
+      // Create tools object
+      let tools: Record<string, any> = createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent, userMessage)
 
-        onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {
-          // Log step completion for debugging
-          console.log('[DEBUG] Step finished:', {
-            hasText: !!text,
-            textLength: text?.length || 0,
-            textPreview: text?.substring(0, 100) || 'no text',
-            toolCallsCount: toolCalls.length,
-            toolResultsCount: toolResults.length,
-            finishReason,
-            usage
-          })
-        },
-        // FORCE TOOL USAGE: The AI MUST use these tools when users mention files
-        // Only include web tools if explicitly needed based on intent detection
-        tools: createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent, userMessage)
-      })
+      // ENHANCED WEB TOOL DETECTION: Add web tools for explicit web requests
+      const explicitWebRequest = /\b(search|news|latest|current|web|internet|online|google|find online|look up|research)\b/i.test(userMessage || '')
+      const needsWebTools = userIntent?.required_tools?.includes('web_search') || 
+                           userIntent?.required_tools?.includes('web_extract') || 
+                           explicitWebRequest
 
-      // Log the complete result structure for debugging
-      console.log('[DEBUG] AI Generation Complete:', {
-        hasText: !!result.text,
-        textLength: result.text?.length || 0,
-        textPreview: result.text?.substring(0, 200) + (result.text && result.text.length > 200 ? '...' : ''),
-        hasSteps: !!result.steps,
-        stepsCount: result.steps?.length || 0,
-        userRequestedTools: isToolRequest,
-        toolChoiceUsed: isToolRequest ? 'required' : 'auto',
-        stepsSummary: result.steps?.map((step, i) => ({
-          step: i + 1,
-          hasText: !!step.text,
-          toolCallsCount: step.toolCalls?.length || 0,
-          toolResultsCount: step.toolResults?.length || 0,
-          finishReason: step.finishReason
-        })) || []
-      })
-
-      // Enhanced tool call processing and error handling
-      let hasToolErrors = false
-      
-      // Check if AI refused to use tools when it should have
-      const shouldHaveUsedTools = forceToolRequest // Use forceToolRequest since we're forcing tools always
-      const aiRefusedTools = result.text && (
-        result.text.includes("I don't have the capability") ||
-        result.text.includes("I'm unable to") ||
-        result.text.includes("I cannot") ||
-        result.text.includes("I can't access") ||
-        result.text.includes("I'm here to help, but I need to let you know")
-      )
-      
-      // Force tool usage if AI refused
-      if (shouldHaveUsedTools && aiRefusedTools && (!result.steps || result.steps.length === 0)) {
-        console.log('[DEBUG] AI refused to use tools, forcing tool call')
+      if (needsWebTools && !tools.web_search) {
+        console.log('[DEBUG] Adding web tools due to explicit web request detected:', { userMessage, explicitWebRequest })
+        // Manually add web tools if not already included
+        const { z } = await import('zod')
+        const { tool } = await import('ai')
         
-        try {
-          // Import storage manager for forced tool call
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-          
-          let forcedToolResult
-          
-          // Determine which tool to force based on user request
-          if (/\b(list files?|show files|directory)\b/i.test(userMessage)) {
-            const files = await storageManager.getFiles(projectId)
-            forcedToolResult = {
-              toolCallId: 'forced-list',
-              toolName: 'list_files',
-              input: {},
-              output: {
+        tools.web_search = tool({
+          description: 'Search the web for current information, news, and trends',
+          inputSchema: z.object({
+            query: z.string().describe('Search query to find relevant web content')
+          }),
+          execute: async ({ query }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              // Use the existing searchWeb function defined in this file
+              const searchResults = await searchWeb(query)
+              
+              return {
                 success: true,
-                message: `✅ Found ${files.length} files in project.`,
-                files: files.map(f => ({
-                  path: f.path,
+                message: `✅ Web search completed for: "${query}"`,
+                results: searchResults.cleanedResults,
+                query,
+                toolCallId
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error('[ERROR] web_search failed:', error)
+              
+              return { 
+                success: false, 
+                error: `Web search failed: ${errorMessage}`,
+                query,
+                toolCallId
+              }
+            }
+          }
+        })
+      }
+
+      // Get model information first
+      const modelInfo = modelId ? getModelById(modelId) : null
+      const modelProvider = modelInfo?.provider
+
+      // COHERE COMPATIBILITY: Filter out complex tools that cause API errors
+      // Cohere has stricter tool validation and doesn't support complex nested schemas
+      if (modelProvider === 'cohere') {
+        const cohereCompatibleTools: Record<string, any> = {}
+
+        // Only include basic file operations for Cohere - exclude edit_file due to complex schema
+        const allowedTools = ['read_file', 'write_file', 'list_files', 'delete_file', 'analyze_dependencies']
+
+        for (const [toolName, toolDef] of Object.entries(tools)) {
+          if (allowedTools.includes(toolName)) {
+            cohereCompatibleTools[toolName] = toolDef
+          }
+        }
+
+        console.log('[COHERE COMPATIBILITY] Filtered tools for Cohere:', {
+          originalCount: Object.keys(tools).length,
+          filteredCount: Object.keys(cohereCompatibleTools).length,
+          allowedTools,
+          removedTools: Object.keys(tools).filter(name => !allowedTools.includes(name))
+        })
+
+        tools = cohereCompatibleTools
+      }
+
+      // CRITICAL SAFEGUARD: Ensure list_files is ALWAYS available
+      // This is a final check to guarantee list_files is in the tool set regardless of any filtering
+      if (!tools.list_files) {
+        console.warn('[SAFEGUARD] list_files tool missing from final set - adding it back')
+        const { z } = await import('zod')
+        const { tool } = await import('ai')
+        
+        tools.list_files = tool({
+          description: 'List files and directories in a specific folder path',
+          inputSchema: z.object({
+            path: z.string().describe('Directory path to list (use "/" for root)')
+          }),
+          execute: async ({ path }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              
+              // Validate path
+              if (!path || typeof path !== 'string') {
+                return { 
+                  success: false, 
+                  error: `Invalid directory path provided`,
+                  path,
+                  toolCallId
+                }
+              }
+              
+              // Get all files from the project
+              const allFiles = await storageManager.getFiles(projectId)
+              
+              // Filter files based on the requested path
+              let filteredFiles;
+              if (path === '/' || path === '') {
+                // Root directory - show all files at root level
+                filteredFiles = allFiles.filter(f => {
+                  const pathParts = f.path.split('/').filter(p => p.length > 0)
+                  return pathParts.length === 1 // Only top-level files
+                })
+              } else {
+                // Specific directory - show files in that directory
+                const normalizedPath = path.startsWith('/') ? path.slice(1) : path
+                const searchPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/'
+                
+                filteredFiles = allFiles.filter(f => {
+                  return f.path.startsWith(searchPath) && 
+                         f.path.slice(searchPath.length).indexOf('/') === -1 // Only direct children
+                })
+              }
+
+              return { 
+                success: true, 
+                message: `✅ Listed ${filteredFiles.length} items in directory: ${path}`,
+                path,
+                files: filteredFiles.map(f => ({
                   name: f.name,
+                  path: f.path,
                   type: f.type,
                   size: f.size,
                   isDirectory: f.isDirectory,
                   createdAt: f.createdAt
                 })),
-                count: files.length,
-                action: 'list'
+                count: filteredFiles.length,
+                action: 'list',
+                toolCallId
               }
-            }
-          } else if (/\b(read|show|open)\b.*file/i.test(userMessage)) {
-            // Try to extract filename from user message
-            const fileMatch = userMessage.match(/(?:read|show|open)\s+(?:the\s+)?([\w\.\/\-]+)/i)
-            if (fileMatch) {
-              const filePath = fileMatch[1]
-              try {
-                const file = await storageManager.getFile(projectId, filePath)
-                if (file) {
-                  forcedToolResult = {
-                    toolCallId: 'forced-read',
-                    toolName: 'read_file',
-                    input: { path: filePath },
-                    output: {
-                      success: true,
-                      message: `✅ File ${filePath} read successfully.`,
-                      path: filePath,
-                      content: file.content || '',
-                      name: file.name,
-                      type: file.type,
-                      size: file.size,
-                      action: 'read'
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('[DEBUG] Forced read failed:', error)
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] list_files failed for ${path}:`, error)
+              
+              return { 
+                success: false, 
+                error: `Failed to list directory ${path}: ${errorMessage}`,
+                path,
+                toolCallId
               }
             }
           }
-          
-          // If we have a forced result, create a new response
-          if (forcedToolResult) {
-            // Update the result text to indicate tool was used
-            const newResponse = `I have used the ${forcedToolResult.toolName} tool to fulfill your request. ${forcedToolResult.output.message}`
-            
-            // Create a new result object that includes the forced tool execution
-            const modifiedResult = {
-              ...result,
-              text: newResponse,
-              steps: [
-                ...(result.steps || []),
-                {
-                  text: newResponse,
-                  toolCalls: [{
-                    toolCallId: forcedToolResult.toolCallId,
-                    toolName: forcedToolResult.toolName,
-                    args: forcedToolResult.input
-                  }],
-                  toolResults: [{
-                    toolCallId: forcedToolResult.toolCallId,
-                    toolName: forcedToolResult.toolName,
-                    result: forcedToolResult.output
-                  }],
-                  finishReason: 'tool-calls' as const,
-                  content: []
-                }
-              ]
-            }
-            
-            // Replace the original result
-            Object.assign(result, modifiedResult)
-            
-            console.log('[DEBUG] Successfully forced tool usage:', forcedToolResult.toolName)
-          }
-        } catch (error) {
-          console.error('[DEBUG] Failed to force tool usage:', error)
-        }
-      }
-      
-      // Debug: Log the complete result structure
-      console.log('[DEBUG] Complete result structure:', {
-        hasToolResults: !!result.toolResults,
-        toolResultsLength: result.toolResults?.length || 0,
-        hasSteps: !!result.steps,
-        stepsLength: result.steps?.length || 0
-      })
-      
-      // Extract tool results from steps (AI SDK stores them here)
-      const allToolResults: any[] = []
-      if (result.steps && result.steps.length > 0) {
-        result.steps.forEach(step => {
-          if (step.toolResults && step.toolResults.length > 0) {
-            allToolResults.push(...step.toolResults)
-          }
         })
       }
-      
-      console.log('[DEBUG] Extracted tool results from steps:', {
-        stepsCount: result.steps?.length || 0,
-        toolResultsFound: allToolResults.length,
-        toolResults: allToolResults
+
+      // Log final tool configuration after Cohere filtering and safeguards
+      console.log('[DEBUG] Final Tool Set:', {
+        totalTools: Object.keys(tools).length,
+        toolNames: Object.keys(tools),
+        hasWebSearch: tools.web_search !== undefined,
+        hasWebExtract: tools.web_extract !== undefined,
+        hasReadFile: tools.read_file !== undefined,
+        hasWriteFile: tools.write_file !== undefined,
+        hasEditFile: tools.edit_file !== undefined,
+        hasListFiles: tools.list_files !== undefined,
+        hasDeleteFile: tools.delete_file !== undefined,
+        hasTaskTools: false, // Filtered out for Cohere
+        taskToolsCount: 0, // Filtered out for Cohere
+        cohereFiltered: modelProvider === 'cohere',
+        listFilesGuaranteed: tools.list_files !== undefined, // CRITICAL: This should ALWAYS be true
+        webToolsIncluded: needsWebTools,
+        explicitWebRequest: explicitWebRequest
       })
-      
-      if (allToolResults.length > 0) {
-        // Debug: Log raw tool results
-        console.log('[DEBUG] Raw tool results:', JSON.stringify(allToolResults, null, 2))
-        
-        // Check for tool errors in any step
-        hasToolErrors = result.steps.some(step => 
-          step.content.some(part => part.type === 'tool-error')
-        )
-        
-        if (hasToolErrors) {
-          console.error('[ERROR] Tool execution errors detected in steps:')
-          result.steps.forEach((step, stepIndex) => {
-            const toolErrors = step.content.filter(part => part.type === 'tool-error')
-            toolErrors.forEach(toolError => {
-              console.error(`Step ${stepIndex + 1} - Tool error:`, {
-                toolName: (toolError as any).toolName,
-                error: (toolError as any).error,
-                input: (toolError as any).input
-              })
-            })
-          })
-        }
+
+      // FINAL VERIFICATION: Ensure list_files is absolutely present
+      if (!tools.list_files) {
+        console.error('[CRITICAL ERROR] list_files tool is missing despite safeguards!')
+        throw new Error('list_files tool is required but missing from final tool set')
+      } else {
+        console.log('[VERIFICATION] ✅ list_files tool is confirmed present in final tool set')
       }
 
-      // Prepare tool calls for storage if any
-      let processedToolCalls = undefined
-
-
-      if (allToolResults.length > 0) {
-        processedToolCalls = allToolResults.map(toolResult => {
-          // Extract tool call info from the AI SDK step structure
-          // AI SDK uses 'input' for arguments and 'output' for results
-          const toolCall = {
-            id: toolResult.toolCallId,
-            name: toolResult.toolName || 'unknown',
-            args: toolResult.input || {},
-            result: toolResult.output
-          }
-          
-          console.log('[DEBUG] Processing tool result:', {
-            toolName: toolCall.name,
-            hasArgs: !!toolCall.args,
-            hasResult: !!toolCall.result,
-            args: toolCall.args,
-            result: toolCall.result
-          })
-          
-          return toolCall
-        })
-        
-        // Debug: Log the processed tool calls
-        console.log('[DEBUG] Processed tool calls:', JSON.stringify(processedToolCalls, null, 2))
-      }
-      
-      // Extract the actual AI-generated text from steps if result.text is empty
-      let actualAIMessage = result.text || ''
-      
-      // If result.text is empty, extract text from the steps
-      if (!actualAIMessage && result.steps && result.steps.length > 0) {
-        // Collect all text content from steps, including both step.text and content with type 'text'
-        const stepTexts: string[] = []
-        
-        result.steps.forEach(step => {
-          // Add step.text if it exists
-          if (step.text && step.text.trim().length > 0) {
-            stepTexts.push(step.text.trim())
-          }
-          
-          // Also check step.content for text content
-          if (step.content && Array.isArray(step.content)) {
-            step.content.forEach(content => {
-              if (content.type === 'text' && content.text && content.text.trim().length > 0) {
-                stepTexts.push(content.text.trim())
-              }
-            })
-          }
-        })
-        
-        if (stepTexts.length > 0) {
-          actualAIMessage = stepTexts.join('\n\n')
-        }
-      }
-      
-    
-      
-      console.log('[DEBUG] Final AI message extraction:', {
-        hasResultText: !!result.text,
-        resultTextLength: result.text?.length || 0,
-        stepsCount: result.steps?.length || 0,
-        extractedTextsCount: result.steps?.reduce((acc, step) => {
-          let count = step.text ? 1 : 0
-          if (step.content && Array.isArray(step.content)) {
-            count += step.content.filter(c => c.type === 'text' && c.text).length
-          }
-          return acc + count
-        }, 0) || 0,
-        finalMessageLength: actualAIMessage.length,
-        finalMessagePreview: actualAIMessage.substring(0, 300) + (actualAIMessage.length > 300 ? '...' : '')
-      })
-      
-      // Store conversation memory with the new AI response
       try {
-        // Import storage manager for conversation memory storage
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
+        // INTELLIGENT READ-WRITE SEPARATION: Use generateText for read-only tools, streamText for write operations
         
-        // Enhanced: Use AI to process and enhance the memory
-        const projectContext = await buildEnhancedProjectContext(projectId, storageManager)
-        const enhancedMemory = await processMemoryWithAI(
-          conversationMemory,
-          userMessage,
-          projectContext,
-          processedToolCalls
+        // Step 1: Create read-only tools for preprocessing phase
+        const readOnlyTools = {
+          read_file: tools.read_file,
+          web_search: tools.web_search,
+          web_extract: tools.web_extract
+        }
+        
+        // Filter out undefined tools
+        const filteredReadOnlyTools = Object.fromEntries(
+          Object.entries(readOnlyTools).filter(([_, tool]) => tool !== undefined)
         )
         
-        if (conversationMemory) {
-          // Update existing memory with AI-enhanced insights
-          await storageManager.updateConversationMemory(
-            conversationMemory.id,
-            {
-              messages: [
-                ...conversationMemory.messages,
-                {
-                  role: 'assistant',
-                  content: actualAIMessage,
-                  timestamp: new Date().toISOString(),
-                  toolCalls: processedToolCalls,
-                  toolResults: processedToolCalls?.map(tc => tc.result) || []
-                }
-              ],
-              lastActivity: new Date().toISOString(),
-              // AI-enhanced memory fields
-              aiInsights: enhancedMemory.keyInsights,
-              semanticSummary: enhancedMemory.semanticSummary,
-              technicalPatterns: enhancedMemory.technicalPatterns,
-              architecturalDecisions: enhancedMemory.architecturalDecisions,
-              nextLogicalSteps: enhancedMemory.nextLogicalSteps,
-              potentialImprovements: enhancedMemory.potentialImprovements,
-              relevanceScore: enhancedMemory.relevanceScore,
-              contextForFuture: enhancedMemory.contextForFuture
-            }
-          )
-        } else {
-          // Create new memory with AI-enhanced insights
-          await storageManager.createConversationMemory({
-            projectId,
-            userId: user.id,
-            messages: [
-              ...messages.slice(-20).map((msg: any) => ({
-                role: msg.role,
-                content: msg.content,
-                timestamp: new Date().toISOString()
-              })),
-              {
-                role: 'assistant',
-                content: actualAIMessage,
-                timestamp: new Date().toISOString(),
-                toolCalls: processedToolCalls,
-                toolResults: processedToolCalls?.map(tc => tc.result) || []
-              }
-            ],
-            summary: enhancedMemory.semanticSummary || `Project: ${projectId} | Messages: ${messages.length + 1}`,
-            keyPoints: enhancedMemory.keyInsights || [],
-            lastActivity: new Date().toISOString(),
-            // AI-enhanced memory fields
-            aiInsights: enhancedMemory.keyInsights,
-            semanticSummary: enhancedMemory.semanticSummary,
-            technicalPatterns: enhancedMemory.technicalPatterns,
-            architecturalDecisions: enhancedMemory.architecturalDecisions,
-            nextLogicalSteps: enhancedMemory.nextLogicalSteps,
-            potentialImprovements: enhancedMemory.potentialImprovements,
-            relevanceScore: enhancedMemory.relevanceScore,
-            contextForFuture: enhancedMemory.contextForFuture
+        console.log('[PREPROCESSING] Read-only tools available:', Object.keys(filteredReadOnlyTools))
+        
+        // Step 2: Check if request needs read-only tools (intelligent detection)
+        const needsReading = /\b(read|list|show|display|get|find|search|analyze|extract|what|how|where|which)\b/i.test(userMessage || '') ||
+                            /\b(files?|content|structure|dependencies|code|implementation)\b/i.test(userMessage || '')
+        
+        let preprocessingResults: any = null
+        
+        if (needsReading && Object.keys(filteredReadOnlyTools).length > 0) {
+          console.log('[PREPROCESSING] Executing read-only tools with generateText')
+          
+          // Execute read-only tools first with focused system prompt
+          const preprocessingPrompt = getPreprocessingSystemPrompt()
+
+          const preprocessingMessages = [
+            { role: 'system' as const, content: preprocessingPrompt },
+            { role: 'user' as const, content: userMessage }
+          ]
+          
+          preprocessingResults = await generateText({
+            model: model,
+            messages: preprocessingMessages,
+            temperature: 0.1,
+            abortSignal: abortController.signal,
+            tools: filteredReadOnlyTools,
+            toolChoice: 'auto'
+          })
+          
+          console.log('[PREPROCESSING] Read-only tool execution result:', {
+            hasToolCalls: !!preprocessingResults.toolCalls?.length,
+            toolCallsCount: preprocessingResults.toolCalls?.length || 0,
+            textLength: preprocessingResults.text?.length || 0
           })
         }
+
+        const hasToolCalls = preprocessingResults?.toolCalls && preprocessingResults.toolCalls.length > 0
+        const hasSignificantText = preprocessingResults?.text && preprocessingResults.text.trim().length > 50
         
-        console.log('[DEBUG] Conversation memory stored successfully:', {
-          projectId,
-          userId: user.id,
-          messageCount: conversationMemory ? conversationMemory.messages.length + 1 : messages.length + 1,
-          lastActivity: new Date().toISOString()
+        console.log('[PREPROCESSING] Read-only tool execution result:', {
+          hasToolCalls,
+          toolCallsCount: preprocessingResults?.toolCalls?.length || 0,
+          hasSignificantText,
+          textLength: preprocessingResults?.text?.length || 0,
+          finishReason: preprocessingResults?.finishReason,
+          toolCallsRaw: JSON.stringify(preprocessingResults?.toolCalls, null, 2),
+          toolResultsRaw: JSON.stringify(preprocessingResults?.toolResults, null, 2)
         })
-      } catch (error) {
-        console.warn('[WARNING] Failed to store conversation memory:', error)
-        // Continue without failing the request
+
+        // Step 3: Now use streamText with JSON command system for all responses
+        console.log('[STREAMING] Starting JSON-enhanced streaming response')
+        
+        // Create enhanced messages with preprocessing context
+        let enhancedMessages: any = [...finalMessages]
+        
+        if (hasToolCalls && preprocessingResults) {
+          // Add preprocessing context to the conversation
+          const preprocessingContext = `## Preprocessing Results
+
+${preprocessingResults.text || 'Information gathered successfully.'}
+
+## Available Information
+${preprocessingResults.toolResults?.map((result: any, index: number) => {
+  const toolCall = preprocessingResults.toolCalls?.[index]
+  return `- ${toolCall?.toolName}: ${JSON.stringify(result, null, 2)}`
+}).join('\n') || 'No additional context available.'}
+
+---
+  ## JSON Formatting Instructions
+      When using JSON tool commands, always ensure the output is valid, parsable JSON:
+      - Use double quotes for all strings and keys
+      - Do not include trailing commas after the last property
+      - Ensure proper JSON structure with matching braces and brackets
+      - Escape special characters in strings (e.g., use \\" for quotes inside strings)
+      - Do not include comments or extra text outside the JSON object
+      - Validate the JSON before outputting to ensure it can be parsed
+
+      Now respond to the user's request. If you need to create, edit, or delete files, use JSON tool commands in code blocks:
+
+      \`\`\`json
+      {
+        "tool": "write_file",
+        "path": "file/path.ext", 
+        "content": "file content here"
       }
-      
-      // CRITICAL: Prevent empty assistant messages from being sent
-      // If the AI only used tools without generating text, generate a simple summary
-      if (!actualAIMessage.trim() && processedToolCalls && processedToolCalls.length > 0) {
-        try {
-          console.log('[DEBUG] Generating simple tool summary...')
+      \`\`\`
+
+
+
+      \`\`\`json
+      {
+        "tool": "delete_file",
+        "path": "file/path.ext"
+      }
+      \`\`\`
+
+Provide a comprehensive response addressing: "${currentUserMessage?.content || ''}"`
           
-          // Generate a simple summary based on tool calls
-          const toolNames = processedToolCalls.map(tc => tc.name).filter(Boolean)
-          const uniqueTools = [...new Set(toolNames)]
+          enhancedMessages.push({
+            role: 'user' as const,
+            content: preprocessingContext
+          })
+        } else {
+          // Add JSON command instructions for cases without preprocessing using focused prompt
+          // DISABLED: Memory functionality temporarily disabled for future use
+          // const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
+          const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate, conversationSummaryContext)
           
-          let summary = `## Task Completed\n\n`
-          summary += `I have successfully completed your request using ${uniqueTools.length} tool${uniqueTools.length > 1 ? 's' : ''}.\n\n`
+          enhancedMessages.push({
+            role: 'system' as const,
+            content: streamingPrompt
+          })
+        }
+
+        // Helper function to detect content type for better frontend handling
+        const detectContentType = (chunk: string): string => {
+          const trimmed = chunk.trim()
+          if (/^#{1,6}\s/.test(trimmed)) return 'header'
+          if (/^[\s]*[-*+]\s/.test(trimmed)) return 'list-item'
+          if (/^\d+\.\s/.test(trimmed)) return 'numbered-list-item'
+          if (/^>\s/.test(trimmed)) return 'blockquote'
           
-          if (uniqueTools.length > 0) {
-            summary += `**Tools used:**\n`
-            uniqueTools.forEach(tool => {
-              summary += `- ${tool}\n`
+          // Enhanced code block detection with language identification
+          if (/^```/.test(trimmed)) {
+            const languageMatch = trimmed.match(/^```(\w+)/)
+            if (languageMatch) {
+              const language = languageMatch[1].toLowerCase()
+              switch (language) {
+                case 'sql': return 'code-block-sql'
+                case 'typescript': case 'ts': return 'code-block-typescript'
+                case 'javascript': case 'js': return 'code-block-javascript'
+                case 'jsx': return 'code-block-jsx'
+                case 'tsx': return 'code-block-tsx'
+                case 'css': return 'code-block-css'
+                case 'bash': case 'sh': return 'code-block-bash'
+                case 'json': return 'code-block-json'
+                case 'yaml': case 'yml': return 'code-block-yaml'
+                case 'html': return 'code-block-html'
+                case 'python': case 'py': return 'code-block-python'
+                default: return 'code-block-generic'
+              }
+            }
+            return 'code-block'
+          }
+          
+          if (/\*\*.*\*\*/.test(trimmed)) return 'bold-text'
+          if (/\*.*\*/.test(trimmed)) return 'italic-text'
+          if (trimmed.includes('\n\n')) return 'paragraph-break'
+          if (trimmed.includes('\n')) return 'line-break'
+          return 'text'
+        }
+
+        // Server-side stream buffer for whitespace preservation and performance
+        interface ServerStreamBuffer {
+          content: string
+          inCodeBlock: boolean
+          lastEmittedContent: string
+        }
+
+        const createServerStreamBuffer = (): ServerStreamBuffer => ({
+          content: '',
+          inCodeBlock: false,
+          lastEmittedContent: ''
+        })
+
+        // Process streaming delta on server side to reduce client load
+        const processServerStreamingDelta = (buffer: ServerStreamBuffer, newDelta: string): string => {
+          // Add new delta to buffer
+          buffer.content += newDelta
+          
+          // Check if we're entering or exiting a code block
+          const codeBlockMarkers = buffer.content.match(/```/g) || []
+          const wasInCodeBlock = buffer.inCodeBlock
+          buffer.inCodeBlock = codeBlockMarkers.length % 2 !== 0
+          
+          // If we're in a code block, buffer it
+          if (buffer.inCodeBlock) {
+            // Find the start of the current code block
+            const lastCodeBlockStart = buffer.content.lastIndexOf('```')
+            
+            // Extract everything up to the code block
+            const beforeCodeBlock = buffer.content.substring(0, lastCodeBlockStart)
+            
+            // If there's content before the code block that hasn't been emitted, emit it
+            if (beforeCodeBlock.length > buffer.lastEmittedContent.length) {
+              const toEmit = beforeCodeBlock.substring(buffer.lastEmittedContent.length)
+              buffer.lastEmittedContent = beforeCodeBlock
+              return toEmit
+            }
+            
+            // Don't emit partial code blocks
+            return ''
+          }
+          
+          // If we just exited a code block, emit the complete code block
+          if (wasInCodeBlock && !buffer.inCodeBlock) {
+            const toEmit = buffer.content.substring(buffer.lastEmittedContent.length)
+            buffer.lastEmittedContent = buffer.content
+            return toEmit
+          }
+          
+          // Not in a code block - emit line by line as they complete
+          const lines = buffer.content.split('\n')
+          const completeLines = lines.slice(0, -1) // All but the last (potentially incomplete) line
+          const completeContent = completeLines.join('\n') + (completeLines.length > 0 ? '\n' : '')
+          
+          if (completeContent.length > buffer.lastEmittedContent.length) {
+            const toEmit = completeContent.substring(buffer.lastEmittedContent.length)
+            buffer.lastEmittedContent = completeContent
+            return toEmit
+          }
+          
+          return ''
+        }
+
+        // Finalize server buffer and return remaining content
+        const finalizeServerStreamBuffer = (buffer: ServerStreamBuffer): string => {
+          const remaining = buffer.content.substring(buffer.lastEmittedContent.length)
+          buffer.lastEmittedContent = buffer.content
+          return remaining
+        }
+
+        // Helper function to preprocess content for better frontend rendering (DEPRECATED - whitespace preserved by buffer)
+        const preprocessForFrontend = (chunk: string): string => {
+          // No longer preprocessing to preserve exact whitespace
+          // Server-side buffering handles formatting
+          return chunk
+        }
+
+        // Create a readable stream that handles both preprocessing results and JSON commands
+        const stream = new ReadableStream({
+          async start(controller) {
+            // First, send preprocessing tool results if available
+            if (hasToolCalls && preprocessingResults) {
+              const processedToolCalls = preprocessingResults.toolCalls?.map((toolCall: any, index: number) => {
+                const toolResultItem = preprocessingResults.toolResults?.[index]
+                return {
+                  id: toolCall.toolCallId,
+                  name: toolCall.toolName || 'unknown',
+                  args: toolResultItem?.input || toolCall.args || {},
+                  result: toolResultItem?.output || toolResultItem || null
+                }
+              }) || []
+
+              const hasToolErrors = processedToolCalls.some((tc: any) => (tc.result as any)?.success === false)
+              
+              const toolData = {
+                type: 'tool-results',
+                toolCalls: processedToolCalls,
+                hasToolCalls: true,
+                hasToolErrors,
+                serverSideExecution: true,
+                fileOperations: [] // No file operations in read-only phase
+              }
+              
+              console.log('[PREPROCESSING] Sending preprocessing results:', JSON.stringify({
+                type: 'tool-results',
+                toolCallsCount: processedToolCalls.length,
+                hasToolErrors,
+                toolNames: processedToolCalls.map((tc: any) => tc.name)
+              }, null, 2))
+              
+              controller.enqueue(`data: ${JSON.stringify(toolData)}\n\n`)
+            }
+            
+            // Start streaming the main response with JSON command support
+            let result;
+            
+            // SPECIAL HANDLING: a0.dev uses custom streaming, not AI SDK streamText
+            if (modelId === 'a0-dev-llm') {
+              console.log('[A0-DEV] Using custom a0.dev streaming instead of AI SDK streamText');
+              
+              // Convert AI SDK messages to a0.dev format with message limit
+              // a0.dev may timeout with too many messages, so limit to recent conversation
+              const maxMessages = 6; // Keep only the most recent messages
+              const recentMessages = enhancedMessages.slice(-maxMessages);
+              const a0Messages = recentMessages.map((msg: any) => ({
+                role: msg.role,
+                content: msg.content
+              }));
+              
+              console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${enhancedMessages.length} total, limited for performance)`);
+              
+              // Smart Context: DISABLED temporarily until fixed
+              // const { storageManager } = await import('@/lib/storage-manager');
+              // await storageManager.init();
+              // const userMsg = messages[messages.length - 1]?.content || '';
+              // const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
+              
+              // Direct generate: fetch once, yield full completion at once (no stream)
+              result = {
+                textStream: (async function* () {
+                  try {
+                    console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages');
+                    const response = await fetch('https://api.a0.dev/ai/llm', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        messages: a0Messages,
+                        temperature: 0.3,
+                        stream: false
+                        // projectFiles: smartContext.selectedFiles,  // DISABLED
+                        // srcPatch: smartContext.srcPatch  // DISABLED
+                      }),
+                      signal: AbortSignal.timeout(32000)
+                    });
+                    console.log('[A0-DEV] API response status:', response.status);
+                    if (!response.ok) {
+                      const errorText = await response.text().catch(() => 'Unknown error');
+                      console.error('[A0-DEV] API error details:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        errorText: errorText.substring(0, 200)
+                      });
+                      throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
+                    }
+                    const data = await response.json();
+                    if (data.completion) {
+                      yield data.completion;
+                    }
+                  } catch (error) {
+                    console.error('[A0-DEV] Generate error:', error);
+                    throw error;
+                  }
+                })()
+              };
+            } else {
+              // Smart Context: DISABLED temporarily until fixed
+              // const { storageManager } = await import('@/lib/storage-manager');
+              // await storageManager.init();
+              // const userMsg = messages[messages.length - 1]?.content || '';
+              // const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
+              
+              // Add smart context to enhanced messages for standard providers
+              // const smartContextMessage = {
+              //   role: 'system' as const,
+              //   content: `## Smart Context - Relevant Project Files
+              //
+              // ${smartContext.srcPatch ? `**Source Structure Changes:** ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
+              // ${smartContext.selectedFiles.map((file: any) => 
+              //   `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``
+              // ).join('\n\n')}
+              //
+              // Use this context to provide accurate, file-aware responses to the user's request.`
+              // };
+              
+              // const enhancedMessagesWithContext = [smartContextMessage, ...enhancedMessages];
+              
+              // Standard AI SDK streaming for all other providers
+              result = await streamText({
+                model: model,
+                messages: enhancedMessages,
+                temperature: 0.3,
+                abortSignal: abortController.signal,
+              });
+            }
+            
+            // Initialize response accumulation and tool tracking for memory
+            let accumulatedResponse = ''
+            const executedToolCalls: any[] = []
+            
+            // Initialize server-side stream buffer for performance
+            const serverBuffer = createServerStreamBuffer()
+            
+            // Listen for tool execution events during streaming
+            const handleToolExecution = (event: CustomEvent) => {
+              console.log('[MEMORY] Tool executed during streaming:', event.detail)
+              executedToolCalls.push({
+                toolCallId: event.detail.toolCall?.id || `tool_${Date.now()}`,
+                toolName: event.detail.action || event.detail.toolCall?.tool || 'unknown',
+                args: {
+                  path: event.detail.path,
+                  content: event.detail.result?.contentPreview || event.detail.toolCall?.content,
+                  ...event.detail.toolCall?.args
+                },
+                timestamp: new Date().toISOString(),
+                result: event.detail.result
+              })
+            }
+            
+            // Add event listeners for tool executions
+            if (typeof window !== 'undefined') {
+              window.addEventListener('json-tool-executed', handleToolExecution as EventListener)
+              window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
+            }
+            
+            console.log('[SERVER-STREAM] Starting server-side buffered streaming for performance')
+            
+            for await (const chunk of result.textStream) {
+              // Accumulate response for memory
+              accumulatedResponse += chunk
+              
+              // Process chunk through server-side buffer (reduces client load)
+              const readyToEmit = processServerStreamingDelta(serverBuffer, chunk)
+              
+              // Only send content when it's ready (complete lines or code blocks)
+              if (readyToEmit) {
+                // Detect content type for better frontend handling
+                const contentType = detectContentType(readyToEmit)
+                
+                // Send pre-processed chunk to reduce client-side work
+                controller.enqueue(`data: ${JSON.stringify({
+                  type: 'text-delta',
+                  delta: readyToEmit,
+                  format: 'markdown',
+                  contentType: contentType,
+                  serverProcessed: true,
+                  whitespacePreserved: true,
+                  hasLineBreaks: readyToEmit.includes('\n'),
+                  renderHints: {
+                    isCodeBlock: contentType.includes('code-block'),
+                    codeLanguage: contentType.startsWith('code-block-') 
+                      ? contentType.replace('code-block-', '') 
+                      : null
+                  }
+                })}\n\n`)
+              }
+              // else: content is buffered (inside code block or incomplete line), skip this cycle
+            }
+            
+            // Finalize buffer and send any remaining content
+            const remainingContent = finalizeServerStreamBuffer(serverBuffer)
+            if (remainingContent) {
+              console.log('[SERVER-STREAM] Flushing remaining buffered content')
+              accumulatedResponse += remainingContent // Ensure it's in accumulated response
+              
+              const contentType = detectContentType(remainingContent)
+              controller.enqueue(`data: ${JSON.stringify({
+                type: 'text-delta',
+                delta: remainingContent,
+                format: 'markdown',
+                contentType: contentType,
+                serverProcessed: true,
+                whitespacePreserved: true,
+                isFinalChunk: true
+              })}\n\n`)
+            }
+            
+            // Clean up event listeners
+            if (typeof window !== 'undefined') {
+              window.removeEventListener('json-tool-executed', handleToolExecution as EventListener)
+              window.removeEventListener('xml-tool-executed', handleToolExecution as EventListener)
+            }
+            
+            // After streaming is complete, store memory with full AI response
+            try {
+              const userMessage = messages[messages.length - 1]?.content || ''
+              console.log('[MEMORY] Processing stream memory for AI response analysis...')
+              console.log('[MEMORY] Accumulated response length:', accumulatedResponse.length)
+              console.log('[MEMORY] Executed tool calls:', executedToolCalls.length)
+              
+              // Store memory asynchronously (don't block response)
+              // DISABLED: Memory functionality temporarily disabled for future use
+              /*
+              storeStreamMemory(
+                projectId,
+                user?.id || 'anonymous',
+                userMessage,
+                accumulatedResponse, // Full accumulated AI response
+                projectContext || ''
+              ).then((memory) => {
+                console.log('[MEMORY] Stream memory stored successfully:', {
+                  memoryId: memory.id,
+                  jsonOperations: memory.jsonOperations.length,
+                  mainPurpose: memory.actionSummary.mainPurpose,
+                  filesAffected: memory.jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
+                })
+              }).catch((error) => {
+                console.error('[MEMORY] Failed to store stream memory:', error)
+              })
+              */
+              
+            } catch (memoryError) {
+              console.error('[MEMORY] Memory processing error:', memoryError)
+            }
+            
+            controller.enqueue(`data: [DONE]\n\n`)
+            controller.close()
+          }
+        })
+
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        })
+      } catch (error: unknown) {
+        console.error('Chat API Error:', error)
+
+        // Check if it's a Mistral API error
+        if (error && typeof error === 'object' && 'message' in error) {
+          const errorMessage = (error as { message?: string }).message
+          if (errorMessage?.includes('Service unavailable') || errorMessage?.includes('Internal Server Error')) {
+            return new Response(JSON.stringify({
+              error: 'AI service temporarily unavailable. Please try again in a moment.',
+              details: 'The Mistral AI service is currently experiencing issues.'
+            }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
             })
           }
-          
-          actualAIMessage = summary
-          console.log('[DEBUG] Simple tool summary generated:', actualAIMessage.substring(0, 100) + '...')
-        } catch (summaryError) {
-          console.error('[ERROR] Failed to generate simple tool summary:', summaryError)
-          
-          // Fallback to basic summary if generation fails
-          actualAIMessage = `## Task Completed\n\nI have successfully completed your request.`
-          console.log('[DEBUG] Error fallback tool summary generated:', actualAIMessage.substring(0, 100) + '...')
         }
+
+        // Return appropriate error response
+        if (error instanceof Error) {
+          return new Response(`Error: ${error.message}`, { status: 500 })
+        }
+
+        return new Response('Internal Server Error', { status: 500 })
       }
-      
-      // Return the response immediately for instant UI update
-      const response = new Response(JSON.stringify({
-        message: actualAIMessage,
-        toolCalls: processedToolCalls,
-        success: !hasToolErrors,
-        hasToolCalls: processedToolCalls && processedToolCalls.length > 0,
-        hasToolErrors,
-        stepCount: result.steps.length,
-        steps: result.steps.map((step, index) => ({
-          stepNumber: index + 1,
-          hasText: !!step.text,
-          toolCallsCount: step.toolCalls?.length || 0,
-          toolResultsCount: step.toolResults?.length || 0,
-          finishReason: step.finishReason
-        })),
-        serverSideExecution: true,  // Flag to indicate server-side execution
-        // IMPORTANT: Include file operations for client-side persistence
-        fileOperations: (await Promise.all((processedToolCalls || []).map(async (toolCall, index) => {
-          console.log(`[DEBUG] Processing toolCall ${index}:`, {
-            name: toolCall.name,
-            hasResult: !!toolCall.result,
-            hasArgs: !!toolCall.args,
-            resultKeys: toolCall.result ? Object.keys(toolCall.result) : [],
-            argsKeys: toolCall.args ? Object.keys(toolCall.args) : []
-          })
-          
-          let operation: any = {
-            type: toolCall.name,
-            path: toolCall.result?.path || toolCall.args?.path,
-            content: toolCall.args?.content || toolCall.result?.content,
-            projectId: projectId,
-            success: toolCall.result?.success !== false
-          }
-
-          // No post-processing needed for edit_file - it's handled directly in the tool execution
-          
-          // Debug log each operation
-          console.log(`[DEBUG] File operation ${index}:`, operation)
-          
-          return operation
-        }))).filter((op, index) => {
-          const shouldInclude = op.success && op.path && (op.type === 'write_file' || op.type === 'edit_file' || op.type === 'delete_file')
-          console.log(`[DEBUG] Operation ${index} filter result:`, {
-            success: op.success,
-            hasPath: !!op.path,
-            isValidType: ['write_file', 'edit_file', 'delete_file'].includes(op.type),
-            shouldInclude
-          })
-          return shouldInclude
-        }) || []
-      }), {
-        status: hasToolErrors ? 207 : 200, // 207 Multi-Status for partial success
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      // }
-
-      // Save both user message and AI response to database in background (now handled client-side)
-      const userMessageForSaving = messages[messages.length - 1]
-
-      return response
-      
-    } // End of if (true) - tools always enabled
-    
+    }
   } catch (error: unknown) {
-    console.error('Chat API Error:', error)
-    
-    // Check if it's a Mistral API error
-    if (error && typeof error === 'object' && 'message' in error) {
-      const errorMessage = (error as { message?: string }).message
-      if (errorMessage?.includes('Service unavailable') || errorMessage?.includes('Internal Server Error')) {
-        return new Response(JSON.stringify({ 
-          error: 'AI service temporarily unavailable. Please try again in a moment.',
-          details: 'The Mistral AI service is currently experiencing issues.'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-    }
-    
-    // Return appropriate error response
-    if (error instanceof Error) {
-      return new Response(`Error: ${error.message}`, { status: 500 })
-    }
-    
+    console.error('Unexpected error in chat API:', error)
     return new Response('Internal Server Error', { status: 500 })
   }
 }
-
