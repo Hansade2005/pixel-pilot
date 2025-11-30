@@ -69,6 +69,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
+import { timeAgo } from "@/lib/utils"
 import { Crown, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
 
 interface SidebarProps {
@@ -675,7 +676,7 @@ export function Sidebar({
                           {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(project.lastActivity).toLocaleDateString()}
+                          {timeAgo(project.lastActivity)}
                         </div>
                       </div>
                     </div>
@@ -758,7 +759,7 @@ export function Sidebar({
                           {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(project.lastActivity).toLocaleDateString()}
+                          {timeAgo(project.lastActivity)}
                         </div>
                       </div>
                     </div>

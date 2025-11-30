@@ -49,7 +49,6 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       'Deploy to Vercel',
       'Visual editing with Design Mode',
       'GitHub sync',
-      '7 message/day limit',
       '1 app/project',
       'Public/open-source unlimited'
     ],
@@ -84,11 +83,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     description: 'Individual Tier',
     features: [
       'All Free features',
-      '$5 of included monthly credits',
+      '$50 of included monthly credits',
       '5x higher attachment size limits',
       'Import from Figma',
       'Custom domains',
-      'Remove Lovable badge',
+      'Remove PiPilot badge',
       '10% revenue share on monetized apps',
       'Unlimited credit purchases'
     ],

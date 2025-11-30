@@ -8,6 +8,7 @@ import Image from "next/image"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
+import { timeAgo } from "@/lib/utils"
 import {
   Pagination,
   PaginationContent,
@@ -256,7 +257,7 @@ export function ProjectGrid() {
                     {project.description}
                   </p>
                   <div className="mt-3 text-xs text-white/50">
-                    Created {new Date(project.createdAt).toLocaleDateString()}
+                    Created {timeAgo(project.createdAt)}
                   </div>
                 </CardContent>
               </Card>
