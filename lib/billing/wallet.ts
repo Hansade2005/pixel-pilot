@@ -197,8 +197,8 @@ export async function purchaseCredits(
       creditsAmount,
       'purchase',
       `Purchased ${creditsAmount} credits ($${creditsAmount})`,
-      stripePaymentId,
-      client
+      client,
+      stripePaymentId
     )
 
     if (!success) {
@@ -308,7 +308,9 @@ export async function canMakeRequest(
   creditsRequired: number = 0.25,
   supabase?: SupabaseClient
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const wallet = await getWalletBalance(userId, supabase)
+  const client = supabase || await createClient()
+
+  const wallet = await getWalletBalance(userId, client)
 
   if (!wallet) {
     return { allowed: false, reason: 'Wallet not found' }

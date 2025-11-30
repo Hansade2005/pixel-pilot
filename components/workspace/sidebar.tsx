@@ -153,8 +153,8 @@ export function Sidebar({
 
     fetchCreditBalance()
 
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchCreditBalance, 30000)
+    // Refresh every 5 seconds for realtime data
+    const interval = setInterval(fetchCreditBalance, 5000)
     return () => clearInterval(interval)
   }, [user?.id])
 

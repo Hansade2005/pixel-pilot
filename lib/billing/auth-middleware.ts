@@ -136,38 +136,50 @@ export async function processRequestBilling(params: {
   try {
     const supabase = await createClient()
 
-    // Deduct credits
-    const result = await deductCredits(
-      userId,
-      CREDITS_PER_MESSAGE,
-      {
-        model,
-        requestType,
-        endpoint,
-        responseTimeMs,
-        tokensUsed,
-        status,
-        errorMessage
-      },
-      supabase
-    )
+    // Only deduct credits for successful requests
+    if (status === 'success') {
+      const result = await deductCredits(
+        userId,
+        CREDITS_PER_MESSAGE,
+        {
+          model,
+          requestType,
+          endpoint,
+          responseTimeMs,
+          tokensUsed,
+          status,
+          errorMessage
+        },
+        supabase
+      )
 
-    if (!result.success) {
-      console.error('[AuthMiddleware] Failed to deduct credits:', result.error)
-      return {
-        success: false,
-        error: result.error
+      if (!result.success) {
+        console.error('[AuthMiddleware] Failed to deduct credits:', result.error)
+        return {
+          success: false,
+          error: result.error
+        }
       }
-    }
 
-    console.log(
-      `[AuthMiddleware] ✅ Deducted ${result.creditsUsed} credits from user ${userId}. New balance: ${result.newBalance}`
-    )
+      console.log(
+        `[AuthMiddleware] ✅ Deducted ${result.creditsUsed} credits from user ${userId}. New balance: ${result.newBalance}`
+      )
 
-    return {
-      success: true,
-      newBalance: result.newBalance,
-      creditsUsed: result.creditsUsed
+      return {
+        success: true,
+        newBalance: result.newBalance,
+        creditsUsed: result.creditsUsed
+      }
+    } else {
+      // For errors, just log without charging
+      console.log(
+        `[AuthMiddleware] ⚠️ Request failed (${status}): ${errorMessage || 'Unknown error'} - No credits charged`
+      )
+      return {
+        success: true,
+        newBalance: undefined,
+        creditsUsed: 0
+      }
     }
   } catch (error) {
     console.error('[AuthMiddleware] Exception in processRequestBilling:', error)
