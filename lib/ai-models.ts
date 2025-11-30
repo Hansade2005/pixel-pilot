@@ -239,6 +239,12 @@ export const chatModels: Array<ChatModel> = [
     description: 'Anthropic Claude Sonnet 4 via OpenRouter - advanced coding and reasoning model',
     provider: 'openrouter',
   },
+  {
+    id: 'claude-haiku-4.5',
+    name: 'Claude Haiku 4.5',
+    description: 'Anthropic Claude Haiku 4.5 via OpenRouter - fast and efficient coding model with reasoning',
+    provider: 'openrouter',
+  },
 
   // OpenRouter Advanced Models (with reasoning support)
   {
