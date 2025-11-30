@@ -4,7 +4,6 @@
  * Rate: 0.25 credits per AI message request
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 // Credit constants
@@ -50,12 +49,10 @@ export interface UsageLogEntry {
  */
 export async function getWalletBalance(
   userId: string,
-  supabase?: SupabaseClient
+  supabase: SupabaseClient
 ): Promise<WalletBalance | null> {
-  const client = supabase || await createClient()
-
   try {
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from('wallet')
       .select('*')
       .eq('user_id', userId)
@@ -68,7 +65,7 @@ export async function getWalletBalance(
 
     if (!data) {
       // Create wallet if it doesn't exist (new user)
-      const { data: newWallet, error: createError } = await client
+      const { data: newWallet, error: createError } = await supabase
         .from('wallet')
         .insert({
           user_id: userId,
@@ -116,7 +113,7 @@ export async function getWalletBalance(
 export async function hasEnoughCredits(
   userId: string,
   creditsRequired: number = CREDITS_PER_MESSAGE,
-  supabase?: SupabaseClient
+  supabase: SupabaseClient
 ): Promise<boolean> {
   const wallet = await getWalletBalance(userId, supabase)
   
@@ -132,13 +129,11 @@ export async function deductCredits(
   userId: string,
   creditsToDeduct: number = CREDITS_PER_MESSAGE,
   metadata: Partial<UsageLogEntry> = {},
-  supabase?: SupabaseClient
+  supabase: SupabaseClient
 ): Promise<CreditDeductionResult> {
-  const client = supabase || await createClient()
-
   try {
     // Get current wallet balance
-    const wallet = await getWalletBalance(userId, client)
+    const wallet = await getWalletBalance(userId, supabase)
 
     if (!wallet) {
       return {
@@ -162,7 +157,7 @@ export async function deductCredits(
     }
 
     // Deduct credits (atomic operation)
-    const { data: updatedWallet, error: updateError } = await client
+    const { data: updatedWallet, error: updateError } = await supabase
       .from('wallet')
       .update({
         credits_balance: wallet.creditsBalance - creditsToDeduct,
@@ -196,10 +191,10 @@ export async function deductCredits(
       status: metadata.status || 'success',
       errorMessage: metadata.errorMessage,
       metadata: metadata.metadata
-    }, client)
+    }, supabase)
 
     // Log transaction
-    await client
+    await supabase
       .from('transactions')
       .insert({
         user_id: userId,
@@ -233,12 +228,10 @@ export async function deductCredits(
  */
 export async function logUsage(
   entry: UsageLogEntry,
-  supabase?: SupabaseClient
+  supabase: SupabaseClient
 ): Promise<boolean> {
-  const client = supabase || await createClient()
-
   try {
-    const { error } = await client
+    const { error } = await supabase
       .from('usage_logs')
       .insert({
         user_id: entry.userId,
@@ -273,14 +266,12 @@ export async function addCredits(
   creditsToAdd: number,
   type: 'subscription_grant' | 'purchase' | 'bonus' | 'refund' | 'adjustment',
   description: string,
-  stripePaymentId?: string,
-  supabase?: SupabaseClient
+  supabase: SupabaseClient,
+  stripePaymentId?: string
 ): Promise<boolean> {
-  const client = supabase || await createClient()
-
   try {
     // Get current wallet balance
-    const wallet = await getWalletBalance(userId, client)
+    const wallet = await getWalletBalance(userId, supabase)
 
     if (!wallet) {
       console.error('[CreditManager] Wallet not found for user:', userId)
@@ -288,7 +279,7 @@ export async function addCredits(
     }
 
     // Add credits
-    const { data: updatedWallet, error: updateError } = await client
+    const { data: updatedWallet, error: updateError } = await supabase
       .from('wallet')
       .update({
         credits_balance: wallet.creditsBalance + creditsToAdd
@@ -303,7 +294,7 @@ export async function addCredits(
     }
 
     // Log transaction
-    await client
+    await supabase
       .from('transactions')
       .insert({
         user_id: userId,
@@ -330,14 +321,12 @@ export async function updateUserPlan(
   userId: string,
   plan: 'free' | 'creator' | 'collaborate' | 'scale',
   subscriptionStatus: 'active' | 'inactive' | 'cancelled' | 'past_due',
+  supabase: SupabaseClient,
   stripeCustomerId?: string,
-  stripeSubscriptionId?: string,
-  supabase?: SupabaseClient
+  stripeSubscriptionId?: string
 ): Promise<boolean> {
-  const client = supabase || await createClient()
-
   try {
-    const wallet = await getWalletBalance(userId, client)
+    const wallet = await getWalletBalance(userId, supabase)
 
     if (!wallet) {
       console.error('[CreditManager] Wallet not found for user:', userId)
@@ -362,7 +351,7 @@ export async function updateUserPlan(
     }
 
     // Update wallet with new plan
-    const { error } = await client
+    const { error } = await supabase
       .from('wallet')
       .update({
         current_plan: plan,
@@ -379,7 +368,7 @@ export async function updateUserPlan(
     }
 
     // Log transaction for plan upgrade
-    await client
+    await supabase
       .from('transactions')
       .insert({
         user_id: userId,
@@ -404,19 +393,17 @@ export async function updateUserPlan(
  */
 export async function getUserUsageStats(
   userId: string,
+  supabase: SupabaseClient,
   startDate?: Date,
-  endDate?: Date,
-  supabase?: SupabaseClient
+  endDate?: Date
 ): Promise<{
   totalCreditsUsed: number
   totalRequests: number
   avgCreditsPerRequest: number
   modelBreakdown: Record<string, number>
 } | null> {
-  const client = supabase || await createClient()
-
   try {
-    let query = client
+    let query = supabase
       .from('usage_logs')
       .select('*')
       .eq('user_id', userId)
@@ -436,13 +423,13 @@ export async function getUserUsageStats(
       return null
     }
 
-    const totalCreditsUsed = data.reduce((sum, log) => sum + parseFloat(log.credits_used.toString()), 0)
+    const totalCreditsUsed = data.reduce((sum: number, log: any) => sum + parseFloat(log.credits_used.toString()), 0)
     const totalRequests = data.length
     const avgCreditsPerRequest = totalRequests > 0 ? totalCreditsUsed / totalRequests : 0
 
     // Model breakdown
     const modelBreakdown: Record<string, number> = {}
-    data.forEach(log => {
+    data.forEach((log: any) => {
       const model = log.model || 'unknown'
       modelBreakdown[model] = (modelBreakdown[model] || 0) + parseFloat(log.credits_used.toString())
     })

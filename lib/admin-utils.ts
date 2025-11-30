@@ -82,6 +82,13 @@ export const ADMIN_MENU_ITEMS = [
     permission: ADMIN_PERMISSIONS.MANAGE_BILLING
   },
   {
+    id: 'credits',
+    label: 'User Credits',
+    icon: 'CreditCard',
+    href: '/admin/credits',
+    permission: ADMIN_PERMISSIONS.MANAGE_BILLING
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     icon: 'BarChart3',
