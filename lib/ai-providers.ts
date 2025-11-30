@@ -166,6 +166,10 @@ const openrouterProvider = createOpenAICompatible({
   name: 'openrouter',
   baseURL: 'https://openrouter.ai/api/v1',
   apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
+  headers: {
+    'HTTP-Referer': 'https://pipilot.dev', // app's URL
+    'X-Title': 'PiPilot', // app's display name
+  },
 });
 
 const zenmuxProvider = createOpenAICompatible({
