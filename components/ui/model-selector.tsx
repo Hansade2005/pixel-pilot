@@ -61,6 +61,7 @@ export function ModelSelector({
     // Claude models
     ['claude-sonnet-4.5', 'PiPilot Claude Sonnet 4.5'],
     ['claude-sonnet-4', 'PiPilot Claude Sonnet 4'],
+    ['claude-haiku-4.5', 'PiPilot Claude Haiku 4.5'],
     // MiniMax models
     ['minimax-m2', 'PiPilot MiniMax M2'],
     // ZenMux models
@@ -122,6 +123,7 @@ export function ModelSelector({
       // Claude models
       'claude-sonnet-4.5',
       'claude-sonnet-4',
+      'claude-haiku-4.5',
       // MiniMax models
       'minimax-m2',
       // ZenMux models
