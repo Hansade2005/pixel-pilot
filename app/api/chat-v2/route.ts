@@ -9008,7 +9008,7 @@ Result must be Markdown formatted for proper display:
     // For proper prompt caching, convert system prompt to a message with cache control
     // Models that use OpenRouter providers (either OpenAI-compatible or Anthropic SDK)
     const openRouterModels = [
-      'pipilot-pro', 'pipilot-ultra', 'claude-sonnet-4.5', 'claude-sonnet-4',
+      'pipilot-pro', 'pipilot-ultra', 'claude-sonnet-4.5', 'claude-sonnet-4', 'claude-haiku-4.5',
       'deepseek-v3.2-exp', 'grok-4-fast-reasoning', 'qwen3-30b-thinking',
       'qwen3-coder', 'qwen3-coder-free', 'qwen3-coder-30b-instruct',
       'deepseek-r1t2-chimera-free', 'qwen3-next-80b-thinking', 'phi-4-multimodal',
@@ -9024,12 +9024,6 @@ Result must be Markdown formatted for proper display:
           providerOptions: {
             openrouter: {
               cache_control: { type: 'ephemeral' }
-            }
-          }
-        } : modelId === 'claude-haiku-4.5' ? {
-          providerOptions: {
-            anthropic: {
-              cacheControl: { type: 'ephemeral' }
             }
           }
         } : {})
