@@ -482,184 +482,93 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Subscription Status Section */}
-      {!subscriptionLoading && subscription && (
-        <Accordion type="single" collapsible className="border-b">
-          <AccordionItem value="subscription" className="border-0">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
-              <div className="flex items-center justify-between w-full mr-4">
-                <div className="flex items-center gap-2">
-                  <Crown className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm font-medium">
-                    {subscription.plan === 'pro' ? 'Pro Plan' :
-                     subscription.plan === 'enterprise' ? 'Enterprise Plan' :
-                     'Free Plan'}
-                  </span>
-                </div>
-                {subscription.plan === 'free' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 px-2 text-xs"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push('/pricing')
-                    }}
-                  >
-                    Upgrade
-                  </Button>
-                )}
+      {/* Credits Section */}
+      <Accordion type="single" collapsible className="border-b">
+        <AccordionItem value="credits" className="border-0">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+            <div className="flex items-center justify-between w-full mr-4">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800 dark:text-green-200">Credits</span>
               </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
-              <div className="space-y-2">
-                {/* Deployment Limits */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      Deployments: {subscription.deploymentsThisMonth || 0} / {subscription.plan === 'pro' ? 10 : 5}
+              {loadingCredits ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-green-700 dark:text-green-300">
+                    {creditBalance !== null ? creditBalance.toFixed(2) : '0.00'}
+                  </span>
+                  <span className="text-xs text-green-600 dark:text-green-400">credits</span>
+                </div>
+              )}
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+            <div className="space-y-2">
+              {!loadingCredits && creditBalance !== null && (
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-green-700 dark:text-green-300">
+                      ~{estimatedMessages} messages remaining
+                    </span>
+                    <span className="text-green-600 dark:text-green-400 capitalize">
+                      {currentPlan} Plan
                     </span>
                   </div>
-                </div>
 
-                {/* GitHub Push Limits for Free users */}
-                {subscription.plan === 'free' && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Github className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        GitHub Pushes: {subscription.githubPushesThisMonth || 0} / 2
-                      </span>
-                    </div>
+                  {/* Credit Status Indicator */}
+                  <div className="flex items-center gap-2">
+                    {creditBalance > 10 ? (
+                      <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                        <TrendingUp className="h-3 w-3" />
+                        <span className="text-xs">Good balance</span>
+                      </div>
+                    ) : creditBalance > 2 ? (
+                      <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span className="text-xs">Low balance</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span className="text-xs">Very low</span>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* Plan Features */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {subscription.plan === 'pro' ? 'Full Access' :
-                     subscription.plan === 'enterprise' ? 'Enterprise Features' :
-                     'Limited Access'}
-                  </span>
-                  {subscription.plan === 'pro' ? (
-                    <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                      <Crown className="h-3 w-3" />
-                      <span className="text-xs">Pro</span>
-                    </div>
-                  ) : subscription.plan === 'enterprise' ? (
-                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                      <Shield className="h-3 w-3" />
-                      <span className="text-xs">Enterprise</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                      <CheckCircle className="h-3 w-3" />
-                      <span className="text-xs">Free</span>
-                    </div>
+                  {/* Top Up Button for Paid Users */}
+                  {currentPlan !== 'free' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                      onClick={() => setShowTopUpDialog(true)}
+                    >
+                      <CreditCard className="h-3 w-3 mr-1" />
+                      Top Up Credits
+                    </Button>
                   )}
-                </div>
 
-                {/* Status Messages */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {subscription.status === 'active' ? 'Active' : subscription.status}
-                  </span>
-                  {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
-                    <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                      <AlertTriangle className="h-3 w-3" />
-                      <span className="text-xs">Limit Reached</span>
-                    </div>
+                  {/* Purchase Button for Low Balance or Free Users */}
+                  {(creditBalance <= 2 || currentPlan === 'free') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                      onClick={() => setShowTopUpDialog(true)}
+                    >
+                      <CreditCard className="h-3 w-3 mr-1" />
+                      {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
+                    </Button>
                   )}
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
-
-      {/* ABE Credit Balance Section */}
-      <div className="border-b bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800 dark:text-green-200">Credits</span>
-            </div>
-            {loadingCredits ? (
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-green-700 dark:text-green-300">
-                  {creditBalance !== null ? creditBalance.toFixed(2) : '0.00'}
-                </span>
-                <span className="text-xs text-green-600 dark:text-green-400">credits</span>
-              </div>
-            )}
-          </div>
-
-          {!loadingCredits && creditBalance !== null && (
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-green-700 dark:text-green-300">
-                  ~{estimatedMessages} messages remaining
-                </span>
-                <span className="text-green-600 dark:text-green-400 capitalize">
-                  {currentPlan} Plan
-                </span>
-              </div>
-
-              {/* Credit Status Indicator */}
-              <div className="flex items-center gap-2">
-                {creditBalance > 10 ? (
-                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                    <TrendingUp className="h-3 w-3" />
-                    <span className="text-xs">Good balance</span>
-                  </div>
-                ) : creditBalance > 2 ? (
-                  <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span className="text-xs">Low balance</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span className="text-xs">Very low</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Top Up Button for Paid Users */}
-              {currentPlan !== 'free' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
-                  onClick={() => setShowTopUpDialog(true)}
-                >
-                  <CreditCard className="h-3 w-3 mr-1" />
-                  Top Up Credits
-                </Button>
-              )}
-
-              {/* Purchase Button for Low Balance or Free Users */}
-              {(creditBalance <= 2 || currentPlan === 'free') && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
-                  onClick={() => setShowTopUpDialog(true)}
-                >
-                  <CreditCard className="h-3 w-3 mr-1" />
-                  {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
-                </Button>
+                </>
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Search and Sort */}
       <div className="p-4 border-b space-y-3">
