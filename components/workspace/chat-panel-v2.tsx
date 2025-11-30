@@ -11,6 +11,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -20,7 +23,8 @@ import {
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
-  Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3
+  Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
+  CreditCard
 } from 'lucide-react'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -34,6 +38,9 @@ import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
+import { createClient } from '@/lib/supabase/client'
+import { getWalletBalance } from '@/lib/billing/credit-manager'
+import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -977,6 +984,14 @@ export function ChatPanelV2({
     status: 'executing' | 'completed' | 'failed'
   }>>>(new Map())
 
+  // ABE Credit balance state
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [currentPlan, setCurrentPlan] = useState<string>('free')
+  const [loadingCredits, setLoadingCredits] = useState(true)
+  const [showTopUpDialog, setShowTopUpDialog] = useState(false)
+  const [topUpAmount, setTopUpAmount] = useState('10')
+  const [processingTopUp, setProcessingTopUp] = useState(false)
+
   // Auto-adjust textarea height on input change
   useEffect(() => {
     if (textareaRef.current) {
@@ -1589,6 +1604,61 @@ export function ChatPanelV2({
   const cancelRevert = () => {
     setShowRevertDialog(false)
     setRevertMessageId(null)
+  }
+
+  // Handle credit top-up
+  const handleTopUp = async () => {
+    const amount = parseFloat(topUpAmount)
+    if (isNaN(amount) || amount < 1 || amount > 1000) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Amount must be between $1 and $1000',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Check if user can purchase credits
+    const { canPurchaseCredits } = await import('@/lib/stripe-config')
+    if (!canPurchaseCredits(currentPlan)) {
+      toast({
+        title: 'Upgrade required',
+        description: 'Credit purchases are only available for paid plans.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    setProcessingTopUp(true)
+
+    try {
+      const response = await fetch('/api/stripe/purchase-credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credits: Math.floor(amount), // Convert dollars to credits (1:1 ratio)
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create credit purchase session')
+      }
+
+      const { url } = await response.json()
+      window.location.href = url
+    } catch (error) {
+      console.error('Error creating credit purchase session:', error)
+      toast({
+        title: 'Purchase failed',
+        description: 'Failed to start credit purchase. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setProcessingTopUp(false)
+    }
   }
 
   // Message action handlers
@@ -2364,6 +2434,39 @@ export function ChatPanelV2({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Fetch credit balance
+  useEffect(() => {
+    const fetchCreditBalance = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          console.warn('[ChatPanelV2] No authenticated user found')
+          return
+        }
+
+        // Use getWalletBalance function instead of direct query
+        const wallet = await getWalletBalance(user.id, supabase)
+
+        if (wallet) {
+          setCreditBalance(wallet.creditsBalance)
+          setCurrentPlan(wallet.currentPlan)
+        }
+      } catch (error) {
+        console.error('[ChatPanelV2] Exception fetching credit balance:', error)
+      } finally {
+        setLoadingCredits(false)
+      }
+    }
+
+    fetchCreditBalance()
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchCreditBalance, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Handle client-side tool results by sending continuation request - DISABLED
   /*
@@ -3673,6 +3776,40 @@ export function ChatPanelV2({
                     return null
                   })()}
 
+                  {/* Special Rendering: Continue Backend Implementation Card */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const continueBackendCalls = toolCalls?.filter(tc =>
+                      tc.toolName === 'continue_backend_implementation' && tc.status === 'completed'
+                    )
+
+                    if (continueBackendCalls && continueBackendCalls.length > 0) {
+                      console.log(`[ChatPanelV2][Render] Rendering ${continueBackendCalls.length} backend continuation card(s)`)
+                      return (
+                        <div className="space-y-4 mb-4">
+                          {continueBackendCalls.map((toolCall) => {
+                            // Try to extract data from the tool call input or result
+                            const input = toolCall.input || {}
+                            const title = input.title || "Continue Backend Implementation"
+                            const description = input.description || "Automatically continue with backend development implementation"
+                            const prompt = input.prompt
+
+                            return (
+                              <ContinueBackendCard
+                                key={toolCall.toolCallId}
+                                title={title}
+                                description={description}
+                                prompt={prompt}
+                                onContinue={onContinueToBackend}
+                              />
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
@@ -3759,6 +3896,42 @@ export function ChatPanelV2({
         )}
 
         <div className="relative">
+          {/* Credit Alert Pill - Positioned inside the textarea area */}
+          {!loadingCredits && creditBalance !== null && creditBalance <= 3 && (
+            <div className="absolute top-2 right-16 z-10">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border border-yellow-200 dark:border-yellow-800">
+                <AlertTriangle className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
+                  {creditBalance.toFixed(1)} credits
+                </span>
+                {(() => {
+                  const planConfig = PRODUCT_CONFIGS[currentPlan]
+                  const canPurchase = planConfig ? planConfig.limits.canPurchaseCredits : false
+                  return canPurchase ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-2 text-xs border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-950 ml-1"
+                      onClick={() => setShowTopUpDialog(true)}
+                    >
+                      <CreditCard className="h-2.5 w-2.5 mr-1" />
+                      Buy
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-5 px-2 text-xs border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-950 ml-1"
+                      onClick={() => window.location.href = '/pricing'}
+                    >
+                      Upgrade
+                    </Button>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleEnhancedSubmit}>
             <Textarea
               ref={textareaRef}
@@ -4186,6 +4359,68 @@ export function ChatPanelV2({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Credit Top-Up Dialog */}
+        <Dialog open={showTopUpDialog} onOpenChange={setShowTopUpDialog}>
+          <DialogContent className={`${isMobile ? 'z-[80]' : ''} bg-gray-900 border-white/10`}>
+            <DialogHeader>
+              <DialogTitle className="text-white">Buy Credits</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Purchase additional credits for your {currentPlan} plan. $1 = 1 credit.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-white">Amount (USD)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={topUpAmount}
+                    onChange={(e) => setTopUpAmount(e.target.value)}
+                    className="bg-gray-800/50 border-white/10 text-white pl-7"
+                    placeholder="10.00"
+                  />
+                </div>
+                <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00</p>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[10, 25, 50, 100].map(amount => (
+                  <Button
+                    key={amount}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTopUpAmount(amount.toString())}
+                    className="border-white/10 text-white hover:bg-white/5"
+                  >
+                    ${amount}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                onClick={handleTopUp}
+                disabled={processingTopUp}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+              >
+                {processingTopUp ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Proceed to Payment
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

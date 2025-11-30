@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { headers } from 'next/headers'
+import { PRODUCT_CONFIGS, EXTRA_CREDITS_PRODUCT } from '@/lib/stripe-config'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil'
@@ -53,21 +54,32 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        const planId = subscription.metadata.plan_id || 'pro'
+        // Get plan from price ID
+        const priceId = subscription.items.data[0]?.price.id
+        const planId = getPlanFromPriceId(priceId) || 'free'
         const status = subscription.status
 
-        // Update user settings
+        // Get current wallet to calculate credit grant
+        const { data: currentWallet } = await supabase
+          .from('wallet')
+          .select('credits_balance, current_plan')
+          .eq('user_id', userId)
+          .single()
+
+        const creditsBefore = currentWallet?.credits_balance || 0
+        const planConfig = PRODUCT_CONFIGS[planId]
+        const monthlyCredits = planConfig?.limits.credits || 20
+
+        // Update wallet with subscription info and grant monthly credits
         const { error } = await supabase
-          .from('user_settings')
+          .from('wallet')
           .upsert({
             user_id: userId,
-            stripe_subscription_id: subscription.id,
             stripe_customer_id: subscription.customer as string,
+            stripe_subscription_id: subscription.id,
+            current_plan: planId,
             subscription_status: mapStripeStatus(status),
-            subscription_plan: planId,
-            subscription_start_date: new Date((subscription as any).current_period_start * 1000).toISOString(),
-            subscription_end_date: new Date((subscription as any).current_period_end * 1000).toISOString(),
-            cancel_at_period_end: subscription.cancel_at_period_end,
+            credits_balance: creditsBefore + monthlyCredits, // Grant monthly credits
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
@@ -76,7 +88,24 @@ export async function POST(request: NextRequest) {
         if (error) {
           console.error('Error updating subscription:', error)
         } else {
-          console.log(`Subscription ${subscription.id} ${event.type} for user ${userId}`)
+          // Log the credit grant transaction
+          await supabase
+            .from('transactions')
+            .insert({
+              user_id: userId,
+              amount: monthlyCredits,
+              type: 'subscription_grant',
+              description: `Monthly credit grant for ${planId} plan`,
+              credits_before: creditsBefore,
+              credits_after: creditsBefore + monthlyCredits,
+              stripe_subscription_id: subscription.id,
+              metadata: {
+                plan: planId,
+                subscription_status: status
+              }
+            })
+
+          console.log(`Subscription ${subscription.id} ${event.type} for user ${userId}, granted ${monthlyCredits} credits`)
         }
         break
       }
@@ -90,15 +119,12 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // Revert to free plan
+        // Update wallet to inactive status, keep current credits
         const { error } = await supabase
-          .from('user_settings')
+          .from('wallet')
           .update({
             subscription_status: 'inactive',
-            subscription_plan: 'free',
             stripe_subscription_id: null,
-            subscription_end_date: new Date().toISOString(),
-            cancel_at_period_end: false,
             updated_at: new Date().toISOString()
           })
           .eq('user_id', userId)
@@ -114,32 +140,60 @@ export async function POST(request: NextRequest) {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
         const subscriptionId = (invoice as any).subscription as string
-        
-        if (!subscriptionId) break
 
-        // Get subscription to find user_id
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-        const userId = subscription.metadata.user_id
+        if (subscriptionId) {
+          // This is a subscription renewal - grant monthly credits
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          const userId = subscription.metadata.user_id
 
-        if (!userId) {
-          console.error('No user_id in subscription metadata')
-          break
-        }
+          if (userId) {
+            const planId = getPlanFromPriceId(subscription.items.data[0]?.price.id) || 'free'
+            const planConfig = PRODUCT_CONFIGS[planId]
+            const monthlyCredits = planConfig?.limits.credits || 20
 
-        // Update last payment date
-        const { error } = await supabase
-          .from('user_settings')
-          .update({
-            last_payment_date: new Date(invoice.created * 1000).toISOString(),
-            subscription_status: 'active',
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', userId)
+            // Get current balance
+            const { data: wallet } = await supabase
+              .from('wallet')
+              .select('credits_balance')
+              .eq('user_id', userId)
+              .single()
 
-        if (error) {
-          console.error('Error updating payment date:', error)
+            const creditsBefore = wallet?.credits_balance || 0
+
+            // Add monthly credits
+            const { error } = await supabase
+              .from('wallet')
+              .update({
+                credits_balance: creditsBefore + monthlyCredits,
+                subscription_status: 'active',
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', userId)
+
+            if (!error) {
+              // Log the renewal credit grant
+              await supabase
+                .from('transactions')
+                .insert({
+                  user_id: userId,
+                  amount: monthlyCredits,
+                  type: 'subscription_grant',
+                  description: `Monthly renewal credit grant for ${planId} plan`,
+                  credits_before: creditsBefore,
+                  credits_after: creditsBefore + monthlyCredits,
+                  stripe_subscription_id: subscriptionId,
+                  metadata: {
+                    invoice_id: invoice.id,
+                    plan: planId
+                  }
+                })
+
+              console.log(`Monthly credits granted for user ${userId}: +${monthlyCredits}`)
+            }
+          }
         } else {
-          console.log(`Payment succeeded for user ${userId}`)
+          // This might be a one-time payment (credit purchase)
+          await handleOneTimePayment(invoice, supabase)
         }
         break
       }
@@ -147,7 +201,7 @@ export async function POST(request: NextRequest) {
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
         const subscriptionId = (invoice as any).subscription as string
-        
+
         if (!subscriptionId) break
 
         // Get subscription to find user_id
@@ -161,7 +215,7 @@ export async function POST(request: NextRequest) {
 
         // Update subscription status to past_due
         const { error } = await supabase
-          .from('user_settings')
+          .from('wallet')
           .update({
             subscription_status: 'past_due',
             updated_at: new Date().toISOString()
@@ -172,6 +226,16 @@ export async function POST(request: NextRequest) {
           console.error('Error updating failed payment:', error)
         } else {
           console.log(`Payment failed for user ${userId}`)
+        }
+        break
+      }
+
+      case 'checkout.session.completed': {
+        // Handle one-time credit purchases
+        const session = event.data.object as Stripe.Checkout.Session
+
+        if (session.mode === 'payment' && session.metadata?.user_id) {
+          await handleCreditPurchase(session, supabase)
         }
         break
       }
@@ -201,17 +265,139 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Helper function to handle one-time credit purchases
+async function handleOneTimePayment(invoice: Stripe.Invoice, supabase: any) {
+  // Check if this is a credit purchase by looking at line items
+  const lineItem = invoice.lines.data[0]
+  if (!lineItem) return
+
+  // Check if it's the extra credits product
+  if (lineItem.price?.id === EXTRA_CREDITS_PRODUCT.stripePriceId) {
+    const userId = invoice.customer_metadata?.user_id || invoice.metadata?.user_id
+    if (!userId) return
+
+    // Calculate credits purchased (price is in cents, 1 credit = $1)
+    const amountPaid = invoice.amount_paid / 100 // Convert cents to dollars
+    const creditsPurchased = Math.floor(amountPaid) // 1 credit per dollar
+
+    // Get current balance
+    const { data: wallet } = await supabase
+      .from('wallet')
+      .select('credits_balance')
+      .eq('user_id', userId)
+      .single()
+
+    const creditsBefore = wallet?.credits_balance || 0
+
+    // Add credits to wallet
+    const { error } = await supabase
+      .from('wallet')
+      .update({
+        credits_balance: creditsBefore + creditsPurchased,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+
+    if (!error) {
+      // Log the purchase transaction
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          amount: creditsPurchased,
+          type: 'purchase',
+          description: `Purchased ${creditsPurchased} extra credits`,
+          credits_before: creditsBefore,
+          credits_after: creditsBefore + creditsPurchased,
+          stripe_payment_id: invoice.payment_intent as string,
+          metadata: {
+            invoice_id: invoice.id,
+            amount_paid: invoice.amount_paid
+          }
+        })
+
+      console.log(`Credits purchased for user ${userId}: +${creditsPurchased}`)
+    }
+  }
+}
+
+// Helper function to handle credit purchases from checkout sessions
+async function handleCreditPurchase(session: Stripe.Checkout.Session, supabase: any) {
+  const userId = session.metadata?.user_id
+  if (!userId) return
+
+  // Get the line items to determine credits purchased
+  const lineItems = await stripe.checkout.sessions.listLineItems(session.id)
+  const lineItem = lineItems.data[0]
+
+  if (lineItem?.price?.id === EXTRA_CREDITS_PRODUCT.stripePriceId) {
+    const quantity = lineItem.quantity || 1
+    const creditsPurchased = quantity // Assuming quantity represents credits
+
+    // Get current balance
+    const { data: wallet } = await supabase
+      .from('wallet')
+      .select('credits_balance')
+      .eq('user_id', userId)
+      .single()
+
+    const creditsBefore = wallet?.credits_balance || 0
+
+    // Add credits to wallet
+    const { error } = await supabase
+      .from('wallet')
+      .update({
+        credits_balance: creditsBefore + creditsPurchased,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+
+    if (!error) {
+      // Log the purchase transaction
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          amount: creditsPurchased,
+          type: 'purchase',
+          description: `Purchased ${creditsPurchased} extra credits via checkout`,
+          credits_before: creditsBefore,
+          credits_after: creditsBefore + creditsPurchased,
+          stripe_payment_id: session.payment_intent as string,
+          metadata: {
+            session_id: session.id,
+            quantity: quantity
+          }
+        })
+
+      console.log(`Credits purchased via checkout for user ${userId}: +${creditsPurchased}`)
+    }
+  }
+}
+
+// Helper function to map Stripe price ID to plan ID
+function getPlanFromPriceId(priceId: string | undefined): string | null {
+  if (!priceId) return null
+
+  for (const [planId, config] of Object.entries(PRODUCT_CONFIGS)) {
+    if (config.prices.monthly.stripePriceId === priceId || config.prices.yearly.stripePriceId === priceId) {
+      return planId
+    }
+  }
+  return null
+}
+
 // Helper function to map Stripe status to our database enum
 function mapStripeStatus(stripeStatus: string): string {
   const statusMap: Record<string, string> = {
     'active': 'active',
-    'trialing': 'trialing',
+    'trialing': 'active', // Treat trialing as active for credits
     'past_due': 'past_due',
-    'canceled': 'canceled',
+    'canceled': 'cancelled',
     'unpaid': 'inactive',
     'incomplete': 'inactive',
     'incomplete_expired': 'inactive'
   }
-  
+
   return statusMap[stripeStatus] || 'inactive'
 }

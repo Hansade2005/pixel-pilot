@@ -60,12 +60,16 @@ import {
   ArrowUpDown,
   Calendar,
   Star,
-  Home
+  Home,
+  Coins,
+  CreditCard,
+  TrendingUp,
+  Loader2
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
-import { Crown, TrendingUp, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
+import { Crown, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
 
 interface SidebarProps {
   user: User
@@ -107,6 +111,106 @@ export function Sidebar({
 
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user?.id)
+
+  // ABE Credit balance state
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [currentPlan, setCurrentPlan] = useState<string>('free')
+  const [estimatedMessages, setEstimatedMessages] = useState<number>(0)
+  const [loadingCredits, setLoadingCredits] = useState(true)
+  const [showTopUpDialog, setShowTopUpDialog] = useState(false)
+  const [topUpAmount, setTopUpAmount] = useState('10')
+  const [processingTopUp, setProcessingTopUp] = useState(false)
+
+  // Fetch credit balance
+  useEffect(() => {
+    const fetchCreditBalance = async () => {
+      if (!user?.id) return
+
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('wallet')
+          .select('credits_balance, current_plan, credits_used_this_month')
+          .eq('user_id', user.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching credit balance:', error)
+          return
+        }
+
+        if (data) {
+          setCreditBalance(data.credits_balance)
+          setCurrentPlan(data.current_plan)
+          setEstimatedMessages(Math.floor(data.credits_balance / 0.25))
+        }
+      } catch (error) {
+        console.error('Exception fetching credit balance:', error)
+      } finally {
+        setLoadingCredits(false)
+      }
+    }
+
+    fetchCreditBalance()
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchCreditBalance, 30000)
+    return () => clearInterval(interval)
+  }, [user?.id])
+
+  // Handle credit top-up
+  const handleTopUp = async () => {
+    if (!user) {
+      router.push('/auth/login')
+      return
+    }
+
+    // Free users should upgrade first
+    if (currentPlan === 'free') {
+      router.push('/pricing')
+      return
+    }
+
+    const amount = parseFloat(topUpAmount)
+    if (isNaN(amount) || amount < 1 || amount > 1000) {
+      alert('Amount must be between $1 and $1000')
+      return
+    }
+
+    // Check if user can purchase credits
+    const { canPurchaseCredits } = await import('@/lib/stripe-config')
+    if (!canPurchaseCredits(currentPlan)) {
+      alert('Credit purchases are only available for paid plans.')
+      return
+    }
+
+    setProcessingTopUp(true)
+
+    try {
+      const response = await fetch('/api/stripe/purchase-credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credits: Math.floor(amount), // Convert dollars to credits (1:1 ratio)
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create credit purchase session')
+      }
+
+      const { url } = await response.json()
+      window.location.href = url
+    } catch (error) {
+      console.error('Error creating credit purchase session:', error)
+      alert('Failed to start credit purchase. Please try again.')
+    } finally {
+      setProcessingTopUp(false)
+    }
+  }
 
   // Advanced filter and sort projects
   const filteredAndSortedProjects = React.useMemo(() => {
@@ -473,6 +577,89 @@ export function Sidebar({
           </AccordionItem>
         </Accordion>
       )}
+
+      {/* ABE Credit Balance Section */}
+      <div className="border-b bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Coins className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800 dark:text-green-200">Credits</span>
+            </div>
+            {loadingCredits ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-green-700 dark:text-green-300">
+                  {creditBalance !== null ? creditBalance.toFixed(2) : '0.00'}
+                </span>
+                <span className="text-xs text-green-600 dark:text-green-400">credits</span>
+              </div>
+            )}
+          </div>
+
+          {!loadingCredits && creditBalance !== null && (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-green-700 dark:text-green-300">
+                  ~{estimatedMessages} messages remaining
+                </span>
+                <span className="text-green-600 dark:text-green-400 capitalize">
+                  {currentPlan} Plan
+                </span>
+              </div>
+
+              {/* Credit Status Indicator */}
+              <div className="flex items-center gap-2">
+                {creditBalance > 10 ? (
+                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <TrendingUp className="h-3 w-3" />
+                    <span className="text-xs">Good balance</span>
+                  </div>
+                ) : creditBalance > 2 ? (
+                  <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span className="text-xs">Low balance</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span className="text-xs">Very low</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Top Up Button for Paid Users */}
+              {currentPlan !== 'free' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                  onClick={() => setShowTopUpDialog(true)}
+                >
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  Top Up Credits
+                </Button>
+              )}
+
+              {/* Purchase Button for Low Balance or Free Users */}
+              {(creditBalance <= 2 || currentPlan === 'free') && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                  onClick={() => setShowTopUpDialog(true)}
+                >
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Search and Sort */}
       <div className="p-4 border-b space-y-3">
@@ -889,6 +1076,71 @@ export function Sidebar({
             </Button>
             <Button onClick={handleCloneProject} disabled={!cloneName.trim()}>
               Clone Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credit Top-Up Dialog */}
+      <Dialog open={showTopUpDialog} onOpenChange={setShowTopUpDialog}>
+        <DialogContent className={`${isMobile ? 'z-[80]' : ''} bg-gray-900 border-white/10`}>
+          <DialogHeader>
+            <DialogTitle className="text-white">Buy Credits</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {currentPlan === 'free'
+                ? 'Upgrade to a paid plan to purchase credits. $1 = 1 credit.'
+                : `Purchase additional credits for your ${currentPlan} plan. $1 = 1 credit.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-white">Amount (USD)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <Input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  className="bg-gray-800/50 border-white/10 text-white pl-7"
+                  placeholder="10.00"
+                />
+              </div>
+              <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00</p>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[10, 25, 50, 100].map(amount => (
+                <Button
+                  key={amount}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTopUpAmount(amount.toString())}
+                  className="border-white/10 text-white hover:bg-white/5"
+                >
+                  ${amount}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleTopUp}
+              disabled={processingTopUp}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+            >
+              {processingTopUp ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Proceed to Payment
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -12,6 +12,8 @@ export interface ProductConfig {
   description: string
   features: string[]
   limits: {
+    credits: number
+    messages: number
     deploymentPlatforms: string[]
     deploymentsPerMonth: number
     githubPushesPerMonth?: number
@@ -22,6 +24,7 @@ export interface ProductConfig {
     allowedModels: string[]
     storage?: string
     users?: number
+    canPurchaseCredits: boolean
   }
   prices: {
     monthly: {
@@ -40,55 +43,58 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   free: {
     id: 'free',
     name: 'Free',
-    description: 'Get started with AI-powered development',
+    description: 'Community Tier',
     features: [
-      'GitHub repository creation (2 pushes/month)',
-      'Deploy to Netlify only',
-      'Limited to 5 deployments per month',
-      'Basic project templates',
-      'Community support'
+      'Basic AI chat & code generation',
+      'Deploy to Vercel',
+      'Visual editing with Design Mode',
+      'GitHub sync',
+      '7 message/day limit',
+      '1 app/project',
+      'Public/open-source unlimited'
     ],
     limits: {
-      deploymentPlatforms: ['netlify'],
+      credits: 20,
+      messages: 80,
+      deploymentPlatforms: ['vercel'],
       deploymentsPerMonth: 5,
       githubPushesPerMonth: 2,
-      canUseVercel: false,
-      canUseNetlify: true,
+      canUseVercel: true,
+      canUseNetlify: false,
       canUseGitHub: true,
       unlimitedPrompts: false,
-      allowedModels: ['auto', 'a0-dev-llm', 'grok-3-mini']
+      allowedModels: ['auto', 'a0-dev-llm', 'grok-3-mini'],
+      canPurchaseCredits: false
     },
     prices: {
       monthly: {
         amount: 0,
-        stripePriceId: ''
+        stripePriceId: 'price_1SZ9843G7U0M1bp1WcX6j6b1'
       },
       yearly: {
         amount: 0,
-        stripePriceId: '',
+        stripePriceId: 'price_1SZ9843G7U0M1bp1WcX6j6b1',
         savings: '0%'
       }
     }
   },
-  pro: {
-    id: 'pro',
-    name: 'Pro',
-    description: 'Professional AI development for serious developers',
+  creator: {
+    id: 'creator',
+    name: 'Creator',
+    description: 'Individual Tier',
     features: [
-      'Everything in Free, plus:',
-      'Unlimited prompts and messages',
-      'Deploy to Vercel and Netlify',
-      '10 deployments per month (combined)',
-      'All premium AI models (GPT-4, Claude, Gemini)',
-      'Advanced project management',
-      'Real-time previews & debugging',
-      'Priority support',
-      'Custom project templates',
-      'Unlimited GitHub pushes',
-      'Full-stack application generation',
-      'Production-ready deployments'
+      'All Free features',
+      '$5 of included monthly credits',
+      '5x higher attachment size limits',
+      'Import from Figma',
+      'Custom domains',
+      'Remove Lovable badge',
+      '10% revenue share on monetized apps',
+      'Unlimited credit purchases'
     ],
     limits: {
+      credits: 50,
+      messages: 200,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 10,
       canUseVercel: true,
@@ -96,33 +102,77 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       canUseGitHub: true,
       unlimitedPrompts: true,
       allowedModels: ALL_MODEL_IDS,
-      storage: 'Unlimited'
+      storage: 'Unlimited',
+      canPurchaseCredits: true
     },
     prices: {
       monthly: {
-        amount: 29,
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || 'price_pro_monthly_id'
+        amount: 15,
+        stripePriceId: 'price_1SZ98W3G7U0M1bp1u30VJE2V'
       },
       yearly: {
-        amount: 279,
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY || 'price_pro_yearly_id',
+        amount: 144,
+        stripePriceId: 'price_1SZ98W3G7U0M1bp1u30VJE2V', // Using monthly for now, can create annual later
         savings: '20%'
       }
     }
   },
-  enterprise: {
-    id: 'enterprise',
-    name: 'Enterprise',
-    description: 'Coming soon - Advanced enterprise features',
+  collaborate: {
+    id: 'collaborate',
+    name: 'Collaborate',
+    description: 'Team Tier',
     features: [
-      'Everything in Pro, plus:',
-      'Team collaboration tools',
-      'Advanced analytics',
-      'Dedicated support',
-      'Custom integrations',
-      'Enterprise security features'
+      'All Creator features',
+      'Shared across unlimited users',
+      'Centralized billing on Vercel',
+      'Share chats and collaborate',
+      'User roles & permissions',
+      '15% revenue share',
+      'Unlimited credit purchases (shared pool)'
     ],
     limits: {
+      credits: 75,
+      messages: 300,
+      deploymentPlatforms: ['vercel', 'netlify'],
+      deploymentsPerMonth: 20,
+      canUseVercel: true,
+      canUseNetlify: true,
+      canUseGitHub: true,
+      unlimitedPrompts: true,
+      allowedModels: ALL_MODEL_IDS,
+      storage: 'Unlimited',
+      users: 100,
+      canPurchaseCredits: true
+    },
+    prices: {
+      monthly: {
+        amount: 25,
+        stripePriceId: 'price_1SZ98n3G7U0M1bp1DipaxRvq'
+      },
+      yearly: {
+        amount: 240,
+        stripePriceId: 'price_1SZ98n3G7U0M1bp1DipaxRvq',
+        savings: '20%'
+      }
+    }
+  },
+  scale: {
+    id: 'scale',
+    name: 'Scale',
+    description: 'Enterprise Tier',
+    features: [
+      'All Collaborate features',
+      'Internal publish',
+      'SSO',
+      'Personal projects',
+      'Opt out of data training',
+      'Design templates',
+      '20% revenue share',
+      'Unlimited credit purchases (shared pool)'
+    ],
+    limits: {
+      credits: 150,
+      messages: 600,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 50,
       canUseVercel: true,
@@ -131,20 +181,30 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       unlimitedPrompts: true,
       allowedModels: ALL_MODEL_IDS,
       storage: 'Unlimited',
-      users: 100
+      users: 1000,
+      canPurchaseCredits: true
     },
     prices: {
       monthly: {
-        amount: 0, // Coming soon
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE_MONTHLY || 'price_enterprise_monthly_id'
+        amount: 60,
+        stripePriceId: 'price_1SZ98v3G7U0M1bp1YAD89Tx4'
       },
       yearly: {
-        amount: 0, // Coming soon
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE_YEARLY || 'price_enterprise_yearly_id',
-        savings: '0%'
+        amount: 576,
+        stripePriceId: 'price_1SZ98v3G7U0M1bp1YAD89Tx4',
+        savings: '20%'
       }
     }
   }
+}
+
+// Extra Credits Product
+export const EXTRA_CREDITS_PRODUCT = {
+  id: 'extra-credits',
+  name: 'Extra Credits',
+  description: 'Purchase additional credits for paid plans',
+  stripePriceId: 'price_1SZ9923G7U0M1bp18UU5eKQ8',
+  pricePerCredit: 1
 }
 
 // Helper functions
@@ -178,14 +238,17 @@ export function getSavings(planId: string, isAnnual: boolean): string | null {
 export function getLimits(planId: string) {
   const config = getProductConfig(planId)
   return config?.limits || {
-    deploymentPlatforms: ['netlify'],
+    credits: 20,
+    messages: 80,
+    deploymentPlatforms: ['vercel'],
     deploymentsPerMonth: 5,
     githubPushesPerMonth: 2,
-    canUseVercel: false,
-    canUseNetlify: true,
+    canUseVercel: true,
+    canUseNetlify: false,
     canUseGitHub: true,
     unlimitedPrompts: false,
-    allowedModels: ['auto']
+    allowedModels: ['auto'],
+    canPurchaseCredits: false
   }
 }
 
@@ -194,9 +257,16 @@ export function canUseModel(planId: string, modelId: string): boolean {
   return limits.allowedModels.includes(modelId)
 }
 
-// Stripe Product IDs (to be created in Stripe dashboard)
+export function canPurchaseCredits(planId: string): boolean {
+  const limits = getLimits(planId)
+  return limits.canPurchaseCredits
+}
+
+// Stripe Product IDs (hardcoded)
 export const STRIPE_PRODUCT_IDS = {
-  PRO: process.env.STRIPE_PRODUCT_PRO || 'prod_pro_id',
-  TEAMS: process.env.STRIPE_PRODUCT_TEAMS || 'prod_teams_id',
-  ENTERPRISE: process.env.STRIPE_PRODUCT_ENTERPRISE || 'prod_enterprise_id'
+  FREE: 'prod_TWBUUaESS42Lhe',
+  CREATOR: 'prod_TWBVaEqAk1898D',
+  COLLABORATE: 'prod_TWBVEKvyCu0hYP',
+  SCALE: 'prod_TWBVHmYvmfFQMA',
+  EXTRA_CREDITS: 'prod_TWBWlx7GadNZK1'
 }

@@ -10,6 +10,8 @@ import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
+import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
+import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
 
 // Disable Next.js body parser for binary data handling
 export const config = {
@@ -1848,8 +1850,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
 }
 
 export async function POST(req: Request) {
-  const requestId = crypto.randomUUID()
-  const startTime = Date.now()
+  let requestId = crypto.randomUUID()
+  let startTime = Date.now()
 
   // Add overall request timeout to stay under Vercel's 300s limit
   const REQUEST_TIMEOUT_MS = 290000; // 290 seconds (5s buffer under 300s limit)
@@ -1885,6 +1887,8 @@ export async function POST(req: Request) {
   let clientFiles: any[] = []
   let clientFileTree: string[] = []
   let extractedMetadata: any = {}
+  let authContext: any = null // For billing
+  let modelId: string | undefined
 
   try {
     // Check content-type to determine if this is compressed binary data or regular JSON
@@ -2100,6 +2104,40 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // ============================================================================
+    // ABE CREDIT SYSTEM - Authenticate and check credits
+    // ============================================================================
+    startTime = Date.now()
+    
+    // Create a Request object for the middleware
+    const request = new Request('http://localhost/api/chat-v2', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      }
+    })
+    
+    const authResult = await authenticateUser(request)
+    
+    if (!authResult.success || !authResult.context) {
+      console.error(`[Chat-V2] ❌ Authentication failed:`, authResult.error)
+      return NextResponse.json(
+        {
+          error: {
+            message: authResult.error?.message || 'Authentication failed',
+            code: authResult.error?.code || 'UNAUTHORIZED',
+            type: 'credit_error'
+          }
+        },
+        { status: authResult.error?.statusCode || 401 }
+      )
+    }
+
+    authContext = authResult.context
+    console.log(
+      `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits (${Math.floor(authContext.creditsBalance / CREDITS_PER_MESSAGE)} messages remaining)`
+    )
 
     // Initialize in-memory project storage for this session
     console.log(`[DEBUG] Initializing in-memory storage with ${clientFiles.length} files and ${clientFileTree.length} tree entries for session ${projectId}`)
@@ -9172,6 +9210,29 @@ Result must be Markdown formatted for proper display:
               }
             }
           } finally {
+            // ============================================================================
+            // ABE BILLING - Deduct credits after successful response
+            // ============================================================================
+            const responseTime = Date.now() - startTime
+            
+            // Process billing (deduct credits)
+            const billingResult = await processRequestBilling({
+              userId: authContext.userId,
+              model: modelId || DEFAULT_CHAT_MODEL,
+              requestType: 'chat',
+              endpoint: '/api/chat-v2',
+              responseTimeMs: responseTime,
+              status: 'success'
+            })
+            
+            if (billingResult.success) {
+              console.log(
+                `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits. New balance: ${billingResult.newBalance} credits (${Math.floor((billingResult.newBalance || 0) / CREDITS_PER_MESSAGE)} messages remaining)`
+              )
+            } else {
+              console.error(`[Chat-V2] ⚠️ Failed to deduct credits:`, billingResult.error)
+            }
+            
             controller.close()
           }
         }
@@ -9189,6 +9250,23 @@ Result must be Markdown formatted for proper display:
     clearTimeout(requestTimeoutId);
 
     console.error('[Chat-V2] Error:', error)
+
+    // ============================================================================
+    // ABE BILLING - Log failed request (no charge)
+    // ============================================================================
+    if (authContext) {
+      const responseTime = Date.now() - startTime
+      await processRequestBilling({
+        userId: authContext.userId,
+        model: modelId || DEFAULT_CHAT_MODEL,
+        requestType: 'chat',
+        endpoint: '/api/chat-v2',
+        responseTimeMs: responseTime,
+        status: 'error',
+        errorMessage: error.message
+      })
+      console.log(`[Chat-V2] ⚠️ Error logged (no credits charged)`)
+    }
 
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

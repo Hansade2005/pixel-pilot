@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import Script from "next/script"
-import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +18,8 @@ export default function PricingPage() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [currentPlan, setCurrentPlan] = useState<string>('free')
+  const [creditBalance, setCreditBalance] = useState<number>(0)
+  const [canPurchaseCredits, setCanPurchaseCredits] = useState<boolean>(false)
 
   const supabase = createClient()
 
@@ -29,20 +30,27 @@ export default function PricingPage() {
       setUser(user)
 
       if (user) {
-        // Fetch current subscription directly from database
+        // Fetch current subscription and credits from wallet table
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
 
-        const { data: userSettings, error: settingsError } = await supabase
-          .from('user_settings')
-          .select('subscription_plan')
+        const { data: wallet, error: walletError } = await supabase
+          .from('wallet')
+          .select('current_plan, credits_balance')
           .eq('user_id', user.id)
           .single()
 
-        if (!settingsError && userSettings) {
-          setCurrentPlan(userSettings.subscription_plan || 'free')
+        if (!walletError && wallet) {
+          setCurrentPlan(wallet.current_plan || 'free')
+          setCreditBalance(wallet.credits_balance || 0)
+
+          // Check if user can purchase credits (paid plans only)
+          const { canPurchaseCredits: canBuy } = await import('@/lib/stripe-config')
+          setCanPurchaseCredits(canBuy(wallet.current_plan))
         } else {
           setCurrentPlan('free')
+          setCreditBalance(20) // Default free credits
+          setCanPurchaseCredits(false)
         }
       }
     }
@@ -135,6 +143,45 @@ export default function PricingPage() {
     }
   }
 
+  const handlePurchaseCredits = async (credits: number) => {
+    if (!user) {
+      window.location.href = '/auth/login?redirect=/pricing'
+      return
+    }
+
+    if (!canPurchaseCredits) {
+      alert('Credit purchases are only available for paid plans.')
+      return
+    }
+
+    setLoadingPlan('credits')
+
+    try {
+      const response = await fetch('/api/stripe/purchase-credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credits,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create credit purchase session')
+      }
+
+      const { url } = await response.json()
+      window.location.href = url
+    } catch (error) {
+      console.error('Error creating credit purchase session:', error)
+      alert('Failed to start credit purchase. Please try again.')
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   const faqData = [
     {
       question: "What is PiPilot and how does it work?",
@@ -142,23 +189,23 @@ export default function PricingPage() {
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes GitHub repository creation with 2 pushes per month, deployment to Netlify only (5 deployments per month), basic project templates, and community support. It's perfect for trying out PiPilot and building small projects."
+      answer: "The free plan includes 20 credits (80 messages), basic AI models, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot and building small projects."
     },
     {
       question: "What deployment platforms are available?",
-      answer: "Free users can deploy to Netlify only. Pro users get access to both Vercel and Netlify for maximum flexibility. Enterprise users will have additional deployment options coming soon."
+      answer: "Free users can deploy to Vercel only. Creator and above get access to both Vercel and Netlify for maximum flexibility."
     },
     {
       question: "What AI models are available?",
-      answer: "PiPilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Pro users get unlimited access to all premium models, while free users have basic access with reasonable limits."
+      answer: "PiPilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Free users have basic access with limits, while paid plans get unlimited access to all premium models."
     },
     {
-      question: "What are the deployment limits?",
-      answer: "Free users can make up to 5 deployments per month to Netlify and only 2 GitHub repository pushes per month. Pro users can make up to 10 deployments per month across both Vercel and Netlify combined, with unlimited GitHub access. Enterprise users will have higher limits when available."
+      question: "What are the credit and message limits?",
+      answer: "Free users get 20 credits (80 messages). Creator: 50 credits (200 messages). Collaborate: 75 credits (300 messages, shared). Scale: 150 credits (600 messages, shared). Paid users can purchase extra credits."
     },
     {
-      question: "What does 'GitHub repository pushes' mean?",
-      answer: "GitHub repository pushes refer to creating or updating repositories on GitHub through PiPilot. This includes initial repository creation and subsequent code pushes. Free users are limited to 2 pushes per month to encourage upgrading to Pro for unlimited development."
+      question: "What does 'credits' mean?",
+      answer: "Credits are used for AI requests. Each message costs 0.25 credits. Free users cannot buy extra credits and must upgrade when exhausted."
     },
     {
       question: "Who owns the projects and code?",
@@ -166,11 +213,11 @@ export default function PricingPage() {
     },
     {
       question: "How much does it cost to use?",
-      answer: "PiPilot offers a free tier with limited deployment access. The Pro plan is $29/month ($279/year) with unlimited prompts and full deployment access - saving 20% with annual billing. Enterprise plans are coming soon."
+      answer: "PiPilot offers a free tier with 80 messages. Creator is $15/month (200 messages), Collaborate $25/month (300 messages shared), Scale $60/month (600 messages shared). Annual plans save 20%."
     },
     {
       question: "Can I upgrade or downgrade my plan?",
-      answer: "Yes! You can upgrade from Free to Pro at any time. Your billing will be prorated accordingly. Enterprise plans will be available soon for teams with advanced needs."
+      answer: "Yes! You can upgrade at any time. Your billing will be prorated accordingly."
     },
     {
       question: "Where can I find out more?",
@@ -195,7 +242,7 @@ export default function PricingPage() {
       period: config.id === 'enterprise' ? undefined : (isAnnual ? "per user / year" : "per user / month"),
       savings: savings,
       note: config.id === 'pro' ? "Most Popular" : (config.id === 'free' ? "Perfect for getting started" : (config.id === 'enterprise' ? "Coming Soon" : undefined)),
-      buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : (config.id === 'enterprise' ? "Contact Sales" : "Select plan")),
+      buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : (config.id === 'scale' ? "Contact Sales" : "Select plan")),
       buttonVariant: "default" as const,
       isPopular: config.id === 'pro',
       planType: config.id,
@@ -321,9 +368,9 @@ export default function PricingPage() {
                     onClick={() => {
                       if (tier.planType === 'free') {
                         window.location.href = '/auth/signup'
-                      } else if (tier.planType === 'enterprise') {
-                        window.location.href = 'mailto:sales@pixelpilot.com?subject=Enterprise Inquiry'
-                      } else if (tier.planType !== 'free' && tier.planType !== 'enterprise') {
+                      } else if (tier.planType === 'scale') {
+                        window.location.href = 'mailto:hello@pipilot.dev?subject=Scale Plan Inquiry'
+                      } else if (tier.planType !== 'free' && tier.planType !== 'scale') {
                         handleSubscribe(tier.planType)
                       }
                     }}
@@ -346,6 +393,50 @@ export default function PricingPage() {
               </Card>
             ))}
           </div>
+
+
+          {/* Extra Credits Section - Only show for paid users */}
+          {user && canPurchaseCredits && (
+            <div className="mb-16">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-4">Need More Credits?</h2>
+                <p className="text-xl text-white/80">
+                  Purchase additional credits for your {currentPlan} plan
+                </p>
+                <div className="mt-4 p-4 bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50 inline-block">
+                  <p className="text-white">
+                    Current Balance: <span className="font-bold text-purple-400">{creditBalance} credits</span>
+                    <span className="text-gray-400 ml-2">({Math.floor(creditBalance / 0.25)} messages remaining)</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                {[10, 25, 50].map((credits) => (
+                  <Card key={credits} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+                    <CardHeader className="text-center pb-4">
+                      <CardTitle className="text-white text-2xl">{credits} Credits</CardTitle>
+                      <CardDescription className="text-gray-300">
+                        ${credits} • {credits * 4} messages
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <Button
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                        disabled={loadingPlan === 'credits'}
+                        onClick={() => handlePurchaseCredits(credits)}
+                      >
+                        {loadingPlan === 'credits' && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Purchase Credits
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
 
 
           {/* FAQ Section */}
