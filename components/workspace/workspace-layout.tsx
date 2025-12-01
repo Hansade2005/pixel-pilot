@@ -1071,12 +1071,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         syncedUrl={syncedPreview.url || customUrl}
                         onUrlChange={setCustomUrl}
                       />
-                    ) : (
-                      /* Database Tab */
-                      <DatabaseTab workspaceId={selectedProject?.id || ""} />
-                    ) : (
+                    ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
                       <CloudTab user={user} selectedProject={selectedProject} />
+                    ) : (
+                      /* Database Tab - fallback */
+                      <DatabaseTab workspaceId={selectedProject?.id || ""} />
                     )}
                   </div>
                 </ResizablePanel>
