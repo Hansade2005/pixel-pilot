@@ -205,17 +205,22 @@ function getTailwindPrefix(property: keyof ComputedStyleInfo): string | null {
   }
 }
 
-// Generate inline style string for non-Tailwind changes
+// Generate inline style string for non-Tailwind changes (JSX object syntax)
 export function generateInlineStyle(changes: StyleChange[]): string {
   const nonTailwindChanges = changes.filter(c => !c.useTailwind);
   if (nonTailwindChanges.length === 0) return '';
 
   const styles = nonTailwindChanges.map(change => {
-    const cssProperty = camelToKebab(change.property);
-    return `${cssProperty}: ${change.newValue}`;
+    // In JSX, style values must be quoted strings or numbers
+    const value = change.newValue;
+    // Check if it's a pure number (for things like opacity, zIndex)
+    const isNumeric = /^-?\d+(\.\d+)?$/.test(value);
+    // Quote the value for JSX object syntax
+    const quotedValue = isNumeric ? value : `"${value}"`;
+    return `${change.property}: ${quotedValue}`;
   });
 
-  return styles.join('; ');
+  return styles.join(', ');
 }
 
 // Convert camelCase to kebab-case
@@ -223,17 +228,46 @@ function camelToKebab(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
-// Parse existing inline style string to object
+// Parse existing inline style string to object (handles both CSS and JSX syntax)
 export function parseInlineStyle(style: string): Record<string, string> {
   const result: Record<string, string> = {};
   if (!style) return result;
 
-  const declarations = style.split(';').filter(Boolean);
-  for (const declaration of declarations) {
-    const [property, value] = declaration.split(':').map(s => s.trim());
-    if (property && value) {
-      const camelProperty = kebabToCamel(property);
-      result[camelProperty] = value;
+  // Handle JSX object syntax: { color: "#fff", fontSize: "16px" }
+  // or CSS syntax: color: #fff; font-size: 16px
+  
+  // Try to detect if it's JSX syntax (has quotes around values or uses camelCase)
+  const isJSXSyntax = style.includes(':') && (style.includes('"') || style.includes("'") || /[a-z][A-Z]/.test(style));
+  
+  if (isJSXSyntax) {
+    // JSX syntax: property: "value" or property: value
+    const declarations = style.split(',').filter(Boolean);
+    for (const declaration of declarations) {
+      const colonIndex = declaration.indexOf(':');
+      if (colonIndex === -1) continue;
+      
+      const property = declaration.slice(0, colonIndex).trim();
+      let value = declaration.slice(colonIndex + 1).trim();
+      
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) || 
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      
+      if (property && value) {
+        result[property] = value;
+      }
+    }
+  } else {
+    // CSS syntax: property: value;
+    const declarations = style.split(';').filter(Boolean);
+    for (const declaration of declarations) {
+      const [property, value] = declaration.split(':').map(s => s.trim());
+      if (property && value) {
+        const camelProperty = kebabToCamel(property);
+        result[camelProperty] = value;
+      }
     }
   }
 
@@ -245,7 +279,7 @@ function kebabToCamel(str: string): string {
   return str.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-// Merge inline styles
+// Merge inline styles (JSX object syntax)
 export function mergeInlineStyles(
   existing: string,
   changes: StyleChange[]
@@ -258,10 +292,15 @@ export function mergeInlineStyles(
     }
   }
 
-  // Convert back to string
+  // Convert back to JSX object syntax with quoted values
   return Object.entries(existingStyles)
-    .map(([prop, val]) => `${camelToKebab(prop)}: ${val}`)
-    .join('; ');
+    .map(([prop, val]) => {
+      // Check if it's a pure number
+      const isNumeric = /^-?\d+(\.\d+)?$/.test(val);
+      const quotedValue = isNumeric ? val : `"${val}"`;
+      return `${prop}: ${quotedValue}`;
+    })
+    .join(', ');
 }
 
 // Simple regex-based code updater (works without full AST parsing)
@@ -472,6 +511,10 @@ function updateElementByLine(
     };
   }
 
+  // Separate text content changes from style changes
+  const textChange = changes.find(c => (c.property as string) === 'textContent');
+  const styleChanges = changes.filter(c => (c.property as string) !== 'textContent');
+
   // Find the JSX element opening tag that starts at or contains this line
   // We need to handle multi-line elements like:
   // <div
@@ -479,7 +522,7 @@ function updateElementByLine(
   //   style={...}
   // >
   
-  const { startLine, endLine, openingTag } = findJSXOpeningTag(lines, targetLineIndex);
+  const { startLine, endLine, openingTag, closingTagLine, elementContent } = findJSXElement(lines, targetLineIndex);
   
   if (startLine === -1 || !openingTag) {
     return {
@@ -489,23 +532,47 @@ function updateElementByLine(
     };
   }
 
-  // Apply changes to the opening tag
-  const updatedOpeningTag = applyChangesToOpeningTag(openingTag, changes);
+  // Apply style changes to the opening tag
+  const updatedOpeningTag = styleChanges.length > 0 
+    ? applyChangesToOpeningTag(openingTag, styleChanges)
+    : openingTag;
   
   // Reconstruct the lines
   const newLines = [...lines];
   
   // Replace the lines containing the opening tag
   const linesBefore = newLines.slice(0, startLine);
-  const linesAfter = newLines.slice(endLine + 1);
   
   // Preserve indentation from the first line
   const indent = lines[startLine].match(/^(\s*)/)?.[1] || '';
-  const updatedLines = updatedOpeningTag.split('\n').map((line, i) => 
+  const updatedTagLines = updatedOpeningTag.split('\n').map((line: string, i: number) => 
     i === 0 ? indent + line.trimStart() : line
   );
+
+  // Handle text content update
+  if (textChange && closingTagLine !== -1) {
+    // Element has a closing tag - update the content between opening and closing
+    const linesAfterOpeningTag = newLines.slice(endLine + 1, closingTagLine);
+    const closingAndAfter = newLines.slice(closingTagLine);
+    
+    // Replace content with new text (preserving indent)
+    const contentIndent = linesAfterOpeningTag.length > 0 
+      ? linesAfterOpeningTag[0].match(/^(\s*)/)?.[1] || indent + '  '
+      : indent + '  ';
+    
+    const result = [
+      ...linesBefore, 
+      ...updatedTagLines, 
+      contentIndent + textChange.newValue,
+      ...closingAndAfter
+    ].join('\n');
+    
+    return { success: true, updatedCode: result };
+  }
   
-  const result = [...linesBefore, ...updatedLines, ...linesAfter].join('\n');
+  // No text change, just update the opening tag
+  const linesAfter = newLines.slice(endLine + 1);
+  const result = [...linesBefore, ...updatedTagLines, ...linesAfter].join('\n');
   
   return {
     success: true,
@@ -513,11 +580,11 @@ function updateElementByLine(
   };
 }
 
-// Find the JSX opening tag that starts at or near the given line
-function findJSXOpeningTag(
+// Find the JSX element including opening tag, content, and closing tag
+function findJSXElement(
   lines: string[],
   targetLine: number
-): { startLine: number; endLine: number; openingTag: string } {
+): { startLine: number; endLine: number; openingTag: string; closingTagLine: number; elementContent: string } {
   // Look for opening tag starting at target line, or search backward
   for (let start = targetLine; start >= Math.max(0, targetLine - 5); start--) {
     const line = lines[start];
@@ -526,16 +593,19 @@ function findJSXOpeningTag(
     const openTagMatch = line.match(/<(\w+)/);
     if (!openTagMatch) continue;
     
+    const tagName = openTagMatch[1];
+    
     // Find where this tag ends
     let depth = 0;
     let tagContent = '';
     let endLine = start;
+    let isSelfClosing = false;
     
     for (let i = start; i < lines.length && i <= start + 20; i++) {
       tagContent += (i > start ? '\n' : '') + lines[i];
       
       // Count angle brackets to find the end of the opening tag
-      for (let j = (i === start ? line.indexOf('<' + openTagMatch[1]) : 0); j < lines[i].length; j++) {
+      for (let j = (i === start ? line.indexOf('<' + tagName) : 0); j < lines[i].length; j++) {
         const char = lines[i][j];
         
         // Skip strings
@@ -561,6 +631,11 @@ function findJSXOpeningTag(
           continue;
         }
         
+        // Check for self-closing tag
+        if (char === '/' && j + 1 < lines[i].length && lines[i][j + 1] === '>') {
+          isSelfClosing = true;
+        }
+        
         if (char === '<') depth++;
         else if (char === '>') {
           depth--;
@@ -570,20 +645,47 @@ function findJSXOpeningTag(
             
             // Extract just the opening tag
             const fullText = lines.slice(start, endLine + 1).join('\n');
-            const tagEndIndex = fullText.indexOf('>', fullText.indexOf('<' + openTagMatch[1])) + 1;
+            const tagEndIndex = fullText.indexOf('>', fullText.indexOf('<' + tagName)) + 1;
             const openingTag = fullText.substring(
-              fullText.indexOf('<' + openTagMatch[1]),
+              fullText.indexOf('<' + tagName),
               tagEndIndex
             );
             
-            return { startLine: start, endLine, openingTag };
+            // If self-closing, no closing tag
+            if (isSelfClosing) {
+              return { startLine: start, endLine, openingTag, closingTagLine: -1, elementContent: '' };
+            }
+            
+            // Find the closing tag
+            const closingTagPattern = new RegExp(`</${tagName}\\s*>`);
+            let closingTagLine = -1;
+            let elementContent = '';
+            let tagDepth = 1;
+            
+            for (let k = endLine + 1; k < lines.length && k <= endLine + 50; k++) {
+              const searchLine = lines[k];
+              
+              // Count opening and closing tags of the same name
+              const openings = (searchLine.match(new RegExp(`<${tagName}[\\s>]`, 'g')) || []).length;
+              const closings = (searchLine.match(closingTagPattern) || []).length;
+              
+              tagDepth += openings - closings;
+              
+              if (tagDepth === 0) {
+                closingTagLine = k;
+                elementContent = lines.slice(endLine + 1, k).join('\n');
+                break;
+              }
+            }
+            
+            return { startLine: start, endLine, openingTag, closingTagLine, elementContent };
           }
         }
       }
     }
   }
   
-  return { startLine: -1, endLine: -1, openingTag: '' };
+  return { startLine: -1, endLine: -1, openingTag: '', closingTagLine: -1, elementContent: '' };
 }
 
 // Apply style changes to an opening tag

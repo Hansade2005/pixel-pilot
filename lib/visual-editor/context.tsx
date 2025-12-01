@@ -143,10 +143,21 @@ function visualEditorReducer(
     case 'ADD_PENDING_CHANGE': {
       const newPendingChanges = new Map(state.pendingChanges);
       const existingChanges = newPendingChanges.get(action.payload.elementId) || [];
-      newPendingChanges.set(action.payload.elementId, [
-        ...existingChanges,
-        ...action.payload.changes,
-      ]);
+      
+      // For each new change, replace if same property exists, otherwise append
+      const mergedChanges = [...existingChanges];
+      for (const newChange of action.payload.changes) {
+        const existingIndex = mergedChanges.findIndex(c => c.property === newChange.property);
+        if (existingIndex >= 0) {
+          // Replace existing change for same property
+          mergedChanges[existingIndex] = newChange;
+        } else {
+          // Add new change
+          mergedChanges.push(newChange);
+        }
+      }
+      
+      newPendingChanges.set(action.payload.elementId, mergedChanges);
       return {
         ...state,
         pendingChanges: newPendingChanges,
@@ -478,8 +489,23 @@ export function VisualEditorProvider({
 
   const updateElementText = useCallback((elementId: string, text: string) => {
     dispatch({ type: 'UPDATE_ELEMENT_TEXT', payload: { elementId, text } });
-    // Send text update to iframe
+    // Send text update to iframe for live preview
     sendToIframe({ type: 'UPDATE_TEXT', payload: { elementId, text } });
+    
+    // Also add as a pending change so it gets saved
+    // We use a special 'textContent' property marker
+    dispatch({
+      type: 'ADD_PENDING_CHANGE',
+      payload: {
+        elementId,
+        changes: [{
+          property: 'textContent' as any, // Special marker for text changes
+          oldValue: '',
+          newValue: text,
+          useTailwind: false,
+        }],
+      },
+    });
   }, [sendToIframe]);
 
   // Apply changes to source file
