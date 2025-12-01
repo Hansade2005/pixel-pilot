@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Logo } from "@/components/ui/logo"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
@@ -565,7 +566,8 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
-                            <Sparkles className="w-5 h-5 text-white" />
+                          <Logo variant="icon" size="sm" />
+
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold text-white">PiPilot AI Platform</h2>
