@@ -19,7 +19,7 @@ import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
+import { Github, Globe, Upload, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -1065,15 +1065,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       <CodePreviewPanel 
                         ref={codePreviewRef} 
                         project={selectedProject} 
-                        activeTab={activeTab} 
-                        onTabChange={setActiveTab} 
+                        onTabChange={() => {}} 
                         previewViewMode={previewViewMode}
                         syncedUrl={syncedPreview.url || customUrl}
                         onUrlChange={setCustomUrl}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
-                      <CloudTab user={user} selectedProject={selectedProject} />
+                      <CloudTab user={user} selectedProject={selectedProject} /> 
                     ) : (
                       /* Database Tab - fallback */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
@@ -1287,7 +1286,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               
               <div className="flex flex-col min-w-0">
                 <h1 className="text-sm font-semibold truncate">
-                  {selectedProject?.name ? (selectedProject.name.length > 12 ? `${selectedProject.name.substring(0, 12)}...` : selectedProject.name) : 'No Project'}
+                  {selectedProject?.name ? (selectedProject.name.length > 7 ? `${selectedProject.name.substring(0, 12)}...` : selectedProject.name) : 'No Project'}
                 </h1>
                 {selectedFile && (
                   <p className="text-xs text-muted-foreground truncate">
@@ -1318,7 +1317,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 disabled={!selectedProject || isBackingUp}
                 title={isBackingUp ? "Backing up..." : "Backup to Cloud"}
               >
-                <Cloud className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                <Upload className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
               </Button>
               <Button
                 variant="ghost"
@@ -1442,7 +1441,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <CodePreviewPanel
                       ref={codePreviewRef}
                       project={selectedProject}
-                      activeTab="preview"
                       onTabChange={() => {}}
                       previewViewMode={previewViewMode}
                       syncedUrl={syncedPreview.url || customUrl}
@@ -1499,15 +1497,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <Eye className="h-4 w-4" />
                 <span className="text-xs">Preview</span>
               </button>
-              <button
-                onClick={() => setMobileTab("cloud")}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "cloud" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Cloud className="h-4 w-4" />
-                <span className="text-xs">Cloud</span>
-              </button>
+
             </div>
           </div>
         </div>

@@ -90,8 +90,7 @@ async function compressProjectFiles(
 
 interface CodePreviewPanelProps {
   project: Project | null;
-  activeTab: "code" | "preview" | "database";
-  onTabChange: (tab: "code" | "preview" | "database") => void;
+  onTabChange?: (tab: "code" | "preview" | "database") => void;
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
@@ -114,9 +113,10 @@ interface PreviewState {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
+  ({ project, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
+    const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("preview")
     const [preview, setPreview] = useState<PreviewState>({
       sandboxId: null,
       url: null,
@@ -1519,20 +1519,29 @@ export default function TodoApp() {
             <WebPreviewNavigation>
               {/* Tab switching buttons - only shown in preview tab */}
               <WebPreviewNavigationButton
-                onClick={() => onTabChange("code")}
+                onClick={() => {
+                  setActiveTab("code")
+                  onTabChange?.("code")
+                }}
                 tooltip="Switch to Code View"
               >
                 <Code className="h-4 w-4" />
               </WebPreviewNavigationButton>
               <WebPreviewNavigationButton
-                onClick={() => onTabChange("preview")}
+                onClick={() => {
+                  setActiveTab("preview")
+                  onTabChange?.("preview")
+                }}
                 disabled={true}
                 tooltip="Current: Preview View"
               >
                 <Eye className="h-4 w-4" />
               </WebPreviewNavigationButton>
               <WebPreviewNavigationButton
-                onClick={() => onTabChange("database")}
+                onClick={() => {
+                  setActiveTab("database")
+                  onTabChange?.("database")
+                }}
                 tooltip="Switch to Database View"
               >
                 <Database className="h-4 w-4" />

@@ -1185,7 +1185,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                       </ResizablePanelGroup>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
-                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
+                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
                     ) : (
                       /* Database Tab */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
