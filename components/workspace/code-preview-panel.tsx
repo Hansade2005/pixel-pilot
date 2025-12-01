@@ -1539,10 +1539,10 @@ export default function TodoApp() {
               </WebPreviewNavigationButton>
               <WebPreviewNavigationButton
                 onClick={() => {
-                  setActiveTab("database")
-                  onTabChange?.("database")
+                  setActiveTab("cloud")
+                  onTabChange?.("cloud")
                 }}
-                tooltip="Switch to Database View"
+                tooltip="Switch to Cloud View"
               >
                 <Database className="h-4 w-4" />
               </WebPreviewNavigationButton>
@@ -1650,7 +1650,7 @@ export default function TodoApp() {
               })}
             />
           </WebPreview>
-        ) : activeTab === "database" ? (
+        ) : activeTab === "cloud" ? (
           <DatabaseTab workspaceId={project?.id || ""} />
         ) : null}
       </div>
