@@ -90,7 +90,7 @@ async function compressProjectFiles(
 
 interface CodePreviewPanelProps {
   project: Project | null;
-  onTabChange?: (tab: "code" | "preview" | "database") => void;
+  onTabChange?: (tab: "code" | "preview" | "cloud") => void;
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
@@ -116,7 +116,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   ({ project, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
-    const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("preview")
+    const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud">("preview")
     const [preview, setPreview] = useState<PreviewState>({
       sandboxId: null,
       url: null,
