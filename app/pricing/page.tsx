@@ -242,7 +242,7 @@ export default function PricingPage() {
       period: config.id === 'enterprise' ? undefined : (isAnnual ? "per user / year" : "per user / month"),
       savings: savings,
       note: config.id === 'pro' ? "Most Popular" : (config.id === 'free' ? "Perfect for getting started" : (config.id === 'enterprise' ? "Coming Soon" : undefined)),
-      buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : (config.id === 'scale' ? "Contact Sales" : "Select plan")),
+      buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : "Select plan"),
       buttonVariant: "default" as const,
       isPopular: config.id === 'pro',
       planType: config.id,
@@ -362,15 +362,12 @@ export default function PricingPage() {
                     className={`w-full ${tier.buttonVariant === 'default' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
                     disabled={
                       loadingPlan === tier.planType ||
-                      tier.buttonText === "Current Plan" ||
-                      tier.buttonText === "Contact Sales"
+                      tier.buttonText === "Current Plan"
                     }
                     onClick={() => {
                       if (tier.planType === 'free') {
                         window.location.href = '/auth/signup'
-                      } else if (tier.planType === 'scale') {
-                        window.location.href = 'mailto:hello@pipilot.dev?subject=Scale Plan Inquiry'
-                      } else if (tier.planType !== 'free' && tier.planType !== 'scale') {
+                      } else if (tier.planType !== 'free') {
                         handleSubscribe(tier.planType)
                       }
                     }}
