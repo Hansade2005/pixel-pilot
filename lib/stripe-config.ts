@@ -111,7 +111,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       },
       yearly: {
         amount: 144,
-        stripePriceId: 'price_1SZ98W3G7U0M1bp1u30VJE2V', // Using monthly for now, can create annual later
+        stripePriceId: 'price_1SZTlN3G7U0M1bp1Us7dGSSg',
         savings: '20%'
       }
     }
@@ -150,7 +150,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       },
       yearly: {
         amount: 240,
-        stripePriceId: 'price_1SZ98n3G7U0M1bp1DipaxRvq',
+        stripePriceId: 'price_1SZTmV3G7U0M1bp1GrNHBxUg',
         savings: '20%'
       }
     }
@@ -190,7 +190,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       },
       yearly: {
         amount: 576,
-        stripePriceId: 'price_1SZ98v3G7U0M1bp1YAD89Tx4',
+        stripePriceId: 'price_1SZToP3G7U0M1bp1v0AWlXZ6',
         savings: '20%'
       }
     }
