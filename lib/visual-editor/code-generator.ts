@@ -135,10 +135,12 @@ function colorToTailwindClass(color: string, prefix: 'bg' | 'text'): string | nu
 
 // Update className string with new Tailwind classes
 export function updateClassName(
-  currentClassName: string,
+  currentClassName: string | undefined,
   changes: StyleChange[]
 ): string {
-  const classes = currentClassName.split(/\s+/).filter(Boolean);
+  // Safe handling of undefined/null className
+  const safeClassName = currentClassName || '';
+  const classes = safeClassName.split(/\s+/).filter(Boolean);
   const classSet = new Set(classes);
 
   for (const change of changes) {

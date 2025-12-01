@@ -135,11 +135,6 @@ function VisualEditorInner({
     }
   }, [state.isEnabled, isIframeReady, sendToIframe]);
 
-  // Handle toggle
-  const handleToggle = useCallback(() => {
-    toggleEnabled(!state.isEnabled);
-  }, [state.isEnabled, toggleEnabled]);
-
   return (
     <div className={cn('relative h-full flex', className)}>
       {/* Main content area */}

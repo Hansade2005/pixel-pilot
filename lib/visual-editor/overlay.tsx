@@ -166,9 +166,9 @@ function ElementHighlight({
         )}
       >
         {element.tagName.toLowerCase()}
-        {element.className && (
+        {element.className && typeof element.className === 'string' && (
           <span className="ml-1 opacity-75">
-            .{element.className.split(' ')[0]}
+            .{(element.className.split(' ')[0] || '')}
           </span>
         )}
       </div>
@@ -373,9 +373,9 @@ export function ElementTree() {
             <span className="font-mono text-blue-600 dark:text-blue-400">
               {'<'}{selection.element.tagName.toLowerCase()}{'>'}
             </span>
-            {selection.element.className && (
+            {selection.element.className && typeof selection.element.className === 'string' && (
               <span className="text-muted-foreground truncate text-xs">
-                .{selection.element.className.split(' ')[0]}
+                .{(selection.element.className.split(' ')[0] || '')}
               </span>
             )}
           </div>

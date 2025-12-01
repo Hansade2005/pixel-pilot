@@ -284,8 +284,28 @@ interface StylesPanelProps {
   element: NonNullable<ReturnType<typeof useVisualEditor>['state']['selectedElements'][0]>['element'];
 }
 
+// Helper function to safely get computed style values with defaults
+function getComputedStyleValue(
+  computedStyles: StylesPanelProps['element']['computedStyles'] | undefined,
+  property: keyof StylesPanelProps['element']['computedStyles'],
+  defaultValue: string = ''
+): string {
+  if (!computedStyles) return defaultValue;
+  return computedStyles[property] ?? defaultValue;
+}
+
 function StylesPanel({ element }: StylesPanelProps) {
+  // Always call hooks at the top level - before any conditional returns
   const { addPendingChange } = useVisualEditor();
+
+  // Guard against missing computedStyles - after hooks
+  if (!element?.computedStyles) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Unable to load element styles. Please try selecting another element.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -377,7 +397,20 @@ function StylesPanel({ element }: StylesPanelProps) {
 
 // Layout Panel
 function LayoutPanel({ element }: StylesPanelProps) {
+  // Always call hooks at the top level - before any conditional returns
   const { addPendingChange } = useVisualEditor();
+
+  // Guard against missing computedStyles - after hooks
+  if (!element?.computedStyles) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Unable to load element layout. Please try selecting another element.
+      </div>
+    );
+  }
+
+  // Safe access to display property with default
+  const display = element.computedStyles.display || 'block';
 
   return (
     <div className="space-y-4">
@@ -385,11 +418,11 @@ function LayoutPanel({ element }: StylesPanelProps) {
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Display</Label>
         <Select
-          value={element.computedStyles.display}
+          value={display}
           onValueChange={(value) => {
             addPendingChange(element.id, [{
               property: 'display',
-              oldValue: element.computedStyles.display,
+              oldValue: display,
               newValue: value,
               useTailwind: true,
               tailwindClass: TAILWIND_MAPPINGS.display[value],
@@ -412,7 +445,7 @@ function LayoutPanel({ element }: StylesPanelProps) {
       </div>
 
       {/* Flex Direction (only if display is flex) */}
-      {element.computedStyles.display.includes('flex') && (
+      {display.includes('flex') && (
         <>
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Flex Direction</Label>
@@ -520,6 +553,15 @@ function LayoutPanel({ element }: StylesPanelProps) {
 // Spacing Panel
 function SpacingPanel({ element }: StylesPanelProps) {
   const { addPendingChange } = useVisualEditor();
+
+  // Guard against missing computedStyles
+  if (!element?.computedStyles) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Unable to load element spacing. Please try selecting another element.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -699,6 +741,19 @@ function SpacingPanel({ element }: StylesPanelProps) {
 function TypographyPanel({ element }: StylesPanelProps) {
   const { addPendingChange } = useVisualEditor();
 
+  // Guard against missing computedStyles
+  if (!element?.computedStyles) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Unable to load typography styles. Please try selecting another element.
+      </div>
+    );
+  }
+
+  // Safe font family extraction
+  const fontFamily = element.computedStyles.fontFamily || 'system-ui';
+  const displayFontFamily = fontFamily.split(',')[0]?.replace(/['"]/g, '').trim() || 'system-ui';
+
   return (
     <div className="space-y-4">
       {/* Text Content */}
@@ -719,11 +774,11 @@ function TypographyPanel({ element }: StylesPanelProps) {
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Font Family</Label>
         <Select
-          value={element.computedStyles.fontFamily.split(',')[0].replace(/['"]/g, '').trim()}
+          value={displayFontFamily}
           onValueChange={(value) => {
             addPendingChange(element.id, [{
               property: 'fontFamily',
-              oldValue: element.computedStyles.fontFamily,
+              oldValue: fontFamily,
               newValue: value,
               useTailwind: true,
             }]);
@@ -748,11 +803,11 @@ function TypographyPanel({ element }: StylesPanelProps) {
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Font Size</Label>
         <Select
-          value={element.computedStyles.fontSize}
+          value={element.computedStyles.fontSize || '16px'}
           onValueChange={(value) => {
             addPendingChange(element.id, [{
               property: 'fontSize',
-              oldValue: element.computedStyles.fontSize,
+              oldValue: element.computedStyles.fontSize || '16px',
               newValue: value,
               useTailwind: true,
               tailwindClass: TAILWIND_FONT_SIZES[value],
@@ -776,11 +831,11 @@ function TypographyPanel({ element }: StylesPanelProps) {
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Font Weight</Label>
         <Select
-          value={element.computedStyles.fontWeight}
+          value={element.computedStyles.fontWeight || '400'}
           onValueChange={(value) => {
             addPendingChange(element.id, [{
               property: 'fontWeight',
-              oldValue: element.computedStyles.fontWeight,
+              oldValue: element.computedStyles.fontWeight || '400',
               newValue: value,
               useTailwind: true,
               tailwindClass: TAILWIND_MAPPINGS.fontWeight[value],
@@ -894,11 +949,13 @@ function TypographyPanel({ element }: StylesPanelProps) {
 
 // Color Picker Component
 interface ColorPickerProps {
-  value: string;
+  value: string | undefined;
   onChange: (color: string) => void;
 }
 
 function ColorPicker({ value, onChange }: ColorPickerProps) {
+  // Safe handling of undefined/null values
+  const safeValue = value || '#000000';
   const presetColors = [
     '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308',
     '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899',
@@ -910,9 +967,9 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
         <Button variant="outline" className="w-full h-8 justify-start gap-2">
           <div
             className="w-4 h-4 rounded border"
-            style={{ backgroundColor: value }}
+            style={{ backgroundColor: safeValue }}
           />
-          <span className="text-xs font-mono truncate">{value}</span>
+          <span className="text-xs font-mono truncate">{safeValue}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-60">
@@ -923,7 +980,7 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
                 key={color}
                 className={cn(
                   'w-8 h-8 rounded border-2 transition-all',
-                  value === color ? 'border-blue-500 scale-110' : 'border-transparent hover:scale-105'
+                  safeValue === color ? 'border-blue-500 scale-110' : 'border-transparent hover:scale-105'
                 )}
                 style={{ backgroundColor: color }}
                 onClick={() => onChange(color)}
@@ -932,13 +989,13 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
           </div>
           <Input
             type="color"
-            value={value}
+            value={safeValue}
             onChange={(e) => onChange(e.target.value)}
             className="h-8 p-1"
           />
           <Input
             type="text"
-            value={value}
+            value={safeValue}
             onChange={(e) => onChange(e.target.value)}
             placeholder="#000000"
             className="h-8 font-mono text-xs"
@@ -951,13 +1008,15 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
 
 // Spacing Input Component
 interface SpacingInputProps {
-  value: string;
+  value: string | undefined;
   onChange: (value: string) => void;
   label?: React.ReactNode;
 }
 
 function SpacingInput({ value, onChange, label }: SpacingInputProps) {
-  const numericValue = parseInt(value.replace('px', ''), 10) || 0;
+  // Safe handling of undefined/null values
+  const safeValue = value || '0px';
+  const numericValue = parseInt(safeValue.replace('px', ''), 10) || 0;
 
   return (
     <div className="relative">
