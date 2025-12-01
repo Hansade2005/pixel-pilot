@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database, Zap, Cloud } from "lucide-react"
+import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -434,7 +434,7 @@ export function ProjectHeader({
                 disabled={!project}
                 className="h-8 w-8 p-0 sm:w-auto sm:px-3"
               >
-                <Share className="h-4 w-4" />
+                <Share2 className="h-4 w-4" />
                 <span className="hidden sm:inline ml-2">
                   {copied ? 'Copied!' : 'Share'}
                 </span>

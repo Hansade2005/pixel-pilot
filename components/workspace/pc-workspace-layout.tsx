@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import type { Workspace, File } from "@/lib/storage-manager"
-import { PcSidebar } from "./pc-sidebar"
+import { Sidebar } from "./sidebar"
 import { ChatPanel } from "./chat-panel"
 import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
@@ -17,7 +17,9 @@ import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database } from "lucide-react"
+import { AIPplatformTab } from "./ai-platform-tab"
+import { CloudTab } from "./cloud-tab"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -50,7 +52,7 @@ interface WorkspaceLayoutProps {
   initialPrompt?: string
 }
 
-export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }: WorkspaceLayoutProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
@@ -59,7 +61,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
@@ -70,7 +72,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "database">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -96,6 +98,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
   const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
   const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")
   const [projectHeaderInitialDescription, setProjectHeaderInitialDescription] = useState("")
+  const [isBackingUp, setIsBackingUp] = useState(false)
 
   // Initial prompt to auto-send to chat when project is created
   const [initialChatPrompt, setInitialChatPrompt] = useState<string | undefined>(undefined)
@@ -358,7 +361,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
             params.delete('prompt') // Remove prompt from URL after extracting
           }
           
-          router.replace(`/pc-workspace?${params.toString()}`)
+          router.replace(`/workspace?${params.toString()}`)
         }
         
         // Clear initial chat prompt after a delay to prevent re-sending
@@ -377,7 +380,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
       // Update URL to reflect the first project
       const params = new URLSearchParams(searchParams.toString())
       params.set('projectId', clientProjects[0].id)
-      router.push(`/pc-workspace?${params.toString()}`)
+      router.push(`/workspace?${params.toString()}`)
     }
   }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
 
@@ -415,7 +418,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
             if (!params.get('projectId')) {
               params.set('projectId', newProjectId)
               console.log('✅ Added projectId to URL while keeping newProject parameter')
-              router.replace(`/pc-workspace?${params.toString()}`)
+              router.replace(`/workspace?${params.toString()}`)
             } else {
               console.log('✅ URL already has projectId, not changing URL to prevent reload')
             }
@@ -428,95 +431,6 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
     }
   }, [newProjectId, user.id, searchParams, router])
 
-  // Handle initialPrompt - auto-generate project details and open create modal
-  // DISABLED: Auto-modal opening has been disabled completely
-  // useEffect(() => {
-  //   const generateAndOpenDialog = async () => {
-  //     // Skip auto-modal opening for newly created projects (created instantly on homepage)
-  //     const hasNewProject = searchParams.get('newProject') || newProjectId
-
-  //     if (initialPrompt && !isAutoRestoring && !isLoadingProjects && !hasProcessedInitialPrompt && !hasNewProject) {
-  //       console.log('WorkspaceLayout: Initial prompt detected, generating project suggestion:', initialPrompt)
-  //       console.log('WorkspaceLayout: Restoration status - isAutoRestoring:', isAutoRestoring, 'isLoadingProjects:', isLoadingProjects)
-
-  //       // Immediately clear the prompt from URL to prevent re-processing on refresh
-  //       const params = new URLSearchParams(searchParams.toString())
-  //       params.delete('prompt')
-  //       router.replace(`/workspace?${params.toString()}`)
-
-  //       try {
-  //         // Call AI to generate project name and description
-  //         const response = await fetch('/api/project-suggestions', {
-  //           method: 'POST',
-  //           headers: {
-  //             'Content-Type': 'application/json',
-  //           },
-  //           body: JSON.stringify({
-  //             prompt: initialPrompt,
-  //             userId: user.id,
-  //           }),
-  //         })
-
-  //         if (!response.ok) {
-  //           throw new Error('Failed to generate project suggestion')
-  //         }
-
-  //         const data = await response.json()
-
-  //         if (data.success && data.suggestion) {
-  //           console.log('WorkspaceLayout: AI generated suggestion:', data.suggestion)
-
-  //           if (isMobile) {
-  //             // For mobile, use the mobile dialog
-  //             setNewProjectName(data.suggestion.name)
-  //             setNewProjectDescription(data.suggestion.description)
-  //             setIsCreateDialogOpen(true)
-  //           } else {
-  //             // For desktop, trigger ProjectHeader dialog with generated details
-  //             setProjectHeaderInitialName(data.suggestion.name)
-  //             setProjectHeaderInitialDescription(data.suggestion.description)
-  //             setOpenProjectHeaderDialog(true)
-  //           }
-  //         } else {
-  //           // Fallback: use original prompt as description
-  //           console.warn('WorkspaceLayout: AI generation failed, using fallback')
-  //           if (isMobile) {
-  //             setNewProjectDescription(initialPrompt)
-  //             setIsCreateDialogOpen(true)
-  //           } else {
-  //             setProjectHeaderInitialDescription(initialPrompt)
-  //             setOpenProjectHeaderDialog(true)
-  //           }
-  //         }
-  //       } catch (error) {
-  //         console.error('WorkspaceLayout: Error generating project suggestion:', error)
-  //         // Fallback: use original prompt as description
-  //         if (isMobile) {
-  //           setNewProjectDescription(initialPrompt)
-  //           setIsCreateDialogOpen(true)
-  //         } else {
-  //           setProjectHeaderInitialDescription(initialPrompt)
-  //           setOpenProjectHeaderDialog(true)
-  //         }
-  //       }
-
-  //       // Mark that we've processed this initial prompt
-  //       setHasProcessedInitialPrompt(true)
-  //     }
-  //   }
-
-  //   generateAndOpenDialog()
-  // }, [initialPrompt, searchParams, router, isMobile, user.id, isAutoRestoring, isLoadingProjects, newProjectId])
-
-  // Reset processed flag when initialPrompt changes (new prompt from homepage)
-  // DISABLED: Auto-modal opening has been disabled completely
-  // useEffect(() => {
-  //   if (initialPrompt) {
-  //     setHasProcessedInitialPrompt(false)
-  //   }
-  // }, [initialPrompt])
-
-  // Load project files when selected project changes
   useEffect(() => {
     const loadProjectFiles = async () => {
       if (selectedProject && typeof window !== 'undefined') {
@@ -607,7 +521,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
         // Update URL to reflect the new project
         const params = new URLSearchParams(searchParams.toString())
         params.set('projectId', workspace.id)
-        router.push(`/pc-workspace?${params.toString()}`)
+        router.push(`/workspace?${params.toString()}`)
         
         // Prevent auto-restore for newly created project
         setJustCreatedProject(true)
@@ -681,17 +595,6 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
     console.log('Selected project changed:', selectedProject)
   }, [selectedProject])
 
-  // Auto-open create project dialog when user has no projects - DISABLED
-  // React.useEffect(() => {
-  //   const projectId = searchParams.get('projectId')
-  //   const newProject = searchParams.get('newProject')
-  //   if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog && !projectId && !newProject) {
-  //     console.log('WorkspaceLayout: No projects found and not viewing specific project, auto-opening create project dialog')
-  //     setIsCreateDialogOpen(true)
-  //     setHasAutoOpenedCreateDialog(true)
-  //   }
-  // }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog, searchParams])
-
   // Reset auto-open flag when projects are loaded
   React.useEffect(() => {
     if (clientProjects.length > 0) {
@@ -720,6 +623,34 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
       setMobileTab("editor")
     }
   }, [selectedFile, isMobile])
+
+  // Listen for AI stream completion to trigger automatic backup
+  React.useEffect(() => {
+    const handleAIStreamComplete = async (event: Event) => {
+      const customEvent = event as CustomEvent
+      console.log('[WorkspaceLayout] AI stream completed, triggering automatic backup')
+      
+      // Only backup if we have a selected project and user
+      if (selectedProject && user?.id) {
+        try {
+          // Trigger the backup function
+          await handleBackupToCloud()
+          console.log('[WorkspaceLayout] Automatic backup completed after AI stream')
+        } catch (error) {
+          console.error('[WorkspaceLayout] Automatic backup failed:', error)
+          // Don't show error toast for automatic backups to avoid spam
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ai-stream-complete', handleAIStreamComplete)
+      
+      return () => {
+        window.removeEventListener('ai-stream-complete', handleAIStreamComplete)
+      }
+    }
+  }, [selectedProject, user?.id])
 
   // Clear chat function for mobile header
   const handleClearChat = async () => {
@@ -781,6 +712,34 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
     }
   }
 
+  // Cloud backup handler for mobile header
+  const handleBackupToCloud = async () => {
+    if (!selectedProject || !user?.id) return
+
+    setIsBackingUp(true)
+    
+    try {
+      const { uploadBackupToCloud } = await import('@/lib/cloud-sync')
+      const success = await uploadBackupToCloud(user.id)
+      
+      if (!success) throw new Error("Backup failed")
+      
+      toast({
+        title: "Backup Complete",
+        description: "Project backed up to cloud successfully"
+      })
+    } catch (error: any) {
+      console.error("Error creating backup:", error)
+      toast({
+        title: "Backup Failed",
+        description: error.message || "Failed to create backup",
+        variant: "destructive"
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
   // Preview control functions
   const refreshPreview = () => {
     if (codePreviewRef.current) {
@@ -812,7 +771,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
       {!isMobile && (
         <>
           {/* Sidebar */}
-          <PcSidebar
+          <Sidebar
             user={user}
             projects={clientProjects}
             selectedProject={selectedProject}
@@ -823,7 +782,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
               // Update URL to reflect selected project
               const params = new URLSearchParams(searchParams.toString())
               params.set('projectId', project.id)
-              router.push(`/pc-workspace?${params.toString()}`)
+              router.push(`/workspace?${params.toString()}`)
               
               console.log('WorkspaceLayout: Project selected, URL updated:', project.name, project.id)
             }}
@@ -845,7 +804,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                   const params = new URLSearchParams(searchParams.toString())
                   params.set('projectId', newProject.id)
                   params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
-                  router.push(`/pc-workspace?${params.toString()}`)
+                  router.push(`/workspace?${params.toString()}`)
                   
                   console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
                   
@@ -878,7 +837,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                 if (selectedProject?.id === deletedProjectId) {
                   const params = new URLSearchParams(searchParams.toString())
                   params.delete('projectId')
-                  router.push(`/pc-workspace?${params.toString()}`)
+                  router.push(`/workspace?${params.toString()}`)
                   setSelectedProject(null)
                   setSelectedFile(null)
                 }
@@ -914,15 +873,15 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
               onShare={(_shareUrl?: string) => {
                 toast({ title: 'Link Copied', description: 'Project link copied to clipboard' })
               }}
-              onSettings={() => window.open('/pc-workspace/management', '_blank')}
-              onDeploy={() => router.push(`/pc-workspace/deployment?project=${selectedProject?.id}`)}
+              onSettings={() => window.open('/workspace/management', '_blank')}
+              onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               onDatabase={() => {
                 if (isMobile) {
-                  // Switch to database tab on mobile
-                  setMobileTab('database')
+                  // Switch to cloud tab on mobile
+                  setMobileTab('cloud')
                 } else if (selectedProject) {
-                  // Navigate to database page on desktop
-                  router.push(`/pc-workspace/${selectedProject.id}/database`)
+                  // Switch to cloud tab on desktop
+                  setActiveTab('cloud')
                 }
               }}
               user={user}
@@ -955,7 +914,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
                     params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
-                    router.push(`/pc-workspace?${params.toString()}`)
+                    router.push(`/workspace?${params.toString()}`)
                     
                     console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
                     
@@ -1016,123 +975,41 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                 {/* Right Panel - Code/Preview Area */}
                 <ResizablePanel defaultSize={60} minSize={30}>
                   <div className="h-full flex flex-col">
-                    {/* Tab Switcher with Preview Controls */}
-                    <div className="border-b border-border bg-card p-2 flex-shrink-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex space-x-1">
-                          <Button
-                            variant={activeTab === "code" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setActiveTab("code")}
-                            title="Code Editor"
-                          >
-                            <Code className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={activeTab === "preview" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setActiveTab("preview")}
-                            title="Live Preview"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={activeTab === "database" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setActiveTab("database")}
-                            title="Database"
-                          >
-                            <Database className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        {/* Preview Controls - Only show in Preview tab */}
-                        {activeTab === "preview" && (
-                          <div className="flex items-center space-x-2">
-                            {/* Mobile/Desktop View Toggle */}
-                            <div className="flex items-center border border-border rounded-lg p-1 bg-muted/50">
-                              <Button
-                                variant={previewViewMode === 'desktop' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setPreviewViewMode('desktop')}
-                                className="h-6 w-6 p-0"
-                                title="Desktop View"
-                              >
-                                <Monitor className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant={previewViewMode === 'mobile' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setPreviewViewMode('mobile')}
-                                className="h-6 w-6 p-0"
-                                title="Mobile View"
-                              >
-                                <Smartphone className="h-3 w-3" />
-                              </Button>
-                            </div>
-
-                            <div className="relative">
-                              <Input
-                                id="preview-url"
-                                placeholder="Preview URL..."
-                                value={syncedPreview.url || customUrl}
-                                onChange={(e) => setCustomUrl(e.target.value)}
-                                className="pl-10 pr-10 rounded-full w-64"
-                                disabled={syncedPreview.isLoading}
-                              />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={refreshPreview}
-                                disabled={!syncedPreview.url}
-                                title="Refresh preview"
-                                className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => window.open(syncedPreview.url || customUrl, '_blank')}
-                                disabled={!syncedPreview.url && !customUrl}
-                                title="Open URL in new tab"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </Button>
-                            </div>
+                    {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
+                    {activeTab !== "preview" && (
+                      <div className="border-b border-border bg-card p-2 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex space-x-1">
                             <Button
-                              variant="outline"
+                              variant={activeTab === "code" ? "secondary" : "ghost"}
                               size="sm"
-                              onClick={openStackBlitz}
-                              disabled={!selectedProject}
-                              title="Open in StackBlitz IDE"
+                              onClick={() => setActiveTab("code")}
+                              title="Code Editor"
                             >
                               <Code className="h-4 w-4" />
                             </Button>
-                            {!syncedPreview.sandboxId ? (
-                              <Button
-                                size="sm"
-                                onClick={createPreview}
-                                disabled={!selectedProject || syncedPreview.isLoading}
-                                title={syncedPreview.isLoading ? 'Starting preview...' : 'Start preview'}
-                              >
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={cleanupSandbox}
-                                title="Stop preview"
-                              >
-                                <Square className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setActiveTab("preview")}
+                              title="Live Preview"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant={activeTab === "cloud" ? "secondary" : "ghost"}
+                              size="sm"
+                              onClick={() => setActiveTab("cloud")}
+                              title="Cloud Services"
+                            >
+                              <Cloud className="h-4 w-4" />
+                            </Button>
                           </div>
-                        )}
+
+
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Content Area */}
                     {activeTab === "code" ? (
@@ -1185,9 +1062,20 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                       </ResizablePanelGroup>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
-                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
+                      <CodePreviewPanel 
+                        ref={codePreviewRef} 
+                        project={selectedProject} 
+                        activeTab={activeTab} 
+                        onTabChange={setActiveTab} 
+                        previewViewMode={previewViewMode}
+                        syncedUrl={syncedPreview.url || customUrl}
+                        onUrlChange={setCustomUrl}
+                      />
+                    ) : activeTab === "cloud" ? (
+                      /* Cloud Tab */
+                      <CloudTab user={user} selectedProject={selectedProject} /> 
                     ) : (
-                      /* Database Tab */
+                      /* Database Tab - fallback */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
                     )}
                   </div>
@@ -1273,7 +1161,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs"
-                  onClick={() => window.open('https://pipilot.dev/pc-workspace/management', '_blank')}
+                  onClick={() => window.open('/workspace/management', '_blank')}
                 >
                   <Settings className="h-3 w-3 mr-1" />
                   Manage
@@ -1283,8 +1171,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs"
-                 onClick={() => window.open(`https://pipilot.dev/pc-workspace/deployment?project=${selectedProject?.id}`, '_blank')}
-
+                  onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
                   disabled={!selectedProject}
                 >
                   <Rocket className="h-3 w-3 mr-1" />
@@ -1309,7 +1196,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-80">
-                  <PcSidebar
+                  <Sidebar
                     user={user}
                     projects={clientProjects}
                     selectedProject={selectedProject}
@@ -1321,7 +1208,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                       // Update URL to reflect selected project
                       const params = new URLSearchParams(searchParams.toString())
                       params.set('projectId', project.id)
-                      router.push(`/pc-workspace?${params.toString()}`)
+                      router.push(`/workspace?${params.toString()}`)
                     }}
                     onProjectCreated={async (newProject) => {
                       try {
@@ -1339,7 +1226,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
                           params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
-                          router.push(`/pc-workspace?${params.toString()}`)
+                          router.push(`/workspace?${params.toString()}`)
                           
                           console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
                           
@@ -1370,7 +1257,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                         if (selectedProject?.id === deletedProjectId) {
                           const params = new URLSearchParams(searchParams.toString())
                           params.delete('projectId')
-                          router.push(`/pc-workspace?${params.toString()}`)
+                          router.push(`/workspace?${params.toString()}`)
                           setSelectedProject(null)
                           setSelectedFile(null)
                           setSidebarOpen(false)
@@ -1427,16 +1314,23 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                onClick={() => {
-                  if (selectedProject) {
-                    router.push(`/pc-workspace/${selectedProject.id}/database`)
-                  }
-                }}
-                disabled={!selectedProject}
-                title="Database"
+                onClick={handleBackupToCloud}
+                disabled={!selectedProject || isBackingUp}
+                title={isBackingUp ? "Backing up..." : "Backup to Cloud"}
               >
-                <Database className="h-4 w-4" />
+                <Cloud className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setMobileTab("cloud")}
+                title="Cloud Services"
+              >
+                <Cloud className="h-4 w-4" />
+              </Button>
+             
+              
              
               <Button
                 variant="ghost"
@@ -1451,7 +1345,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                onClick={() => router.push(`/pc-workspace/deployment?project=${selectedProject?.id}`)}
+                onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
                 disabled={!selectedProject}
                 title="Deploy"
               >
@@ -1551,13 +1445,15 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                       activeTab="preview"
                       onTabChange={() => {}}
                       previewViewMode={previewViewMode}
+                      syncedUrl={syncedPreview.url || customUrl}
+                      onUrlChange={setCustomUrl}
                     />
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="database" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                <TabsContent value="cloud" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <DatabaseTab workspaceId={selectedProject?.id || ""} />
+                    <CloudTab user={user} selectedProject={selectedProject} />
                   </div>
                 </TabsContent>
               </Tabs>
@@ -1566,7 +1462,7 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
 
           {/* Fixed Mobile Bottom Tab Navigation */}
           <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-            <div className="grid grid-cols-5 h-12">
+            <div className="grid grid-cols-4 h-12">
               <button
                 onClick={() => setMobileTab("chat")}
                 className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
@@ -1604,13 +1500,13 @@ export function PcWorkspaceLayout({ user, projects, newProjectId, initialPrompt 
                 <span className="text-xs">Preview</span>
               </button>
               <button
-                onClick={() => setMobileTab("database")}
+                onClick={() => setMobileTab("cloud")}
                 className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "database" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  mobileTab === "cloud" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Database className="h-4 w-4" />
-                <span className="text-xs">Database</span>
+                <Cloud className="h-4 w-4" />
+                <span className="text-xs">Cloud</span>
               </button>
             </div>
           </div>

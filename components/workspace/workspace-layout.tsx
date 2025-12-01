@@ -19,7 +19,7 @@ import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play,DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -1318,7 +1318,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 disabled={!selectedProject || isBackingUp}
                 title={isBackingUp ? "Backing up..." : "Backup to Cloud"}
               >
-                <Cloud className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                <DatabaseBackup className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
               </Button>
               <Button
                 variant="ghost"
