@@ -205,7 +205,7 @@ function getTailwindPrefix(property: keyof ComputedStyleInfo): string | null {
   }
 }
 
-// Generate inline style string for non-Tailwind changes (JSX object syntax)
+  // Generate inline style string for non-Tailwind changes (JSX object syntax)
 export function generateInlineStyle(changes: StyleChange[]): string {
   const nonTailwindChanges = changes.filter(c => !c.useTailwind);
   if (nonTailwindChanges.length === 0) return '';
@@ -215,15 +215,15 @@ export function generateInlineStyle(changes: StyleChange[]): string {
     const value = change.newValue;
     // Check if it's a pure number (for things like opacity, zIndex)
     const isNumeric = /^-?\d+(\.\d+)?$/.test(value);
-    // Quote the value for JSX object syntax
-    const quotedValue = isNumeric ? value : `"${value}"`;
+    // Quote the value for JSX object syntax - use single quotes to avoid escaping issues
+    const quotedValue = isNumeric ? value : `'${value}'`;
     return `${change.property}: ${quotedValue}`;
   });
 
-  return styles.join(', ');
-}
-
-// Convert camelCase to kebab-case
+  const result = styles.join(', ');
+  console.log('[generateInlineStyle] Generated:', result);
+  return result;
+}// Convert camelCase to kebab-case
 function camelToKebab(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
@@ -284,23 +284,32 @@ export function mergeInlineStyles(
   existing: string,
   changes: StyleChange[]
 ): string {
+  console.log('[mergeInlineStyles] Existing:', existing);
+  console.log('[mergeInlineStyles] Changes:', changes);
+  
   const existingStyles = parseInlineStyle(existing);
+  console.log('[mergeInlineStyles] Parsed existing styles:', existingStyles);
   
   for (const change of changes) {
     if (!change.useTailwind) {
       existingStyles[change.property] = change.newValue;
     }
   }
+  
+  console.log('[mergeInlineStyles] Merged styles:', existingStyles);
 
-  // Convert back to JSX object syntax with quoted values
-  return Object.entries(existingStyles)
+  // Convert back to JSX object syntax with quoted values - use single quotes to avoid escaping issues
+  const result = Object.entries(existingStyles)
     .map(([prop, val]) => {
       // Check if it's a pure number
       const isNumeric = /^-?\d+(\.\d+)?$/.test(val);
-      const quotedValue = isNumeric ? val : `"${val}"`;
+      const quotedValue = isNumeric ? val : `'${val}'`;
       return `${prop}: ${quotedValue}`;
     })
     .join(', ');
+    
+  console.log('[mergeInlineStyles] Result:', result);
+  return result;
 }
 
 // Simple regex-based code updater (works without full AST parsing)
@@ -746,10 +755,16 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
     const newInlineStyle = generateInlineStyle(styleChanges);
     const styleMatch = result.match(/style=\{\{([^}]*)\}\}/);
     
+    console.log('[applyChangesToOpeningTag] Style changes:', styleChanges);
+    console.log('[applyChangesToOpeningTag] New inline style:', newInlineStyle);
+    console.log('[applyChangesToOpeningTag] Style match:', styleMatch);
+    
     if (styleMatch) {
       // Merge with existing style
       const mergedStyle = mergeInlineStyles(styleMatch[1], styleChanges);
-      result = result.replace(styleMatch[0], `style={{ ${mergedStyle} }}`);
+      const replacement = `style={{ ${mergedStyle} }}`;
+      console.log('[applyChangesToOpeningTag] Replacement:', replacement);
+      result = result.replace(styleMatch[0], replacement);
     } else {
       // Add new style attribute
       const tagNameMatch = result.match(/^<(\w+)/);
@@ -773,15 +788,20 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
               pos++;
             }
           }
-          result = result.slice(0, pos) + ` style={{ ${newInlineStyle} }}` + result.slice(pos);
+          const styleAttr = ` style={{ ${newInlineStyle} }}`;
+          console.log('[applyChangesToOpeningTag] Adding style after className:', styleAttr);
+          result = result.slice(0, pos) + styleAttr + result.slice(pos);
         } else {
           const insertPos = tagNameMatch[0].length;
-          result = result.slice(0, insertPos) + ` style={{ ${newInlineStyle} }}` + result.slice(insertPos);
+          const styleAttr = ` style={{ ${newInlineStyle} }}`;
+          console.log('[applyChangesToOpeningTag] Adding style after tag name:', styleAttr);
+          result = result.slice(0, insertPos) + styleAttr + result.slice(insertPos);
         }
       }
     }
   }
   
+  console.log('[applyChangesToOpeningTag] Final result:', result);
   return result;
 }
 
