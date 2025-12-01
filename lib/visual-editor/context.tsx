@@ -51,7 +51,9 @@ type VisualEditorAction =
   | { type: 'SET_ACTIVE_TOOL'; payload: VisualEditorTool }
   | { type: 'SET_SIDEBAR_OPEN'; payload: boolean }
   | { type: 'SET_ACTIVE_PANEL'; payload: SidebarPanel }
-  | { type: 'UPDATE_ELEMENT_RECT'; payload: { elementId: string; rect: DOMRect } };
+  | { type: 'UPDATE_ELEMENT_RECT'; payload: { elementId: string; rect: DOMRect } }
+  | { type: 'UPDATE_ELEMENT_STYLE'; payload: { elementId: string; property: string; value: string } }
+  | { type: 'UPDATE_ELEMENT_TEXT'; payload: { elementId: string; text: string } };
 
 // Reducer function
 function visualEditorReducer(
@@ -235,6 +237,47 @@ function visualEditorReducer(
       };
     }
 
+    case 'UPDATE_ELEMENT_STYLE': {
+      const updatedSelections = state.selectedElements.map(sel => {
+        if (sel.elementId === action.payload.elementId) {
+          return {
+            ...sel,
+            element: {
+              ...sel.element,
+              computedStyles: {
+                ...sel.element.computedStyles,
+                [action.payload.property]: action.payload.value,
+              },
+            },
+          };
+        }
+        return sel;
+      });
+      return {
+        ...state,
+        selectedElements: updatedSelections,
+      };
+    }
+
+    case 'UPDATE_ELEMENT_TEXT': {
+      const updatedSelections = state.selectedElements.map(sel => {
+        if (sel.elementId === action.payload.elementId) {
+          return {
+            ...sel,
+            element: {
+              ...sel.element,
+              textContent: action.payload.text,
+            },
+          };
+        }
+        return sel;
+      });
+      return {
+        ...state,
+        selectedElements: updatedSelections,
+      };
+    }
+
     default:
       return state;
   }
@@ -259,6 +302,8 @@ interface VisualEditorContextValue {
   setSidebarOpen: (open: boolean) => void;
   setActivePanel: (panel: SidebarPanel) => void;
   updateElementRect: (elementId: string, rect: DOMRect) => void;
+  updateElementStyle: (elementId: string, property: string, value: string) => void;
+  updateElementText: (elementId: string, text: string) => void;
   // Iframe communication
   sendToIframe: (message: VisualEditorMessage) => void;
   setIframeRef: (iframe: HTMLIFrameElement | null) => void;
@@ -383,6 +428,14 @@ export function VisualEditorProvider({
   const addPendingChange = useCallback((elementId: string, changes: StyleChange[]) => {
     dispatch({ type: 'ADD_PENDING_CHANGE', payload: { elementId, changes } });
     
+    // Update the element's computed styles in state so sidebar reflects changes
+    changes.forEach(change => {
+      dispatch({ 
+        type: 'UPDATE_ELEMENT_STYLE', 
+        payload: { elementId, property: change.property, value: change.newValue } 
+      });
+    });
+    
     // Send style changes to iframe for immediate preview
     sendToIframe({ type: 'APPLY_STYLE', payload: { elementId, changes } });
   }, [sendToIframe]);
@@ -418,6 +471,16 @@ export function VisualEditorProvider({
   const updateElementRect = useCallback((elementId: string, rect: DOMRect) => {
     dispatch({ type: 'UPDATE_ELEMENT_RECT', payload: { elementId, rect } });
   }, []);
+
+  const updateElementStyle = useCallback((elementId: string, property: string, value: string) => {
+    dispatch({ type: 'UPDATE_ELEMENT_STYLE', payload: { elementId, property, value } });
+  }, []);
+
+  const updateElementText = useCallback((elementId: string, text: string) => {
+    dispatch({ type: 'UPDATE_ELEMENT_TEXT', payload: { elementId, text } });
+    // Send text update to iframe
+    sendToIframe({ type: 'UPDATE_TEXT', payload: { elementId, text } });
+  }, [sendToIframe]);
 
   // Apply changes to source file
   const applyChangesToFile = useCallback(async (
@@ -456,6 +519,8 @@ export function VisualEditorProvider({
     setSidebarOpen,
     setActivePanel,
     updateElementRect,
+    updateElementStyle,
+    updateElementText,
     sendToIframe,
     setIframeRef,
     applyChangesToFile,

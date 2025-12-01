@@ -739,7 +739,7 @@ function SpacingPanel({ element }: StylesPanelProps) {
 
 // Typography Panel
 function TypographyPanel({ element }: StylesPanelProps) {
-  const { addPendingChange } = useVisualEditor();
+  const { addPendingChange, updateElementText } = useVisualEditor();
 
   // Guard against missing computedStyles
   if (!element?.computedStyles) {
@@ -757,15 +757,16 @@ function TypographyPanel({ element }: StylesPanelProps) {
   return (
     <div className="space-y-4">
       {/* Text Content */}
-      {element.textContent && (
+      {element.textContent !== undefined && (
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Text Content</Label>
           <textarea
-            className="w-full min-h-[80px] p-2 text-sm border rounded resize-none"
-            value={element.textContent}
+            className="w-full min-h-[80px] p-2 text-sm border rounded resize-none bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            value={element.textContent || ''}
             onChange={(e) => {
-              // Text content changes are handled differently
+              updateElementText(element.id, e.target.value);
             }}
+            placeholder="Enter text content..."
           />
         </div>
       )}

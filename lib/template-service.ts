@@ -83,7 +83,8 @@ export class TemplateService {
     "remark-gfm": "^4.0.1",
 
     "@tanstack/react-table": "^8.20.5",
-    "@vercel/node": "^3.0.0"
+    "@vercel/node": "^3.0.0",
+    "@dyad-sh/react-vite-component-tagger": "0.8.0"
 
   },
   "devDependencies": {
@@ -120,11 +121,15 @@ export class TemplateService {
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { visualEditorPlugin } from './vite-plugin-visual-editor'
+import dyadTagger from '@dyad-sh/react-vite-component-tagger'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    // Component Tagger Plugin - enhances visual editor source mapping
+    // Set VITE_ENABLE_VISUAL_EDITOR=true to activate
+    process.env.VITE_ENABLE_VISUAL_EDITOR === 'true' && dyadTagger(),
     // Visual Editor Plugin - enables source mapping for visual editing
     // Set VITE_ENABLE_VISUAL_EDITOR=true to activate
     process.env.VITE_ENABLE_VISUAL_EDITOR === 'true' && visualEditorPlugin(),
@@ -845,6 +850,27 @@ export default App`,
     return true;
   }
 
+  // Update text content from parent
+  function updateTextContent(elementId, text) {
+    const element = findElementById(elementId);
+    if (!element) return false;
+    // Only update direct text nodes, not nested element content
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        node.textContent = text;
+        sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
+        return true;
+      }
+    }
+    // If no text node exists, set innerHTML for simple elements
+    if (element.children.length === 0) {
+      element.textContent = text;
+      sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
+      return true;
+    }
+    return false;
+  }
+
   // Message handler
   function handleMessage(event) {
     // Security: Only allow messages from known origins
@@ -872,6 +898,9 @@ export default App`,
         break;
       case 'APPLY_STYLE':
         applyStyleChanges(message.payload.elementId, message.payload.changes);
+        break;
+      case 'UPDATE_TEXT':
+        updateTextContent(message.payload.elementId, message.payload.text);
         break;
       case 'REQUEST_ELEMENT_INFO':
         var el = findElementById(message.payload.elementId);
@@ -5906,7 +5935,8 @@ This setup provides a complete, production-ready authentication system for your 
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
 
-    "@tanstack/react-table": "^8.20.5"
+    "@tanstack/react-table": "^8.20.5",
+    "@dyad-sh/nextjs-webpack-component-tagger": "0.8.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -5952,6 +5982,14 @@ const nextConfig = {
   // Only enabled when NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
   webpack: (config, { dev }) => {
     if (dev && process.env.NEXT_PUBLIC_ENABLE_VISUAL_EDITOR === 'true') {
+      // Add component tagger for enhanced visual editor source mapping
+      config.module.rules.push({
+        test: /\.(jsx|tsx)$/,
+        exclude: /node_modules/,
+        enforce: "pre",
+        use: '@dyad-sh/nextjs-webpack-component-tagger',
+      });
+
       // Add custom babel plugin for visual editor source mapping
       config.module.rules.push({
         test: /\\.(tsx|jsx)$/,
@@ -6779,6 +6817,27 @@ export default function Home() {
     return true;
   }
 
+  // Update text content from parent
+  function updateTextContent(elementId, text) {
+    const element = findElementById(elementId);
+    if (!element) return false;
+    // Only update direct text nodes, not nested element content
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        node.textContent = text;
+        sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
+        return true;
+      }
+    }
+    // If no text node exists, set innerHTML for simple elements
+    if (element.children.length === 0) {
+      element.textContent = text;
+      sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
+      return true;
+    }
+    return false;
+  }
+
   // Message handler
   function handleMessage(event) {
     // Security: Only allow messages from known origins
@@ -6806,6 +6865,9 @@ export default function Home() {
         break;
       case 'APPLY_STYLE':
         applyStyleChanges(message.payload.elementId, message.payload.changes);
+        break;
+      case 'UPDATE_TEXT':
+        updateTextContent(message.payload.elementId, message.payload.text);
         break;
       case 'REQUEST_ELEMENT_INFO':
         var el = findElementById(message.payload.elementId);
