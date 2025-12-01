@@ -149,7 +149,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
     useEffect(() => {
         if (activeSection === "api-keys" && currentTeam) loadApiKeys()
         if (activeSection === "wallet" && currentTeam) loadWallet()
-        if (activeSection === "teams") loadTeams()
+        if (activeSection === "teams") loadTeamsForTab()
         if (activeSection === "activity" && currentTeam) loadActivity()
     }, [activeSection, currentTeam])
 
@@ -231,6 +231,13 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
             toast.error('Failed to load teams')
         } finally {
             setLoadingTeams(false)
+        }
+    }
+
+    async function loadTeamsForTab() {
+        // Only reload teams if we don't have them yet or need to refresh
+        if (teams.length === 0) {
+            await loadTeams()
         }
     }
 
