@@ -323,6 +323,37 @@ export function Navigation() {
                         </button>
                       </DropdownMenuTrigger>
                                            <DropdownMenuContent align="end" className="w-56 bg-gray-800 border-gray-700">
+                         {/* Credits Section in Dropdown */}
+                         {!loadingCredits && creditBalance !== null && (
+                           <div className="px-3 py-3 border-b border-gray-700">
+                             <div className="flex items-center justify-between mb-2">
+                               <div className="flex items-center space-x-2">
+                                 <Coins className="w-4 h-4 text-green-400" />
+                                 <span className="text-sm font-medium text-green-300">
+                                   {creditBalance.toFixed(2)} credits
+                                 </span>
+                               </div>
+                               {creditBalance <= 2 && (
+                                 <AlertTriangle className="w-3 h-3 text-orange-400" />
+                               )}
+                             </div>
+                             <div className="text-xs text-gray-400">
+                               ~{estimatedMessages} messages remaining • {currentPlan} Plan
+                             </div>
+                             {/* Top Up Button for Low Balance */}
+                             {(creditBalance <= 2 || currentPlan === 'free') && (
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                                 onClick={() => setShowTopUpDialog(true)}
+                               >
+                                 <CreditCard className="h-3 w-3 mr-1" />
+                                 {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
+                               </Button>
+                             )}
+                           </div>
+                         )}
                          <Link href="/workspace/account">
                            <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                              <User className="w-4 h-4 mr-2" />
@@ -436,14 +467,6 @@ export function Navigation() {
                                      'Free Plan'}
                                   </span>
                                 </div>
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {subscription.plan === 'pro'
-                                  ? `${subscription.deploymentsThisMonth || 0}/10 deployments`
-                                  : subscription.plan === 'enterprise'
-                                  ? 'Unlimited usage'
-                                  : `${subscription.deploymentsThisMonth || 0}/5 deployments`
-                                }
                               </div>
                             </div>
                           )}
