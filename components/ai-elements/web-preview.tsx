@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef } from "react";
 
 export type DevicePreset = {
   name: string;
@@ -360,15 +360,34 @@ export const WebPreviewDeviceSelector = ({
 
 export type WebPreviewBodyProps = ComponentProps<"iframe"> & {
   loading?: ReactNode;
+  onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
 };
 
-export const WebPreviewBody = ({
+export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>(({
   className,
   loading,
   src,
+  onIframeRef,
   ...props
-}: WebPreviewBodyProps) => {
+}, ref) => {
   const { url, device } = useWebPreview();
+  const internalRef = useRef<HTMLIFrameElement>(null);
+  
+  // Combine refs and call the callback
+  const setRefs = (iframe: HTMLIFrameElement | null) => {
+    // Set internal ref
+    (internalRef as React.MutableRefObject<HTMLIFrameElement | null>).current = iframe;
+    
+    // Forward ref
+    if (typeof ref === 'function') {
+      ref(iframe);
+    } else if (ref) {
+      ref.current = iframe;
+    }
+    
+    // Call callback if provided
+    onIframeRef?.(iframe);
+  };
 
   return (
     <div className="h-full">
@@ -395,6 +414,7 @@ export const WebPreviewBody = ({
                 className="bg-white rounded-sm overflow-hidden w-full h-full"
               >
                 <iframe
+                  ref={setRefs}
                   className={cn("w-full h-full border-0", className)}
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
                   src={(src ?? url) || undefined}
@@ -420,6 +440,7 @@ export const WebPreviewBody = ({
         </div>
       ) : (
         <iframe
+          ref={setRefs}
           className={cn("w-full h-full border-0", className)}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
           src={(src ?? url) || undefined}
@@ -430,7 +451,9 @@ export const WebPreviewBody = ({
       {!device && loading}
     </div>
   );
-};
+});
+
+WebPreviewBody.displayName = "WebPreviewBody";
 
 export type WebPreviewConsoleProps = ComponentProps<"div"> & {
   logs?: Array<{

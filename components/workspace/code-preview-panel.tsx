@@ -159,7 +159,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   
   // Visual Editor state
   const [isVisualEditorEnabled, setIsVisualEditorEnabled] = useState(false)
-  const previewIframeRef = useRef<HTMLIFrameElement>(null)
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
 
   // Dispatch preview state changes to parent component
   useEffect(() => {
@@ -1522,6 +1522,7 @@ export default function TodoApp() {
           </ScrollArea>
         ) : activeTab === "preview" ? (
           <VisualEditorWrapper
+            iframeRef={previewIframeRef}
             isEnabled={isVisualEditorEnabled}
             onToggle={setIsVisualEditorEnabled}
             onSaveChanges={onVisualEditorSave}
@@ -1628,7 +1629,8 @@ export default function TodoApp() {
                 <WebPreviewBody
                   className="h-full"
                   src={preview.url}
-                  ref={(iframe) => {
+                  ref={previewIframeRef}
+                  onIframeRef={(iframe) => {
                     if (iframe) {
                       injectConsoleInterceptor(iframe)
                     }

@@ -19,11 +19,11 @@ import {
   generateFileUpdate,
   type StyleChange,
 } from '@/lib/visual-editor';
-import { MousePointer2, X, Edit3, Wand2 } from 'lucide-react';
+import { Edit3, Wand2 } from 'lucide-react';
 
 interface VisualEditorWrapperProps {
   children: React.ReactNode;
-  iframeRef?: React.RefObject<HTMLIFrameElement>;
+  iframeRef?: React.RefObject<HTMLIFrameElement | null>;
   previewUrl?: string;
   isEnabled?: boolean;
   onToggle?: (enabled: boolean) => void;
@@ -54,6 +54,8 @@ function VisualEditorInner({
   // Track internal ref if not provided
   const internalIframeRef = useRef<HTMLIFrameElement>(null);
   const activeIframeRef = iframeRef || internalIframeRef;
+  const [isIframeReady, setIsIframeReady] = useState(false);
+  const lastIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // Sync external enabled state
   useEffect(() => {
@@ -67,36 +69,71 @@ function VisualEditorInner({
     onToggle?.(state.isEnabled);
   }, [state.isEnabled, onToggle]);
 
-  // Inject visual editor script when iframe loads
+  // Monitor iframe ref changes and inject script when available
   useEffect(() => {
-    const iframe = activeIframeRef.current;
-    if (!iframe) return;
-
-    const handleLoad = () => {
-      // Set the iframe ref in context
-      setIframeRef(iframe);
+    const checkAndSetupIframe = () => {
+      const iframe = activeIframeRef.current;
       
-      // Inject the visual editor script
-      setTimeout(() => {
-        if (injectVisualEditorScript(iframe)) {
-          // Send initial state
-          if (state.isEnabled) {
-            sendToIframe({ type: 'VISUAL_EDITOR_TOGGLE', payload: { enabled: true } });
+      if (!iframe) {
+        setIsIframeReady(false);
+        return;
+      }
+      
+      // Only setup if iframe changed
+      if (lastIframeRef.current === iframe && isIframeReady) {
+        return;
+      }
+      
+      const setupIframe = () => {
+        console.log('[Visual Editor Wrapper] Setting up iframe');
+        lastIframeRef.current = iframe;
+        setIframeRef(iframe);
+        
+        // Try to inject the script
+        try {
+          const injected = injectVisualEditorScript(iframe);
+          if (injected) {
+            console.log('[Visual Editor Wrapper] Script injected successfully');
+            setIsIframeReady(true);
+            
+            // Send initial state after a short delay to ensure script is ready
+            setTimeout(() => {
+              sendToIframe({ type: 'VISUAL_EDITOR_INIT', payload: { enabled: state.isEnabled } });
+            }, 100);
           }
+        } catch (error) {
+          console.warn('[Visual Editor Wrapper] Failed to inject script:', error);
         }
-      }, 500);
+      };
+      
+      // Check if iframe is loaded
+      if (iframe.contentDocument?.readyState === 'complete') {
+        setupIframe();
+      } else {
+        // Wait for load
+        const handleLoad = () => {
+          setupIframe();
+          iframe.removeEventListener('load', handleLoad);
+        };
+        iframe.addEventListener('load', handleLoad);
+        return () => iframe.removeEventListener('load', handleLoad);
+      }
     };
+    
+    // Check immediately and also poll for changes (ref might be set after render)
+    checkAndSetupIframe();
+    const interval = setInterval(checkAndSetupIframe, 500);
+    
+    return () => clearInterval(interval);
+  }, [activeIframeRef, setIframeRef, sendToIframe, state.isEnabled, isIframeReady]);
 
-    // If already loaded, inject immediately
-    if (iframe.contentDocument?.readyState === 'complete') {
-      handleLoad();
+  // Send toggle message when isEnabled changes AND iframe is ready
+  useEffect(() => {
+    if (isIframeReady) {
+      console.log('[Visual Editor Wrapper] Sending toggle message:', state.isEnabled);
+      sendToIframe({ type: 'VISUAL_EDITOR_TOGGLE', payload: { enabled: state.isEnabled } });
     }
-
-    iframe.addEventListener('load', handleLoad);
-    return () => {
-      iframe.removeEventListener('load', handleLoad);
-    };
-  }, [activeIframeRef, setIframeRef, sendToIframe, state.isEnabled]);
+  }, [state.isEnabled, isIframeReady, sendToIframe]);
 
   // Handle toggle
   const handleToggle = useCallback(() => {
@@ -111,43 +148,6 @@ function VisualEditorInner({
         
         {/* Visual editor overlay */}
         <VisualEditorOverlay iframeRef={activeIframeRef} />
-        
-        {/* Toggle button - floating */}
-        <div className="absolute top-2 right-2 z-50">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={state.isEnabled ? "default" : "outline"}
-                  size="sm"
-                  onClick={handleToggle}
-                  className={cn(
-                    "h-9 gap-2 shadow-lg transition-all",
-                    state.isEnabled && "bg-blue-600 hover:bg-blue-700 text-white"
-                  )}
-                >
-                  {state.isEnabled ? (
-                    <>
-                      <Edit3 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Editing</span>
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Visual Edit</span>
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {state.isEnabled 
-                  ? "Exit visual editing mode (Esc)" 
-                  : "Enter visual editing mode - click to select elements"
-                }
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
       </div>
       
       {/* Sidebar */}
