@@ -79,6 +79,11 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
 
   // Get the first selected element for editing
   const selectedElement = state.selectedElements[0]?.element;
+  
+  // Check if there are pending changes for the selected element
+  const hasPendingChanges = selectedElement 
+    ? (state.pendingChanges.get(selectedElement.id)?.length ?? 0) > 0
+    : false;
 
   const handleSave = async () => {
     if (!selectedElement) return;
@@ -235,7 +240,7 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
       </ScrollArea>
 
       {/* Footer with save button */}
-      {selectedElement && state.pendingChanges.size > 0 && (
+      {selectedElement && hasPendingChanges && (
         <div className="p-3 border-t">
           <Button
             className="w-full"
