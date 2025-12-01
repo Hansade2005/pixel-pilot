@@ -24,7 +24,7 @@ import {
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
-  CreditCard
+  CreditCard, Coins
 } from 'lucide-react'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -991,6 +991,7 @@ export function ChatPanelV2({
   const [showTopUpDialog, setShowTopUpDialog] = useState(false)
   const [topUpAmount, setTopUpAmount] = useState('10')
   const [processingTopUp, setProcessingTopUp] = useState(false)
+  const [showCreditExhaustionModal, setShowCreditExhaustionModal] = useState(false)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -2727,6 +2728,12 @@ export function ChatPanelV2({
       return
     }
 
+    // Check credit balance before sending message
+    if (!loadingCredits && creditBalance !== null && creditBalance <= 0) {
+      setShowCreditExhaustionModal(true)
+      return
+    }
+
     // Build enhanced message content with attachments
     let enhancedContent = input.trim()
     let displayContent = input.trim() // Content shown to user (without hidden contexts)
@@ -4421,6 +4428,64 @@ export function ChatPanelV2({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Credit Exhaustion Modal */}
+        <AlertDialog open={showCreditExhaustionModal} onOpenChange={setShowCreditExhaustionModal}>
+          <AlertDialogContent className="bg-gray-900 border-red-500/20 z-[80]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-red-400 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Credits Exhausted
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                You have run out of credits and cannot send messages. Purchase more credits to continue using PiPilot.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-red-400" />
+                    <span className="text-red-300 font-medium">Current Balance</span>
+                  </div>
+                  <span className="text-red-400 font-bold">{creditBalance?.toFixed(2) || '0.00'} credits</span>
+                </div>
+                <p className="text-xs text-red-300/70 mt-2">
+                  You need credits to send messages and use PiPilot's AI features.
+                </p>
+              </div>
+            </div>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel className="bg-gray-700 text-gray-300 hover:bg-gray-600 border-gray-600">
+                Cancel
+              </AlertDialogCancel>
+              {(() => {
+                const planConfig = PRODUCT_CONFIGS[currentPlan]
+                const canPurchase = planConfig ? planConfig.limits.canPurchaseCredits : false
+                return canPurchase ? (
+                  <Button
+                    onClick={() => {
+                      setShowCreditExhaustionModal(false)
+                      setShowTopUpDialog(true)
+                    }}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Buy Credits
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => window.location.href = '/pricing'}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+                  >
+                    <Zap className="mr-2 h-4 w-4" />
+                    Upgrade Plan
+                  </Button>
+                )
+              })()}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
