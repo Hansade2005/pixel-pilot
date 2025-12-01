@@ -11,6 +11,16 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
 import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { 
   Menu, 
   X, 
   User, 
@@ -23,7 +33,12 @@ import {
   Bell,
   ChevronDown,
   Zap,
-  Database
+  Database,
+  Coins,
+  CreditCard,
+  TrendingUp,
+  AlertTriangle,
+  Loader2
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -41,6 +56,15 @@ export function Navigation() {
 
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user?.id)
+
+  // Credit balance state
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [currentPlan, setCurrentPlan] = useState<string>('free')
+  const [estimatedMessages, setEstimatedMessages] = useState<number>(0)
+  const [loadingCredits, setLoadingCredits] = useState(true)
+  const [showTopUpDialog, setShowTopUpDialog] = useState(false)
+  const [topUpAmount, setTopUpAmount] = useState('10')
+  const [processingTopUp, setProcessingTopUp] = useState(false)
 
   useEffect(() => {
     checkUser()
@@ -68,6 +92,13 @@ export function Navigation() {
     return () => window.removeEventListener('resize', updateDeviceType);
   }, []);
 
+  // Fetch credit balance when user changes
+  useEffect(() => {
+    if (user?.id) {
+      fetchCreditBalance(user.id)
+    }
+  }, [user?.id])
+
   const checkUser = async () => {
     try {
       const supabase = createClient()
@@ -88,6 +119,80 @@ export function Navigation() {
       setIsUserDropdownOpen(false)
     } catch (error) {
       console.error("Error logging out:", error)
+    }
+  }
+
+  const fetchCreditBalance = async (userId: string) => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('wallet')
+        .select('credits_balance, current_plan, credits_used_this_month')
+        .eq('user_id', userId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching credit balance:', error)
+        return
+      }
+
+      if (data) {
+        setCreditBalance(data.credits_balance)
+        setCurrentPlan(data.current_plan)
+        setEstimatedMessages(Math.floor(data.credits_balance / 0.25))
+      }
+    } catch (error) {
+      console.error('Exception fetching credit balance:', error)
+    } finally {
+      setLoadingCredits(false)
+    }
+  }
+
+  const handleTopUp = async () => {
+    if (!user) {
+      // Redirect to login if not authenticated
+      window.location.href = '/auth/login'
+      return
+    }
+
+    // Free users should upgrade first
+    if (currentPlan === 'free') {
+      window.location.href = '/pricing'
+      return
+    }
+
+    const amount = parseFloat(topUpAmount)
+    if (isNaN(amount) || amount < 1 || amount > 1000) {
+      alert('Amount must be between $1 and $1000')
+      return
+    }
+
+    setProcessingTopUp(true)
+
+    try {
+      const response = await fetch('/api/stripe/purchase-credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credits: Math.floor(amount), // Convert dollars to credits (1:1 ratio)
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = result.url
+      } else {
+        throw new Error(result.error || 'Failed to create credit purchase session')
+      }
+    } catch (error: any) {
+      console.error('Error creating credit purchase session:', error)
+      alert('Failed to start credit purchase. Please try again.')
+    } finally {
+      setProcessingTopUp(false)
     }
   }
 
@@ -174,10 +279,18 @@ export function Navigation() {
                          subscription.plan === 'enterprise' ? 'Enterprise' :
                          'Free'}
                       </span>
-                      {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
-                        <span className="text-xs text-orange-400 font-medium">
-                          Limit
-                        </span>
+                    </div>
+                  )}
+
+                  {/* Credits Section */}
+                  {!loadingCredits && creditBalance !== null && (
+                    <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-sm border border-green-500/30">
+                      <Coins className="w-4 h-4 text-green-400" />
+                      <span className="text-sm font-medium text-green-300">
+                        {creditBalance.toFixed(2)} credits
+                      </span>
+                      {creditBalance <= 2 && (
+                        <AlertTriangle className="w-3 h-3 text-orange-400" />
                       )}
                     </div>
                   )}
@@ -323,20 +436,47 @@ export function Navigation() {
                                      'Free Plan'}
                                   </span>
                                 </div>
-                                {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
-                                  <span className="text-xs text-orange-400 bg-orange-400/10 px-2 py-1 rounded">
-                                    Limit
-                                  </span>
-                                )}
                               </div>
                               <div className="text-xs text-gray-400">
                                 {subscription.plan === 'pro'
                                   ? `${subscription.deploymentsThisMonth || 0}/10 deployments`
                                   : subscription.plan === 'enterprise'
                                   ? 'Unlimited usage'
-                                  : `${subscription.deploymentsThisMonth || 0}/5 deployments • ${subscription.githubPushesThisMonth || 0}/2 pushes`
+                                  : `${subscription.deploymentsThisMonth || 0}/5 deployments`
                                 }
                               </div>
+                            </div>
+                          )}
+
+                          {/* Credits Section in Dropdown */}
+                          {!loadingCredits && creditBalance !== null && (
+                            <div className="px-3 py-3 border-b border-gray-700">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <Coins className="w-4 h-4 text-green-400" />
+                                  <span className="text-sm font-medium text-green-300">
+                                    {creditBalance.toFixed(2)} credits
+                                  </span>
+                                </div>
+                                {creditBalance <= 2 && (
+                                  <AlertTriangle className="w-3 h-3 text-orange-400" />
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                ~{estimatedMessages} messages remaining • {currentPlan} Plan
+                              </div>
+                              {/* Top Up Button for Low Balance */}
+                              {(creditBalance <= 2 || currentPlan === 'free') && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                                  onClick={() => setShowTopUpDialog(true)}
+                                >
+                                  <CreditCard className="h-3 w-3 mr-1" />
+                                  {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
+                                </Button>
+                              )}
                             </div>
                           )}
 
@@ -394,6 +534,71 @@ export function Navigation() {
             </div>
           )}
       </div></div>
+
+      {/* Credit Top-Up Dialog */}
+      <Dialog open={showTopUpDialog} onOpenChange={setShowTopUpDialog}>
+        <DialogContent className="bg-gray-900 border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Buy Credits</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {currentPlan === 'free'
+                ? 'Upgrade to a paid plan to purchase credits. $1 = 1 credit.'
+                : `Purchase additional credits for your ${currentPlan} plan. $1 = 1 credit.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-white">Amount (USD)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <Input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  className="bg-gray-800/50 border-white/10 text-white pl-7"
+                  placeholder="10.00"
+                />
+              </div>
+              <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00</p>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[10, 25, 50, 100].map(amount => (
+                <Button
+                  key={amount}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTopUpAmount(amount.toString())}
+                  className="border-white/10 text-white hover:bg-white/5"
+                >
+                  ${amount}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleTopUp}
+              disabled={processingTopUp}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+            >
+              {processingTopUp ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Proceed to Payment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </nav>
   )
 }

@@ -570,7 +570,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
 
                         </div>
                         <div>
-                            <h2 className="text-lg font-semibold text-white">PiPilot AI Platform</h2>
+                            
                             <p className="text-sm text-gray-400">
                                 {currentTeam ? `Managing ${currentTeam.name}` : 'Select or create a team'}
                             </p>
@@ -625,7 +625,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                             onClick={() => router.push('/ai/platform')}
                         >
                             <ExternalLink className="w-4 h-4 mr-2" />
-                            Open Full Platform
+                        
                         </Button>
                     </div>
                 </div>

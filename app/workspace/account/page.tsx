@@ -36,7 +36,8 @@ import {
   BarChart3,
   Receipt,
   AlertTriangle,
-  Plus
+  Plus,
+  Coins
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
@@ -74,6 +75,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 
@@ -171,7 +180,7 @@ function AccountSettingsPageContent() {
     storageUsed: 0
   })
 
-  // Delete account form state
+  // Delete account state
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
 
   const supabase = createClient()
@@ -323,6 +332,7 @@ function AccountSettingsPageContent() {
       checkCloudSyncStatus(user.id)
       checkConnectionStatus(user.id)
       fetchSubscriptionStatus(user.id)
+      fetchCreditBalance(user.id)
 
       // Auto-restore is disabled on account page - only available in workspace with project ID
       console.log('Account page: Auto-restore is disabled on this page')
@@ -1257,16 +1267,90 @@ function AccountSettingsPageContent() {
   }
 
 
-  const handleViewDetailedUsage = () => {
-    // Navigate to detailed usage analytics
-    // For now, just show an alert
-    alert('Detailed usage analytics feature is not yet implemented. Please check back later.')
+  const fetchCreditBalance = async (userId: string) => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('wallet')
+        .select('credits_balance, current_plan, credits_used_this_month')
+        .eq('user_id', userId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching credit balance:', error)
+        return
+      }
+
+      if (data) {
+        setCreditBalance(data.credits_balance)
+        setCurrentPlan(data.current_plan)
+        setEstimatedMessages(Math.floor(data.credits_balance / 0.25))
+      }
+    } catch (error) {
+      console.error('Exception fetching credit balance:', error)
+    } finally {
+      setLoadingCredits(false)
+    }
+  }
+
+  const handleTopUp = async (amount: number) => {
+    try {
+      setProcessingTopUp(true)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to top up credits.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Create Stripe checkout session for credit top-up
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: amount,
+          type: 'credit_topup',
+          userId: user.id,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = result.url
+      } else {
+        throw new Error(result.error || 'Failed to create checkout session')
+      }
+    } catch (error: any) {
+      console.error('Error creating top-up session:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process top-up. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingTopUp(false)
+    }
   }
 
   const handleDownloadAllInvoices = () => {
     // Download all user invoices
     // For now, just show an alert
     alert('Download all invoices feature is not yet implemented. Please check back later.')
+  }
+
+  const handleViewDetailedUsage = () => {
+    // View detailed usage
+    // For now, just show an alert
+    alert('Detailed usage view is not yet implemented. Please check back later.')
   }
 
 
@@ -1656,14 +1740,67 @@ function AccountSettingsPageContent() {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <GitHubIcon className="h-4 w-4 text-gray-700" />
-                        <span className="text-sm">GitHub Pushes</span>
+                    {/* Credits Section */}
+                    <div className="space-y-2 p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Coins className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Credits</span>
+                        </div>
+                        {loadingCredits ? (
+                          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        ) : (
+                          <span className="text-sm font-bold text-green-700 dark:text-green-300">
+                            {creditBalance !== null ? creditBalance.toFixed(2) : '0.00'}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-sm font-medium">
-                        {usageStats.githubPushesThisMonth} / {subscription?.plan === 'free' ? 2 : 'Unlimited'}
-                      </span>
+
+                      {!loadingCredits && creditBalance !== null && (
+                        <>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-green-700 dark:text-green-300">
+                              ~{estimatedMessages} messages remaining
+                            </span>
+                            <span className="text-green-600 dark:text-green-400 capitalize">
+                              {currentPlan} Plan
+                            </span>
+                          </div>
+
+                          {/* Credit Status Indicator */}
+                          <div className="flex items-center gap-2">
+                            {creditBalance > 10 ? (
+                              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                <TrendingUp className="h-3 w-3" />
+                                <span className="text-xs">Good balance</span>
+                              </div>
+                            ) : creditBalance > 2 ? (
+                              <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="text-xs">Low balance</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="text-xs">Very low</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Top Up Button */}
+                          {(creditBalance <= 2 || currentPlan === 'free') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                              onClick={() => setShowTopUpDialog(true)}
+                            >
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -2456,6 +2593,71 @@ function AccountSettingsPageContent() {
       </div>
       {/* Footer */}
       <Footer />
+
+      {/* Credit Top-Up Dialog */}
+      <Dialog open={showTopUpDialog} onOpenChange={setShowTopUpDialog}>
+        <DialogContent className="bg-gray-900 border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Buy Credits</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {currentPlan === 'free'
+                ? 'Upgrade to a paid plan to purchase credits. $1 = 1 credit.'
+                : `Purchase additional credits for your ${currentPlan} plan. $1 = 1 credit.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-white">Amount (USD)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <Input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  className="bg-gray-800/50 border-white/10 text-white pl-7"
+                  placeholder="10.00"
+                />
+              </div>
+              <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00</p>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[10, 25, 50, 100].map(amount => (
+                <Button
+                  key={amount}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTopUpAmount(amount.toString())}
+                  className="border-white/10 text-white hover:bg-white/5"
+                >
+                  ${amount}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => handleTopUp(parseFloat(topUpAmount) || 0)}
+              disabled={processingTopUp || !topUpAmount || parseFloat(topUpAmount) < 1}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+            >
+              {processingTopUp ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Proceed to Payment
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
