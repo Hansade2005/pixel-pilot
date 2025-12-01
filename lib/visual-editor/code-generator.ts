@@ -427,34 +427,260 @@ export function generateFileUpdate(
   sourceFile?: string,
   sourceLine?: number
 ): CodeUpdateResult {
-  // If we have source line info, we can be more precise
-  if (sourceLine) {
-    const lines = originalCode.split('\n');
-    const targetLine = lines[sourceLine - 1];
+  // If we have source line info, use line-based approach
+  if (sourceLine && sourceLine > 0) {
+    return updateElementByLine(originalCode, sourceLine, changes);
+  }
+
+  // Try to parse line from element ID (format: "file:line:column")
+  const lineFromId = parseLineFromElementId(elementId);
+  if (lineFromId) {
+    return updateElementByLine(originalCode, lineFromId, changes);
+  }
+
+  // Fall back to regex-based update (least reliable)
+  return updateCodeWithChanges(originalCode, elementId, changes);
+}
+
+// Parse line number from element ID format "file:line:column"
+function parseLineFromElementId(elementId: string): number | null {
+  // Format: "src/App.tsx:11:0" -> extract line number 11
+  const parts = elementId.split(':');
+  if (parts.length >= 2) {
+    const lineNum = parseInt(parts[parts.length - 2], 10);
+    if (!isNaN(lineNum) && lineNum > 0) {
+      return lineNum;
+    }
+  }
+  return null;
+}
+
+// Update element by line number - handles JSX elements that may span multiple lines
+function updateElementByLine(
+  code: string,
+  lineNumber: number,
+  changes: StyleChange[]
+): CodeUpdateResult {
+  const lines = code.split('\n');
+  const targetLineIndex = lineNumber - 1; // Convert to 0-indexed
+  
+  if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
+    return {
+      success: false,
+      updatedCode: code,
+      error: `Line ${lineNumber} is out of range`,
+    };
+  }
+
+  // Find the JSX element opening tag that starts at or contains this line
+  // We need to handle multi-line elements like:
+  // <div
+  //   className="..."
+  //   style={...}
+  // >
+  
+  const { startLine, endLine, openingTag } = findJSXOpeningTag(lines, targetLineIndex);
+  
+  if (startLine === -1 || !openingTag) {
+    return {
+      success: false,
+      updatedCode: code,
+      error: `Could not find JSX element at line ${lineNumber}`,
+    };
+  }
+
+  // Apply changes to the opening tag
+  const updatedOpeningTag = applyChangesToOpeningTag(openingTag, changes);
+  
+  // Reconstruct the lines
+  const newLines = [...lines];
+  
+  // Replace the lines containing the opening tag
+  const linesBefore = newLines.slice(0, startLine);
+  const linesAfter = newLines.slice(endLine + 1);
+  
+  // Preserve indentation from the first line
+  const indent = lines[startLine].match(/^(\s*)/)?.[1] || '';
+  const updatedLines = updatedOpeningTag.split('\n').map((line, i) => 
+    i === 0 ? indent + line.trimStart() : line
+  );
+  
+  const result = [...linesBefore, ...updatedLines, ...linesAfter].join('\n');
+  
+  return {
+    success: true,
+    updatedCode: result,
+  };
+}
+
+// Find the JSX opening tag that starts at or near the given line
+function findJSXOpeningTag(
+  lines: string[],
+  targetLine: number
+): { startLine: number; endLine: number; openingTag: string } {
+  // Look for opening tag starting at target line, or search backward
+  for (let start = targetLine; start >= Math.max(0, targetLine - 5); start--) {
+    const line = lines[start];
     
-    if (targetLine) {
-      // Try to update just this line
-      const tailwindChanges = changes.filter(c => c.useTailwind);
-      const classNameMatch = targetLine.match(/className=["']([^"']*)["']/);
+    // Check if this line contains an opening tag
+    const openTagMatch = line.match(/<(\w+)/);
+    if (!openTagMatch) continue;
+    
+    // Find where this tag ends
+    let depth = 0;
+    let tagContent = '';
+    let endLine = start;
+    
+    for (let i = start; i < lines.length && i <= start + 20; i++) {
+      tagContent += (i > start ? '\n' : '') + lines[i];
       
-      if (classNameMatch && tailwindChanges.length > 0) {
-        const newClassName = updateClassName(classNameMatch[1], tailwindChanges);
-        const updatedLine = targetLine.replace(
-          classNameMatch[0],
-          `className="${newClassName}"`
-        );
-        lines[sourceLine - 1] = updatedLine;
+      // Count angle brackets to find the end of the opening tag
+      for (let j = (i === start ? line.indexOf('<' + openTagMatch[1]) : 0); j < lines[i].length; j++) {
+        const char = lines[i][j];
         
-        return {
-          success: true,
-          updatedCode: lines.join('\n'),
-        };
+        // Skip strings
+        if (char === '"' || char === "'") {
+          const quote = char;
+          j++;
+          while (j < lines[i].length && lines[i][j] !== quote) {
+            if (lines[i][j] === '\\') j++; // Skip escaped characters
+            j++;
+          }
+          continue;
+        }
+        
+        // Skip template literals and JSX expressions
+        if (char === '{') {
+          let braceDepth = 1;
+          j++;
+          while (j < lines[i].length && braceDepth > 0) {
+            if (lines[i][j] === '{') braceDepth++;
+            else if (lines[i][j] === '}') braceDepth--;
+            j++;
+          }
+          continue;
+        }
+        
+        if (char === '<') depth++;
+        else if (char === '>') {
+          depth--;
+          if (depth === 0) {
+            // Found the end of the opening tag
+            endLine = i;
+            
+            // Extract just the opening tag
+            const fullText = lines.slice(start, endLine + 1).join('\n');
+            const tagEndIndex = fullText.indexOf('>', fullText.indexOf('<' + openTagMatch[1])) + 1;
+            const openingTag = fullText.substring(
+              fullText.indexOf('<' + openTagMatch[1]),
+              tagEndIndex
+            );
+            
+            return { startLine: start, endLine, openingTag };
+          }
+        }
       }
     }
   }
+  
+  return { startLine: -1, endLine: -1, openingTag: '' };
+}
 
-  // Fall back to regex-based update
-  return updateCodeWithChanges(originalCode, elementId, changes);
+// Apply style changes to an opening tag
+function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): string {
+  const tailwindChanges = changes.filter(c => c.useTailwind);
+  const styleChanges = changes.filter(c => !c.useTailwind);
+  
+  let result = openingTag;
+  
+  // Handle className updates
+  if (tailwindChanges.length > 0) {
+    // Check for existing className
+    const classNameMatch = result.match(/className=["']([^"']*)["']/);
+    const classNameExprMatch = result.match(/className=\{([^}]+)\}/);
+    
+    if (classNameMatch) {
+      // Update existing className string
+      const newClassName = updateClassName(classNameMatch[1], tailwindChanges);
+      result = result.replace(classNameMatch[0], `className="${newClassName}"`);
+    } else if (classNameExprMatch) {
+      // Has dynamic className - append our classes using cn() or template literal
+      const existingExpr = classNameExprMatch[1];
+      const newClasses = tailwindChanges
+        .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+        .filter(Boolean)
+        .join(' ');
+      
+      // Try to use cn() if it looks like it's already using it
+      if (existingExpr.includes('cn(')) {
+        result = result.replace(
+          classNameExprMatch[0],
+          `className={cn(${existingExpr.replace('cn(', '').replace(/\)$/, '')}, "${newClasses}")}`
+        );
+      } else {
+        result = result.replace(
+          classNameExprMatch[0],
+          `className={\`\${${existingExpr}} ${newClasses}\`}`
+        );
+      }
+    } else {
+      // No className - add one
+      const newClassName = tailwindChanges
+        .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+        .filter(Boolean)
+        .join(' ');
+      
+      // Find position to insert (after tag name)
+      const tagNameMatch = result.match(/^<(\w+)/);
+      if (tagNameMatch) {
+        const insertPos = tagNameMatch[0].length;
+        result = result.slice(0, insertPos) + ` className="${newClassName}"` + result.slice(insertPos);
+      }
+    }
+  }
+  
+  // Handle style updates
+  if (styleChanges.length > 0) {
+    const newInlineStyle = generateInlineStyle(styleChanges);
+    const styleMatch = result.match(/style=\{\{([^}]*)\}\}/);
+    
+    if (styleMatch) {
+      // Merge with existing style
+      const mergedStyle = mergeInlineStyles(styleMatch[1], styleChanges);
+      result = result.replace(styleMatch[0], `style={{ ${mergedStyle} }}`);
+    } else {
+      // Add new style attribute
+      const tagNameMatch = result.match(/^<(\w+)/);
+      if (tagNameMatch) {
+        // Insert after className if it exists, otherwise after tag name
+        const classNamePos = result.indexOf('className=');
+        if (classNamePos > 0) {
+          // Find end of className attribute
+          let pos = classNamePos + 'className='.length;
+          if (result[pos] === '"' || result[pos] === "'") {
+            const quote = result[pos];
+            pos++;
+            while (pos < result.length && result[pos] !== quote) pos++;
+            pos++;
+          } else if (result[pos] === '{') {
+            let depth = 1;
+            pos++;
+            while (pos < result.length && depth > 0) {
+              if (result[pos] === '{') depth++;
+              else if (result[pos] === '}') depth--;
+              pos++;
+            }
+          }
+          result = result.slice(0, pos) + ` style={{ ${newInlineStyle} }}` + result.slice(pos);
+        } else {
+          const insertPos = tagNameMatch[0].length;
+          result = result.slice(0, insertPos) + ` style={{ ${newInlineStyle} }}` + result.slice(insertPos);
+        }
+      }
+    }
+  }
+  
+  return result;
 }
 
 export default {

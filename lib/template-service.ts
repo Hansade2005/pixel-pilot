@@ -690,18 +690,19 @@ export default App`,
     const sourceFile = element.getAttribute('data-ve-file');
     const sourceLine = element.getAttribute('data-ve-line');
     
-    // Get direct text content
+    // Get only the FIRST direct text node content to prevent duplication
     let textContent = '';
     for (const node of element.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        textContent += node.textContent;
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        textContent = node.textContent.trim();
+        break;
       }
     }
     
     return {
       id,
       tagName: element.tagName,
-      textContent: textContent.trim(),
+      textContent: textContent,
       className: element.className || '',
       computedStyles: getComputedStyleInfo(element),
       rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
@@ -854,7 +855,8 @@ export default App`,
   function updateTextContent(elementId, text) {
     const element = findElementById(elementId);
     if (!element) return false;
-    // Only update direct text nodes, not nested element content
+    
+    // Find and update only the FIRST text node to prevent duplication
     for (const node of element.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         node.textContent = text;
@@ -862,13 +864,18 @@ export default App`,
         return true;
       }
     }
-    // If no text node exists, set innerHTML for simple elements
-    if (element.children.length === 0) {
-      element.textContent = text;
+    
+    // If no text node exists, prepend one for elements with children
+    if (element.children.length > 0) {
+      element.insertBefore(document.createTextNode(text), element.firstChild);
       sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
       return true;
     }
-    return false;
+    
+    // For simple elements with no children, set textContent directly
+    element.textContent = text;
+    sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
+    return true;
   }
 
   // Message handler
@@ -6657,18 +6664,19 @@ export default function Home() {
     const sourceFile = element.getAttribute('data-ve-file');
     const sourceLine = element.getAttribute('data-ve-line');
     
-    // Get direct text content
+    // Get only the FIRST direct text node content to prevent duplication
     let textContent = '';
     for (const node of element.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        textContent += node.textContent;
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        textContent = node.textContent.trim();
+        break;
       }
     }
     
     return {
       id,
       tagName: element.tagName,
-      textContent: textContent.trim(),
+      textContent: textContent,
       className: element.className || '',
       computedStyles: getComputedStyleInfo(element),
       rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
@@ -6821,7 +6829,8 @@ export default function Home() {
   function updateTextContent(elementId, text) {
     const element = findElementById(elementId);
     if (!element) return false;
-    // Only update direct text nodes, not nested element content
+    
+    // Find and update only the FIRST text node to prevent duplication
     for (const node of element.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
         node.textContent = text;
@@ -6829,13 +6838,18 @@ export default function Home() {
         return true;
       }
     }
-    // If no text node exists, set innerHTML for simple elements
-    if (element.children.length === 0) {
-      element.textContent = text;
+    
+    // If no text node exists, prepend one for elements with children
+    if (element.children.length > 0) {
+      element.insertBefore(document.createTextNode(text), element.firstChild);
       sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
       return true;
     }
-    return false;
+    
+    // For simple elements with no children, set textContent directly
+    element.textContent = text;
+    sendToParent({ type: 'TEXT_UPDATED', payload: { elementId, success: true } });
+    return true;
   }
 
   // Message handler

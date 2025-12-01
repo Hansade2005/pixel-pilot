@@ -27,7 +27,7 @@ interface VisualEditorWrapperProps {
   previewUrl?: string;
   isEnabled?: boolean;
   onToggle?: (enabled: boolean) => void;
-  onSaveChanges?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string }) => Promise<boolean>;
+  onSaveChanges?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string; sourceLine?: number }) => Promise<boolean>;
   className?: string;
 }
 
@@ -158,6 +158,7 @@ function VisualEditorInner({
                 elementId,
                 changes,
                 sourceFile: selection?.element.sourceFile,
+                sourceLine: selection?.element.sourceLine,
               });
             }
           }}
@@ -181,10 +182,11 @@ export function VisualEditorWrapper({
   const handleApplyChanges = useCallback(async (
     elementId: string,
     changes: StyleChange[],
-    sourceFile?: string
+    sourceFile?: string,
+    sourceLine?: number
   ): Promise<boolean> => {
     if (onSaveChanges) {
-      return onSaveChanges({ elementId, changes, sourceFile });
+      return onSaveChanges({ elementId, changes, sourceFile, sourceLine });
     }
     return false;
   }, [onSaveChanges]);

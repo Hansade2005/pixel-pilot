@@ -112,14 +112,14 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   }
 
   function getTextContent(element) {
-    // Get direct text content only, not from children
-    let text = '';
+    // Get only the FIRST direct text node content
+    // This matches what updateTextContent edits, preventing duplication
     for (const node of element.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent;
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        return node.textContent.trim();
       }
     }
-    return text.trim();
+    return '';
   }
 
   function getElementInfo(element) {
@@ -362,15 +362,22 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     const element = findElementById(elementId);
     if (!element) return false;
 
-    // Only update direct text nodes
+    // Find the first text node and update only that one
+    // For elements with mixed content (text + elements), we only edit the first text node
+    let firstTextNode = null;
     for (const node of element.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) {
-        node.textContent = text;
-        return true;
+        firstTextNode = node;
+        break;
       }
     }
     
-    // If no text node, prepend one
+    if (firstTextNode) {
+      firstTextNode.textContent = text;
+      return true;
+    }
+    
+    // If no text node exists, prepend one
     element.insertBefore(document.createTextNode(text), element.firstChild);
     return true;
   }

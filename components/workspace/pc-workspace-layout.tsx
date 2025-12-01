@@ -96,7 +96,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const handleVisualEditorSave = async (changes: { 
     elementId: string; 
     changes: StyleChange[]; 
-    sourceFile?: string 
+    sourceFile?: string;
+    sourceLine?: number;
   }): Promise<boolean> => {
     try {
       if (!selectedProject || !changes.sourceFile) {
@@ -121,7 +122,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         file.content,
         changes.elementId,
         changes.changes,
-        changes.sourceFile
+        changes.sourceFile,
+        changes.sourceLine
       )
 
       if (!result.success) {

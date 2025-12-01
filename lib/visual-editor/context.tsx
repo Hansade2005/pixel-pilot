@@ -317,7 +317,7 @@ const VisualEditorContext = createContext<VisualEditorContextValue | null>(null)
 interface VisualEditorProviderProps {
   children: ReactNode;
   config?: Partial<VisualEditorConfig>;
-  onApplyChanges?: (elementId: string, changes: StyleChange[], sourceFile?: string) => Promise<boolean>;
+  onApplyChanges?: (elementId: string, changes: StyleChange[], sourceFile?: string, sourceLine?: number) => Promise<boolean>;
 }
 
 export function VisualEditorProvider({
@@ -491,7 +491,12 @@ export function VisualEditorProvider({
     if (!selection || !onApplyChanges) return false;
 
     try {
-      const success = await onApplyChanges(elementId, changes, selection.element.sourceFile);
+      const success = await onApplyChanges(
+        elementId, 
+        changes, 
+        selection.element.sourceFile,
+        selection.element.sourceLine
+      );
       if (success) {
         applyChanges(elementId, `Updated ${changes.length} style(s)`);
       }
