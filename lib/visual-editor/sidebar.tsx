@@ -87,15 +87,30 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
 
   const handleSave = async () => {
     if (!selectedElement) return;
+    
+    console.log('[Sidebar] handleSave clicked');
+    console.log('[Sidebar] Selected element:', selectedElement);
+    console.log('[Sidebar] Pending changes for element:', state.pendingChanges.get(selectedElement.id));
+    
     setIsSaving(true);
     try {
       const changes = state.pendingChanges.get(selectedElement.id) || [];
+      console.log('[Sidebar] Changes to save:', changes);
+      
       if (changes.length > 0) {
-        await applyChangesToFile(selectedElement.id, changes);
+        console.log('[Sidebar] Calling applyChangesToFile...');
+        const success = await applyChangesToFile(selectedElement.id, changes);
+        console.log('[Sidebar] applyChangesToFile result:', success);
+      } else {
+        console.warn('[Sidebar] No changes to save!');
       }
+      
       if (onSave) {
+        console.log('[Sidebar] Calling onSave callback...');
         await onSave();
       }
+    } catch (error) {
+      console.error('[Sidebar] handleSave error:', error);
     } finally {
       setIsSaving(false);
     }

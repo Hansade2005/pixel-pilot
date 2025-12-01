@@ -143,15 +143,25 @@ export function updateClassName(
   const classes = safeClassName.split(/\s+/).filter(Boolean);
   const classSet = new Set(classes);
 
+  console.log('[updateClassName] Input className:', currentClassName);
+  console.log('[updateClassName] Changes:', changes);
+
   for (const change of changes) {
     if (!change.useTailwind) continue;
 
     // Get the new Tailwind class
     const newClass = change.tailwindClass || cssToTailwindClass(change.property, change.newValue);
-    if (!newClass) continue;
+    console.log(`[updateClassName] Property: ${change.property}, Value: ${change.newValue}, TW Class: ${newClass}`);
+    
+    if (!newClass) {
+      console.warn(`[updateClassName] No Tailwind class generated for ${change.property}: ${change.newValue}`);
+      continue;
+    }
 
     // Find and remove any existing classes for this property
     const prefix = getTailwindPrefix(change.property);
+    console.log(`[updateClassName] Prefix for ${change.property}: ${prefix}`);
+    
     if (prefix) {
       // Remove existing classes with the same prefix
       const classesToRemove = Array.from(classSet).filter(cls => {
@@ -165,14 +175,18 @@ export function updateClassName(
         return false;
       });
       
+      console.log(`[updateClassName] Removing classes:`, classesToRemove);
       classesToRemove.forEach(cls => classSet.delete(cls));
     }
 
     // Add the new class
+    console.log(`[updateClassName] Adding class: ${newClass}`);
     classSet.add(newClass);
   }
 
-  return Array.from(classSet).join(' ');
+  const result = Array.from(classSet).join(' ');
+  console.log('[updateClassName] Final className:', result);
+  return result;
 }
 
 // Get Tailwind prefix for a CSS property
@@ -702,6 +716,10 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
   const tailwindChanges = changes.filter(c => c.useTailwind);
   const styleChanges = changes.filter(c => !c.useTailwind);
   
+  console.log('[applyChangesToOpeningTag] All changes:', changes);
+  console.log('[applyChangesToOpeningTag] Tailwind changes:', tailwindChanges);
+  console.log('[applyChangesToOpeningTag] Style changes:', styleChanges);
+  
   let result = openingTag;
   
   // Handle className updates
@@ -710,9 +728,14 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
     const classNameMatch = result.match(/className=["']([^"']*)["']/);
     const classNameExprMatch = result.match(/className=\{([^}]+)\}/);
     
+    console.log('[applyChangesToOpeningTag] className match:', classNameMatch);
+    console.log('[applyChangesToOpeningTag] className expr match:', classNameExprMatch);
+    
     if (classNameMatch) {
       // Update existing className string
       const newClassName = updateClassName(classNameMatch[1], tailwindChanges);
+      console.log('[applyChangesToOpeningTag] Old className:', classNameMatch[1]);
+      console.log('[applyChangesToOpeningTag] New className:', newClassName);
       result = result.replace(classNameMatch[0], `className="${newClassName}"`);
     } else if (classNameExprMatch) {
       // Has dynamic className - append our classes using cn() or template literal
