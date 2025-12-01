@@ -90,7 +90,8 @@ async function compressProjectFiles(
 
 interface CodePreviewPanelProps {
   project: Project | null;
-  onTabChange?: (tab: "code" | "preview" | "cloud") => void;
+  activeTab: "code" | "preview" | "database";
+  onTabChange: (tab: "code" | "preview" | "database") => void;
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
@@ -113,10 +114,9 @@ interface PreviewState {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
-    const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud">("preview")
     const [preview, setPreview] = useState<PreviewState>({
       sandboxId: null,
       url: null,
@@ -1519,30 +1519,21 @@ export default function TodoApp() {
             <WebPreviewNavigation>
               {/* Tab switching buttons - only shown in preview tab */}
               <WebPreviewNavigationButton
-                onClick={() => {
-                  setActiveTab("code")
-                  onTabChange?.("code")
-                }}
+                onClick={() => onTabChange("code")}
                 tooltip="Switch to Code View"
               >
                 <Code className="h-4 w-4" />
               </WebPreviewNavigationButton>
               <WebPreviewNavigationButton
-                onClick={() => {
-                  setActiveTab("preview")
-                  onTabChange?.("preview")
-                }}
+                onClick={() => onTabChange("preview")}
                 disabled={true}
                 tooltip="Current: Preview View"
               >
                 <Eye className="h-4 w-4" />
               </WebPreviewNavigationButton>
               <WebPreviewNavigationButton
-                onClick={() => {
-                  setActiveTab("cloud")
-                  onTabChange?.("cloud")
-                }}
-                tooltip="Switch to Cloud View"
+                onClick={() => onTabChange("database")}
+                tooltip="Switch to Database View"
               >
                 <Database className="h-4 w-4" />
               </WebPreviewNavigationButton>
@@ -1650,7 +1641,7 @@ export default function TodoApp() {
               })}
             />
           </WebPreview>
-        ) : activeTab === "cloud" ? (
+        ) : activeTab === "database" ? (
           <DatabaseTab workspaceId={project?.id || ""} />
         ) : null}
       </div>
