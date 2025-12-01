@@ -571,8 +571,8 @@ export function Sidebar({
         </AccordionItem>
       </Accordion>
 
-      {/* Search and Sort */}
-      <div className="p-4 border-b space-y-3">
+      {/* Search */}
+      <div className="p-4 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -583,54 +583,12 @@ export function Sidebar({
             className="pl-9 bg-sidebar-accent"
           />
         </div>
-        
-        {/* Sort Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  <ArrowUpDown className="h-3 w-3 mr-1" />
-                  Sort by {sortBy === 'lastActivity' ? 'Activity' : sortBy === 'name' ? 'Name' : 'Created'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setSortBy('lastActivity')}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Last Activity
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSortBy('name')}>
-                  <Folder className="mr-2 h-4 w-4" />
-                  Name
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSortBy('created')}>
-                  <Star className="mr-2 h-4 w-4" />
-                  Created Date
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-            >
-              <ArrowUpDown className={`h-3 w-3 ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
-            </Button>
-          </div>
-          
-          <div className="text-xs text-muted-foreground">
-            {filteredAndSortedProjects.length} project{filteredAndSortedProjects.length !== 1 ? 's' : ''}
-          </div>
-        </div>
       </div>
 
       {/* Projects */}
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-sidebar-foreground">Your Projects</h3>
+          <h3 className="text-sm font-medium text-sidebar-foreground">Projects {filteredAndSortedProjects.length}</h3>
           <div className="flex items-center space-x-2">
             <Button 
               variant="outline" 
@@ -842,7 +800,7 @@ export function Sidebar({
             <DropdownMenuContent align="end" className={`w-56 ${isMobile ? 'z-[70]' : 'z-50'}`}>
               <DropdownMenuItem onClick={() => router.push('/workspace/account')}>
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                Account
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>

@@ -17,6 +17,8 @@ import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
+import { AIPplatformTab } from "./ai-platform-tab"
+import { CloudTab } from "./cloud-tab"
 import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
@@ -59,7 +61,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
@@ -70,7 +72,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "database">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -875,11 +877,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               onDatabase={() => {
                 if (isMobile) {
-                  // Switch to database tab on mobile
-                  setMobileTab('database')
+                  // Switch to cloud tab on mobile
+                  setMobileTab('cloud')
                 } else if (selectedProject) {
-                  // Navigate to database page on desktop
-                  router.push(`/workspace/${selectedProject.id}/database`)
+                  // Switch to cloud tab on desktop
+                  setActiveTab('cloud')
                 }
               }}
               user={user}
@@ -995,12 +997,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                               <Eye className="h-4 w-4" />
                             </Button>
                             <Button
-                              variant={activeTab === "database" ? "secondary" : "ghost"}
+                              variant={activeTab === "cloud" ? "secondary" : "ghost"}
                               size="sm"
-                              onClick={() => setActiveTab("database")}
-                              title="Database"
+                              onClick={() => setActiveTab("cloud")}
+                              title="Cloud Services"
                             >
-                              <Database className="h-4 w-4" />
+                              <Cloud className="h-4 w-4" />
                             </Button>
                           </div>
 
@@ -1072,6 +1074,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     ) : (
                       /* Database Tab */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
+                    ) : (
+                      /* Cloud Tab */
+                      <CloudTab user={user} selectedProject={selectedProject} />
                     )}
                   </div>
                 </ResizablePanel>
@@ -1319,15 +1324,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                onClick={() => {
-                  if (selectedProject) {
-                    router.push(`/workspace/${selectedProject.id}/database`)
-                  }
-                }}
-                disabled={!selectedProject}
-                title="Database"
+                onClick={() => setMobileTab("cloud")}
+                title="Cloud Services"
               >
-                <Database className="h-4 w-4" />
+                <Cloud className="h-4 w-4" />
               </Button>
              
               
@@ -1451,9 +1451,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="database" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                <TabsContent value="cloud" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <DatabaseTab workspaceId={selectedProject?.id || ""} />
+                    <CloudTab user={user} selectedProject={selectedProject} />
                   </div>
                 </TabsContent>
               </Tabs>
@@ -1462,7 +1462,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
           {/* Fixed Mobile Bottom Tab Navigation */}
           <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-            <div className="grid grid-cols-5 h-12">
+            <div className="grid grid-cols-4 h-12">
               <button
                 onClick={() => setMobileTab("chat")}
                 className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
@@ -1500,13 +1500,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <span className="text-xs">Preview</span>
               </button>
               <button
-                onClick={() => setMobileTab("database")}
+                onClick={() => setMobileTab("cloud")}
                 className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "database" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  mobileTab === "cloud" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Database className="h-4 w-4" />
-                <span className="text-xs">Database</span>
+                <Cloud className="h-4 w-4" />
+                <span className="text-xs">Cloud</span>
               </button>
             </div>
           </div>
