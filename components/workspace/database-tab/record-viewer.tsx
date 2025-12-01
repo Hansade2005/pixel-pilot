@@ -46,7 +46,7 @@ export function RecordViewer({
 
   if (!table) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center relative">
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center relative">
         {/* Table Explorer Toggle Button - Only show when explorer is closed */}
         {onToggleExplorer && !showExplorer && (
           <div className="absolute top-4 left-4">
@@ -103,7 +103,7 @@ export function RecordViewer({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="p-3 border-b border-border">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -208,7 +208,7 @@ export function RecordViewer({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-3">
         {activeTab === "records" ? (
           <Card>
             <CardContent className="p-0">

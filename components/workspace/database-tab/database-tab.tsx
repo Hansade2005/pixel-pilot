@@ -301,7 +301,7 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Database Schema Export Bar */}
-      <div className="flex items-center justify-between p-2 border-b border-border bg-muted/30">
+      <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <DatabaseIcon className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">Database Schema</span>
@@ -376,7 +376,7 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
       {/* Right Panel - Record Viewer */}
       <div className={cn(
         "flex-1 overflow-y-auto",
-        isMobile ? "pt-16" : "" // Add top padding on mobile for the toggle button
+        isMobile ? "pt-4" : "" // Reduced padding for mobile toggle button space
       )}>
         <RecordViewer
           table={selectedTable}
