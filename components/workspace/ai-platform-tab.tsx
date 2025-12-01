@@ -499,9 +499,10 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
             setNewTeamName('')
             setNewTeamDescription('')
             setShowCreateTeamDialog(false)
-            await loadTeams()
 
+            // Add the new team to the local state instead of reloading
             if (data) {
+                setTeams(prev => [data, ...prev])
                 await switchTeam(data)
             }
         } catch (error: any) {
