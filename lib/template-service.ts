@@ -100,7 +100,11 @@ export class TemplateService {
     "tailwindcss": "^3.3.6",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3",
+    "@babel/types": "^7.24.0"
   }
 }
 `,
@@ -115,10 +119,16 @@ export class TemplateService {
       content: `import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { visualEditorPlugin } from './vite-plugin-visual-editor'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Visual Editor Plugin - enables source mapping for visual editing
+    // Set VITE_ENABLE_VISUAL_EDITOR=true to activate
+    process.env.VITE_ENABLE_VISUAL_EDITOR === 'true' && visualEditorPlugin(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -140,6 +150,105 @@ export default defineConfig({
     ],
   },
 })`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'vite-plugin-visual-editor.ts',
+      path: 'vite-plugin-visual-editor.ts',
+      content: `// Visual Editor Vite Plugin
+// Adds source file info (data-ve-id, data-ve-file, data-ve-line) to JSX elements
+// This enables the visual editor to map DOM elements back to source code
+
+import { Plugin } from 'vite';
+import * as babel from '@babel/core';
+import * as t from '@babel/types';
+
+export function visualEditorPlugin(): Plugin {
+  return {
+    name: 'vite-visual-editor',
+    enforce: 'pre',
+    transform(code: string, id: string) {
+      // Only process JSX/TSX files in src directory
+      if (!id.match(/\\/src\\/.*\\.[jt]sx?$/)) return null;
+      if (id.includes('node_modules')) return null;
+
+      try {
+        const result = babel.transformSync(code, {
+          filename: id,
+          presets: [
+            ['@babel/preset-react', { runtime: 'automatic' }],
+            '@babel/preset-typescript',
+          ],
+          plugins: [
+            function visualEditorBabelPlugin() {
+              let elementIndex = 0;
+              
+              return {
+                visitor: {
+                  JSXOpeningElement(path: any) {
+                    const { node } = path;
+                    const loc = node.loc;
+                    
+                    if (!loc) return;
+                    
+                    // Skip if already has data-ve-id
+                    const hasVeId = node.attributes.some(
+                      (attr: any) => attr.type === 'JSXAttribute' && 
+                        attr.name?.name === 'data-ve-id'
+                    );
+                    if (hasVeId) return;
+                    
+                    // Create relative path from project root
+                    const relativePath = id.replace(/^.*\\/src\\//, 'src/');
+                    
+                    // Add data-ve-id attribute (unique identifier)
+                    const idAttr = t.jsxAttribute(
+                      t.jsxIdentifier('data-ve-id'),
+                      t.stringLiteral(\`\${relativePath}:\${loc.start.line}:\${elementIndex++}\`)
+                    );
+                    
+                    // Add data-ve-file attribute (source file path)
+                    const fileAttr = t.jsxAttribute(
+                      t.jsxIdentifier('data-ve-file'),
+                      t.stringLiteral(relativePath)
+                    );
+                    
+                    // Add data-ve-line attribute (line number)
+                    const lineAttr = t.jsxAttribute(
+                      t.jsxIdentifier('data-ve-line'),
+                      t.stringLiteral(String(loc.start.line))
+                    );
+                    
+                    node.attributes.push(idAttr, fileAttr, lineAttr);
+                  },
+                },
+              };
+            },
+          ],
+          sourceMaps: true,
+        });
+
+        if (result && result.code) {
+          return {
+            code: result.code,
+            map: result.map,
+          };
+        }
+      } catch (error) {
+        // Silently fail - visual editor source mapping is optional
+        // console.warn('[Visual Editor Plugin] Transform error:', error);
+      }
+
+      return null;
+    },
+  };
+}
+
+export default visualEditorPlugin;
+`,
       fileType: 'typescript',
       type: 'typescript',
       size: 0,
@@ -176,7 +285,7 @@ export default defineConfig({
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": ["src", "vite-plugin-visual-editor.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }`,
       fileType: 'json',
@@ -195,7 +304,7 @@ export default defineConfig({
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "vite-plugin-visual-editor.ts"]
 }`,
       fileType: 'json',
       type: 'json',
@@ -249,6 +358,8 @@ export default {
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Visual Editor Client - enables visual editing when loaded in pipilot.dev iframe -->
+    <script src="/visual-editor-client.js" defer></script>
   </body>
 </html>`,
       fileType: 'html',
@@ -417,6 +528,382 @@ export default App`,
       content: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="35.93" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 228"><path fill="#00D8FF" d="M210.483 73.824a171.49 171.49 0 0 0-8.24-2.597c.465-1.9.893-3.777 1.273-5.621c6.238-30.281 2.16-54.676-10.332-62.708c-12.065-7.7-29.006.329-43.54 19.526a171.23 171.23 0 0 0-6.375 8.05c-18.452-5.098-37.194-8.446-55.904-9.938c-1.621-.133-3.222-.26-4.811-.38c.116-1.098.234-2.194.354-3.287C99.735 3.471 108.873.393 117.31.393c12.575 0 20.323 6.72 22.568 18.442c.198 1.006.29 2.077.354 3.22c.377 6.478.553 13.21.553 20.069c0 6.747-.158 13.378-.5 19.764c-.063 1.089-.152 2.183-.267 3.28c1.609-.12 3.231-.247 4.863-.38c18.887-1.52 37.796-4.914 56.397-10.163a145.788 145.788 0 0 1 6.491-8.207c14.739-19.422 31.946-27.462 44.004-19.764c12.637 8.08 16.777 32.754 10.504 63.025c-.38 1.844-.808 3.721-1.273 5.621a171.49 171.49 0 0 0-8.24 2.597c-19.026 6.15-37.927 15.798-56.263 28.525c18.336 12.727 37.237 22.375 56.263 28.525a171.49 171.49 0 0 0 8.24 2.597c.465 1.9.893 3.777 1.273 5.621c6.273 30.271 2.133 54.945-10.504 63.025c-12.058 7.698-29.265-.342-44.004-19.764a145.788 145.788 0 0 1-6.491-8.207c-18.601-5.249-37.51-8.643-56.397-10.163c-1.632-.133-3.254-.26-4.863-.38c.115-1.097.204-2.191.267-3.28c.342-6.386.5-13.017.5-19.764c0-6.859-.176-13.591-.553-20.069c-.064-1.143-.156-2.214-.354-3.22c-2.245-11.722-9.993-18.442-22.568-18.442c-8.437 0-17.575 3.078-25.297 9.42c-.12 1.093-.238 2.189-.354 3.287c-1.589.12-3.19.247-4.811.38c-18.71 1.492-37.452 4.84-55.904 9.938a171.23 171.23 0 0 0-6.375-8.05c-14.534-19.197-31.475-27.226-43.54-19.526c-12.492 8.032-16.57 32.427-10.332 62.708c.38 1.844.808 3.721 1.273 5.621a171.49 171.49 0 0 0 8.24 2.597c19.026 6.15 37.927 15.798 56.263 28.525C172.556 89.622 191.457 79.974 210.483 73.824zM128.036 163.754c-19.893 0-36.236-16.343-36.236-36.236s16.343-36.236 36.236-36.236s36.236 16.343 36.236 36.236S147.929 163.754 128.036 163.754z"></path></svg>`,
       fileType: 'svg',
       type: 'svg',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'visual-editor-client.js',
+      path: 'public/visual-editor-client.js',
+      content: `/**
+ * Visual Editor Client - Embedded in production builds
+ * Enables visual editing when the app is loaded in an iframe from pipilot.dev
+ * Works with both development (E2B) and production (Supabase hosting) scenarios
+ */
+(function() {
+  'use strict';
+  
+  // Only run in iframe context
+  if (window === window.parent) {
+    console.log('[VE-Client] Not in iframe, skipping initialization');
+    return;
+  }
+
+  // Allowed parent origins for security
+  // Supports: pipilot.dev main site, *.pipilot.dev subdomains, *.e2b.app E2B URLs, localhost
+  const ALLOWED_ORIGINS = [
+    'https://pipilot.dev',
+    'https://www.pipilot.dev',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+  ];
+  
+  // Check if origin is allowed (supports wildcards for subdomains)
+  function isAllowedOrigin(origin) {
+    if (!origin) return false;
+    // Exact match
+    if (ALLOWED_ORIGINS.includes(origin)) return true;
+    // *.pipilot.dev subdomains (e.g., code-lens-stream.pipilot.dev)
+    if (origin.endsWith('.pipilot.dev')) return true;
+    // *.e2b.app URLs (e.g., 3000-ikmd9ltiykjsfg57q5pf3.e2b.app)
+    if (origin.endsWith('.e2b.app')) return true;
+    return false;
+  }
+
+  // State
+  let isEnabled = false;
+  let selectedElements = new Map();
+  let hoveredElement = null;
+  let hoverOverlay = null;
+  let selectionOverlays = new Map();
+  let elementIdCounter = 1;
+  const elementIdMap = new WeakMap();
+
+  // Generate unique element ID using DOM path
+  function generateElementId(element) {
+    if (elementIdMap.has(element)) {
+      return elementIdMap.get(element);
+    }
+    
+    // Check for existing data-ve-id (from build-time plugin)
+    const existingId = element.getAttribute('data-ve-id');
+    if (existingId) {
+      elementIdMap.set(element, existingId);
+      return existingId;
+    }
+    
+    // Generate DOM path-based ID for production
+    const path = getDOMPath(element);
+    const id = 've-' + path;
+    element.setAttribute('data-ve-id', id);
+    elementIdMap.set(element, id);
+    return id;
+  }
+
+  // Get DOM path for element identification
+  function getDOMPath(element) {
+    const path = [];
+    let current = element;
+    
+    while (current && current !== document.body) {
+      let selector = current.tagName.toLowerCase();
+      
+      if (current.id) {
+        selector += '#' + current.id;
+        path.unshift(selector);
+        break;
+      }
+      
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\\s+/).slice(0, 2).join('.');
+        if (classes) selector += '.' + classes;
+      }
+      
+      // Add index if needed
+      const parent = current.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter(c => c.tagName === current.tagName);
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(current);
+          selector += ':nth(' + index + ')';
+        }
+      }
+      
+      path.unshift(selector);
+      current = current.parentElement;
+    }
+    
+    return path.join('>');
+  }
+
+  // Get computed styles for an element
+  function getComputedStyleInfo(element) {
+    const computed = window.getComputedStyle(element);
+    return {
+      display: computed.display,
+      position: computed.position,
+      flexDirection: computed.flexDirection,
+      justifyContent: computed.justifyContent,
+      alignItems: computed.alignItems,
+      gap: computed.gap,
+      marginTop: computed.marginTop,
+      marginRight: computed.marginRight,
+      marginBottom: computed.marginBottom,
+      marginLeft: computed.marginLeft,
+      paddingTop: computed.paddingTop,
+      paddingRight: computed.paddingRight,
+      paddingBottom: computed.paddingBottom,
+      paddingLeft: computed.paddingLeft,
+      width: computed.width,
+      height: computed.height,
+      fontSize: computed.fontSize,
+      fontWeight: computed.fontWeight,
+      color: computed.color,
+      backgroundColor: computed.backgroundColor,
+      borderRadius: computed.borderRadius,
+    };
+  }
+
+  // Check if element should be ignored
+  function shouldIgnoreElement(element) {
+    if (!element || element.nodeType !== 1) return true;
+    const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'HEAD', 'HTML', 'NOSCRIPT'];
+    if (ignoreTags.includes(element.tagName)) return true;
+    if (element.closest('[data-ve-overlay]')) return true;
+    const computed = window.getComputedStyle(element);
+    if (computed.display === 'none' || computed.visibility === 'hidden') return true;
+    return false;
+  }
+
+  // Get element info for parent
+  function getElementInfo(element) {
+    if (shouldIgnoreElement(element)) return null;
+    
+    const id = generateElementId(element);
+    const rect = element.getBoundingClientRect();
+    const sourceFile = element.getAttribute('data-ve-file');
+    const sourceLine = element.getAttribute('data-ve-line');
+    
+    // Get direct text content
+    let textContent = '';
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        textContent += node.textContent;
+      }
+    }
+    
+    return {
+      id,
+      tagName: element.tagName,
+      textContent: textContent.trim(),
+      className: element.className || '',
+      computedStyles: getComputedStyleInfo(element),
+      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+      sourceFile: sourceFile || undefined,
+      sourceLine: sourceLine ? parseInt(sourceLine, 10) : undefined,
+    };
+  }
+
+  // Send message to parent with origin check
+  function sendToParent(message) {
+    try {
+      window.parent.postMessage(message, '*');
+    } catch (e) {
+      console.warn('[VE-Client] Failed to send message:', e);
+    }
+  }
+
+  // Create overlay element
+  function createOverlay() {
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-ve-overlay', 'true');
+    overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:999999;box-sizing:border-box;transition:all 0.1s ease;';
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  // Update overlay position and style
+  function updateOverlay(overlay, rect, type) {
+    if (!overlay) return;
+    const isHover = type === 'hover';
+    const color = isHover ? 'rgba(59,130,246,0.5)' : 'rgba(37,99,235,0.7)';
+    const bg = isHover ? 'rgba(59,130,246,0.05)' : 'rgba(37,99,235,0.05)';
+    overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:999999;box-sizing:border-box;' +
+      'top:' + rect.top + 'px;left:' + rect.left + 'px;width:' + rect.width + 'px;height:' + rect.height + 'px;' +
+      'border:2px solid ' + color + ';background:' + bg + ';transition:all 0.1s ease;';
+  }
+
+  // Remove overlay
+  function removeOverlay(overlay) {
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  }
+
+  // Find element by ID
+  function findElementById(id) {
+    return document.querySelector('[data-ve-id=\"' + id + '\"]');
+  }
+
+  // Clear all selections
+  function clearSelection() {
+    selectedElements.clear();
+    selectionOverlays.forEach(removeOverlay);
+    selectionOverlays.clear();
+  }
+
+  // Event Handlers
+  function handleMouseMove(e) {
+    if (!isEnabled) return;
+    const element = document.elementFromPoint(e.clientX, e.clientY);
+    if (!element || shouldIgnoreElement(element)) {
+      if (hoveredElement) {
+        hoveredElement = null;
+        removeOverlay(hoverOverlay);
+        hoverOverlay = null;
+        sendToParent({ type: 'ELEMENT_HOVERED', payload: { element: null } });
+      }
+      return;
+    }
+    
+    const elementId = generateElementId(element);
+    if (hoveredElement !== element && !selectedElements.has(elementId)) {
+      hoveredElement = element;
+      if (!hoverOverlay) hoverOverlay = createOverlay();
+      updateOverlay(hoverOverlay, element.getBoundingClientRect(), 'hover');
+      sendToParent({ type: 'ELEMENT_HOVERED', payload: { element: getElementInfo(element) } });
+    }
+  }
+
+  function handleClick(e) {
+    if (!isEnabled) return;
+    const element = document.elementFromPoint(e.clientX, e.clientY);
+    if (!element || shouldIgnoreElement(element)) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const elementId = generateElementId(element);
+    const isMultiSelect = e.ctrlKey || e.metaKey;
+    
+    if (isMultiSelect) {
+      if (selectedElements.has(elementId)) {
+        selectedElements.delete(elementId);
+        removeOverlay(selectionOverlays.get(elementId));
+        selectionOverlays.delete(elementId);
+        sendToParent({ type: 'ELEMENT_DESELECTED', payload: { elementId } });
+      } else {
+        selectedElements.set(elementId, element);
+        const overlay = createOverlay();
+        selectionOverlays.set(elementId, overlay);
+        updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+        sendToParent({ type: 'ELEMENT_SELECTED', payload: { elements: [getElementInfo(element)], isMultiSelect: true } });
+      }
+    } else {
+      clearSelection();
+      selectedElements.set(elementId, element);
+      const overlay = createOverlay();
+      selectionOverlays.set(elementId, overlay);
+      updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+      sendToParent({ type: 'ELEMENT_SELECTED', payload: { elements: [getElementInfo(element)], isMultiSelect: false } });
+    }
+    
+    if (hoverOverlay) { removeOverlay(hoverOverlay); hoverOverlay = null; }
+    hoveredElement = null;
+  }
+
+  function handleKeyDown(e) {
+    if (!isEnabled) return;
+    if (e.key === 'Escape') {
+      clearSelection();
+      sendToParent({ type: 'CLEAR_SELECTION', payload: {} });
+    }
+  }
+
+  function handleScroll() {
+    selectionOverlays.forEach(function(overlay, elementId) {
+      const element = findElementById(elementId);
+      if (element) updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+    });
+    if (hoverOverlay && hoveredElement) {
+      updateOverlay(hoverOverlay, hoveredElement.getBoundingClientRect(), 'hover');
+    }
+  }
+
+  // Apply style changes from parent
+  function applyStyleChanges(elementId, changes) {
+    const element = findElementById(elementId);
+    if (!element) return false;
+    changes.forEach(function(change) {
+      const prop = change.property.replace(/([A-Z])/g, '-$1').toLowerCase();
+      element.style.setProperty(prop, change.newValue);
+    });
+    const overlay = selectionOverlays.get(elementId);
+    if (overlay) updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+    sendToParent({ type: 'STYLE_APPLIED', payload: { elementId, success: true } });
+    return true;
+  }
+
+  // Message handler
+  function handleMessage(event) {
+    // Security: Only allow messages from known origins
+    if (!isAllowedOrigin(event.origin)) {
+      return;
+    }
+    
+    var message = event.data;
+    if (!message || !message.type) return;
+    
+    switch (message.type) {
+      case 'VISUAL_EDITOR_INIT':
+      case 'VISUAL_EDITOR_TOGGLE':
+        isEnabled = message.payload.enabled;
+        if (!isEnabled) {
+          clearSelection();
+          if (hoverOverlay) { removeOverlay(hoverOverlay); hoverOverlay = null; }
+          hoveredElement = null;
+        }
+        document.body.style.cursor = isEnabled ? 'crosshair' : '';
+        sendToParent({ type: 'VISUAL_EDITOR_READY', payload: { enabled: isEnabled } });
+        break;
+      case 'CLEAR_SELECTION':
+        clearSelection();
+        break;
+      case 'APPLY_STYLE':
+        applyStyleChanges(message.payload.elementId, message.payload.changes);
+        break;
+      case 'REQUEST_ELEMENT_INFO':
+        var el = findElementById(message.payload.elementId);
+        if (el) sendToParent({ type: 'ELEMENT_INFO_RESPONSE', payload: { element: getElementInfo(el) } });
+        break;
+    }
+  }
+
+  // Initialize
+  function init() {
+    document.addEventListener('mousemove', handleMouseMove, true);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    window.addEventListener('message', handleMessage);
+    
+    // Notify parent we're ready
+    sendToParent({ type: 'VISUAL_EDITOR_READY', payload: {} });
+    console.log('[VE-Client] Initialized - waiting for parent commands');
+  }
+
+  // Run on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+`,
+      fileType: 'javascript',
+      type: 'javascript',
       size: 0,
       isDirectory: false
     },
@@ -873,6 +1360,10 @@ Your external apps can now interact with your pipilot.dev databases! 🚀`,
 # Example:
 # VITE_API_KEY=your_local_api_key
 # VITE_DATABASE_URL=your_local_database_url
+
+# Visual Editor - Enable source mapping for visual editing
+# Set to 'true' to enable (adds data-ve-* attributes to JSX elements)
+VITE_ENABLE_VISUAL_EDITOR=true
 
 # This file is typically used for sensitive information
 # and should be added to .gitignore
@@ -5427,7 +5918,10 @@ This setup provides a complete, production-ready authentication system for your 
     "postcss": "^8.4.32",
     "eslint": "^8.55.0",
     "eslint-config-next": "14.0.4",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3"
   }
 }`,
       fileType: 'json',
@@ -5454,9 +5948,123 @@ const nextConfig = {
       },
     ]
   },
+  // Visual Editor: Custom webpack config to inject source location data
+  // Only enabled when NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
+  webpack: (config, { dev }) => {
+    if (dev && process.env.NEXT_PUBLIC_ENABLE_VISUAL_EDITOR === 'true') {
+      // Add custom babel plugin for visual editor source mapping
+      config.module.rules.push({
+        test: /\\.(tsx|jsx)$/,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: require.resolve('./visual-editor-loader.js'),
+          },
+        ],
+      });
+    }
+    return config;
+  },
 }
 
 module.exports = nextConfig`,
+      fileType: 'javascript',
+      type: 'javascript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'visual-editor-loader.js',
+      path: 'visual-editor-loader.js',
+      content: `// Visual Editor Webpack Loader for Next.js
+// Adds data-ve-id, data-ve-file, data-ve-line attributes to JSX elements
+// This enables the visual editor to map DOM elements back to source code
+
+const babel = require('@babel/core');
+
+module.exports = function visualEditorLoader(source) {
+  const callback = this.async();
+  const filename = this.resourcePath;
+
+  // Only process files in src or app directories
+  if (!filename.match(/[\\\\/](src|app|components)[\\\\/]/)) {
+    return callback(null, source);
+  }
+
+  try {
+    let elementIndex = 0;
+
+    const result = babel.transformSync(source, {
+      filename,
+      presets: [
+        ['@babel/preset-react', { runtime: 'automatic' }],
+        '@babel/preset-typescript',
+      ],
+      plugins: [
+        function visualEditorBabelPlugin({ types: t }) {
+          return {
+            visitor: {
+              JSXOpeningElement(path) {
+                const { node } = path;
+                const loc = node.loc;
+
+                if (!loc) return;
+
+                // Skip if already has data-ve-id
+                const hasVeId = node.attributes.some(
+                  (attr) =>
+                    attr.type === 'JSXAttribute' &&
+                    attr.name?.name === 'data-ve-id'
+                );
+                if (hasVeId) return;
+
+                // Create relative path
+                const relativePath = filename
+                  .replace(/^.*[\\\\/](src|app|components)[\\\\/]/, '$1/')
+                  .replace(/\\\\/g, '/');
+
+                // Add data-ve-id attribute
+                const idAttr = t.jsxAttribute(
+                  t.jsxIdentifier('data-ve-id'),
+                  t.stringLiteral(
+                    relativePath + ':' + loc.start.line + ':' + elementIndex++
+                  )
+                );
+
+                // Add data-ve-file attribute
+                const fileAttr = t.jsxAttribute(
+                  t.jsxIdentifier('data-ve-file'),
+                  t.stringLiteral(relativePath)
+                );
+
+                // Add data-ve-line attribute
+                const lineAttr = t.jsxAttribute(
+                  t.jsxIdentifier('data-ve-line'),
+                  t.stringLiteral(String(loc.start.line))
+                );
+
+                node.attributes.push(idAttr, fileAttr, lineAttr);
+              },
+            },
+          };
+        },
+      ],
+      sourceMaps: true,
+      sourceFileName: filename,
+    });
+
+    if (result && result.code) {
+      callback(null, result.code, result.map);
+    } else {
+      callback(null, source);
+    }
+  } catch (error) {
+    // Silently fallback to original source if transformation fails
+    console.warn('[Visual Editor Loader] Transform skipped:', filename);
+    callback(null, source);
+  }
+};
+`,
       fileType: 'javascript',
       type: 'javascript',
       size: 0,
@@ -5688,6 +6296,7 @@ export default {
       path: 'src/app/layout.tsx',
       content: `import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -5704,7 +6313,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+        {/* Visual Editor Client - enables visual editing when loaded in pipilot.dev iframe */}
+        <Script src="/visual-editor-client.js" strategy="afterInteractive" />
+      </body>
     </html>
   )
 }`,
@@ -5849,6 +6462,382 @@ export default function Home() {
       content: `<svg height="18" viewBox="0 0 284 65" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m141.04 16.005c-11.37 11.37-28.5 11.37-39.87 0L16.04 16.005C4.67 27.375 4.67 44.505 16.04 55.875L16.04 55.875C27.41 67.245 44.54 67.245 55.91 55.875L141.04 55.875C152.41 67.245 169.54 67.245 180.91 55.875L267.04 55.875C278.41 67.245 295.54 67.245 306.91 55.875L306.91 55.875C318.28 44.505 318.28 27.375 306.91 16.005L267.04 16.005C255.67 4.635 238.54 4.635 227.17 16.005L141.04 16.005Z" fill="black"/><path d="m141.04 16.005c-11.37 11.37-28.5 11.37-39.87 0L16.04 16.005C4.67 27.375 4.67 44.505 16.04 55.875L16.04 55.875C27.41 67.245 44.54 67.245 55.91 55.875L141.04 55.875C152.41 67.245 169.54 67.245 180.91 55.875L267.04 55.875C278.41 67.245 295.54 67.245 306.91 55.875L306.91 55.875C318.28 44.505 318.28 27.375 306.91 16.005L267.04 16.005C255.67 4.635 238.54 4.635 227.17 16.005L141.04 16.005Z" fill="black"/><path d="m141.04 16.005c-11.37 11.37-28.5 11.37-39.87 0L16.04 16.005C4.67 27.375 4.67 44.505 16.04 55.875L16.04 55.875C27.41 67.245 44.54 67.245 55.91 55.875L141.04 55.875C152.41 67.245 169.54 67.245 180.91 55.875L267.04 55.875C278.41 67.245 295.54 67.245 306.91 55.875L306.91 55.875C318.28 44.505 318.28 27.375 306.91 16.005L267.04 16.005C255.67 4.635 238.54 4.635 227.17 16.005L141.04 16.005Z" fill="black"/></svg>`,
       fileType: 'svg',
       type: 'svg',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'visual-editor-client.js',
+      path: 'public/visual-editor-client.js',
+      content: `/**
+ * Visual Editor Client - Embedded in production builds
+ * Enables visual editing when the app is loaded in an iframe from pipilot.dev
+ * Works with both development (E2B) and production (Supabase/Vercel hosting) scenarios
+ */
+(function() {
+  'use strict';
+  
+  // Only run in iframe context
+  if (window === window.parent) {
+    console.log('[VE-Client] Not in iframe, skipping initialization');
+    return;
+  }
+
+  // Allowed parent origins for security
+  // Supports: pipilot.dev main site, *.pipilot.dev subdomains, *.e2b.app E2B URLs, localhost
+  const ALLOWED_ORIGINS = [
+    'https://pipilot.dev',
+    'https://www.pipilot.dev',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+  ];
+  
+  // Check if origin is allowed (supports wildcards for subdomains)
+  function isAllowedOrigin(origin) {
+    if (!origin) return false;
+    // Exact match
+    if (ALLOWED_ORIGINS.includes(origin)) return true;
+    // *.pipilot.dev subdomains (e.g., code-lens-stream.pipilot.dev)
+    if (origin.endsWith('.pipilot.dev')) return true;
+    // *.e2b.app URLs (e.g., 3000-ikmd9ltiykjsfg57q5pf3.e2b.app)
+    if (origin.endsWith('.e2b.app')) return true;
+    return false;
+  }
+
+  // State
+  let isEnabled = false;
+  let selectedElements = new Map();
+  let hoveredElement = null;
+  let hoverOverlay = null;
+  let selectionOverlays = new Map();
+  let elementIdCounter = 1;
+  const elementIdMap = new WeakMap();
+
+  // Generate unique element ID using DOM path
+  function generateElementId(element) {
+    if (elementIdMap.has(element)) {
+      return elementIdMap.get(element);
+    }
+    
+    // Check for existing data-ve-id (from build-time plugin)
+    const existingId = element.getAttribute('data-ve-id');
+    if (existingId) {
+      elementIdMap.set(element, existingId);
+      return existingId;
+    }
+    
+    // Generate DOM path-based ID for production
+    const path = getDOMPath(element);
+    const id = 've-' + path;
+    element.setAttribute('data-ve-id', id);
+    elementIdMap.set(element, id);
+    return id;
+  }
+
+  // Get DOM path for element identification
+  function getDOMPath(element) {
+    const path = [];
+    let current = element;
+    
+    while (current && current !== document.body) {
+      let selector = current.tagName.toLowerCase();
+      
+      if (current.id) {
+        selector += '#' + current.id;
+        path.unshift(selector);
+        break;
+      }
+      
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\\s+/).slice(0, 2).join('.');
+        if (classes) selector += '.' + classes;
+      }
+      
+      // Add index if needed
+      const parent = current.parentElement;
+      if (parent) {
+        const siblings = Array.from(parent.children).filter(c => c.tagName === current.tagName);
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(current);
+          selector += ':nth(' + index + ')';
+        }
+      }
+      
+      path.unshift(selector);
+      current = current.parentElement;
+    }
+    
+    return path.join('>');
+  }
+
+  // Get computed styles for an element
+  function getComputedStyleInfo(element) {
+    const computed = window.getComputedStyle(element);
+    return {
+      display: computed.display,
+      position: computed.position,
+      flexDirection: computed.flexDirection,
+      justifyContent: computed.justifyContent,
+      alignItems: computed.alignItems,
+      gap: computed.gap,
+      marginTop: computed.marginTop,
+      marginRight: computed.marginRight,
+      marginBottom: computed.marginBottom,
+      marginLeft: computed.marginLeft,
+      paddingTop: computed.paddingTop,
+      paddingRight: computed.paddingRight,
+      paddingBottom: computed.paddingBottom,
+      paddingLeft: computed.paddingLeft,
+      width: computed.width,
+      height: computed.height,
+      fontSize: computed.fontSize,
+      fontWeight: computed.fontWeight,
+      color: computed.color,
+      backgroundColor: computed.backgroundColor,
+      borderRadius: computed.borderRadius,
+    };
+  }
+
+  // Check if element should be ignored
+  function shouldIgnoreElement(element) {
+    if (!element || element.nodeType !== 1) return true;
+    const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'HEAD', 'HTML', 'NOSCRIPT'];
+    if (ignoreTags.includes(element.tagName)) return true;
+    if (element.closest('[data-ve-overlay]')) return true;
+    const computed = window.getComputedStyle(element);
+    if (computed.display === 'none' || computed.visibility === 'hidden') return true;
+    return false;
+  }
+
+  // Get element info for parent
+  function getElementInfo(element) {
+    if (shouldIgnoreElement(element)) return null;
+    
+    const id = generateElementId(element);
+    const rect = element.getBoundingClientRect();
+    const sourceFile = element.getAttribute('data-ve-file');
+    const sourceLine = element.getAttribute('data-ve-line');
+    
+    // Get direct text content
+    let textContent = '';
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        textContent += node.textContent;
+      }
+    }
+    
+    return {
+      id,
+      tagName: element.tagName,
+      textContent: textContent.trim(),
+      className: element.className || '',
+      computedStyles: getComputedStyleInfo(element),
+      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+      sourceFile: sourceFile || undefined,
+      sourceLine: sourceLine ? parseInt(sourceLine, 10) : undefined,
+    };
+  }
+
+  // Send message to parent with origin check
+  function sendToParent(message) {
+    try {
+      window.parent.postMessage(message, '*');
+    } catch (e) {
+      console.warn('[VE-Client] Failed to send message:', e);
+    }
+  }
+
+  // Create overlay element
+  function createOverlay() {
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-ve-overlay', 'true');
+    overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:999999;box-sizing:border-box;transition:all 0.1s ease;';
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  // Update overlay position and style
+  function updateOverlay(overlay, rect, type) {
+    if (!overlay) return;
+    const isHover = type === 'hover';
+    const color = isHover ? 'rgba(59,130,246,0.5)' : 'rgba(37,99,235,0.7)';
+    const bg = isHover ? 'rgba(59,130,246,0.05)' : 'rgba(37,99,235,0.05)';
+    overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:999999;box-sizing:border-box;' +
+      'top:' + rect.top + 'px;left:' + rect.left + 'px;width:' + rect.width + 'px;height:' + rect.height + 'px;' +
+      'border:2px solid ' + color + ';background:' + bg + ';transition:all 0.1s ease;';
+  }
+
+  // Remove overlay
+  function removeOverlay(overlay) {
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  }
+
+  // Find element by ID
+  function findElementById(id) {
+    return document.querySelector('[data-ve-id="' + id + '"]');
+  }
+
+  // Clear all selections
+  function clearSelection() {
+    selectedElements.clear();
+    selectionOverlays.forEach(removeOverlay);
+    selectionOverlays.clear();
+  }
+
+  // Event Handlers
+  function handleMouseMove(e) {
+    if (!isEnabled) return;
+    const element = document.elementFromPoint(e.clientX, e.clientY);
+    if (!element || shouldIgnoreElement(element)) {
+      if (hoveredElement) {
+        hoveredElement = null;
+        removeOverlay(hoverOverlay);
+        hoverOverlay = null;
+        sendToParent({ type: 'ELEMENT_HOVERED', payload: { element: null } });
+      }
+      return;
+    }
+    
+    const elementId = generateElementId(element);
+    if (hoveredElement !== element && !selectedElements.has(elementId)) {
+      hoveredElement = element;
+      if (!hoverOverlay) hoverOverlay = createOverlay();
+      updateOverlay(hoverOverlay, element.getBoundingClientRect(), 'hover');
+      sendToParent({ type: 'ELEMENT_HOVERED', payload: { element: getElementInfo(element) } });
+    }
+  }
+
+  function handleClick(e) {
+    if (!isEnabled) return;
+    const element = document.elementFromPoint(e.clientX, e.clientY);
+    if (!element || shouldIgnoreElement(element)) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const elementId = generateElementId(element);
+    const isMultiSelect = e.ctrlKey || e.metaKey;
+    
+    if (isMultiSelect) {
+      if (selectedElements.has(elementId)) {
+        selectedElements.delete(elementId);
+        removeOverlay(selectionOverlays.get(elementId));
+        selectionOverlays.delete(elementId);
+        sendToParent({ type: 'ELEMENT_DESELECTED', payload: { elementId } });
+      } else {
+        selectedElements.set(elementId, element);
+        const overlay = createOverlay();
+        selectionOverlays.set(elementId, overlay);
+        updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+        sendToParent({ type: 'ELEMENT_SELECTED', payload: { elements: [getElementInfo(element)], isMultiSelect: true } });
+      }
+    } else {
+      clearSelection();
+      selectedElements.set(elementId, element);
+      const overlay = createOverlay();
+      selectionOverlays.set(elementId, overlay);
+      updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+      sendToParent({ type: 'ELEMENT_SELECTED', payload: { elements: [getElementInfo(element)], isMultiSelect: false } });
+    }
+    
+    if (hoverOverlay) { removeOverlay(hoverOverlay); hoverOverlay = null; }
+    hoveredElement = null;
+  }
+
+  function handleKeyDown(e) {
+    if (!isEnabled) return;
+    if (e.key === 'Escape') {
+      clearSelection();
+      sendToParent({ type: 'CLEAR_SELECTION', payload: {} });
+    }
+  }
+
+  function handleScroll() {
+    selectionOverlays.forEach(function(overlay, elementId) {
+      const element = findElementById(elementId);
+      if (element) updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+    });
+    if (hoverOverlay && hoveredElement) {
+      updateOverlay(hoverOverlay, hoveredElement.getBoundingClientRect(), 'hover');
+    }
+  }
+
+  // Apply style changes from parent
+  function applyStyleChanges(elementId, changes) {
+    const element = findElementById(elementId);
+    if (!element) return false;
+    changes.forEach(function(change) {
+      const prop = change.property.replace(/([A-Z])/g, '-\$1').toLowerCase();
+      element.style.setProperty(prop, change.newValue);
+    });
+    const overlay = selectionOverlays.get(elementId);
+    if (overlay) updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+    sendToParent({ type: 'STYLE_APPLIED', payload: { elementId, success: true } });
+    return true;
+  }
+
+  // Message handler
+  function handleMessage(event) {
+    // Security: Only allow messages from known origins
+    if (!isAllowedOrigin(event.origin)) {
+      return;
+    }
+    
+    var message = event.data;
+    if (!message || !message.type) return;
+    
+    switch (message.type) {
+      case 'VISUAL_EDITOR_INIT':
+      case 'VISUAL_EDITOR_TOGGLE':
+        isEnabled = message.payload.enabled;
+        if (!isEnabled) {
+          clearSelection();
+          if (hoverOverlay) { removeOverlay(hoverOverlay); hoverOverlay = null; }
+          hoveredElement = null;
+        }
+        document.body.style.cursor = isEnabled ? 'crosshair' : '';
+        sendToParent({ type: 'VISUAL_EDITOR_READY', payload: { enabled: isEnabled } });
+        break;
+      case 'CLEAR_SELECTION':
+        clearSelection();
+        break;
+      case 'APPLY_STYLE':
+        applyStyleChanges(message.payload.elementId, message.payload.changes);
+        break;
+      case 'REQUEST_ELEMENT_INFO':
+        var el = findElementById(message.payload.elementId);
+        if (el) sendToParent({ type: 'ELEMENT_INFO_RESPONSE', payload: { element: getElementInfo(el) } });
+        break;
+    }
+  }
+
+  // Initialize
+  function init() {
+    document.addEventListener('mousemove', handleMouseMove, true);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    window.addEventListener('message', handleMessage);
+    
+    // Notify parent we're ready
+    sendToParent({ type: 'VISUAL_EDITOR_READY', payload: {} });
+    console.log('[VE-Client] Initialized - waiting for parent commands');
+  }
+
+  // Run on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+`,
+      fileType: 'javascript',
+      type: 'javascript',
       size: 0,
       isDirectory: false
     },
@@ -10352,6 +11341,28 @@ This setup provides a complete, production-ready authentication system for your 
 **Built with ❤️ by the pipilot.dev team**`,
       fileType: 'markdown',
       type: 'markdown',
+      size: 0,
+      isDirectory: false
+    },
+    // Add .env.local file for local environment variables (Next.js)
+    {
+      name: '.env.local',
+      path: '.env.local',
+      content: `# Local environment variables (not committed to git)
+# Add your local environment variables here
+
+# Pipilot API Key
+# PIPILOT_API_KEY=sk_live_your_api_key_here
+
+# Visual Editor - Enable source mapping for visual editing
+# Set to 'true' to enable (adds data-ve-* attributes to JSX elements)
+NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
+
+# This file is typically used for sensitive information
+# and should be added to .gitignore
+`,
+      fileType: 'env',
+      type: 'text',
       size: 0,
       isDirectory: false
     },

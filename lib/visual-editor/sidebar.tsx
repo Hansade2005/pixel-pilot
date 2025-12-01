@@ -1,0 +1,981 @@
+"use client";
+
+import React, { useState, useCallback } from 'react';
+import { cn } from '@/lib/utils';
+import { useVisualEditor } from './context';
+import { ElementTree } from './overlay';
+import type { StyleChange, SidebarPanel, ComputedStyleInfo } from './types';
+import {
+  TAILWIND_MAPPINGS,
+  TAILWIND_SPACING,
+  TAILWIND_FONT_SIZES,
+  TAILWIND_BORDER_RADIUS,
+} from './types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  X,
+  Undo2,
+  Redo2,
+  Save,
+  MousePointer2,
+  Type,
+  Move,
+  Square,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Maximize2,
+  ChevronUp,
+  ChevronDown,
+  Palette,
+  Bold,
+  Italic,
+  Underline,
+} from 'lucide-react';
+
+interface VisualEditorSidebarProps {
+  className?: string;
+  onSave?: () => Promise<void>;
+}
+
+export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarProps) {
+  const {
+    state,
+    config,
+    setActivePanel,
+    setActiveTool,
+    setSidebarOpen,
+    addPendingChange,
+    applyChangesToFile,
+    undo,
+    redo,
+    clearSelection,
+  } = useVisualEditor();
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Get the first selected element for editing
+  const selectedElement = state.selectedElements[0]?.element;
+
+  const handleSave = async () => {
+    if (!selectedElement) return;
+    setIsSaving(true);
+    try {
+      const changes = state.pendingChanges.get(selectedElement.id) || [];
+      if (changes.length > 0) {
+        await applyChangesToFile(selectedElement.id, changes);
+      }
+      if (onSave) {
+        await onSave();
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!state.sidebarOpen) return null;
+
+  return (
+    <div
+      className={cn(
+        'w-80 bg-background border-l flex flex-col h-full',
+        className
+      )}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm">Visual Editor</span>
+          {state.selectedElements.length > 1 && (
+            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
+              {state.selectedElements.length} selected
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={undo}
+            disabled={state.historyIndex < 0}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={redo}
+            disabled={state.historyIndex >= state.history.length - 1}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setSidebarOpen(false)}
+            title="Close sidebar"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Tools */}
+      <div className="flex items-center gap-1 p-2 border-b">
+        <ToolButton
+          icon={<MousePointer2 className="h-4 w-4" />}
+          isActive={state.activeTool === 'select'}
+          onClick={() => setActiveTool('select')}
+          tooltip="Select (V)"
+        />
+        <ToolButton
+          icon={<Type className="h-4 w-4" />}
+          isActive={state.activeTool === 'text'}
+          onClick={() => setActiveTool('text')}
+          tooltip="Text (T)"
+        />
+        <ToolButton
+          icon={<Move className="h-4 w-4" />}
+          isActive={state.activeTool === 'spacing'}
+          onClick={() => setActiveTool('spacing')}
+          tooltip="Spacing (S)"
+        />
+        <ToolButton
+          icon={<Square className="h-4 w-4" />}
+          isActive={state.activeTool === 'layout'}
+          onClick={() => setActiveTool('layout')}
+          tooltip="Layout (L)"
+        />
+      </div>
+
+      {/* Content */}
+      <ScrollArea className="flex-1">
+        {selectedElement ? (
+          <Tabs
+            value={state.activePanel}
+            onValueChange={(v) => setActivePanel(v as SidebarPanel)}
+            className="w-full"
+          >
+            <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0">
+              <TabsTrigger
+                value="styles"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
+              >
+                Styles
+              </TabsTrigger>
+              <TabsTrigger
+                value="layout"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
+              >
+                Layout
+              </TabsTrigger>
+              <TabsTrigger
+                value="spacing"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
+              >
+                Spacing
+              </TabsTrigger>
+              <TabsTrigger
+                value="typography"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
+              >
+                Text
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="styles" className="p-3 space-y-4">
+              <StylesPanel element={selectedElement} />
+            </TabsContent>
+
+            <TabsContent value="layout" className="p-3 space-y-4">
+              <LayoutPanel element={selectedElement} />
+            </TabsContent>
+
+            <TabsContent value="spacing" className="p-3 space-y-4">
+              <SpacingPanel element={selectedElement} />
+            </TabsContent>
+
+            <TabsContent value="typography" className="p-3 space-y-4">
+              <TypographyPanel element={selectedElement} />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="p-4">
+            <ElementTree />
+          </div>
+        )}
+      </ScrollArea>
+
+      {/* Footer with save button */}
+      {selectedElement && state.pendingChanges.size > 0 && (
+        <div className="p-3 border-t">
+          <Button
+            className="w-full"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>Saving...</>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tool button component
+interface ToolButtonProps {
+  icon: React.ReactNode;
+  isActive: boolean;
+  onClick: () => void;
+  tooltip: string;
+}
+
+function ToolButton({ icon, isActive, onClick, tooltip }: ToolButtonProps) {
+  return (
+    <Button
+      variant={isActive ? 'secondary' : 'ghost'}
+      size="icon"
+      className="h-8 w-8"
+      onClick={onClick}
+      title={tooltip}
+    >
+      {icon}
+    </Button>
+  );
+}
+
+// Styles Panel
+interface StylesPanelProps {
+  element: NonNullable<ReturnType<typeof useVisualEditor>['state']['selectedElements'][0]>['element'];
+}
+
+function StylesPanel({ element }: StylesPanelProps) {
+  const { addPendingChange } = useVisualEditor();
+
+  return (
+    <div className="space-y-4">
+      {/* Background Color */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Background</Label>
+        <ColorPicker
+          value={element.computedStyles.backgroundColor}
+          onChange={(color) => {
+            addPendingChange(element.id, [{
+              property: 'backgroundColor',
+              oldValue: element.computedStyles.backgroundColor,
+              newValue: color,
+              useTailwind: false,
+            }]);
+          }}
+        />
+      </div>
+
+      {/* Text Color */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Text Color</Label>
+        <ColorPicker
+          value={element.computedStyles.color}
+          onChange={(color) => {
+            addPendingChange(element.id, [{
+              property: 'color',
+              oldValue: element.computedStyles.color,
+              newValue: color,
+              useTailwind: false,
+            }]);
+          }}
+        />
+      </div>
+
+      <Separator />
+
+      {/* Border */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Border Radius</Label>
+        <Select
+          value={element.computedStyles.borderRadius || '0px'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'borderRadius',
+              oldValue: element.computedStyles.borderRadius || '0px',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: TAILWIND_BORDER_RADIUS[value],
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(TAILWIND_BORDER_RADIUS).map(([px, tw]) => (
+              <SelectItem key={px} value={px}>
+                {tw} ({px})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Opacity */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">
+          Opacity: {Math.round(parseFloat(element.computedStyles.opacity || '1') * 100)}%
+        </Label>
+        <Slider
+          value={[parseFloat(element.computedStyles.opacity || '1') * 100]}
+          min={0}
+          max={100}
+          step={5}
+          onValueChange={([value]) => {
+            addPendingChange(element.id, [{
+              property: 'opacity',
+              oldValue: element.computedStyles.opacity || '1',
+              newValue: String(value / 100),
+              useTailwind: false,
+            }]);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Layout Panel
+function LayoutPanel({ element }: StylesPanelProps) {
+  const { addPendingChange } = useVisualEditor();
+
+  return (
+    <div className="space-y-4">
+      {/* Display */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Display</Label>
+        <Select
+          value={element.computedStyles.display}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'display',
+              oldValue: element.computedStyles.display,
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: TAILWIND_MAPPINGS.display[value],
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="block">Block</SelectItem>
+            <SelectItem value="flex">Flex</SelectItem>
+            <SelectItem value="grid">Grid</SelectItem>
+            <SelectItem value="inline">Inline</SelectItem>
+            <SelectItem value="inline-block">Inline Block</SelectItem>
+            <SelectItem value="inline-flex">Inline Flex</SelectItem>
+            <SelectItem value="none">Hidden</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Flex Direction (only if display is flex) */}
+      {element.computedStyles.display.includes('flex') && (
+        <>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Flex Direction</Label>
+            <Select
+              value={element.computedStyles.flexDirection || 'row'}
+              onValueChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'flexDirection',
+                  oldValue: element.computedStyles.flexDirection || 'row',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: TAILWIND_MAPPINGS.flexDirection[value],
+                }]);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="row">Row</SelectItem>
+                <SelectItem value="row-reverse">Row Reverse</SelectItem>
+                <SelectItem value="column">Column</SelectItem>
+                <SelectItem value="column-reverse">Column Reverse</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Justify Content</Label>
+            <div className="flex gap-1">
+              {[
+                { value: 'flex-start', icon: <AlignLeft className="h-4 w-4" /> },
+                { value: 'center', icon: <AlignCenter className="h-4 w-4" /> },
+                { value: 'flex-end', icon: <AlignRight className="h-4 w-4" /> },
+                { value: 'space-between', icon: <AlignJustify className="h-4 w-4" /> },
+              ].map(({ value, icon }) => (
+                <Button
+                  key={value}
+                  variant={element.computedStyles.justifyContent === value ? 'secondary' : 'outline'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    addPendingChange(element.id, [{
+                      property: 'justifyContent',
+                      oldValue: element.computedStyles.justifyContent || 'flex-start',
+                      newValue: value,
+                      useTailwind: true,
+                      tailwindClass: TAILWIND_MAPPINGS.justifyContent[value],
+                    }]);
+                  }}
+                >
+                  {icon}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Align Items</Label>
+            <Select
+              value={element.computedStyles.alignItems || 'stretch'}
+              onValueChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'alignItems',
+                  oldValue: element.computedStyles.alignItems || 'stretch',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: TAILWIND_MAPPINGS.alignItems[value],
+                }]);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flex-start">Start</SelectItem>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="flex-end">End</SelectItem>
+                <SelectItem value="baseline">Baseline</SelectItem>
+                <SelectItem value="stretch">Stretch</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Gap</Label>
+            <SpacingInput
+              value={element.computedStyles.gap || '0px'}
+              onChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'gap',
+                  oldValue: element.computedStyles.gap || '0px',
+                  newValue: value,
+                  useTailwind: true,
+                }]);
+              }}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Spacing Panel
+function SpacingPanel({ element }: StylesPanelProps) {
+  const { addPendingChange } = useVisualEditor();
+
+  return (
+    <div className="space-y-4">
+      {/* Margin */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground font-medium">Margin</Label>
+        <div className="grid grid-cols-3 gap-2 place-items-center">
+          <div />
+          <SpacingInput
+            value={element.computedStyles.marginTop}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'marginTop',
+                oldValue: element.computedStyles.marginTop,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ArrowUp className="h-3 w-3" />}
+          />
+          <div />
+          
+          <SpacingInput
+            value={element.computedStyles.marginLeft}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'marginLeft',
+                oldValue: element.computedStyles.marginLeft,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ArrowLeft className="h-3 w-3" />}
+          />
+          <div className="w-12 h-12 border-2 border-dashed rounded flex items-center justify-center text-xs text-muted-foreground">
+            M
+          </div>
+          <SpacingInput
+            value={element.computedStyles.marginRight}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'marginRight',
+                oldValue: element.computedStyles.marginRight,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ArrowRight className="h-3 w-3" />}
+          />
+          
+          <div />
+          <SpacingInput
+            value={element.computedStyles.marginBottom}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'marginBottom',
+                oldValue: element.computedStyles.marginBottom,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ArrowDown className="h-3 w-3" />}
+          />
+          <div />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Padding */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground font-medium">Padding</Label>
+        <div className="grid grid-cols-3 gap-2 place-items-center">
+          <div />
+          <SpacingInput
+            value={element.computedStyles.paddingTop}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'paddingTop',
+                oldValue: element.computedStyles.paddingTop,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ChevronUp className="h-3 w-3" />}
+          />
+          <div />
+          
+          <SpacingInput
+            value={element.computedStyles.paddingLeft}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'paddingLeft',
+                oldValue: element.computedStyles.paddingLeft,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ArrowLeft className="h-3 w-3" />}
+          />
+          <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded flex items-center justify-center text-xs text-green-600 dark:text-green-400">
+            P
+          </div>
+          <SpacingInput
+            value={element.computedStyles.paddingRight}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'paddingRight',
+                oldValue: element.computedStyles.paddingRight,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ArrowRight className="h-3 w-3" />}
+          />
+          
+          <div />
+          <SpacingInput
+            value={element.computedStyles.paddingBottom}
+            onChange={(value) => {
+              addPendingChange(element.id, [{
+                property: 'paddingBottom',
+                oldValue: element.computedStyles.paddingBottom,
+                newValue: value,
+                useTailwind: true,
+              }]);
+            }}
+            label={<ChevronDown className="h-3 w-3" />}
+          />
+          <div />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Size */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground font-medium">Size</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Width</Label>
+            <Input
+              className="h-8"
+              value={element.computedStyles.width}
+              onChange={(e) => {
+                addPendingChange(element.id, [{
+                  property: 'width',
+                  oldValue: element.computedStyles.width,
+                  newValue: e.target.value,
+                  useTailwind: false,
+                }]);
+              }}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Height</Label>
+            <Input
+              className="h-8"
+              value={element.computedStyles.height}
+              onChange={(e) => {
+                addPendingChange(element.id, [{
+                  property: 'height',
+                  oldValue: element.computedStyles.height,
+                  newValue: e.target.value,
+                  useTailwind: false,
+                }]);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Typography Panel
+function TypographyPanel({ element }: StylesPanelProps) {
+  const { addPendingChange } = useVisualEditor();
+
+  return (
+    <div className="space-y-4">
+      {/* Text Content */}
+      {element.textContent && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Text Content</Label>
+          <textarea
+            className="w-full min-h-[80px] p-2 text-sm border rounded resize-none"
+            value={element.textContent}
+            onChange={(e) => {
+              // Text content changes are handled differently
+            }}
+          />
+        </div>
+      )}
+
+      {/* Font Family */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Font Family</Label>
+        <Select
+          value={element.computedStyles.fontFamily.split(',')[0].replace(/['"]/g, '').trim()}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'fontFamily',
+              oldValue: element.computedStyles.fontFamily,
+              newValue: value,
+              useTailwind: true,
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Inter">Inter</SelectItem>
+            <SelectItem value="system-ui">System UI</SelectItem>
+            <SelectItem value="Arial">Arial</SelectItem>
+            <SelectItem value="Helvetica">Helvetica</SelectItem>
+            <SelectItem value="Georgia">Georgia</SelectItem>
+            <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+            <SelectItem value="monospace">Monospace</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Font Size */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Font Size</Label>
+        <Select
+          value={element.computedStyles.fontSize}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'fontSize',
+              oldValue: element.computedStyles.fontSize,
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: TAILWIND_FONT_SIZES[value],
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(TAILWIND_FONT_SIZES).map(([px, tw]) => (
+              <SelectItem key={px} value={px}>
+                {tw} ({px})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Font Weight */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Font Weight</Label>
+        <Select
+          value={element.computedStyles.fontWeight}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'fontWeight',
+              oldValue: element.computedStyles.fontWeight,
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: TAILWIND_MAPPINGS.fontWeight[value],
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(TAILWIND_MAPPINGS.fontWeight).map(([weight, tw]) => (
+              <SelectItem key={weight} value={weight}>
+                {tw} ({weight})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Text Align */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Text Align</Label>
+        <div className="flex gap-1">
+          {[
+            { value: 'left', icon: <AlignLeft className="h-4 w-4" /> },
+            { value: 'center', icon: <AlignCenter className="h-4 w-4" /> },
+            { value: 'right', icon: <AlignRight className="h-4 w-4" /> },
+            { value: 'justify', icon: <AlignJustify className="h-4 w-4" /> },
+          ].map(({ value, icon }) => (
+            <Button
+              key={value}
+              variant={element.computedStyles.textAlign === value ? 'secondary' : 'outline'}
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                addPendingChange(element.id, [{
+                  property: 'textAlign',
+                  oldValue: element.computedStyles.textAlign || 'left',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: TAILWIND_MAPPINGS.textAlign[value],
+                }]);
+              }}
+            >
+              {icon}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Line Height */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Line Height</Label>
+        <Input
+          className="h-8"
+          value={element.computedStyles.lineHeight}
+          onChange={(e) => {
+            addPendingChange(element.id, [{
+              property: 'lineHeight',
+              oldValue: element.computedStyles.lineHeight,
+              newValue: e.target.value,
+              useTailwind: false,
+            }]);
+          }}
+        />
+      </div>
+
+      {/* Text Decoration */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Text Style</Label>
+        <div className="flex gap-1">
+          <Button
+            variant={element.computedStyles.fontWeight === '700' ? 'secondary' : 'outline'}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => {
+              const newWeight = element.computedStyles.fontWeight === '700' ? '400' : '700';
+              addPendingChange(element.id, [{
+                property: 'fontWeight',
+                oldValue: element.computedStyles.fontWeight,
+                newValue: newWeight,
+                useTailwind: true,
+                tailwindClass: newWeight === '700' ? 'font-bold' : 'font-normal',
+              }]);
+            }}
+          >
+            <Bold className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={element.computedStyles.textDecoration === 'underline' ? 'secondary' : 'outline'}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => {
+              const newDecoration = element.computedStyles.textDecoration === 'underline' ? 'none' : 'underline';
+              addPendingChange(element.id, [{
+                property: 'textDecoration',
+                oldValue: element.computedStyles.textDecoration || 'none',
+                newValue: newDecoration,
+                useTailwind: true,
+                tailwindClass: newDecoration === 'underline' ? 'underline' : 'no-underline',
+              }]);
+            }}
+          >
+            <Underline className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Color Picker Component
+interface ColorPickerProps {
+  value: string;
+  onChange: (color: string) => void;
+}
+
+function ColorPicker({ value, onChange }: ColorPickerProps) {
+  const presetColors = [
+    '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308',
+    '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899',
+  ];
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full h-8 justify-start gap-2">
+          <div
+            className="w-4 h-4 rounded border"
+            style={{ backgroundColor: value }}
+          />
+          <span className="text-xs font-mono truncate">{value}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60">
+        <div className="space-y-3">
+          <div className="grid grid-cols-5 gap-2">
+            {presetColors.map(color => (
+              <button
+                key={color}
+                className={cn(
+                  'w-8 h-8 rounded border-2 transition-all',
+                  value === color ? 'border-blue-500 scale-110' : 'border-transparent hover:scale-105'
+                )}
+                style={{ backgroundColor: color }}
+                onClick={() => onChange(color)}
+              />
+            ))}
+          </div>
+          <Input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-8 p-1"
+          />
+          <Input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="#000000"
+            className="h-8 font-mono text-xs"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Spacing Input Component
+interface SpacingInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  label?: React.ReactNode;
+}
+
+function SpacingInput({ value, onChange, label }: SpacingInputProps) {
+  const numericValue = parseInt(value.replace('px', ''), 10) || 0;
+
+  return (
+    <div className="relative">
+      {label && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-muted-foreground">
+          {label}
+        </div>
+      )}
+      <Input
+        type="number"
+        className="h-8 w-16 text-center text-xs"
+        value={numericValue}
+        onChange={(e) => onChange(`${e.target.value}px`)}
+        min={0}
+        step={4}
+      />
+    </div>
+  );
+}
+
+export default VisualEditorSidebar;

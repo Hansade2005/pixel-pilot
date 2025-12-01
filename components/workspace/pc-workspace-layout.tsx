@@ -27,6 +27,7 @@ import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
+import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -90,6 +91,88 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
+
+  // Visual Editor save handler - applies style changes to source files
+  const handleVisualEditorSave = async (changes: { 
+    elementId: string; 
+    changes: StyleChange[]; 
+    sourceFile?: string 
+  }): Promise<boolean> => {
+    try {
+      if (!selectedProject || !changes.sourceFile) {
+        console.warn('[VisualEditor] Cannot save: no project or source file')
+        return false
+      }
+
+      // Get the source file from storage
+      const file = await storageManager.getFile(selectedProject.id, changes.sourceFile)
+      if (!file) {
+        console.warn('[VisualEditor] Source file not found:', changes.sourceFile)
+        toast({
+          title: 'File not found',
+          description: `Could not find ${changes.sourceFile}`,
+          variant: 'destructive',
+        })
+        return false
+      }
+
+      // Generate the updated code
+      const result = generateFileUpdate(
+        file.content,
+        changes.elementId,
+        changes.changes,
+        changes.sourceFile
+      )
+
+      if (!result.success) {
+        console.error('[VisualEditor] Failed to update code:', result.error)
+        toast({
+          title: 'Update failed',
+          description: result.error || 'Failed to apply style changes',
+          variant: 'destructive',
+        })
+        return false
+      }
+
+      // Save the updated code to storage
+      await storageManager.updateFile(selectedProject.id, changes.sourceFile, {
+        content: result.updatedCode,
+        updatedAt: new Date().toISOString(),
+      })
+
+      // Trigger file explorer refresh
+      setFileExplorerKey(prev => prev + 1)
+      
+      // Dispatch files-changed event to notify other components
+      window.dispatchEvent(new CustomEvent('files-changed', {
+        detail: { 
+          projectId: selectedProject.id,
+          action: 'visual-edit',
+          path: changes.sourceFile,
+        }
+      }))
+
+      // Trigger auto backup
+      triggerAutoBackup(`Visual editor updated: ${changes.sourceFile}`)
+
+      toast({
+        title: 'Styles applied',
+        description: `Updated ${changes.changes.length} style(s) in ${changes.sourceFile}`,
+      })
+
+      console.log('[VisualEditor] Successfully saved changes to:', changes.sourceFile)
+      return true
+    } catch (error) {
+      console.error('[VisualEditor] Error saving changes:', error)
+      toast({
+        title: 'Save failed',
+        description: 'An error occurred while saving changes',
+        variant: 'destructive',
+      })
+      return false
+    }
+  }
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
@@ -1070,6 +1153,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         previewViewMode={previewViewMode}
                         syncedUrl={syncedPreview.url || customUrl}
                         onUrlChange={setCustomUrl}
+                        onVisualEditorSave={handleVisualEditorSave}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */

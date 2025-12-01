@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,9 @@ import {
   Package,
   Trash2,
   Copy,
-  Database
+  Database,
+  Edit3,
+  Wand2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
@@ -38,6 +40,11 @@ import {
   DEVICE_PRESETS
 } from "@/components/ai-elements/web-preview";
 import { DatabaseTab } from "./database-tab";
+import { 
+  VisualEditorWrapper,
+  VisualEditorToggle,
+} from "./visual-editor-wrapper";
+import type { StyleChange } from "@/lib/visual-editor";
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -95,6 +102,7 @@ interface CodePreviewPanelProps {
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
+  onVisualEditorSave?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string }) => Promise<boolean>;
 }
 
 export interface CodePreviewPanelRef {
@@ -104,6 +112,8 @@ export interface CodePreviewPanelRef {
   refreshPreview: () => void;
   preview: PreviewState;
   isStackBlitzLoading: boolean;
+  toggleVisualEditor: (enabled: boolean) => void;
+  isVisualEditorEnabled: boolean;
 }
 
 interface PreviewState {
@@ -114,7 +124,7 @@ interface PreviewState {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -146,6 +156,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [processLogs, setProcessLogs] = useState<string[]>([])
   const processLogsRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  
+  // Visual Editor state
+  const [isVisualEditorEnabled, setIsVisualEditorEnabled] = useState(false)
+  const previewIframeRef = useRef<HTMLIFrameElement>(null)
 
   // Dispatch preview state changes to parent component
   useEffect(() => {
@@ -163,8 +177,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     openStackBlitz,
     refreshPreview,
     preview,
-    isStackBlitzLoading: isStackBlitzOpen
-  }), [preview, isStackBlitzOpen])
+    isStackBlitzLoading: isStackBlitzOpen,
+    toggleVisualEditor: setIsVisualEditorEnabled,
+    isVisualEditorEnabled,
+  }), [preview, isStackBlitzOpen, isVisualEditorEnabled])
 
   // Unified console logging function - combines all log types
   const addConsoleLog = (message: string, type: 'terminal' | 'browser' | 'process' | 'server' = 'terminal') => {
@@ -1505,6 +1521,12 @@ export default function TodoApp() {
             </div>
           </ScrollArea>
         ) : activeTab === "preview" ? (
+          <VisualEditorWrapper
+            isEnabled={isVisualEditorEnabled}
+            onToggle={setIsVisualEditorEnabled}
+            onSaveChanges={onVisualEditorSave}
+            className="h-full"
+          >
           <WebPreview
             className="h-full"
             defaultUrl={syncedUrl || preview.url || ""}
@@ -1539,6 +1561,13 @@ export default function TodoApp() {
               </WebPreviewNavigationButton>
 
               <div className="flex-1" />
+              
+              {/* Visual Editor Toggle */}
+              <VisualEditorToggle
+                isEnabled={isVisualEditorEnabled}
+                onToggle={setIsVisualEditorEnabled}
+              />
+              
               <WebPreviewDeviceSelector />
 
               <WebPreviewNavigationButton
@@ -1641,6 +1670,7 @@ export default function TodoApp() {
               })}
             />
           </WebPreview>
+        </VisualEditorWrapper>
         ) : activeTab === "database" ? (
           <DatabaseTab workspaceId={project?.id || ""} />
         ) : null}
