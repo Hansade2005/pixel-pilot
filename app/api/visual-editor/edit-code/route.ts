@@ -38,10 +38,11 @@ export async function POST(request: Request) {
 
 **CRITICAL INSTRUCTIONS:**
 1. You will receive the COMPLETE file content below
-2. Apply the requested changes ONLY to line ${targetLine}
-3. Return the COMPLETE updated file with ALL lines
-4. DO NOT add explanations, markdown, or code fences
-5. Return ONLY the updated code - nothing else
+2. Apply ALL the requested changes to line ${targetLine} - DO NOT skip any
+3. If there are multiple changes, apply them ALL to the SAME line/element
+4. Return the COMPLETE updated file with ALL lines unchanged except line ${targetLine}
+5. DO NOT add explanations, markdown, or code fences
+6. Return ONLY the updated code - nothing else
 
 **UNDERSTANDING THE CHANGES:**
 - "REPLACE TEXT \"X\" WITH \"Y\"" → Find text X inside JSX element and replace with Y
@@ -50,10 +51,25 @@ export async function POST(request: Request) {
   Example: <h1>Old Text</h1> → <h1>X</h1>
 - "UPDATE INLINE STYLE X to: Y" → Modify the style={{X: ...}} property to Y
   Example: style={{color: 'red'}} → style={{color: Y}}
-- "Add Tailwind class: X" → Add X to the className attribute
+  IMPORTANT: When updating multiple styles, keep all existing styles and only change the specified ones
+  Example: style={{color: 'red', fontSize: '16px'}} + "UPDATE INLINE STYLE color to: blue" 
+  → style={{color: 'blue', fontSize: '16px'}}
+- "Add Tailwind class: X" → Add X to the className attribute (keep existing classes)
   Example: className="btn" → className="btn X"
 - "UPDATE X to: Y" → Change attribute X to value Y
   Example: href="old" → href="Y"
+
+**MULTIPLE CHANGES EXAMPLE:**
+If you see:
+"APPLY ALL 3 CHANGES BELOW:
+1. UPDATE INLINE STYLE color to: #8b5cf6
+2. UPDATE INLINE STYLE fontSize to: 24px
+3. REPLACE TEXT \"Hello\" WITH \"Welcome\""
+
+And the line is: <h1 style={{color: 'red', fontSize: '16px'}}>Hello World</h1>
+
+You MUST apply ALL 3 changes to produce:
+<h1 style={{color: '#8b5cf6', fontSize: '24px'}}>Welcome World</h1>
 
 **File:** ${sourceFile}
 **Element ID:** ${elementId}

@@ -121,7 +121,7 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
   return (
     <div
       className={cn(
-        'w-80 bg-background border-l flex flex-col h-full',
+        'fixed left-0 top-0 z-50 w-80 h-screen bg-background border-r shadow-lg flex flex-col',
         className
       )}
     >

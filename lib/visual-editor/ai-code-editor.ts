@@ -324,7 +324,7 @@ export async function generateAICodeEdit(
     console.log('[AI Code Editor] Original text extracted:', originalText);
     
     // Generate edit intent with explicit instructions
-    const intent = changes.map(change => {
+    const intentLines = changes.map((change, index) => {
       const parts: string[] = [];
       
       if (change.tailwindClass) {
@@ -350,8 +350,13 @@ export async function generateAICodeEdit(
         }
       }
       
-      return parts.join('; ');
-    }).filter(Boolean).join('\n');
+      return parts.length > 0 ? `${index + 1}. ${parts.join('; ')}` : null;
+    }).filter(Boolean);
+    
+    // Add header for multiple changes
+    const intent = changes.length > 1
+      ? `APPLY ALL ${changes.length} CHANGES BELOW TO THE SAME ELEMENT:\n${intentLines.join('\n')}`
+      : intentLines.join('\n');
     
     console.log('[AI Code Editor] Intent:', intent);
     

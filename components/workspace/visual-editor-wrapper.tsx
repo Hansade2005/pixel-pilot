@@ -136,16 +136,16 @@ function VisualEditorInner({
   }, [state.isEnabled, isIframeReady, sendToIframe]);
 
   return (
-    <div className={cn('relative h-full flex', className)}>
+    <div className={cn('relative h-full w-full', className)}>
       {/* Main content area */}
-      <div className="flex-1 relative">
+      <div className="h-full w-full relative">
         {children}
         
         {/* Visual editor overlay */}
         <VisualEditorOverlay iframeRef={activeIframeRef} />
       </div>
       
-      {/* Sidebar */}
+      {/* Sidebar - positioned as fixed overlay on left side */}
       {state.isEnabled && (
         <VisualEditorSidebar
           onSave={async () => {
