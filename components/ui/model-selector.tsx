@@ -167,7 +167,7 @@ export function ModelSelector({
             </div>
           </SelectTrigger>
 
-          <SelectContent align="start" className="w-[260px] bg-popover text-popover-foreground border">
+          <SelectContent align="start" className="w-[260px] bg-popover text-popover-foreground border z-[100]">
             {Object.entries(modelsByProvider).map(([provider, models]) => (
               <div key={provider} className="py-1">
                 <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -217,7 +217,7 @@ export function ModelSelector({
           </div>
         </SelectTrigger>
 
-        <SelectContent className="w-[420px]">
+        <SelectContent className="w-[420px] z-[100]">
           {Object.entries(modelsByProvider).map(([provider, models]) => (
             <div key={provider} className="py-2">
               <div className="px-3 py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide border-b">
