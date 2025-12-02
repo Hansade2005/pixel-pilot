@@ -620,37 +620,61 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       setIsImportingGitlab(true)
       toast.loading('Importing GitLab repository...', { id: 'gitlab-import' })
 
-      // Import the repository
-      const response = await fetch('/api/gitlab/import-repo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          repoUrl: gitlabRepoUrl.trim(),
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to import repository')
+      // Parse GitLab URL to extract owner and repo
+      const urlMatch = gitlabRepoUrl.match(/(?:https?:\/\/)?([^\/]+)\/([^\/]+)\/([^\/]+)(?:\/|$)/i)
+      if (!urlMatch) {
+        throw new Error('Invalid GitLab repository URL')
       }
 
-      // Get metadata from headers
-      const repoName = response.headers.get('X-Repo-Name') || ''
-      const repoOwner = response.headers.get('X-Owner') || ''
-      const domain = response.headers.get('X-Domain') || ''
-      const branch = response.headers.get('X-Branch') || 'main'
-      
+      const [, domain, owner, repo] = urlMatch
+      const cleanRepo = repo.replace(/\.git$/, '') // Remove .git suffix if present
+
+      console.log(`Importing GitLab repo: ${domain}/${owner}/${cleanRepo}`)
+
+      // GitLab uses different URL structure for downloads - try main branch first
+      const baseUrl = domain.includes('gitlab.com') ? 'https://gitlab.com' : `https://${domain}`
+      const zipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/main/${cleanRepo}-main.zip`
+      console.log(`Downloading from: ${zipUrl}`)
+
+      // Download directly in browser
+      let response = await fetch(zipUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/zip, application/octet-stream, */*'
+        }
+      })
+      let branch = 'main'
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Try master branch if main doesn't exist
+          const masterZipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/master/${cleanRepo}-master.zip`
+          console.log(`Main branch not found, trying master: ${masterZipUrl}`)
+          response = await fetch(masterZipUrl, {
+            mode: 'cors',
+            headers: {
+              'Accept': 'application/zip, application/octet-stream, */*'
+            }
+          })
+          branch = 'master'
+
+          if (!response.ok) {
+            throw new Error('Repository not found or not accessible. Make sure it\'s a public repository.')
+          }
+        } else {
+          throw new Error('Failed to download repository. Make sure it\'s a public repository.')
+        }
+      }
+
       // Get binary data and convert to base64 for processing
       const arrayBuffer = await response.arrayBuffer()
       const zipData = Buffer.from(arrayBuffer).toString('base64')
       
-      console.log('✅ GitLab repo imported:', { repoName, repoOwner, domain, branch, size: arrayBuffer.byteLength })
+      console.log('✅ GitLab repo downloaded:', { repoName: cleanRepo, repoOwner: owner, domain, branch, size: arrayBuffer.byteLength })
 
       // Create project with repo details
-      const projectName = repoName
-      const projectDescription = `Imported from GitLab: ${domain}/${repoOwner}/${repoName}`
+      const projectName = cleanRepo
+      const projectDescription = `Imported from GitLab: ${domain}/${owner}/${cleanRepo}`
 
       // Generate unique slug
       const { storageManager } = await import('@/lib/storage-manager')
@@ -686,7 +710,7 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       })
 
       // Extract and apply GitLab files
-      await applyGithubFiles(workspace.id, zipData, repoName)
+      await applyGithubFiles(workspace.id, zipData, cleanRepo)
 
       // Create initial checkpoint
       try {
