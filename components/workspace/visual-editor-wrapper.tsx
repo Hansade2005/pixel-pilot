@@ -151,15 +151,144 @@ function VisualEditorInner({
           onSave={async () => {
             if (!onSaveChanges) return;
             
-            // Save all pending changes
+            console.log('[Visual Editor Wrapper] Starting multi-element save');
+            console.log('[Visual Editor Wrapper] Total pending changes:', state.pendingChanges.size);
+            
+            // Group changes by file for batch processing
+            const fileGroups = new Map<string, Array<{
+              elementId: string;
+              changes: StyleChange[];
+              sourceLine?: number;
+            }>>();
+            
             for (const [elementId, changes] of state.pendingChanges) {
               const selection = state.selectedElements.find(s => s.elementId === elementId);
-              await onSaveChanges({
+              const sourceFile = selection?.element.sourceFile;
+              
+              if (!sourceFile) {
+                console.warn('[Visual Editor Wrapper] No source file for element:', elementId);
+                continue;
+              }
+              
+              if (!fileGroups.has(sourceFile)) {
+                fileGroups.set(sourceFile, []);
+              }
+              
+              fileGroups.get(sourceFile)!.push({
                 elementId,
                 changes,
-                sourceFile: selection?.element.sourceFile,
                 sourceLine: selection?.element.sourceLine,
               });
+            }
+            
+            console.log('[Visual Editor Wrapper] Grouped into', fileGroups.size, 'file(s)');
+            
+            // Process each file's changes
+            const results: Array<{ file: string; success: boolean; error?: string }> = [];
+            
+            for (const [sourceFile, elements] of fileGroups) {
+              console.log(`[Visual Editor Wrapper] Processing ${elements.length} element(s) in ${sourceFile}`);
+              
+              // Check if we can use batch editing (multiple elements in same file)
+              if (elements.length > 1) {
+                console.log(`[Visual Editor Wrapper] Using BATCH EDIT for ${elements.length} elements`);
+                
+                try {
+                  const success = await onSaveChanges({
+                    elementId: '__BATCH__', // Special marker for batch
+                    changes: [], // Batch handler will handle this differently
+                    sourceFile,
+                    sourceLine: 0,
+                    batchElements: elements, // Pass all elements for batch processing
+                  } as any);
+                  
+                  results.push({
+                    file: sourceFile,
+                    success,
+                    error: success ? undefined : 'Batch edit failed',
+                  });
+                  
+                  if (success) {
+                    console.log(`[Visual Editor Wrapper] ✓ Batch saved ${elements.length} elements`);
+                  }
+                  
+                  continue; // Skip sequential processing
+                } catch (error) {
+                  console.error('[Visual Editor Wrapper] Batch edit failed, falling back to sequential:', error);
+                  // Fall through to sequential processing
+                }
+              }
+              
+              // Sequential processing for single element or batch fallback
+              console.log(`[Visual Editor Wrapper] Using SEQUENTIAL EDIT for ${elements.length} element(s)`);
+              
+              // Sort elements by line number (bottom to top) to avoid line shifts
+              const sortedElements = elements.sort((a, b) => 
+                (b.sourceLine || 0) - (a.sourceLine || 0)
+              );
+              
+              // Apply changes sequentially for same file (to avoid conflicts)
+              let fileSuccess = true;
+              let fileError: string | undefined;
+              
+              for (const element of sortedElements) {
+                try {
+                  const success = await onSaveChanges({
+                    elementId: element.elementId,
+                    changes: element.changes,
+                    sourceFile,
+                    sourceLine: element.sourceLine,
+                  });
+                  
+                  if (!success) {
+                    fileSuccess = false;
+                    fileError = `Failed to apply changes to element ${element.elementId}`;
+                    console.error('[Visual Editor Wrapper]', fileError);
+                    break; // Stop processing this file on error
+                  }
+                  
+                  console.log(`[Visual Editor Wrapper] ✓ Saved element ${element.elementId}`);
+                } catch (error) {
+                  fileSuccess = false;
+                  fileError = error instanceof Error ? error.message : 'Unknown error';
+                  console.error('[Visual Editor Wrapper] Error saving element:', error);
+                  break;
+                }
+              }
+              
+              results.push({
+                file: sourceFile,
+                success: fileSuccess,
+                error: fileError,
+              });
+            }
+            
+            // Report results
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+            
+            console.log(`[Visual Editor Wrapper] Completed: ${successCount} success, ${failCount} failed`);
+            
+            // Show toast notification
+            if (failCount === 0 && successCount > 0) {
+              // All succeeded
+              const totalElements = Array.from(state.pendingChanges.keys()).length;
+              const notification = successCount === 1
+                ? `Updated 1 file successfully`
+                : `Updated ${successCount} file(s) with ${totalElements} element change(s)`;
+              
+              // Use a success toast (you'll need to import toast from your UI lib)
+              console.log('✅ [Visual Editor Wrapper]', notification);
+            } else if (failCount > 0) {
+              // Some failed
+              const failedFiles = results.filter(r => !r.success).map(r => r.file);
+              console.error('❌ [Visual Editor Wrapper] Failed files:', failedFiles);
+              
+              const errorMsg = successCount > 0
+                ? `${successCount} file(s) updated, but ${failCount} failed`
+                : `Failed to update ${failCount} file(s)`;
+              
+              console.error('❌ [Visual Editor Wrapper]', errorMsg);
             }
           }}
         />
