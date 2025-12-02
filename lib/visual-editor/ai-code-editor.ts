@@ -312,23 +312,18 @@ export async function generateAICodeEdit(
     console.log('[AI Code Editor] Starting AI-powered edit via API');
     console.log('[AI Code Editor] Changes:', changes);
     
-    // Extract code context around target line
-    const { context, startLine, endLine } = extractCodeContext(
-      originalCode,
-      sourceLine - 1, // Convert to 0-indexed
-      15 // Get 15 lines before and after for better context
-    );
+    // Extract the target line to get original text content
+    const allLines = originalCode.split('\n');
+    const targetLineContent = allLines[sourceLine - 1] || '';
     
-    console.log('[AI Code Editor] Context extracted:', { startLine, endLine });
+    // Extract text between JSX tags (e.g., <p>Hello World</p> -> "Hello World")
+    const textMatch = targetLineContent.match(/>([^<]+)</); // Match text between > and <
+    const originalText = textMatch ? textMatch[1].trim() : '';
     
-    // Build the context object for API
-    const contextLines = context.split('\n');
-    const targetLineIndex = sourceLine - startLine - 1;
-    const beforeLines = contextLines.slice(0, targetLineIndex);
-    const targetLine = contextLines[targetLineIndex] || '';
-    const afterLines = contextLines.slice(targetLineIndex + 1);
+    console.log('[AI Code Editor] Target line content:', targetLineContent);
+    console.log('[AI Code Editor] Original text extracted:', originalText);
     
-    // Generate edit intent
+    // Generate edit intent with explicit instructions
     const intent = changes.map(change => {
       const parts: string[] = [];
       
@@ -337,7 +332,22 @@ export async function generateAICodeEdit(
       }
       
       if (change.newValue && change.property) {
-        parts.push(`Set ${String(change.property)}: ${change.newValue}`);
+        const prop = String(change.property);
+        
+        // Distinguish between text content and styling
+        if (prop === 'textContent' || prop === 'innerText' || prop === 'children') {
+          // Include original text so AI knows exactly what to replace
+          if (originalText) {
+            parts.push(`REPLACE TEXT "${originalText}" WITH "${change.newValue}"`);
+          } else {
+            parts.push(`CHANGE TEXT CONTENT to: "${change.newValue}"`);
+          }
+        } else if (prop.startsWith('style.')) {
+          const styleProp = prop.replace('style.', '');
+          parts.push(`UPDATE INLINE STYLE ${styleProp} to: ${change.newValue}`);
+        } else {
+          parts.push(`UPDATE ${prop} to: ${change.newValue}`);
+        }
       }
       
       return parts.join('; ');
@@ -353,6 +363,7 @@ export async function generateAICodeEdit(
       body: JSON.stringify({
         fullCode: originalCode,  // Send complete file
         targetLine: sourceLine,
+        originalText,  // Original text content to replace
         intent,
         elementId,
         sourceFile,
