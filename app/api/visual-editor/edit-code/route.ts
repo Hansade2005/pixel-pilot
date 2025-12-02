@@ -4,12 +4,8 @@ import { getModel } from '@/lib/ai-providers'
 
 // Input validation schema
 const editCodeSchema = z.object({
-  context: z.object({
-    beforeLines: z.array(z.string()),
-    targetLine: z.string(),
-    afterLines: z.array(z.string()),
-    lineNumber: z.number(),
-  }),
+  fullCode: z.string().min(1),
+  targetLine: z.number(),
   intent: z.string().min(1).max(2000),
   elementId: z.string(),
   sourceFile: z.string(),
@@ -19,64 +15,67 @@ export async function POST(request: Request) {
   try {
     // Parse and validate request body
     const body = await request.json()
-    const { context, intent, elementId, sourceFile } = editCodeSchema.parse(body)
+    const { fullCode, targetLine, intent, elementId, sourceFile } = editCodeSchema.parse(body)
 
     console.log('🎨 [Visual Editor API] Editing code for:', sourceFile)
     console.log('🎨 [Visual Editor API] Element ID:', elementId)
+    console.log('🎨 [Visual Editor API] Target line:', targetLine)
     console.log('🎨 [Visual Editor API] Intent:', intent)
+    console.log('🎨 [Visual Editor API] File size:', fullCode.length, 'chars')
 
-    // Use Codestral for precise code editing
-    const codestralModel = getModel('grok-4-1-fast-non-reasoning')
+    // Use Grok with 2M token context window
+    const model = getModel('grok-4-1-fast-non-reasoning')
    
     // Build the editing prompt
     const editPrompt = `You are an expert code editor. Your task is to apply styling changes to React/JSX code with surgical precision.
 
-**IMPORTANT RULES:**
-1. Return ONLY the edited code section - no explanations, no markdown, no code fences
-2. Maintain ALL existing code structure, props, and logic
-3. Apply the requested changes precisely
-4. Preserve whitespace and indentation exactly as in the original
-5. DO NOT add comments or explanations in the code
-6. DO NOT wrap the response in markdown code blocks
+**CRITICAL INSTRUCTIONS:**
+1. You will receive the COMPLETE file content below
+2. Apply the requested changes ONLY to line ${targetLine}
+3. Return the COMPLETE updated file with ALL lines
+4. DO NOT add explanations, markdown, or code fences
+5. Return ONLY the updated code - nothing else
 
 **File:** ${sourceFile}
 **Element ID:** ${elementId}
-**Line Number:** ${context.lineNumber}
-
-**Code Context:**
-\`\`\`
-${context.beforeLines.join('\n')}
-${context.targetLine} ← TARGET LINE
-${context.afterLines.join('\n')}
-\`\`\`
+**Target Line:** ${targetLine}
 
 **Changes to Apply:**
 ${intent}
 
-**Instructions:**
-Apply the requested changes to the TARGET LINE and return the complete edited section (all lines shown above). The output should be valid ${sourceFile.endsWith('.tsx') || sourceFile.endsWith('.jsx') ? 'JSX' : sourceFile.endsWith('.ts') ? 'TypeScript' : 'JavaScript'} code that can directly replace the original section.
+**Complete File Content:**
+\`\`\`
+${fullCode}
+\`\`\`
 
-Return the edited code now:`
+**Instructions:**
+Apply the changes to line ${targetLine} and return the complete updated file. Maintain all formatting, indentation, and structure. Return the full file content now:`
 
     // Generate the edited code with low temperature for precision
     const result = await generateText({
-      model: codestralModel,
+      model: model,
       temperature: 0.1, // Very low temperature for deterministic edits
       prompt: editPrompt,
     })
 
-    const editedCode = result.text.trim()
+    let updatedCode = result.text.trim()
+    
+    // Remove markdown code fences if present
+    updatedCode = updatedCode.replace(/^```(?:tsx|jsx|typescript|javascript)?\s*\n/i, '');
+    updatedCode = updatedCode.replace(/\n```\s*$/i, '');
+    updatedCode = updatedCode.trim();
 
     console.log('✅ [Visual Editor API] Code edited successfully')
-    console.log('📝 [Visual Editor API] Output length:', editedCode.length, 'chars')
+    console.log('📝 [Visual Editor API] Original size:', fullCode.length, 'chars')
+    console.log('📝 [Visual Editor API] Updated size:', updatedCode.length, 'chars')
 
     return Response.json({
       success: true,
-      editedCode,
+      updatedCode,
       metadata: {
         elementId,
         sourceFile,
-        lineNumber: context.lineNumber,
+        targetLine,
         intent,
       },
     })

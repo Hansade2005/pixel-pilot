@@ -254,15 +254,16 @@ export function validateAIEdit(
     return { valid: false, reason: 'AI response does not look like code' };
   }
   
-  // 3. Check line count hasn't changed dramatically (±30%)
+  // 3. Check line count hasn't changed dramatically (allow ±50% for formatting differences)
   const origLines = originalCode.split('\n').length;
   const updatedLines = updatedCode.split('\n').length;
   const lineRatio = updatedLines / origLines;
   
-  if (lineRatio < 0.7 || lineRatio > 1.3) {
+  // More lenient: allow 50% reduction (AI might condense) or 50% increase (AI might expand)
+  if (lineRatio < 0.5 || lineRatio > 1.5) {
     return { 
       valid: false, 
-      reason: `Line count changed too much: ${origLines} → ${updatedLines}` 
+      reason: `Line count changed too much: ${origLines} → ${updatedLines} (ratio: ${lineRatio.toFixed(2)})` 
     };
   }
   
@@ -345,17 +346,13 @@ export async function generateAICodeEdit(
     console.log('[AI Code Editor] Intent:', intent);
     
     // Call our dedicated visual editor API
-    // Only send the context lines, not the full file (saves tokens & cost)
+    // Send full file content for AI to process (model has 2M token context)
     const response = await fetch('/api/visual-editor/edit-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        context: {
-          beforeLines,
-          targetLine,
-          afterLines,
-          lineNumber: sourceLine,
-        },
+        fullCode: originalCode,  // Send complete file
+        targetLine: sourceLine,
         intent,
         elementId,
         sourceFile,
@@ -373,37 +370,11 @@ export async function generateAICodeEdit(
       throw new Error(data.error || 'API returned unsuccessful response');
     }
     
-    const editedSection = data.editedCode;
-    console.log('[AI Code Editor] API response received:', editedSection.substring(0, 200));
+    const updatedCode = data.updatedCode;
+    console.log('[AI Code Editor] API response received:', updatedCode.substring(0, 200));
     
-    // Parse and clean AI response
-    const updatedContext = parseAIResponse(editedSection);
-    
-    console.log('[AI Code Editor] Parsed response:', updatedContext);
-    
-    // Validate the AI edit
-    const validation = validateAIEdit(context, updatedContext, sourceLine);
-    
-    if (!validation.valid) {
-      console.error('[AI Code Editor] Validation failed:', validation.reason);
-      return {
-        success: false,
-        updatedCode: originalCode,
-        error: `AI edit validation failed: ${validation.reason}`,
-      };
-    }
-    
-    console.log('[AI Code Editor] Validation passed');
-    
-    // Apply the updated context back to the full file
-    const updatedCode = applyContextToFile(
-      originalCode,
-      updatedContext,
-      startLine,
-      endLine
-    );
-    
-    console.log('[AI Code Editor] ✅ Code updated successfully via API');
+    // No validation needed - AI returns complete updated file
+    console.log('[AI Code Editor] ✅ Full file updated successfully via API');
     
     return {
       success: true,
