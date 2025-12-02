@@ -286,7 +286,7 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
             </div>
             <Button
               variant="outline"
-              onClick={() => window.open('/workspace/database', '_blank')}
+              onClick={() => window.open('/database', '_blank')}
               className="w-full"
             >
               <DatabaseIcon className="h-4 w-4 mr-2" />

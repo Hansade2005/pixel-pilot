@@ -60,6 +60,26 @@ export default function LoginPage() {
     }
   }
 
+  const handleGoogleLogin = async () => {
+    const supabase = createClient()
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'openid email profile',
+          redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
+        },
+      })
+      if (error) throw error
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "An error occurred")
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
@@ -69,7 +89,7 @@ export default function LoginPage() {
                             <CardDescription>Sign in to your PiPilot account</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* GitHub OAuth Button */}
+            {/* OAuth Buttons */}
             <div className="space-y-4">
               <Button
                 type="button"
@@ -80,6 +100,22 @@ export default function LoginPage() {
               >
                 <Github className="h-4 w-4 mr-2" />
                 Continue with GitHub
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+              >
+                <img
+                  src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/google.svg"
+                  alt="Google"
+                  className="h-4 w-4 mr-2"
+                  style={{ filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)' }}
+                />
+                Continue with Google
               </Button>
 
               <div className="relative">
@@ -114,6 +150,11 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+              </div>
+              <div className="text-right">
+                <Link href="/auth/forgot-password" className="text-sm text-destructive hover:underline">
+                  Forgot password?
+                </Link>
               </div>
               {error && <div className="text-sm text-destructive">{error}</div>}
               <Button type="submit" className="w-full" disabled={isLoading}>
