@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     console.log('🎨 [Visual Editor API] Intent:', intent)
 
     // Use Codestral for precise code editing
-    const codestralModel = getModel('codestral-latest')
+    const codestralModel = getModel('grok-4-1-fast-non-reasoning')
    
     // Build the editing prompt
     const editPrompt = `You are an expert code editor. Your task is to apply styling changes to React/JSX code with surgical precision.

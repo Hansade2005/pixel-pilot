@@ -23,7 +23,7 @@ interface EditIntent {
 }
 
 /**
- * Extract code context around a specific line
+ * Extract code context around a specific line, ensuring complete JSX elements
  */
 export function extractCodeContext(
   code: string,
@@ -31,8 +31,81 @@ export function extractCodeContext(
   contextLines: number = 10
 ): { context: string; startLine: number; endLine: number } {
   const lines = code.split('\n');
-  const startLine = Math.max(0, targetLine - contextLines);
-  const endLine = Math.min(lines.length, targetLine + contextLines);
+  let startLine = Math.max(0, targetLine - contextLines);
+  let endLine = Math.min(lines.length, targetLine + contextLines + 1);
+  
+  // Expand backwards to ensure we start with a complete line/tag
+  // Look for opening tags or complete statements
+  while (startLine > 0) {
+    const line = lines[startLine].trim();
+    
+    // Good starting points:
+    // - Function/component declarations
+    // - Complete JSX opening tags at start of line
+    // - Import statements
+    // - Variable declarations
+    if (
+      line.startsWith('export ') ||
+      line.startsWith('function ') ||
+      line.startsWith('const ') ||
+      line.startsWith('let ') ||
+      line.startsWith('import ') ||
+      line.match(/^<\w+/) || // JSX tag at start
+      line === '' // Empty line is natural boundary
+    ) {
+      break;
+    }
+    
+    startLine--;
+    if (targetLine - startLine > contextLines + 10) break; // Don't go too far
+  }
+  
+  // Expand forwards to ensure we end with complete tags
+  // Track open/close tag balance
+  let tagBalance = 0;
+  let inTarget = false;
+  
+  for (let i = startLine; i < endLine && i < lines.length; i++) {
+    const line = lines[i];
+    
+    if (i === targetLine) {
+      inTarget = true;
+    }
+    
+    // Count opening tags (not self-closing)
+    const openTags = line.match(/<(\w+)(?![^>]*\/>)[^>]*>/g) || [];
+    tagBalance += openTags.length;
+    
+    // Count closing tags
+    const closeTags = line.match(/<\/\w+>/g) || [];
+    tagBalance -= closeTags.length;
+    
+    // Count self-closing tags (don't affect balance)
+    const selfClosing = line.match(/<\w+[^>]*\/>/g) || [];
+    
+    // After target line, if tags are balanced and we hit a natural boundary, stop
+    if (inTarget && i > targetLine && tagBalance === 0) {
+      const nextLine = lines[i + 1]?.trim() || '';
+      
+      // Natural stopping points
+      if (
+        nextLine === '' ||
+        nextLine === '}' ||
+        nextLine.startsWith('export ') ||
+        nextLine.startsWith('function ') ||
+        nextLine.startsWith('const ') ||
+        nextLine.startsWith('import ') ||
+        nextLine.startsWith('//') ||
+        i - targetLine > contextLines
+      ) {
+        endLine = i + 1;
+        break;
+      }
+    }
+  }
+  
+  // Ensure we don't extend too far
+  endLine = Math.min(endLine, targetLine + contextLines + 15);
   
   const context = lines.slice(startLine, endLine).join('\n');
   
