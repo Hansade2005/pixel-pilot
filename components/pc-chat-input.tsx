@@ -633,14 +633,18 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
 
       // GitLab uses different URL structure for downloads - try main branch first
       const baseUrl = domain.includes('gitlab.com') ? 'https://gitlab.com' : `https://${domain}`
-      const zipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/main/${cleanRepo}-main.zip`
+      const originalZipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/main/${cleanRepo}-main.zip`
+      
+      // Use CORS proxy to bypass GitLab CORS restrictions
+      const zipUrl = `https://proxy.cors.sh/${originalZipUrl}`
       console.log(`Downloading from: ${zipUrl}`)
 
-      // Download directly in browser
+      // Download via CORS proxy
       let response = await fetch(zipUrl, {
-        mode: 'cors',
         headers: {
-          'Accept': 'application/zip, application/octet-stream, */*'
+          'Accept': 'application/zip, application/octet-stream, */*',
+          'x-requested-with': 'XMLHttpRequest',
+          'Origin': window.location.origin
         }
       })
       let branch = 'main'
@@ -648,12 +652,14 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       if (!response.ok) {
         if (response.status === 404) {
           // Try master branch if main doesn't exist
-          const masterZipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/master/${cleanRepo}-master.zip`
+          const originalMasterZipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/master/${cleanRepo}-master.zip`
+          const masterZipUrl = `https://proxy.cors.sh/${originalMasterZipUrl}`
           console.log(`Main branch not found, trying master: ${masterZipUrl}`)
           response = await fetch(masterZipUrl, {
-            mode: 'cors',
             headers: {
-              'Accept': 'application/zip, application/octet-stream, */*'
+              'Accept': 'application/zip, application/octet-stream, */*',
+              'x-requested-with': 'XMLHttpRequest',
+              'Origin': window.location.origin
             }
           })
           branch = 'master'
