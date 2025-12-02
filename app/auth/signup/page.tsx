@@ -130,6 +130,9 @@ export default function SignupPage() {
                   style={{ filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)' }}
                 />
                 Continue with Google
+                <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded-full font-medium">
+                  New
+                </span>
               </Button>
 
               <div className="relative">
