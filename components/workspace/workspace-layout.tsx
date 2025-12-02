@@ -98,11 +98,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     changes: StyleChange[]; 
     sourceFile?: string;
     sourceLine?: number;
-    batchElements?: Array<{
-      elementId: string;
-      changes: StyleChange[];
-      sourceLine?: number;
-    }>;
   }): Promise<boolean> => {
     try {
       if (!selectedProject || !changes.sourceFile) {
@@ -122,49 +117,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         return false
       }
 
-      let result: { success: boolean; updatedCode: string; error?: string };
-
-      // Check if this is a batch edit
-      if (changes.elementId === '__BATCH__' && changes.batchElements && changes.batchElements.length > 1) {
-        console.log('[VisualEditor] Using BATCH editing for', changes.batchElements.length, 'elements');
-        
-        // Import batch editor
-        const { generateBatchFileUpdate } = await import('@/lib/visual-editor/batch-code-editor');
-        
-        // Generate batch update
-        result = await generateBatchFileUpdate(
-          file.content,
-          changes.batchElements,
-          changes.sourceFile
-        );
-        
-        if (result.success) {
-          toast({
-            title: 'Batch update successful',
-            description: `Updated ${changes.batchElements.length} elements in ${changes.sourceFile}`,
-          });
-        }
-      } else {
-        // Single element edit - use regular AI editing
-        console.log('[VisualEditor] Using SINGLE element editing');
-        
-        const { generateFileUpdate } = await import('@/lib/visual-editor');
-        
-        result = await generateFileUpdate(
-          file.content,
-          changes.elementId,
-          changes.changes,
-          changes.sourceFile,
-          changes.sourceLine
-        );
-        
-        if (result.success && changes.changes.length <= 3) {
-          toast({
-            title: 'Styles applied',
-            description: `Updated ${changes.changes.length} style(s) in ${changes.sourceFile}`,
-          });
-        }
-      }
+      // Generate the updated code using AI-powered editing
+      console.log('[VisualEditor] Generating code update with AI via API...');
+      
+      const result = await generateFileUpdate(
+        file.content,
+        changes.elementId,
+        changes.changes,
+        changes.sourceFile,
+        changes.sourceLine
+      );
 
       if (!result.success) {
         console.error('[VisualEditor] Failed to update code:', result.error)
@@ -196,6 +158,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       // Trigger auto backup
       triggerAutoBackup(`Visual editor updated: ${changes.sourceFile}`)
+
+      toast({
+        title: 'Styles applied',
+        description: `Updated ${changes.changes.length} style(s) in ${changes.sourceFile}`,
+      })
 
       console.log('[VisualEditor] Successfully saved changes to:', changes.sourceFile)
       return true
