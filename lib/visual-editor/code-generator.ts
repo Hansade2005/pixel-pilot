@@ -8,6 +8,13 @@ import {
   TAILWIND_FONT_SIZES,
   TAILWIND_BORDER_RADIUS,
 } from './types';
+import { generateAICodeEdit } from './ai-code-editor';
+
+// Configuration
+export const CODE_EDITOR_CONFIG = {
+  useAI: true, // Toggle between AI-powered (via /api/visual-editor/edit-code) and regex-based editing
+  // Note: The API route uses Codestral model via getModel('codestral-latest')
+};
 
 // CSS property to Tailwind class prefix mapping
 const TAILWIND_PREFIXES: Record<string, string> = {
@@ -487,8 +494,30 @@ export function generateFileUpdate(
   elementId: string,
   changes: StyleChange[],
   sourceFile?: string,
-  sourceLine?: number
-): CodeUpdateResult {
+  sourceLine?: number,
+  aiGenerateFunction?: (prompt: string) => Promise<string>
+): CodeUpdateResult | Promise<CodeUpdateResult> {
+  console.log('[generateFileUpdate] Config:', CODE_EDITOR_CONFIG);
+  console.log('[generateFileUpdate] Source line:', sourceLine, 'Source file:', sourceFile);
+  
+  // Use AI-powered editing if enabled (AI code editor calls API directly)
+  if (CODE_EDITOR_CONFIG.useAI && sourceLine && sourceFile) {
+    console.log('[generateFileUpdate] Using AI-powered editing via API');
+    
+    // Return the promise from AI editing (calls /api/visual-editor/edit-code)
+    return generateAICodeEdit(
+      originalCode,
+      elementId,
+      changes,
+      sourceFile,
+      sourceLine,
+      aiGenerateFunction
+    );
+  }
+  
+  console.log('[generateFileUpdate] Using regex-based editing fallback');
+  
+  // Fall back to regex-based editing (synchronous)
   // If we have source line info, use line-based approach
   if (sourceLine && sourceLine > 0) {
     return updateElementByLine(originalCode, sourceLine, changes);

@@ -117,14 +117,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         return false
       }
 
-      // Generate the updated code
-      const result = generateFileUpdate(
+      // Generate the updated code using AI-powered editing
+      console.log('[VisualEditor] Generating code update with AI via API...');
+      
+      const result = await generateFileUpdate(
         file.content,
         changes.elementId,
         changes.changes,
         changes.sourceFile,
         changes.sourceLine
-      )
+      );
 
       if (!result.success) {
         console.error('[VisualEditor] Failed to update code:', result.error)
