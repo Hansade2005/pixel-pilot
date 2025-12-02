@@ -636,15 +636,13 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       const originalZipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/main/${cleanRepo}-main.zip`
       
       // Use CORS proxy to bypass GitLab CORS restrictions
-      const zipUrl = `https://proxy.cors.sh/${originalZipUrl}`
+      const zipUrl = `https://corsproxy.io/?${encodeURIComponent(originalZipUrl)}`
       console.log(`Downloading from: ${zipUrl}`)
 
       // Download via CORS proxy
       let response = await fetch(zipUrl, {
         headers: {
-          'Accept': 'application/zip, application/octet-stream, */*',
-          'x-requested-with': 'XMLHttpRequest',
-          'Origin': window.location.origin
+          'Accept': 'application/zip, application/octet-stream, */*'
         }
       })
       let branch = 'main'
@@ -653,13 +651,11 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
         if (response.status === 404) {
           // Try master branch if main doesn't exist
           const originalMasterZipUrl = `${baseUrl}/${owner}/${cleanRepo}/-/archive/master/${cleanRepo}-master.zip`
-          const masterZipUrl = `https://proxy.cors.sh/${originalMasterZipUrl}`
+          const masterZipUrl = `https://corsproxy.io/?${encodeURIComponent(originalMasterZipUrl)}`
           console.log(`Main branch not found, trying master: ${masterZipUrl}`)
           response = await fetch(masterZipUrl, {
             headers: {
-              'Accept': 'application/zip, application/octet-stream, */*',
-              'x-requested-with': 'XMLHttpRequest',
-              'Origin': window.location.origin
+              'Accept': 'application/zip, application/octet-stream, */*'
             }
           })
           branch = 'master'
