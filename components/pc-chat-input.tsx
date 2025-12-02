@@ -526,13 +526,16 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
         throw new Error(error.error || 'Failed to import repository')
       }
 
-      const data = await response.json()
-      console.log('✅ GitHub repo imported:', data)
-
-      // Extract repo info
-      const repoName = data.repoName
-      const repoOwner = data.owner
-      const zipData = data.zipData
+      // Get metadata from headers
+      const repoName = response.headers.get('X-Repo-Name') || ''
+      const repoOwner = response.headers.get('X-Owner') || ''
+      const branch = response.headers.get('X-Branch') || 'main'
+      
+      // Get binary data and convert to base64 for processing
+      const arrayBuffer = await response.arrayBuffer()
+      const zipData = Buffer.from(arrayBuffer).toString('base64')
+      
+      console.log('✅ GitHub repo imported:', { repoName, repoOwner, branch, size: arrayBuffer.byteLength })
 
       // Create project with repo details
       const projectName = repoName
@@ -633,14 +636,17 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
         throw new Error(error.error || 'Failed to import repository')
       }
 
-      const data = await response.json()
-      console.log('✅ GitLab repo imported:', data)
-
-      // Extract repo info
-      const repoName = data.repoName
-      const repoOwner = data.owner
-      const domain = data.domain
-      const zipData = data.zipData
+      // Get metadata from headers
+      const repoName = response.headers.get('X-Repo-Name') || ''
+      const repoOwner = response.headers.get('X-Owner') || ''
+      const domain = response.headers.get('X-Domain') || ''
+      const branch = response.headers.get('X-Branch') || 'main'
+      
+      // Get binary data and convert to base64 for processing
+      const arrayBuffer = await response.arrayBuffer()
+      const zipData = Buffer.from(arrayBuffer).toString('base64')
+      
+      console.log('✅ GitLab repo imported:', { repoName, repoOwner, domain, branch, size: arrayBuffer.byteLength })
 
       // Create project with repo details
       const projectName = repoName
@@ -827,14 +833,15 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
               throw new Error('Failed to import GitHub repository')
             }
 
-            const importData = await importResponse.json()
+            // Get metadata from headers
+            const repoName = importResponse.headers.get('X-Repo-Name') || ''
+            
+            // Get binary data and convert to base64 for processing
+            const arrayBuffer = await importResponse.arrayBuffer()
+            const zipData = Buffer.from(arrayBuffer).toString('base64')
 
-            if (importData.success) {
-              await applyGithubFiles(workspace.id, importData.zipData, importData.repoName)
-              toast.success('GitHub repository imported!', { id: 'github-import' })
-            } else {
-              throw new Error(importData.error || 'Failed to import repository')
-            }
+            await applyGithubFiles(workspace.id, zipData, repoName)
+            toast.success('GitHub repository imported!', { id: 'github-import' })
           } catch (githubError) {
             console.error('GitHub import error:', githubError)
             toast.error('Failed to import GitHub repository', { id: 'github-import' })
