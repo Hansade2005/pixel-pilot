@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Github } from "lucide-react"
+import { Github, ArrowLeft } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -84,9 +84,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <Card>
-          <CardHeader className="text-center">
+          <CardHeader className="relative">
+            <div className="absolute top-0 right-0">
+              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                <ArrowLeft className="h-3 w-3" />
+                Home
+              </Link>
+            </div>
             <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-                            <CardDescription>Sign in to your PiPilot account</CardDescription>
+            <CardDescription>Sign in to your PiPilot account</CardDescription>
           </CardHeader>
           <CardContent>
             {/* OAuth Buttons */}

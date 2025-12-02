@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Mail } from "lucide-react"
+import { Mail, ArrowLeft } from "lucide-react"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -50,7 +50,13 @@ export default function ForgotPasswordPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="w-full max-w-md">
           <Card>
-            <CardHeader className="text-center">
+            <CardHeader className="relative text-center">
+              <div className="absolute top-0 right-0">
+                <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <ArrowLeft className="h-3 w-3" />
+                  Home
+                </Link>
+              </div>
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
                 <Mail className="h-6 w-6 text-accent" />
               </div>
@@ -77,7 +83,13 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <Card>
-          <CardHeader className="text-center">
+          <CardHeader className="relative text-center">
+            <div className="absolute top-0 right-0">
+              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                <ArrowLeft className="h-3 w-3" />
+                Home
+              </Link>
+            </div>
             <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
             <CardDescription>Enter your email to reset your password</CardDescription>
           </CardHeader>

@@ -12,7 +12,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { isEmailValidForSignup } from "@/lib/email-validation"
-import {Github} from "lucide-react"
+import {Github, ArrowLeft} from "lucide-react"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -98,9 +98,15 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <Card>
-          <CardHeader className="text-center">
+          <CardHeader className="relative">
+            <div className="absolute top-0 right-0">
+              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                <ArrowLeft className="h-3 w-3" />
+                Home
+              </Link>
+            </div>
             <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-                            <CardDescription>Join PiPilot and start creating</CardDescription>
+            <CardDescription>Join PiPilot and start creating</CardDescription>
           </CardHeader>
           <CardContent>
             {/* OAuth Buttons */}
