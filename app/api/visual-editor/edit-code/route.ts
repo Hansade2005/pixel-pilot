@@ -4,7 +4,6 @@ import { getModel } from '@/lib/ai-providers'
 
 // Input validation schema
 const editCodeSchema = z.object({
-  code: z.string().min(1),
   context: z.object({
     beforeLines: z.array(z.string()),
     targetLine: z.string(),
@@ -20,7 +19,7 @@ export async function POST(request: Request) {
   try {
     // Parse and validate request body
     const body = await request.json()
-    const { code, context, intent, elementId, sourceFile } = editCodeSchema.parse(body)
+    const { context, intent, elementId, sourceFile } = editCodeSchema.parse(body)
 
     console.log('🎨 [Visual Editor API] Editing code for:', sourceFile)
     console.log('🎨 [Visual Editor API] Element ID:', elementId)

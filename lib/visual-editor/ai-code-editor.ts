@@ -272,11 +272,11 @@ export async function generateAICodeEdit(
     console.log('[AI Code Editor] Intent:', intent);
     
     // Call our dedicated visual editor API
+    // Only send the context lines, not the full file (saves tokens & cost)
     const response = await fetch('/api/visual-editor/edit-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        code: originalCode,
         context: {
           beforeLines,
           targetLine,
