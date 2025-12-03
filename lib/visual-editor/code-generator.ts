@@ -12,8 +12,9 @@ import { generateAICodeEdit } from './ai-code-editor';
 
 // Configuration
 export const CODE_EDITOR_CONFIG = {
-  useAI: true, // Toggle between AI-powered (via /api/visual-editor/edit-code) and regex-based editing
-  // Note: The API route uses Codestral model via getModel('codestral-latest')
+  useAI: false, // Changed: Use direct search-replace instead of AI
+  useClientReplaceTool: true, // New: Use client_replace_string_in_file tool
+  // Note: Direct search-replace is faster and more reliable than AI regeneration
 };
 
 // CSS property to Tailwind class prefix mapping
@@ -488,7 +489,7 @@ function updateElementByTag(
   };
 }
 
-// Generate full file update with proper formatting
+// Generate full file update with direct search-replace operations
 export function generateFileUpdate(
   originalCode: string,
   elementId: string,
@@ -499,11 +500,25 @@ export function generateFileUpdate(
 ): CodeUpdateResult | Promise<CodeUpdateResult> {
   console.log('[generateFileUpdate] Config:', CODE_EDITOR_CONFIG);
   console.log('[generateFileUpdate] Source line:', sourceLine, 'Source file:', sourceFile);
-  
-  // Use AI-powered editing if enabled (AI code editor calls API directly)
+
+  // Use direct search-replace approach (much faster and more reliable)
+  if (CODE_EDITOR_CONFIG.useClientReplaceTool && sourceLine && sourceFile) {
+    console.log('[generateFileUpdate] Using direct search-replace approach');
+
+    // Return the promise from search-replace editing
+    return generateSearchReplaceEdit(
+      originalCode,
+      elementId,
+      changes,
+      sourceFile,
+      sourceLine
+    );
+  }
+
+  // Fallback to AI-powered editing if enabled
   if (CODE_EDITOR_CONFIG.useAI && sourceLine && sourceFile) {
     console.log('[generateFileUpdate] Using AI-powered editing via API');
-    
+
     // Return the promise from AI editing (calls /api/visual-editor/edit-code)
     return generateAICodeEdit(
       originalCode,
@@ -514,22 +529,10 @@ export function generateFileUpdate(
       aiGenerateFunction
     );
   }
-  
+
   console.log('[generateFileUpdate] Using regex-based editing fallback');
-  
-  // Fall back to regex-based editing (synchronous)
-  // If we have source line info, use line-based approach
-  if (sourceLine && sourceLine > 0) {
-    return updateElementByLine(originalCode, sourceLine, changes);
-  }
 
-  // Try to parse line from element ID (format: "file:line:column")
-  const lineFromId = parseLineFromElementId(elementId);
-  if (lineFromId) {
-    return updateElementByLine(originalCode, lineFromId, changes);
-  }
-
-  // Fall back to regex-based update (least reliable)
+  // Fall back to regex-based editing (least reliable)
   return updateCodeWithChanges(originalCode, elementId, changes);
 }
 
@@ -857,6 +860,207 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
   return result;
 }
 
+// Generate search-replace operations for visual editor changes
+export async function generateSearchReplaceEdit(
+  originalCode: string,
+  elementId: string,
+  changes: StyleChange[],
+  sourceFile: string,
+  sourceLine: number
+): Promise<CodeUpdateResult> {
+  try {
+    console.log('[SearchReplace] Starting direct search-replace edit');
+    console.log('[SearchReplace] Changes:', changes);
+
+    // Find the element in the code using line-based approach
+    const elementInfo = findElementByLine(originalCode, sourceLine);
+    if (!elementInfo) {
+      return {
+        success: false,
+        updatedCode: originalCode,
+        error: `Could not locate element at line ${sourceLine}`,
+      };
+    }
+
+    console.log('[SearchReplace] Found element:', elementInfo);
+
+    // Generate all search-replace operations
+    const operations: Array<{ searchString: string; replaceString: string; change: StyleChange }> = [];
+
+    for (const change of changes) {
+      const searchReplace = generateSearchReplaceStrings(elementInfo.openingTag, change);
+      if (searchReplace) {
+        operations.push({
+          ...searchReplace,
+          change,
+        });
+      }
+    }
+
+    if (operations.length === 0) {
+      return {
+        success: false,
+        updatedCode: originalCode,
+        error: 'No valid search-replace operations generated',
+      };
+    }
+
+    console.log('[SearchReplace] Generated operations:', operations.length);
+
+    // Apply all operations sequentially
+    let currentCode = originalCode;
+    const appliedOperations: any[] = [];
+    const failedOperations: any[] = [];
+
+    for (const operation of operations) {
+      try {
+        // Apply the search-replace operation
+        if (currentCode.includes(operation.searchString)) {
+          currentCode = currentCode.replace(operation.searchString, operation.replaceString);
+          appliedOperations.push({
+            searchString: operation.searchString,
+            replaceString: operation.replaceString,
+            change: operation.change,
+          });
+        } else {
+          // Try to find and replace in the element context
+          const elementStart = currentCode.indexOf(elementInfo.openingTag);
+          if (elementStart !== -1) {
+            const beforeElement = currentCode.substring(0, elementStart);
+            const afterElement = currentCode.substring(elementStart);
+            const updatedAfter = afterElement.replace(operation.searchString, operation.replaceString);
+
+            if (updatedAfter !== afterElement) {
+              currentCode = beforeElement + updatedAfter;
+              appliedOperations.push({
+                searchString: operation.searchString,
+                replaceString: operation.replaceString,
+                change: operation.change,
+              });
+            } else {
+              failedOperations.push({
+                searchString: operation.searchString,
+                replaceString: operation.replaceString,
+                change: operation.change,
+                error: 'Search string not found in element',
+              });
+            }
+          } else {
+            failedOperations.push({
+              searchString: operation.searchString,
+              replaceString: operation.replaceString,
+              change: operation.change,
+              error: 'Element not found in code',
+            });
+          }
+        }
+      } catch (error) {
+        failedOperations.push({
+          searchString: operation.searchString,
+          replaceString: operation.replaceString,
+          change: operation.change,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    console.log('[SearchReplace] Applied operations:', appliedOperations.length);
+    console.log('[SearchReplace] Failed operations:', failedOperations.length);
+
+    return {
+      success: appliedOperations.length > 0,
+      updatedCode: currentCode,
+      error: failedOperations.length > 0 ? `Failed to apply ${failedOperations.length} operations` : undefined,
+    };
+
+  } catch (error) {
+    console.error('[SearchReplace] Error:', error);
+    return {
+      success: false,
+      updatedCode: originalCode,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// Find element information by line number
+function findElementByLine(code: string, lineNumber: number): any {
+  const lines = code.split('\n');
+  const targetLineIndex = lineNumber - 1;
+
+  if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
+    return null;
+  }
+
+  // Use the existing findJSXElement function
+  const elementInfo = findJSXElement(lines, targetLineIndex);
+
+  if (elementInfo.startLine === -1) {
+    return null;
+  }
+
+  return {
+    openingTag: elementInfo.openingTag,
+    startLine: elementInfo.startLine,
+    endLine: elementInfo.endLine,
+    closingTagLine: elementInfo.closingTagLine,
+    elementContent: elementInfo.elementContent,
+    fullElement: lines.slice(elementInfo.startLine, elementInfo.closingTagLine !== -1 ? elementInfo.closingTagLine + 1 : elementInfo.endLine + 1).join('\n'),
+  };
+}
+
+// Generate search and replace strings for a change
+function generateSearchReplaceStrings(openingTag: string, change: StyleChange): { searchString: string; replaceString: string } | null {
+  if (change.useTailwind) {
+    // Handle Tailwind class changes
+    const classNameMatch = openingTag.match(/className=["']([^"']*)["']/);
+    if (classNameMatch) {
+      const oldClassName = classNameMatch[1];
+      const newClassName = updateClassName(oldClassName, [change]);
+      return {
+        searchString: `className="${oldClassName}"`,
+        replaceString: `className="${newClassName}"`,
+      };
+    } else {
+      // Add new className
+      const newClassName = change.tailwindClass || cssToTailwindClass(change.property, change.newValue);
+      if (newClassName) {
+        const tagStart = openingTag.match(/^<(\w+)/);
+        if (tagStart) {
+          return {
+            searchString: tagStart[0],
+            replaceString: `${tagStart[0]} className="${newClassName}"`,
+          };
+        }
+      }
+    }
+  } else {
+    // Handle inline style changes
+    const styleMatch = openingTag.match(/style=\{\{([^}]*)\}\}/);
+    const newInlineStyle = generateInlineStyle([change]);
+
+    if (styleMatch) {
+      // Merge with existing style
+      const mergedStyle = mergeInlineStyles(styleMatch[1], [change]);
+      return {
+        searchString: `style={{ ${styleMatch[1]} }}`,
+        replaceString: `style={{ ${mergedStyle} }}`,
+      };
+    } else {
+      // Add new style
+      const tagStart = openingTag.match(/^<(\w+)/);
+      if (tagStart) {
+        return {
+          searchString: tagStart[0],
+          replaceString: `${tagStart[0]} style={{ ${newInlineStyle} }}`,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export default {
   cssToTailwindClass,
   updateClassName,
@@ -865,4 +1069,5 @@ export default {
   mergeInlineStyles,
   updateCodeWithChanges,
   generateFileUpdate,
+  generateSearchReplaceEdit,
 };
