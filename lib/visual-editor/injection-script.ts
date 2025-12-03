@@ -689,6 +689,11 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   function handleMessage(event) {
     const message = event.data;
     if (!message || !message.type) return;
+    
+    // Debug: Log all messages
+    if (message.type.includes('THEME') || message.type.includes('DRAG')) {
+      console.log('[Visual Editor] Received message:', message.type, message.payload);
+    }
 
     switch (message.type) {
       case 'VISUAL_EDITOR_INIT':
@@ -768,10 +773,13 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
       // Theme preview handlers
       case 'APPLY_THEME_PREVIEW':
         applyThemePreview(message.payload.themeCSS);
+        // Send confirmation back to parent
+        sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true, cssLength: message.payload.themeCSS?.length || 0 } });
         break;
 
       case 'CLEAR_THEME_PREVIEW':
         clearThemePreview();
+        sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
         break;
 
       // Undo/Redo style handlers
@@ -799,14 +807,27 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
 
   // Theme preview functions
   function applyThemePreview(themeCSS) {
+    console.log('[Visual Editor] Applying theme preview, CSS length:', themeCSS?.length);
+    
+    if (!themeCSS) {
+      console.warn('[Visual Editor] No theme CSS provided');
+      return;
+    }
+    
     let styleTag = document.getElementById('ve-theme-preview');
     if (!styleTag) {
       styleTag = document.createElement('style');
       styleTag.id = 've-theme-preview';
+      // Insert at the END of head to override other styles
       document.head.appendChild(styleTag);
     }
-    styleTag.textContent = themeCSS;
-    console.log('[Visual Editor] Theme preview applied');
+    
+    // Add !important to all CSS variables for higher specificity
+    const enhancedCSS = themeCSS.replace(/: ([^;]+);/g, ': $1 !important;');
+    styleTag.textContent = enhancedCSS;
+    
+    console.log('[Visual Editor] Theme preview applied successfully');
+    console.log('[Visual Editor] Style tag in DOM:', !!document.getElementById('ve-theme-preview'));
   }
 
   function clearThemePreview() {

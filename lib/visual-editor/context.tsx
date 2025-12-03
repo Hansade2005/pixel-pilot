@@ -471,14 +471,36 @@ export function VisualEditorProvider({
 
   // Send message to iframe
   const sendToIframe = useCallback((message: VisualEditorMessage) => {
+    // Debug logging for theme-related messages
+    if (message.type.includes('THEME') || message.type.includes('DRAG')) {
+      console.log('[Visual Editor Context] sendToIframe called:', message.type);
+      console.log('[Visual Editor Context] iframe ref exists:', !!iframeRef.current);
+      console.log('[Visual Editor Context] contentWindow exists:', !!iframeRef.current?.contentWindow);
+    }
+    
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(message, '*');
+      if (message.type.includes('THEME') || message.type.includes('DRAG')) {
+        console.log('[Visual Editor Context] Message sent successfully:', message.type);
+      }
+    } else {
+      console.warn('[Visual Editor Context] Cannot send message - no iframe ref:', message.type);
     }
   }, []);
 
   // Set iframe reference
   const setIframeRef = useCallback((iframe: HTMLIFrameElement | null) => {
     iframeRef.current = iframe;
+    
+    // Debug: Check if visual editor is initialized in iframe
+    if (iframe?.contentWindow) {
+      try {
+        const isInitialized = (iframe.contentWindow as any).__VISUAL_EDITOR_INITIALIZED__;
+        console.log('[Visual Editor Context] setIframeRef - initialized in iframe:', isInitialized);
+      } catch (e) {
+        console.log('[Visual Editor Context] Cannot access iframe contentWindow (cross-origin?):', e);
+      }
+    }
     
     // Initialize visual editor in iframe when ref is set
     if (iframe && state.isEnabled) {

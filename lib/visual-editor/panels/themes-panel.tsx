@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useVisualEditor } from '../context';
 import { Button } from '@/components/ui/button';
@@ -41,11 +41,31 @@ export function ThemesPanel({
   onExportTheme,
   projectType = 'unknown'
 }: ThemesPanelProps) {
-  const { sendToIframe } = useVisualEditor();
+  const { sendToIframe, state } = useVisualEditor();
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
   const [isImporting, setIsImporting] = useState(false);
+  const [lastConfirmation, setLastConfirmation] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Listen for theme preview confirmation from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      if (!message || !message.type) return;
+      
+      if (message.type === 'THEME_PREVIEW_APPLIED') {
+        console.log('[Themes Panel] ✅ Theme preview confirmed applied in iframe, CSS length:', message.payload?.cssLength);
+        setLastConfirmation(`Applied (${message.payload?.cssLength} chars)`);
+      } else if (message.type === 'THEME_PREVIEW_CLEARED') {
+        console.log('[Themes Panel] ✅ Theme preview confirmed cleared in iframe');
+        setLastConfirmation('Cleared');
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Group themes by category
   const themesByCategory = BUILT_IN_THEMES.reduce<Record<string, Theme[]>>((acc, theme: Theme) => {
@@ -70,6 +90,8 @@ export function ThemesPanel({
     setSelectedThemeId(theme.id);
     // Send preview to iframe
     const previewCSS = generateThemeCSS(theme, previewMode === 'dark');
+    console.log('[Themes Panel] Sending theme preview, CSS length:', previewCSS.length);
+    console.log('[Themes Panel] Theme:', theme.name, 'Mode:', previewMode);
     sendToIframe({ type: 'APPLY_THEME_PREVIEW', payload: { themeCSS: previewCSS } });
   }, [sendToIframe, previewMode]);
 
@@ -145,6 +167,13 @@ export function ThemesPanel({
           </Button>
         </div>
       </div>
+
+      {/* Debug Status - Remove in production */}
+      {lastConfirmation && (
+        <div className="text-xs text-green-600 bg-green-50 rounded px-2 py-1">
+          ✅ Preview: {lastConfirmation}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="grid grid-cols-2 gap-2">

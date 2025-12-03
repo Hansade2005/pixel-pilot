@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useVisualEditor } from '../context';
 import { Button } from '@/components/ui/button';
@@ -132,7 +132,23 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
   const { sendToIframe, state } = useVisualEditor();
   const [searchQuery, setSearchQuery] = useState('');
   const [draggingElement, setDraggingElement] = useState<DraggableElement | null>(null);
+  const [placingElement, setPlacingElement] = useState<DraggableElement | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['layout', 'typography']);
+
+  // Listen for element inserted message from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      if (message?.type === 'ELEMENT_INSERTED' || message?.type === 'DRAG_CANCELLED') {
+        console.log('[Elements Panel] Element inserted/cancelled, clearing placement mode');
+        setPlacingElement(null);
+        setDraggingElement(null);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Filter elements based on search
   const filteredElements = searchQuery
@@ -152,6 +168,7 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
     setDraggingElement(element);
 
     // Notify iframe about drag start
+    console.log('[Elements Panel] Starting drag:', element.name);
     sendToIframe({
       type: 'DRAG_ELEMENT_START',
       payload: {
@@ -162,7 +179,27 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
   }, [sendToIframe]);
 
   const handleDragEnd = useCallback(() => {
+    console.log('[Elements Panel] Drag ended');
     setDraggingElement(null);
+    sendToIframe({ type: 'DRAG_ELEMENT_END', payload: {} });
+  }, [sendToIframe]);
+
+  // Click to enter placement mode (more reliable than drag across iframes)
+  const handleStartPlacement = useCallback((element: DraggableElement) => {
+    console.log('[Elements Panel] Starting placement mode:', element.name);
+    setPlacingElement(element);
+    sendToIframe({
+      type: 'DRAG_ELEMENT_START',
+      payload: {
+        elementType: element.id,
+        content: element.defaultContent,
+      },
+    });
+  }, [sendToIframe]);
+
+  const handleCancelPlacement = useCallback(() => {
+    console.log('[Elements Panel] Cancelling placement');
+    setPlacingElement(null);
     sendToIframe({ type: 'DRAG_ELEMENT_END', payload: {} });
   }, [sendToIframe]);
 
@@ -174,6 +211,7 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
 
   const renderElementCard = (element: DraggableElement) => {
     const IconComponent = ICON_MAP[element.icon] || Box;
+    const isPlacing = placingElement?.id === element.id;
 
     return (
       <TooltipProvider key={element.id}>
@@ -183,21 +221,27 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
               draggable
               onDragStart={(e) => handleDragStart(e, element)}
               onDragEnd={handleDragEnd}
+              onClick={() => handleStartPlacement(element)}
               className={cn(
-                'group relative flex items-center gap-2 p-2 rounded-md border cursor-grab',
+                'group relative flex items-center gap-2 p-2 rounded-md border cursor-pointer',
                 'hover:border-primary/50 hover:bg-accent/50 transition-all',
-                'active:cursor-grabbing',
-                draggingElement?.id === element.id && 'opacity-50 border-primary'
+                draggingElement?.id === element.id && 'opacity-50 border-primary',
+                isPlacing && 'border-green-500 bg-green-500/10 ring-1 ring-green-500'
               )}
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded bg-muted/50 flex-shrink-0">
-                <IconComponent className="h-4 w-4 text-muted-foreground" />
+              <div className={cn(
+                "flex items-center justify-center w-8 h-8 rounded bg-muted/50 flex-shrink-0",
+                isPlacing && "bg-green-500/20"
+              )}>
+                <IconComponent className={cn("h-4 w-4 text-muted-foreground", isPlacing && "text-green-600")} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{element.name}</p>
-                {element.supportsNesting && (
+                {isPlacing ? (
+                  <span className="text-[10px] text-green-600 font-medium">Click in preview to place</span>
+                ) : element.supportsNesting ? (
                   <span className="text-[10px] text-primary">Nestable</span>
-                )}
+                ) : null}
               </div>
               <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
@@ -205,8 +249,9 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
           <TooltipContent side="right" className="max-w-xs">
             <p className="font-medium">{element.name}</p>
             <p className="text-xs text-muted-foreground">{element.description}</p>
+            <p className="text-xs text-primary mt-1">Click to place, or drag to preview</p>
             {element.variants && element.variants.length > 0 && (
-              <p className="text-xs text-primary mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {element.variants.length} variant{element.variants.length > 1 ? 's' : ''} available
               </p>
             )}
@@ -224,6 +269,26 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
         <span className="font-medium text-sm">Elements</span>
       </div>
 
+      {/* Placement Mode Banner */}
+      {placingElement && (
+        <div className="bg-green-500/10 border border-green-500 rounded-md p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-700">Placing: {placingElement.name}</p>
+              <p className="text-xs text-green-600">Click anywhere in the preview to insert</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelPlacement}
+              className="h-7 text-xs text-green-700 hover:text-green-800 hover:bg-green-500/20"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -238,7 +303,7 @@ export function ElementsPanel({ onInsertElement }: ElementsPanelProps) {
 
       {/* Instructions */}
       <div className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-        <p>Drag elements to the canvas or click to insert at cursor position.</p>
+        <p>Click an element to start placement mode, then click in preview to insert.</p>
       </div>
 
       <Separator />
