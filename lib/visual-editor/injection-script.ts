@@ -690,9 +690,14 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     const message = event.data;
     if (!message || !message.type) return;
     
-    // Debug: Log all messages
+    // Debug: Log and acknowledge theme/drag messages
     if (message.type.includes('THEME') || message.type.includes('DRAG')) {
-      console.log('[Visual Editor] Received message:', message.type, message.payload);
+      console.log('[Visual Editor Iframe] Received message:', message.type, message.payload);
+      // Send acknowledgment to parent so they can see in parent console
+      sendToParent({ 
+        type: 'DEBUG_MESSAGE_RECEIVED', 
+        payload: { receivedType: message.type, timestamp: Date.now() } 
+      });
     }
 
     switch (message.type) {
@@ -808,26 +813,34 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   // Theme preview functions
   function applyThemePreview(themeCSS) {
     console.log('[Visual Editor] Applying theme preview, CSS length:', themeCSS?.length);
+    console.log('[Visual Editor] Theme CSS content (first 500 chars):', themeCSS?.substring(0, 500));
     
     if (!themeCSS) {
       console.warn('[Visual Editor] No theme CSS provided');
       return;
     }
     
-    let styleTag = document.getElementById('ve-theme-preview');
-    if (!styleTag) {
-      styleTag = document.createElement('style');
-      styleTag.id = 've-theme-preview';
-      // Insert at the END of head to override other styles
-      document.head.appendChild(styleTag);
+    // Remove existing preview style tag
+    let existingTag = document.getElementById('ve-theme-preview');
+    if (existingTag) {
+      existingTag.remove();
     }
     
-    // Add !important to all CSS variables for higher specificity
+    // Create new style tag
+    const styleTag = document.createElement('style');
+    styleTag.id = 've-theme-preview';
+    styleTag.setAttribute('data-visual-editor', 'theme-preview');
+    
+    // Add !important to all CSS rules for higher specificity
     const enhancedCSS = themeCSS.replace(/: ([^;]+);/g, ': $1 !important;');
     styleTag.textContent = enhancedCSS;
     
+    // Insert at the END of head to override other styles
+    document.head.appendChild(styleTag);
+    
     console.log('[Visual Editor] Theme preview applied successfully');
     console.log('[Visual Editor] Style tag in DOM:', !!document.getElementById('ve-theme-preview'));
+    console.log('[Visual Editor] Style tag content length:', document.getElementById('ve-theme-preview')?.textContent?.length);
   }
 
   function clearThemePreview() {

@@ -913,7 +913,46 @@ export default App`,
         var el = findElementById(message.payload.elementId);
         if (el) sendToParent({ type: 'ELEMENT_INFO_RESPONSE', payload: { element: getElementInfo(el) } });
         break;
+      case 'APPLY_THEME_PREVIEW':
+        console.log('[VE-Client] Received APPLY_THEME_PREVIEW message');
+        applyThemePreview(message.payload.themeCSS);
+        break;
+      case 'CLEAR_THEME_PREVIEW':
+        console.log('[VE-Client] Received CLEAR_THEME_PREVIEW message');
+        clearThemePreview();
+        break;
     }
+  }
+
+  // Apply theme preview - inject CSS variables
+  function applyThemePreview(themeCSS) {
+    console.log('[VE-Client] applyThemePreview called with CSS:', themeCSS ? themeCSS.substring(0, 100) + '...' : 'null');
+    
+    // Remove existing preview style
+    var existing = document.getElementById('visual-editor-theme-preview');
+    if (existing) {
+      existing.remove();
+    }
+    
+    // Create and inject new theme CSS
+    var style = document.createElement('style');
+    style.id = 'visual-editor-theme-preview';
+    style.setAttribute('data-visual-editor', 'theme-preview');
+    style.textContent = themeCSS;
+    document.head.appendChild(style);
+    
+    console.log('[VE-Client] Theme preview applied, style element added to head');
+    sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true } });
+  }
+
+  // Clear theme preview
+  function clearThemePreview() {
+    var existing = document.getElementById('visual-editor-theme-preview');
+    if (existing) {
+      existing.remove();
+      console.log('[VE-Client] Theme preview cleared');
+    }
+    sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
   }
 
   // Initialize
@@ -6887,7 +6926,46 @@ export default function Home() {
         var el = findElementById(message.payload.elementId);
         if (el) sendToParent({ type: 'ELEMENT_INFO_RESPONSE', payload: { element: getElementInfo(el) } });
         break;
+      case 'APPLY_THEME_PREVIEW':
+        console.log('[VE-Client] Received APPLY_THEME_PREVIEW message');
+        applyThemePreview(message.payload.themeCSS);
+        break;
+      case 'CLEAR_THEME_PREVIEW':
+        console.log('[VE-Client] Received CLEAR_THEME_PREVIEW message');
+        clearThemePreview();
+        break;
     }
+  }
+
+  // Apply theme preview - inject CSS variables
+  function applyThemePreview(themeCSS) {
+    console.log('[VE-Client] applyThemePreview called with CSS:', themeCSS ? themeCSS.substring(0, 100) + '...' : 'null');
+    
+    // Remove existing preview style
+    var existing = document.getElementById('visual-editor-theme-preview');
+    if (existing) {
+      existing.remove();
+    }
+    
+    // Create and inject new theme CSS
+    var style = document.createElement('style');
+    style.id = 'visual-editor-theme-preview';
+    style.setAttribute('data-visual-editor', 'theme-preview');
+    style.textContent = themeCSS;
+    document.head.appendChild(style);
+    
+    console.log('[VE-Client] Theme preview applied, style element added to head');
+    sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true } });
+  }
+
+  // Clear theme preview
+  function clearThemePreview() {
+    var existing = document.getElementById('visual-editor-theme-preview');
+    if (existing) {
+      existing.remove();
+      console.log('[VE-Client] Theme preview cleared');
+    }
+    sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
   }
 
   // Initialize

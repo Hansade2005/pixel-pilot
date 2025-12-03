@@ -762,6 +762,12 @@ export function generateThemeCSS(theme: Theme, isDark: boolean = false): string 
   ${colors.chart4 ? `--chart-4: ${colors.chart4};` : ''}
   ${colors.chart5 ? `--chart-5: ${colors.chart5};` : ''}
 }
+
+/* Apply theme colors directly to body for immediate visual feedback */
+body {
+  background-color: hsl(${colors.background});
+  color: hsl(${colors.foreground});
+}
 `.trim();
 }
 

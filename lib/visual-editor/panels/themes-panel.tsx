@@ -54,12 +54,14 @@ export function ThemesPanel({
       const message = event.data;
       if (!message || !message.type) return;
       
-      if (message.type === 'THEME_PREVIEW_APPLIED') {
+      if (message.type === 'DEBUG_MESSAGE_RECEIVED') {
+        console.log('[Themes Panel] 📨 Iframe received message:', message.payload?.receivedType);
+      } else if (message.type === 'THEME_PREVIEW_APPLIED') {
         console.log('[Themes Panel] ✅ Theme preview confirmed applied in iframe, CSS length:', message.payload?.cssLength);
-        setLastConfirmation(`Applied (${message.payload?.cssLength} chars)`);
+        setLastConfirmation(`Preview applied (${message.payload?.cssLength} chars)`);
       } else if (message.type === 'THEME_PREVIEW_CLEARED') {
         console.log('[Themes Panel] ✅ Theme preview confirmed cleared in iframe');
-        setLastConfirmation('Cleared');
+        setLastConfirmation('Preview cleared');
       }
     };
     
