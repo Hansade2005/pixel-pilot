@@ -884,10 +884,37 @@ export async function generateSearchReplaceEdit(
 
     console.log('[SearchReplace] Found element:', elementInfo);
 
+    // Separate text content changes from style changes
+    const textChange = changes.find(c => (c.property as string) === 'textContent');
+    const styleChanges = changes.filter(c => (c.property as string) !== 'textContent');
+
     // Generate all search-replace operations
     const operations: Array<{ searchString: string; replaceString: string; change: StyleChange }> = [];
 
-    for (const change of changes) {
+    // Handle text content changes
+    if (textChange && elementInfo.closingTagLine !== -1) {
+      const lines = originalCode.split('\n');
+      const contentLines = lines.slice(elementInfo.endLine + 1, elementInfo.closingTagLine);
+      const currentContent = contentLines.join('\n').trim();
+
+      // Find the indentation of the content
+      const contentIndent = contentLines.length > 0
+        ? contentLines[0].match(/^(\s*)/)?.[1] || ''
+        : '';
+
+      // Create search string with proper indentation
+      const searchString = contentLines.map(line => line.trim()).join('\n');
+      const replaceString = textChange.newValue;
+
+      operations.push({
+        searchString,
+        replaceString: contentIndent + replaceString,
+        change: textChange,
+      });
+    }
+
+    // Handle style changes
+    for (const change of styleChanges) {
       const searchReplace = generateSearchReplaceStrings(elementInfo.openingTag, change);
       if (searchReplace) {
         operations.push({
