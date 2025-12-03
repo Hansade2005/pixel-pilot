@@ -403,7 +403,7 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
       if (!container) return;
 
       const containerWidth = container.clientWidth - 32; // Padding
-      const containerHeight = container.clientHeight - 60; // Padding + label space
+      const containerHeight = container.clientHeight - 16; // Padding only, no label space
 
       // Add device frame padding
       const framePaddingH = device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12;
@@ -431,7 +431,7 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
   return (
     <div className="h-full" ref={containerRef}>
       {device ? (
-        <div className="h-full flex items-center justify-center p-4 overflow-hidden">
+        <div className="h-full flex items-center justify-center p-2 overflow-hidden">
           <div className="flex flex-col items-center">
             {/* Device frame with actual dimensions */}
             <div
@@ -478,13 +478,6 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
               {device.type === "mobile" && (
                 <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gray-400 rounded-full opacity-50" />
               )}
-            </div>
-
-            {/* Device label */}
-            <div className="text-center mt-2">
-              <span className="text-xs text-muted-foreground bg-background px-2 py-1 rounded">
-                {device.name} ({device.width}×{device.height}) • {Math.round(scale * 100)}%
-              </span>
             </div>
           </div>
           {loading}
