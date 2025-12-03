@@ -715,6 +715,376 @@ export const BUILT_IN_THEMES: Theme[] = [
 // ============================================
 
 /**
+ * Convert HSL string to actual hsl() CSS value
+ */
+function hslStringToCSS(hslValue: string): string {
+  // Input: "240 5.9% 10%" -> Output: "hsl(240, 5.9%, 10%)"
+  const parts = hslValue.trim().split(/\s+/);
+  if (parts.length >= 3) {
+    return `hsl(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+  }
+  return `hsl(${hslValue})`;
+}
+
+/**
+ * Generate vanilla CSS with actual color values (no CSS variables needed)
+ * This is used for instant preview in Vite projects without requiring build
+ */
+export function generateVanillaCSS(theme: Theme, isDark: boolean = false): string {
+  const colors = isDark ? theme.colors.dark : theme.colors.light;
+  const { typography, spacing } = theme;
+
+  return `
+/* Vanilla CSS Theme - Applies instantly without build */
+/* Theme: ${theme.name} (${isDark ? 'dark' : 'light'} mode) */
+
+:root {
+  /* CSS Variables (for Tailwind compatibility) */
+  --background: ${colors.background};
+  --foreground: ${colors.foreground};
+  --card: ${colors.card};
+  --card-foreground: ${colors.cardForeground};
+  --popover: ${colors.card};
+  --popover-foreground: ${colors.cardForeground};
+  --primary: ${colors.primary};
+  --primary-foreground: ${colors.primaryForeground};
+  --secondary: ${colors.secondary};
+  --secondary-foreground: ${colors.secondaryForeground};
+  --muted: ${colors.muted};
+  --muted-foreground: ${colors.mutedForeground};
+  --accent: ${colors.accent};
+  --accent-foreground: ${colors.accentForeground};
+  --destructive: ${colors.destructive};
+  --destructive-foreground: ${colors.destructiveForeground};
+  --border: ${colors.border};
+  --input: ${colors.input};
+  --ring: ${colors.ring};
+  --radius: ${spacing.borderRadius};
+  --font-sans: ${typography.fontFamily};
+  --font-mono: ${typography.fontFamilyMono};
+}
+
+/* Direct color application for instant preview */
+html, body {
+  background-color: ${hslStringToCSS(colors.background)} !important;
+  color: ${hslStringToCSS(colors.foreground)} !important;
+  font-family: ${typography.fontFamily};
+}
+
+/* Primary colors */
+.bg-primary, [class*="bg-primary"] {
+  background-color: ${hslStringToCSS(colors.primary)} !important;
+}
+.text-primary, [class*="text-primary"]:not([class*="text-primary-foreground"]) {
+  color: ${hslStringToCSS(colors.primary)} !important;
+}
+.text-primary-foreground, [class*="text-primary-foreground"] {
+  color: ${hslStringToCSS(colors.primaryForeground)} !important;
+}
+.border-primary, [class*="border-primary"] {
+  border-color: ${hslStringToCSS(colors.primary)} !important;
+}
+
+/* Secondary colors */
+.bg-secondary, [class*="bg-secondary"] {
+  background-color: ${hslStringToCSS(colors.secondary)} !important;
+}
+.text-secondary, [class*="text-secondary"]:not([class*="text-secondary-foreground"]) {
+  color: ${hslStringToCSS(colors.secondary)} !important;
+}
+.text-secondary-foreground, [class*="text-secondary-foreground"] {
+  color: ${hslStringToCSS(colors.secondaryForeground)} !important;
+}
+
+/* Background and foreground */
+.bg-background, [class*="bg-background"] {
+  background-color: ${hslStringToCSS(colors.background)} !important;
+}
+.text-foreground, [class*="text-foreground"] {
+  color: ${hslStringToCSS(colors.foreground)} !important;
+}
+
+/* Card colors */
+.bg-card, [class*="bg-card"] {
+  background-color: ${hslStringToCSS(colors.card)} !important;
+}
+.text-card-foreground, [class*="text-card-foreground"] {
+  color: ${hslStringToCSS(colors.cardForeground)} !important;
+}
+
+/* Muted colors */
+.bg-muted, [class*="bg-muted"] {
+  background-color: ${hslStringToCSS(colors.muted)} !important;
+}
+.text-muted, [class*="text-muted"]:not([class*="text-muted-foreground"]) {
+  color: ${hslStringToCSS(colors.muted)} !important;
+}
+.text-muted-foreground, [class*="text-muted-foreground"] {
+  color: ${hslStringToCSS(colors.mutedForeground)} !important;
+}
+
+/* Accent colors */
+.bg-accent, [class*="bg-accent"] {
+  background-color: ${hslStringToCSS(colors.accent)} !important;
+}
+.text-accent, [class*="text-accent"]:not([class*="text-accent-foreground"]) {
+  color: ${hslStringToCSS(colors.accent)} !important;
+}
+.text-accent-foreground, [class*="text-accent-foreground"] {
+  color: ${hslStringToCSS(colors.accentForeground)} !important;
+}
+
+/* Destructive colors */
+.bg-destructive, [class*="bg-destructive"] {
+  background-color: ${hslStringToCSS(colors.destructive)} !important;
+}
+.text-destructive, [class*="text-destructive"]:not([class*="text-destructive-foreground"]) {
+  color: ${hslStringToCSS(colors.destructive)} !important;
+}
+.text-destructive-foreground, [class*="text-destructive-foreground"] {
+  color: ${hslStringToCSS(colors.destructiveForeground)} !important;
+}
+
+/* Border colors */
+.border-border, [class*="border-border"], 
+.border, [class*="border"]:not([class*="border-"]) {
+  border-color: ${hslStringToCSS(colors.border)} !important;
+}
+.border-input, [class*="border-input"] {
+  border-color: ${hslStringToCSS(colors.input)} !important;
+}
+
+/* Ring/focus colors */
+.ring-ring, [class*="ring-ring"],
+.focus\\:ring, [class*="focus:ring"] {
+  --tw-ring-color: ${hslStringToCSS(colors.ring)};
+}
+
+/* Popover colors */
+.bg-popover, [class*="bg-popover"] {
+  background-color: ${hslStringToCSS(colors.card)} !important;
+}
+.text-popover-foreground, [class*="text-popover-foreground"] {
+  color: ${hslStringToCSS(colors.cardForeground)} !important;
+}
+
+/* Common UI elements */
+button:not([class*="bg-"]) {
+  background-color: ${hslStringToCSS(colors.primary)};
+  color: ${hslStringToCSS(colors.primaryForeground)};
+}
+
+input:not([class*="bg-"]), 
+textarea:not([class*="bg-"]), 
+select:not([class*="bg-"]) {
+  background-color: ${hslStringToCSS(colors.background)};
+  border-color: ${hslStringToCSS(colors.input)};
+  color: ${hslStringToCSS(colors.foreground)};
+}
+
+/* Links */
+a:not([class*="text-"]) {
+  color: ${hslStringToCSS(colors.primary)};
+}
+
+/* Cards and containers */
+[class*="rounded"], .card, .panel {
+  border-radius: ${spacing.borderRadius};
+}
+
+/* Shadows with theme-aware colors */
+.shadow, [class*="shadow"] {
+  --tw-shadow-color: ${hslStringToCSS(colors.border)};
+}
+`.trim();
+}
+
+/**
+ * Generate complete vanilla CSS with both light and dark mode support
+ */
+export function generateCompleteVanillaCSS(theme: Theme): string {
+  const lightColors = theme.colors.light;
+  const darkColors = theme.colors.dark;
+  const { typography, spacing } = theme;
+
+  return `
+/* Complete Vanilla CSS Theme: ${theme.name} */
+/* Applies instantly without build - includes light and dark modes */
+
+:root {
+  /* Light mode CSS Variables */
+  --background: ${lightColors.background};
+  --foreground: ${lightColors.foreground};
+  --card: ${lightColors.card};
+  --card-foreground: ${lightColors.cardForeground};
+  --popover: ${lightColors.card};
+  --popover-foreground: ${lightColors.cardForeground};
+  --primary: ${lightColors.primary};
+  --primary-foreground: ${lightColors.primaryForeground};
+  --secondary: ${lightColors.secondary};
+  --secondary-foreground: ${lightColors.secondaryForeground};
+  --muted: ${lightColors.muted};
+  --muted-foreground: ${lightColors.mutedForeground};
+  --accent: ${lightColors.accent};
+  --accent-foreground: ${lightColors.accentForeground};
+  --destructive: ${lightColors.destructive};
+  --destructive-foreground: ${lightColors.destructiveForeground};
+  --border: ${lightColors.border};
+  --input: ${lightColors.input};
+  --ring: ${lightColors.ring};
+  --radius: ${spacing.borderRadius};
+  --font-sans: ${typography.fontFamily};
+  --font-mono: ${typography.fontFamilyMono};
+  
+  /* Direct color values for instant application */
+  --bg-color: ${hslStringToCSS(lightColors.background)};
+  --fg-color: ${hslStringToCSS(lightColors.foreground)};
+  --primary-color: ${hslStringToCSS(lightColors.primary)};
+  --primary-fg-color: ${hslStringToCSS(lightColors.primaryForeground)};
+  --secondary-color: ${hslStringToCSS(lightColors.secondary)};
+  --secondary-fg-color: ${hslStringToCSS(lightColors.secondaryForeground)};
+  --accent-color: ${hslStringToCSS(lightColors.accent)};
+  --accent-fg-color: ${hslStringToCSS(lightColors.accentForeground)};
+  --muted-color: ${hslStringToCSS(lightColors.muted)};
+  --muted-fg-color: ${hslStringToCSS(lightColors.mutedForeground)};
+  --card-color: ${hslStringToCSS(lightColors.card)};
+  --card-fg-color: ${hslStringToCSS(lightColors.cardForeground)};
+  --border-color: ${hslStringToCSS(lightColors.border)};
+  --input-color: ${hslStringToCSS(lightColors.input)};
+  --ring-color: ${hslStringToCSS(lightColors.ring)};
+  --destructive-color: ${hslStringToCSS(lightColors.destructive)};
+  --destructive-fg-color: ${hslStringToCSS(lightColors.destructiveForeground)};
+}
+
+.dark {
+  /* Dark mode CSS Variables */
+  --background: ${darkColors.background};
+  --foreground: ${darkColors.foreground};
+  --card: ${darkColors.card};
+  --card-foreground: ${darkColors.cardForeground};
+  --popover: ${darkColors.card};
+  --popover-foreground: ${darkColors.cardForeground};
+  --primary: ${darkColors.primary};
+  --primary-foreground: ${darkColors.primaryForeground};
+  --secondary: ${darkColors.secondary};
+  --secondary-foreground: ${darkColors.secondaryForeground};
+  --muted: ${darkColors.muted};
+  --muted-foreground: ${darkColors.mutedForeground};
+  --accent: ${darkColors.accent};
+  --accent-foreground: ${darkColors.accentForeground};
+  --destructive: ${darkColors.destructive};
+  --destructive-foreground: ${darkColors.destructiveForeground};
+  --border: ${darkColors.border};
+  --input: ${darkColors.input};
+  --ring: ${darkColors.ring};
+  
+  /* Direct color values for instant application */
+  --bg-color: ${hslStringToCSS(darkColors.background)};
+  --fg-color: ${hslStringToCSS(darkColors.foreground)};
+  --primary-color: ${hslStringToCSS(darkColors.primary)};
+  --primary-fg-color: ${hslStringToCSS(darkColors.primaryForeground)};
+  --secondary-color: ${hslStringToCSS(darkColors.secondary)};
+  --secondary-fg-color: ${hslStringToCSS(darkColors.secondaryForeground)};
+  --accent-color: ${hslStringToCSS(darkColors.accent)};
+  --accent-fg-color: ${hslStringToCSS(darkColors.accentForeground)};
+  --muted-color: ${hslStringToCSS(darkColors.muted)};
+  --muted-fg-color: ${hslStringToCSS(darkColors.mutedForeground)};
+  --card-color: ${hslStringToCSS(darkColors.card)};
+  --card-fg-color: ${hslStringToCSS(darkColors.cardForeground)};
+  --border-color: ${hslStringToCSS(darkColors.border)};
+  --input-color: ${hslStringToCSS(darkColors.input)};
+  --ring-color: ${hslStringToCSS(darkColors.ring)};
+  --destructive-color: ${hslStringToCSS(darkColors.destructive)};
+  --destructive-fg-color: ${hslStringToCSS(darkColors.destructiveForeground)};
+}
+
+/* Base styles - apply instantly */
+html, body {
+  background-color: var(--bg-color) !important;
+  color: var(--fg-color) !important;
+  font-family: ${typography.fontFamily};
+  font-size: ${typography.fontSizeBase};
+  line-height: ${typography.lineHeightBase};
+  letter-spacing: ${typography.letterSpacing};
+}
+
+/* Primary */
+.bg-primary { background-color: var(--primary-color) !important; }
+.text-primary { color: var(--primary-color) !important; }
+.text-primary-foreground { color: var(--primary-fg-color) !important; }
+.border-primary { border-color: var(--primary-color) !important; }
+
+/* Secondary */
+.bg-secondary { background-color: var(--secondary-color) !important; }
+.text-secondary { color: var(--secondary-color) !important; }
+.text-secondary-foreground { color: var(--secondary-fg-color) !important; }
+.border-secondary { border-color: var(--secondary-color) !important; }
+
+/* Background/Foreground */
+.bg-background { background-color: var(--bg-color) !important; }
+.text-foreground { color: var(--fg-color) !important; }
+
+/* Card */
+.bg-card { background-color: var(--card-color) !important; }
+.text-card-foreground { color: var(--card-fg-color) !important; }
+
+/* Muted */
+.bg-muted { background-color: var(--muted-color) !important; }
+.text-muted { color: var(--muted-color) !important; }
+.text-muted-foreground { color: var(--muted-fg-color) !important; }
+
+/* Accent */
+.bg-accent { background-color: var(--accent-color) !important; }
+.text-accent { color: var(--accent-color) !important; }
+.text-accent-foreground { color: var(--accent-fg-color) !important; }
+
+/* Destructive */
+.bg-destructive { background-color: var(--destructive-color) !important; }
+.text-destructive { color: var(--destructive-color) !important; }
+.text-destructive-foreground { color: var(--destructive-fg-color) !important; }
+
+/* Borders */
+.border-border { border-color: var(--border-color) !important; }
+.border-input { border-color: var(--input-color) !important; }
+
+/* Ring */
+.ring-ring { --tw-ring-color: var(--ring-color); }
+
+/* Popover */
+.bg-popover { background-color: var(--card-color) !important; }
+.text-popover-foreground { color: var(--card-fg-color) !important; }
+
+/* Form elements */
+input, textarea, select {
+  background-color: var(--bg-color);
+  border-color: var(--input-color);
+  color: var(--fg-color);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--ring-color);
+  outline-color: var(--ring-color);
+}
+
+/* Buttons */
+button {
+  border-radius: ${spacing.borderRadius};
+}
+
+/* Border radius utilities */
+.rounded { border-radius: ${spacing.borderRadius}; }
+.rounded-sm { border-radius: ${spacing.borderRadiusSm}; }
+.rounded-md { border-radius: ${spacing.borderRadiusMd}; }
+.rounded-lg { border-radius: ${spacing.borderRadiusLg}; }
+.rounded-xl { border-radius: ${spacing.borderRadiusXl}; }
+
+/* Links */
+a { color: var(--primary-color); }
+a:hover { opacity: 0.8; }
+`.trim();
+}
+
+/**
  * Generate CSS variables from a theme
  */
 export function generateThemeCSS(theme: Theme, isDark: boolean = false): string {
@@ -1034,6 +1404,8 @@ export function getThemesByCategory(category: Theme['category']): Theme[] {
 export default {
   BUILT_IN_THEMES,
   generateThemeCSS,
+  generateVanillaCSS,
+  generateCompleteVanillaCSS,
   generateGlobalsCSSForNextJS,
   generateAppCSSForVite,
   parseThemeFromCSS,

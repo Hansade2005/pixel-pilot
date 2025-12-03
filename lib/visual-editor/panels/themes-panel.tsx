@@ -26,7 +26,7 @@ import {
   Download,
   FileCode,
 } from 'lucide-react';
-import { Theme, BUILT_IN_THEMES, generateThemeCSS, parseThemeFromCSS } from '../themes';
+import { Theme, BUILT_IN_THEMES, generateThemeCSS, generateVanillaCSS, parseThemeFromCSS } from '../themes';
 
 interface ThemesPanelProps {
   onApplyTheme?: (theme: Theme) => void;
@@ -90,11 +90,18 @@ export function ThemesPanel({
 
   const handleThemeSelect = useCallback((theme: Theme) => {
     console.log('[Themes Panel] Theme selected:', theme.name, theme.id);
+    console.log('[Themes Panel] Project type:', projectType);
     setSelectedThemeId(theme.id);
     setLastConfirmation(null); // Clear previous confirmation
     
-    // Send preview to iframe
-    const previewCSS = generateThemeCSS(theme, previewMode === 'dark');
+    // For Vite projects, use vanilla CSS for instant preview (no build needed)
+    // For Next.js or unknown, use standard CSS variables
+    const isDark = previewMode === 'dark';
+    const previewCSS = projectType === 'vite' 
+      ? generateVanillaCSS(theme, isDark)
+      : generateThemeCSS(theme, isDark);
+    
+    console.log('[Themes Panel] Using', projectType === 'vite' ? 'vanilla CSS' : 'standard CSS variables');
     console.log('[Themes Panel] Generated CSS length:', previewCSS.length);
     console.log('[Themes Panel] sendToIframe function exists:', !!sendToIframe);
     
@@ -104,7 +111,7 @@ export function ThemesPanel({
     } else {
       console.error('[Themes Panel] sendToIframe is not available!');
     }
-  }, [sendToIframe, previewMode]);
+  }, [sendToIframe, previewMode, projectType]);
 
   const handleApplyTheme = useCallback(() => {
     console.log('[Themes Panel] Apply Theme clicked, selectedThemeId:', selectedThemeId);
@@ -166,7 +173,10 @@ export function ThemesPanel({
     if (selectedThemeId) {
       const theme = BUILT_IN_THEMES.find((t: Theme) => t.id === selectedThemeId);
       if (theme) {
-        const previewCSS = generateThemeCSS(theme, newMode === 'dark');
+        const isDark = newMode === 'dark';
+        const previewCSS = projectType === 'vite'
+          ? generateVanillaCSS(theme, isDark)
+          : generateThemeCSS(theme, isDark);
         sendToIframe({ type: 'APPLY_THEME_PREVIEW', payload: { themeCSS: previewCSS } });
       }
     }

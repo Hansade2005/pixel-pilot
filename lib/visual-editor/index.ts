@@ -42,6 +42,8 @@ export {
   type ThemeColors,
   BUILT_IN_THEMES,
   generateThemeCSS,
+  generateVanillaCSS,
+  generateCompleteVanillaCSS,
   generateGlobalsCSSForNextJS,
   generateAppCSSForVite,
   parseThemeFromCSS,
