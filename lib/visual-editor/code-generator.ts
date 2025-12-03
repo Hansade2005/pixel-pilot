@@ -92,6 +92,17 @@ export function cssToTailwindClass(
     return TAILWIND_MAPPINGS.fontWeight?.[value] || null;
   }
 
+  // Handle font families
+  if (property === 'fontFamily') {
+    // Check direct mappings first
+    const fontMapping = TAILWIND_MAPPINGS.fontFamily?.[value];
+    if (fontMapping) {
+      return fontMapping;
+    }
+    // For arbitrary fonts, use bracket notation
+    return `font-[${value.replace(/\s+/g, '_')}]`;
+  }
+
   // Handle border radius
   if (property === 'borderRadius') {
     return TAILWIND_BORDER_RADIUS[value] || null;
@@ -913,8 +924,23 @@ export async function generateSearchReplaceEdit(
       });
     }
 
-    // Handle style changes
-    for (const change of styleChanges) {
+    // Handle style changes - group Tailwind changes together
+    const tailwindChanges = styleChanges.filter(c => c.useTailwind);
+    const inlineChanges = styleChanges.filter(c => !c.useTailwind);
+
+    if (tailwindChanges.length > 0) {
+      const searchReplace = generateGroupedTailwindSearchReplace(elementInfo.openingTag, tailwindChanges);
+      if (searchReplace) {
+        operations.push({
+          searchString: searchReplace.searchString,
+          replaceString: searchReplace.replaceString,
+          change: tailwindChanges[0], // Use first change as representative
+        });
+      }
+    }
+
+    // Handle individual inline style changes
+    for (const change of inlineChanges) {
       const searchReplace = generateSearchReplaceStrings(elementInfo.openingTag, change);
       if (searchReplace) {
         operations.push({
@@ -1080,6 +1106,37 @@ function generateSearchReplaceStrings(openingTag: string, change: StyleChange): 
         return {
           searchString: tagStart[0],
           replaceString: `${tagStart[0]} style={{ ${newInlineStyle} }}`,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+// Generate grouped search-replace for multiple Tailwind changes
+function generateGroupedTailwindSearchReplace(openingTag: string, changes: StyleChange[]): { searchString: string; replaceString: string } | null {
+  const classNameMatch = openingTag.match(/className=["']([^"']*)["']/);
+  if (classNameMatch) {
+    const oldClassName = classNameMatch[1];
+    const newClassName = updateClassName(oldClassName, changes);
+    return {
+      searchString: `className="${oldClassName}"`,
+      replaceString: `className="${newClassName}"`,
+    };
+  } else {
+    // Add new className with all changes
+    const newClassName = changes
+      .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+      .filter(Boolean)
+      .join(' ');
+
+    if (newClassName) {
+      const tagStart = openingTag.match(/^<(\w+)/);
+      if (tagStart) {
+        return {
+          searchString: tagStart[0],
+          replaceString: `${tagStart[0]} className="${newClassName}"`,
         };
       }
     }

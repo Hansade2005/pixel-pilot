@@ -198,7 +198,21 @@ export const TAILWIND_MAPPINGS: Record<string, Record<string, string>> = {
     '800': 'font-extrabold',
     '900': 'font-black',
   },
-};
+  fontFamily: {
+    'sans-serif': 'font-sans',
+    'serif': 'font-serif',
+    'monospace': 'font-mono',
+    'Arial': 'font-sans',
+    'Helvetica': 'font-sans',
+    'Times New Roman': 'font-serif',
+    'Courier New': 'font-mono',
+    'Georgia': 'font-serif',
+    'Verdana': 'font-sans',
+    'system-ui': 'font-sans',
+    '-apple-system': 'font-sans',
+    'BlinkMacSystemFont': 'font-sans',
+  },
+}
 
 // Spacing scale for Tailwind (in pixels -> class)
 export const TAILWIND_SPACING: Record<number, string> = {
