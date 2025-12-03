@@ -764,7 +764,296 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
           sendToParent({ type: 'ELEMENT_INFO_RESPONSE', payload: { element: info } });
         }
         break;
+
+      // Theme preview handlers
+      case 'APPLY_THEME_PREVIEW':
+        applyThemePreview(message.payload.themeCSS);
+        break;
+
+      case 'CLEAR_THEME_PREVIEW':
+        clearThemePreview();
+        break;
+
+      // Undo/Redo style handlers
+      case 'UNDO_STYLE':
+      case 'REDO_STYLE':
+        if (message.payload.elementId && message.payload.changes) {
+          applyStyleChanges(message.payload.elementId, message.payload.changes);
+        }
+        break;
+
+      // Drag and drop handlers
+      case 'DRAG_ELEMENT_START':
+        startDragMode(message.payload.elementType, message.payload.content);
+        break;
+
+      case 'DRAG_ELEMENT_END':
+        endDragMode();
+        break;
+
+      case 'INSERT_ELEMENT':
+        insertElement(message.payload.content, message.payload.targetElementId, message.payload.position);
+        break;
     }
+  }
+
+  // Theme preview functions
+  function applyThemePreview(themeCSS) {
+    let styleTag = document.getElementById('ve-theme-preview');
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 've-theme-preview';
+      document.head.appendChild(styleTag);
+    }
+    styleTag.textContent = themeCSS;
+    console.log('[Visual Editor] Theme preview applied');
+  }
+
+  function clearThemePreview() {
+    const styleTag = document.getElementById('ve-theme-preview');
+    if (styleTag) {
+      styleTag.remove();
+      console.log('[Visual Editor] Theme preview cleared');
+    }
+  }
+
+  // Drag and drop functions
+  let isDraggingElement = false;
+  let dragElementType = null;
+  let dragElementContent = null;
+  let dropTargetOverlay = null;
+  let currentDropTarget = null;
+  let dropPosition = 'inside'; // 'before', 'after', 'inside'
+
+  function startDragMode(elementType, content) {
+    isDraggingElement = true;
+    dragElementType = elementType;
+    dragElementContent = content;
+    document.body.style.cursor = 'copy';
+    
+    // Create drop target overlay
+    if (!dropTargetOverlay) {
+      dropTargetOverlay = document.createElement('div');
+      dropTargetOverlay.setAttribute('data-ve-overlay', 'true');
+      dropTargetOverlay.id = 've-drop-overlay';
+      dropTargetOverlay.style.cssText = \`
+        position: fixed;
+        pointer-events: none;
+        z-index: 999998;
+        box-sizing: border-box;
+        border: 2px dashed #22c55e;
+        background: rgba(34, 197, 94, 0.1);
+        display: none;
+      \`;
+      document.body.appendChild(dropTargetOverlay);
+    }
+    
+    // Add drag-specific event listeners
+    document.addEventListener('mousemove', handleDragMove, true);
+    document.addEventListener('click', handleDrop, true);
+    document.addEventListener('keydown', handleDragKeyDown, true);
+    
+    console.log('[Visual Editor] Drag mode started:', elementType);
+  }
+
+  function endDragMode() {
+    isDraggingElement = false;
+    dragElementType = null;
+    dragElementContent = null;
+    currentDropTarget = null;
+    document.body.style.cursor = isEnabled ? 'crosshair' : '';
+    
+    // Hide drop overlay
+    if (dropTargetOverlay) {
+      dropTargetOverlay.style.display = 'none';
+    }
+    
+    // Remove drag event listeners
+    document.removeEventListener('mousemove', handleDragMove, true);
+    document.removeEventListener('click', handleDrop, true);
+    document.removeEventListener('keydown', handleDragKeyDown, true);
+    
+    console.log('[Visual Editor] Drag mode ended');
+  }
+
+  function handleDragMove(event) {
+    if (!isDraggingElement) return;
+    
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    if (!target || shouldIgnoreElement(target)) {
+      if (dropTargetOverlay) dropTargetOverlay.style.display = 'none';
+      currentDropTarget = null;
+      return;
+    }
+    
+    // Find valid drop container
+    const dropTarget = findDropTarget(target);
+    if (!dropTarget) {
+      if (dropTargetOverlay) dropTargetOverlay.style.display = 'none';
+      currentDropTarget = null;
+      return;
+    }
+    
+    currentDropTarget = dropTarget;
+    
+    // Determine drop position based on mouse position
+    const rect = dropTarget.getBoundingClientRect();
+    const mouseY = event.clientY;
+    const relativeY = (mouseY - rect.top) / rect.height;
+    
+    if (relativeY < 0.25) {
+      dropPosition = 'before';
+    } else if (relativeY > 0.75) {
+      dropPosition = 'after';
+    } else {
+      dropPosition = 'inside';
+    }
+    
+    // Update drop overlay
+    if (dropTargetOverlay) {
+      dropTargetOverlay.style.display = 'block';
+      
+      if (dropPosition === 'before') {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = (rect.top - 2) + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = '4px';
+        dropTargetOverlay.style.background = '#22c55e';
+        dropTargetOverlay.style.border = 'none';
+      } else if (dropPosition === 'after') {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = (rect.bottom - 2) + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = '4px';
+        dropTargetOverlay.style.background = '#22c55e';
+        dropTargetOverlay.style.border = 'none';
+      } else {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = rect.top + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = rect.height + 'px';
+        dropTargetOverlay.style.background = 'rgba(34, 197, 94, 0.1)';
+        dropTargetOverlay.style.border = '2px dashed #22c55e';
+      }
+    }
+  }
+
+  function findDropTarget(element) {
+    // Valid drop containers
+    const validContainers = ['DIV', 'SECTION', 'ARTICLE', 'MAIN', 'ASIDE', 'HEADER', 'FOOTER', 'NAV', 'FORM', 'UL', 'OL', 'BODY'];
+    
+    let current = element;
+    while (current && current !== document.body) {
+      if (validContainers.includes(current.tagName) && !current.hasAttribute('data-ve-overlay')) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    
+    // Default to body if no valid container found
+    return document.body;
+  }
+
+  function handleDrop(event) {
+    if (!isDraggingElement || !currentDropTarget || !dragElementContent) {
+      endDragMode();
+      return;
+    }
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Parse the JSX content and create HTML element
+    const htmlContent = jsxToHtml(dragElementContent);
+    
+    // Create a temporary container to parse the HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    const newElement = temp.firstElementChild;
+    
+    if (!newElement) {
+      console.warn('[Visual Editor] Failed to create element');
+      endDragMode();
+      return;
+    }
+    
+    // Generate unique ID for the new element
+    const elementId = generateElementId(newElement);
+    
+    // Insert element based on position
+    if (dropPosition === 'before') {
+      currentDropTarget.parentNode.insertBefore(newElement, currentDropTarget);
+    } else if (dropPosition === 'after') {
+      currentDropTarget.parentNode.insertBefore(newElement, currentDropTarget.nextSibling);
+    } else {
+      currentDropTarget.appendChild(newElement);
+    }
+    
+    // Notify parent about the insertion
+    sendToParent({
+      type: 'ELEMENT_INSERTED',
+      payload: {
+        elementId,
+        content: dragElementContent,
+        targetElementId: generateElementId(currentDropTarget),
+        position: dropPosition,
+        parentTag: currentDropTarget.tagName,
+      }
+    });
+    
+    console.log('[Visual Editor] Element inserted:', elementId, 'position:', dropPosition);
+    
+    endDragMode();
+  }
+
+  function handleDragKeyDown(event) {
+    // Cancel drag on Escape
+    if (event.key === 'Escape') {
+      endDragMode();
+      sendToParent({ type: 'DRAG_CANCELLED', payload: {} });
+    }
+  }
+
+  // Convert JSX-like content to HTML (basic conversion)
+  function jsxToHtml(jsx) {
+    if (!jsx) return '';
+    
+    return jsx
+      // Convert className to class
+      .replace(/className=/g, 'class=')
+      // Convert JSX expressions {value} to empty (remove them)
+      .replace(/\\{[^}]+\\}/g, '')
+      // Handle self-closing tags
+      .replace(/<(\\w+)([^>]*)\\/>/g, '<$1$2></$1>')
+      // Clean up any double spaces
+      .replace(/\\s+/g, ' ')
+      .trim();
+  }
+
+  function insertElement(content, targetElementId, position) {
+    const target = targetElementId ? findElementById(targetElementId) : document.body;
+    if (!target) return;
+    
+    const htmlContent = jsxToHtml(content);
+    const temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    const newElement = temp.firstElementChild;
+    
+    if (!newElement) return;
+    
+    if (position === 'before') {
+      target.parentNode.insertBefore(newElement, target);
+    } else if (position === 'after') {
+      target.parentNode.insertBefore(newElement, target.nextSibling);
+    } else {
+      target.appendChild(newElement);
+    }
+    
+    const elementId = generateElementId(newElement);
+    sendToParent({
+      type: 'ELEMENT_INSERTED',
+      payload: { elementId, content, position }
+    });
   }
 
   // Initialize event listeners

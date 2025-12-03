@@ -183,6 +183,9 @@ export type VisualEditorMessage =
   | { type: 'ELEMENT_INFO_RESPONSE'; payload: { element: ElementInfo } }
   | { type: 'STYLE_APPLIED'; payload: { elementId: string; success: boolean } }
   | { type: 'DOM_UPDATED'; payload: { elements: ElementInfo[] } }
+  // Undo/Redo messages
+  | { type: 'UNDO_STYLE'; payload: { elementId: string; changes: StyleChange[] } }
+  | { type: 'REDO_STYLE'; payload: { elementId: string; changes: StyleChange[] } }
   // Drag & Drop element messages
   | { type: 'DRAG_ELEMENT_START'; payload: { elementType: string; content: string } }
   | { type: 'DRAG_ELEMENT_OVER'; payload: { x: number; y: number } }
@@ -190,6 +193,9 @@ export type VisualEditorMessage =
   | { type: 'DROP_ELEMENT'; payload: { elementType: string; content: string; targetId?: string; position: 'before' | 'after' | 'inside' } }
   | { type: 'ELEMENT_DROPPED'; payload: { elementId: string; success: boolean; insertedAt?: { targetId: string; position: string } } }
   | { type: 'DROP_ZONE_HIGHLIGHT'; payload: { targetId: string; position: 'before' | 'after' | 'inside' } | null }
+  | { type: 'ELEMENT_INSERTED'; payload: { elementId: string; content: string; targetElementId?: string; position: string; parentTag?: string } }
+  | { type: 'INSERT_ELEMENT'; payload: { content: string; targetElementId?: string; position: 'before' | 'after' | 'inside' } }
+  | { type: 'DRAG_CANCELLED'; payload: {} }
   // Theme messages
   | { type: 'APPLY_THEME_PREVIEW'; payload: { themeCSS: string } }
   | { type: 'CLEAR_THEME_PREVIEW'; payload: {} };
