@@ -121,21 +121,40 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
   return (
     <div
       className={cn(
-        'fixed left-0 top-0 z-50 w-80 h-screen bg-background border-r shadow-lg flex flex-col',
+        'fixed left-0 top-0 z-50 h-screen bg-background border-r shadow-lg flex flex-col',
+        'w-72 sm:w-80 md:w-80 lg:w-80 xl:w-80', // Responsive width - narrower on mobile
         className
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">Visual Editor</span>
+      <div className="flex items-center justify-between p-2 border-b bg-card/50">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="font-semibold text-sm truncate">Visual Editor</span>
           {state.selectedElements.length > 1 && (
-            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
-              {state.selectedElements.length} selected
+            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full">
+              {state.selectedElements.length}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Save button in header - always visible */}
+          {selectedElement && hasPendingChanges && (
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isSaving ? (
+                <>Saving...</>
+              ) : (
+                <>
+                  <Save className="h-3 w-3 mr-1" />
+                  Save
+                </>
+              )}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -144,7 +163,7 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
             disabled={state.historyIndex < 0}
             title="Undo (Ctrl+Z)"
           >
-            <Undo2 className="h-4 w-4" />
+            <Undo2 className="h-3 w-3" />
           </Button>
           <Button
             variant="ghost"
@@ -154,7 +173,7 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
             disabled={state.historyIndex >= state.history.length - 1}
             title="Redo (Ctrl+Shift+Z)"
           >
-            <Redo2 className="h-4 w-4" />
+            <Redo2 className="h-3 w-3" />
           </Button>
           <Button
             variant="ghost"
@@ -163,13 +182,13 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
             onClick={() => setSidebarOpen(false)}
             title="Close sidebar"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3 w-3" />
           </Button>
         </div>
       </div>
 
-      {/* Tools */}
-      <div className="flex items-center gap-1 p-2 border-b">
+      {/* Tools - Compact */}
+      <div className="flex items-center justify-center gap-1 p-2 border-b bg-muted/30">
         <ToolButton
           icon={<MousePointer2 className="h-4 w-4" />}
           isActive={state.activeTool === 'select'}
@@ -198,81 +217,49 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
 
       {/* Content */}
       <ScrollArea className="flex-1">
-        {selectedElement ? (
-          <Tabs
-            value={state.activePanel}
-            onValueChange={(v) => setActivePanel(v as SidebarPanel)}
-            className="w-full"
-          >
-            <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0">
-              <TabsTrigger
-                value="styles"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
-              >
-                Styles
-              </TabsTrigger>
-              <TabsTrigger
-                value="layout"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
-              >
-                Layout
-              </TabsTrigger>
-              <TabsTrigger
-                value="spacing"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
-              >
-                Spacing
-              </TabsTrigger>
-              <TabsTrigger
-                value="typography"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent"
-              >
-                Text
-              </TabsTrigger>
-            </TabsList>
+        <div className="p-2">
+          {selectedElement ? (
+            <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
+              <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
+                <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
+                <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
+                <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
+                <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="styles" className="p-3 space-y-4">
-              <StylesPanel element={selectedElement} />
-            </TabsContent>
+              <TabsContent value="styles" className="mt-0 space-y-2">
+                <StylesPanel element={selectedElement} />
+              </TabsContent>
 
-            <TabsContent value="layout" className="p-3 space-y-4">
-              <LayoutPanel element={selectedElement} />
-            </TabsContent>
+              <TabsContent value="layout" className="mt-0 space-y-2">
+                <LayoutPanel element={selectedElement} />
+              </TabsContent>
 
-            <TabsContent value="spacing" className="p-3 space-y-4">
-              <SpacingPanel element={selectedElement} />
-            </TabsContent>
+              <TabsContent value="spacing" className="mt-0 space-y-2">
+                <SpacingPanel element={selectedElement} />
+              </TabsContent>
 
-            <TabsContent value="typography" className="p-3 space-y-4">
-              <TypographyPanel element={selectedElement} />
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="p-4">
-            <ElementTree />
-          </div>
-        )}
+              <TabsContent value="typography" className="mt-0 space-y-2">
+                <TypographyPanel element={selectedElement} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
+              <MousePointer2 className="h-12 w-12 mb-4 opacity-50" />
+              <p className="text-sm">Select an element to edit</p>
+              <p className="text-xs mt-1">Click on any element in the canvas</p>
+            </div>
+          )}
+        </div>
       </ScrollArea>
 
-      {/* Footer with save button */}
-      {selectedElement && hasPendingChanges && (
-        <div className="p-3 border-t">
-          <Button
-            className="w-full"
-            onClick={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <>Saving...</>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </>
-            )}
-          </Button>
+      {/* Footer - Compact */}
+      <div className="p-2 border-t bg-muted/30">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Changes: {Array.from(state.pendingChanges.values()).reduce((total, changes) => total + changes.length, 0)}</span>
+          <span>Selected: {state.selectedElements.length}</span>
         </div>
-      )}
+      </div>
     </div>
   );
 }

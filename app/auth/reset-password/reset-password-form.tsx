@@ -50,7 +50,7 @@ export default function ResetPasswordForm() {
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
-
+ 
     try {
       const { error } = await supabase.auth.updateUser({
         password,
