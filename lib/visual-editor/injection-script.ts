@@ -14,6 +14,16 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   let hoveredElement = null;
   const elementIdMap = new WeakMap();
   let nextElementId = 1;
+  
+  // Resize state
+  let isResizing = false;
+  let resizeHandle = null;
+  let resizeStartX = 0;
+  let resizeStartY = 0;
+  let resizeStartWidth = 0;
+  let resizeStartHeight = 0;
+  let resizeElement = null;
+  let resizeElementId = null;
 
   // Utility functions
   function generateElementId(element) {
@@ -170,6 +180,7 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   // Create highlight overlay
   let hoverOverlay = null;
   let selectionOverlays = new Map();
+  let resizeHandles = new Map(); // Map of elementId -> handle elements
 
   function createOverlay() {
     const overlay = document.createElement('div');
@@ -182,6 +193,241 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     \`;
     document.body.appendChild(overlay);
     return overlay;
+  }
+
+  // Create resize handles for an element
+  function createResizeHandles(elementId, rect) {
+    const handles = [];
+    const handleSize = 8;
+    const positions = [
+      { name: 'nw', cursor: 'nwse-resize', x: -handleSize/2, y: -handleSize/2 },
+      { name: 'n', cursor: 'ns-resize', x: rect.width/2 - handleSize/2, y: -handleSize/2 },
+      { name: 'ne', cursor: 'nesw-resize', x: rect.width - handleSize/2, y: -handleSize/2 },
+      { name: 'e', cursor: 'ew-resize', x: rect.width - handleSize/2, y: rect.height/2 - handleSize/2 },
+      { name: 'se', cursor: 'nwse-resize', x: rect.width - handleSize/2, y: rect.height - handleSize/2 },
+      { name: 's', cursor: 'ns-resize', x: rect.width/2 - handleSize/2, y: rect.height - handleSize/2 },
+      { name: 'sw', cursor: 'nesw-resize', x: -handleSize/2, y: rect.height - handleSize/2 },
+      { name: 'w', cursor: 'ew-resize', x: -handleSize/2, y: rect.height/2 - handleSize/2 },
+    ];
+
+    positions.forEach(pos => {
+      const handle = document.createElement('div');
+      handle.setAttribute('data-ve-overlay', 'true');
+      handle.setAttribute('data-ve-handle', pos.name);
+      handle.setAttribute('data-ve-element-id', elementId);
+      handle.style.cssText = \`
+        position: fixed;
+        width: \${handleSize}px;
+        height: \${handleSize}px;
+        background: white;
+        border: 2px solid #2563eb;
+        border-radius: 2px;
+        cursor: \${pos.cursor};
+        z-index: 1000000;
+        pointer-events: auto;
+        left: \${rect.left + pos.x}px;
+        top: \${rect.top + pos.y}px;
+      \`;
+      
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startResize(elementId, pos.name, e);
+      });
+      
+      document.body.appendChild(handle);
+      handles.push(handle);
+    });
+
+    return handles;
+  }
+
+  function updateResizeHandles(elementId, rect) {
+    const handles = resizeHandles.get(elementId);
+    if (!handles) return;
+
+    const handleSize = 8;
+    const positions = [
+      { name: 'nw', x: -handleSize/2, y: -handleSize/2 },
+      { name: 'n', x: rect.width/2 - handleSize/2, y: -handleSize/2 },
+      { name: 'ne', x: rect.width - handleSize/2, y: -handleSize/2 },
+      { name: 'e', x: rect.width - handleSize/2, y: rect.height/2 - handleSize/2 },
+      { name: 'se', x: rect.width - handleSize/2, y: rect.height - handleSize/2 },
+      { name: 's', x: rect.width/2 - handleSize/2, y: rect.height - handleSize/2 },
+      { name: 'sw', x: -handleSize/2, y: rect.height - handleSize/2 },
+      { name: 'w', x: -handleSize/2, y: rect.height/2 - handleSize/2 },
+    ];
+
+    handles.forEach((handle, index) => {
+      const pos = positions[index];
+      handle.style.left = (rect.left + pos.x) + 'px';
+      handle.style.top = (rect.top + pos.y) + 'px';
+    });
+  }
+
+  function removeResizeHandles(elementId) {
+    const handles = resizeHandles.get(elementId);
+    if (handles) {
+      handles.forEach(handle => handle.parentNode?.removeChild(handle));
+      resizeHandles.delete(elementId);
+    }
+  }
+
+  function removeAllResizeHandles() {
+    resizeHandles.forEach((handles, elementId) => {
+      handles.forEach(handle => handle.parentNode?.removeChild(handle));
+    });
+    resizeHandles.clear();
+  }
+
+  // Resize functions
+  function startResize(elementId, handle, event) {
+    const element = findElementById(elementId);
+    if (!element) return;
+
+    isResizing = true;
+    resizeHandle = handle;
+    resizeStartX = event.clientX;
+    resizeStartY = event.clientY;
+    resizeElement = element;
+    resizeElementId = elementId;
+
+    const rect = element.getBoundingClientRect();
+    resizeStartWidth = rect.width;
+    resizeStartHeight = rect.height;
+
+    document.body.style.cursor = event.target.style.cursor;
+    document.addEventListener('mousemove', handleResizeMove, true);
+    document.addEventListener('mouseup', handleResizeEnd, true);
+  }
+
+  function handleResizeMove(event) {
+    if (!isResizing || !resizeElement) return;
+
+    const deltaX = event.clientX - resizeStartX;
+    const deltaY = event.clientY - resizeStartY;
+
+    let newWidth = resizeStartWidth;
+    let newHeight = resizeStartHeight;
+
+    // Calculate new dimensions based on handle
+    switch (resizeHandle) {
+      case 'e':
+      case 'ne':
+      case 'se':
+        newWidth = Math.max(20, resizeStartWidth + deltaX);
+        break;
+      case 'w':
+      case 'nw':
+      case 'sw':
+        newWidth = Math.max(20, resizeStartWidth - deltaX);
+        break;
+    }
+
+    switch (resizeHandle) {
+      case 's':
+      case 'se':
+      case 'sw':
+        newHeight = Math.max(20, resizeStartHeight + deltaY);
+        break;
+      case 'n':
+      case 'ne':
+      case 'nw':
+        newHeight = Math.max(20, resizeStartHeight - deltaY);
+        break;
+    }
+
+    // Apply resize to element
+    resizeElement.style.width = newWidth + 'px';
+    resizeElement.style.height = newHeight + 'px';
+
+    // Update overlay and handles
+    const rect = resizeElement.getBoundingClientRect();
+    const overlay = selectionOverlays.get(resizeElementId);
+    if (overlay) {
+      updateOverlay(overlay, rect, 'selected');
+    }
+    updateResizeHandles(resizeElementId, rect);
+
+    // Send resize update to parent
+    sendToParent({ 
+      type: 'ELEMENT_RESIZED', 
+      payload: { 
+        elementId: resizeElementId, 
+        newRect: {
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          bottom: rect.bottom,
+          x: rect.x,
+          y: rect.y,
+        }
+      } 
+    });
+  }
+
+  function handleResizeEnd(event) {
+    if (!isResizing || !resizeElement) return;
+
+    const rect = resizeElement.getBoundingClientRect();
+    
+    // Notify parent of final size
+    sendToParent({ 
+      type: 'ELEMENT_RESIZED', 
+      payload: { 
+        elementId: resizeElementId, 
+        newRect: {
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          bottom: rect.bottom,
+          x: rect.x,
+          y: rect.y,
+        }
+      } 
+    });
+
+    isResizing = false;
+    resizeHandle = null;
+    resizeElement = null;
+    resizeElementId = null;
+    document.body.style.cursor = isEnabled ? 'crosshair' : '';
+    
+    document.removeEventListener('mousemove', handleResizeMove, true);
+    document.removeEventListener('mouseup', handleResizeEnd, true);
+  }
+
+  // Delete element function
+  function deleteElement(elementId) {
+    const element = findElementById(elementId);
+    if (!element) {
+      sendToParent({ type: 'ELEMENT_DELETED', payload: { elementId, success: false } });
+      return false;
+    }
+
+    // Get parent info before deleting
+    const parentElement = element.parentElement;
+    
+    // Remove the element from DOM
+    element.remove();
+
+    // Clear selection for this element
+    selectedElements.delete(elementId);
+    const overlay = selectionOverlays.get(elementId);
+    if (overlay) {
+      removeOverlay(overlay);
+      selectionOverlays.delete(elementId);
+    }
+    removeResizeHandles(elementId);
+
+    sendToParent({ type: 'ELEMENT_DELETED', payload: { elementId, success: true } });
+    sendToParent({ type: 'CLEAR_SELECTION', payload: {} });
+    
+    return true;
   }
 
   function updateOverlay(overlay, rect, type) {
@@ -245,6 +491,7 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
 
   function handleClick(event) {
     if (!isEnabled) return;
+    if (isResizing) return; // Don't process clicks while resizing
     
     const element = document.elementFromPoint(event.clientX, event.clientY);
     if (!element || shouldIgnoreElement(element)) return;
@@ -262,12 +509,18 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
         const overlay = selectionOverlays.get(elementId);
         removeOverlay(overlay);
         selectionOverlays.delete(elementId);
+        removeResizeHandles(elementId);
         sendToParent({ type: 'ELEMENT_DESELECTED', payload: { elementId } });
       } else {
         selectedElements.set(elementId, element);
         const overlay = createOverlay();
         selectionOverlays.set(elementId, overlay);
-        updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+        const rect = element.getBoundingClientRect();
+        updateOverlay(overlay, rect, 'selected');
+        
+        // Create resize handles for the element
+        const handles = createResizeHandles(elementId, rect);
+        resizeHandles.set(elementId, handles);
         
         const elementInfo = getElementInfo(element);
         sendToParent({ 
@@ -282,7 +535,12 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
       selectedElements.set(elementId, element);
       const overlay = createOverlay();
       selectionOverlays.set(elementId, overlay);
-      updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+      const rect = element.getBoundingClientRect();
+      updateOverlay(overlay, rect, 'selected');
+      
+      // Create resize handles for the element
+      const handles = createResizeHandles(elementId, rect);
+      resizeHandles.set(elementId, handles);
       
       const elementInfo = getElementInfo(element);
       sendToParent({ 
@@ -303,6 +561,7 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     selectedElements.clear();
     selectionOverlays.forEach((overlay) => removeOverlay(overlay));
     selectionOverlays.clear();
+    removeAllResizeHandles();
   }
 
   function handleKeyDown(event) {
@@ -313,6 +572,22 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
       clearSelection();
       sendToParent({ type: 'CLEAR_SELECTION', payload: {} });
     }
+    
+    // Delete or Backspace to delete selected elements
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      // Don't delete if user is typing in an input
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) {
+        return;
+      }
+      
+      event.preventDefault();
+      
+      // Delete all selected elements
+      const elementsToDelete = Array.from(selectedElements.keys());
+      elementsToDelete.forEach(elementId => {
+        deleteElement(elementId);
+      });
+    }
   }
 
   function handleScroll() {
@@ -320,7 +595,9 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     selectionOverlays.forEach((overlay, elementId) => {
       const element = findElementById(elementId);
       if (element) {
-        updateOverlay(overlay, element.getBoundingClientRect(), 'selected');
+        const rect = element.getBoundingClientRect();
+        updateOverlay(overlay, rect, 'selected');
+        updateResizeHandles(elementId, rect);
       }
     });
     
@@ -413,6 +690,45 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
 
       case 'UPDATE_TEXT':
         updateTextContent(message.payload.elementId, message.payload.text);
+        break;
+
+      case 'DELETE_ELEMENT':
+        deleteElement(message.payload.elementId);
+        break;
+
+      case 'RESIZE_ELEMENT':
+        const resizeEl = findElementById(message.payload.elementId);
+        if (resizeEl) {
+          if (message.payload.width) {
+            resizeEl.style.width = message.payload.width;
+          }
+          if (message.payload.height) {
+            resizeEl.style.height = message.payload.height;
+          }
+          // Update overlay and handles
+          const rect = resizeEl.getBoundingClientRect();
+          const overlay = selectionOverlays.get(message.payload.elementId);
+          if (overlay) {
+            updateOverlay(overlay, rect, 'selected');
+          }
+          updateResizeHandles(message.payload.elementId, rect);
+          sendToParent({ 
+            type: 'ELEMENT_RESIZED', 
+            payload: { 
+              elementId: message.payload.elementId, 
+              newRect: {
+                width: rect.width,
+                height: rect.height,
+                top: rect.top,
+                left: rect.left,
+                right: rect.right,
+                bottom: rect.bottom,
+                x: rect.x,
+                y: rect.y,
+              }
+            } 
+          });
+        }
         break;
 
       case 'REQUEST_ELEMENT_INFO':

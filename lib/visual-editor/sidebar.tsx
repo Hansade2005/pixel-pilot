@@ -54,6 +54,8 @@ import {
   Bold,
   Italic,
   Underline,
+  Trash2,
+  Scaling,
 } from 'lucide-react';
 
 interface VisualEditorSidebarProps {
@@ -73,6 +75,7 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
     undo,
     redo,
     clearSelection,
+    deleteSelectedElements,
   } = useVisualEditor();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -213,6 +216,29 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
           onClick={() => setActiveTool('layout')}
           tooltip="Layout (L)"
         />
+        <ToolButton
+          icon={<Scaling className="h-4 w-4" />}
+          isActive={state.activeTool === 'resize'}
+          onClick={() => setActiveTool('resize')}
+          tooltip="Resize (R)"
+        />
+        {/* Delete button - only enabled when element is selected */}
+        <ToolButton
+          icon={<Trash2 className="h-4 w-4" />}
+          isActive={state.activeTool === 'delete'}
+          onClick={() => {
+            if (state.selectedElements.length > 0) {
+              // Confirm before deleting
+              if (confirm(`Delete ${state.selectedElements.length} selected element(s)?`)) {
+                deleteSelectedElements();
+              }
+            } else {
+              setActiveTool('delete');
+            }
+          }}
+          tooltip="Delete (Del)"
+          disabled={state.selectedElements.length === 0 && state.activeTool !== 'delete'}
+        />
       </div>
 
       {/* Content */}
@@ -270,16 +296,18 @@ interface ToolButtonProps {
   isActive: boolean;
   onClick: () => void;
   tooltip: string;
+  disabled?: boolean;
 }
 
-function ToolButton({ icon, isActive, onClick, tooltip }: ToolButtonProps) {
+function ToolButton({ icon, isActive, onClick, tooltip, disabled }: ToolButtonProps) {
   return (
     <Button
       variant={isActive ? 'secondary' : 'ghost'}
       size="icon"
-      className="h-8 w-8"
+      className={cn('h-8 w-8', disabled && 'opacity-50 cursor-not-allowed')}
       onClick={onClick}
       title={tooltip}
+      disabled={disabled}
     >
       {icon}
     </Button>

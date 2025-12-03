@@ -43,6 +43,7 @@ type VisualEditorAction =
   | { type: 'DESELECT_ELEMENT'; payload: string }
   | { type: 'CLEAR_SELECTION' }
   | { type: 'SET_SELECTED_ELEMENTS'; payload: ElementSelection[] }
+  | { type: 'REMOVE_ELEMENT'; payload: string }
   | { type: 'ADD_PENDING_CHANGE'; payload: { elementId: string; changes: StyleChange[] } }
   | { type: 'CLEAR_PENDING_CHANGES' }
   | { type: 'APPLY_CHANGES'; payload: { elementId: string; description: string } }
@@ -138,6 +139,15 @@ function visualEditorReducer(
       return {
         ...state,
         selectedElements: action.payload,
+      };
+
+    case 'REMOVE_ELEMENT':
+      return {
+        ...state,
+        selectedElements: state.selectedElements.filter(
+          (sel) => sel.element.id !== action.payload
+        ),
+        hoveredElement: state.hoveredElement?.id === action.payload ? null : state.hoveredElement,
       };
 
     case 'ADD_PENDING_CHANGE': {
@@ -315,6 +325,10 @@ interface VisualEditorContextValue {
   updateElementRect: (elementId: string, rect: DOMRect) => void;
   updateElementStyle: (elementId: string, property: string, value: string) => void;
   updateElementText: (elementId: string, text: string) => void;
+  // Delete and resize actions
+  deleteElement: (elementId: string) => void;
+  deleteSelectedElements: () => void;
+  resizeElement: (elementId: string, width: number, height: number) => void;
   // Iframe communication
   sendToIframe: (message: VisualEditorMessage) => void;
   setIframeRef: (iframe: HTMLIFrameElement | null) => void;
@@ -385,6 +399,22 @@ export function VisualEditorProvider({
           break;
         case 'DOM_UPDATED':
           // Update element info when DOM changes
+          break;
+        case 'ELEMENT_DELETED':
+          // Handle element deletion - remove from selection and clear pending changes
+          dispatch({ type: 'REMOVE_ELEMENT', payload: message.payload.elementId });
+          break;
+        case 'ELEMENT_RESIZED':
+          // Handle resize completion - update element dimensions
+          if (message.payload.newRect) {
+            dispatch({
+              type: 'UPDATE_ELEMENT_RECT',
+              payload: {
+                elementId: message.payload.elementId,
+                rect: message.payload.newRect,
+              },
+            });
+          }
           break;
       }
     };
@@ -508,6 +538,52 @@ export function VisualEditorProvider({
     });
   }, [sendToIframe]);
 
+  // Delete an element
+  const deleteElement = useCallback((elementId: string) => {
+    // Send delete message to iframe
+    sendToIframe({ type: 'DELETE_ELEMENT', payload: { elementId } });
+    // Remove from state
+    dispatch({ type: 'REMOVE_ELEMENT', payload: elementId });
+  }, [sendToIframe]);
+
+  // Delete all selected elements
+  const deleteSelectedElements = useCallback(() => {
+    state.selectedElements.forEach((sel) => {
+      deleteElement(sel.elementId);
+    });
+  }, [state.selectedElements, deleteElement]);
+
+  // Resize an element
+  const resizeElement = useCallback((elementId: string, width: number, height: number) => {
+    // Send resize message to iframe with pixel values as strings
+    sendToIframe({ 
+      type: 'RESIZE_ELEMENT', 
+      payload: { elementId, width: `${width}px`, height: `${height}px` } 
+    });
+    
+    // Add as pending changes for width and height
+    dispatch({
+      type: 'ADD_PENDING_CHANGE',
+      payload: {
+        elementId,
+        changes: [
+          {
+            property: 'width',
+            oldValue: '',
+            newValue: `${width}px`,
+            useTailwind: true,
+          },
+          {
+            property: 'height',
+            oldValue: '',
+            newValue: `${height}px`,
+            useTailwind: true,
+          },
+        ],
+      },
+    });
+  }, [sendToIframe]);
+
   // Apply changes to source file
   const applyChangesToFile = useCallback(async (
     elementId: string,
@@ -552,6 +628,9 @@ export function VisualEditorProvider({
     updateElementRect,
     updateElementStyle,
     updateElementText,
+    deleteElement,
+    deleteSelectedElements,
+    resizeElement,
     sendToIframe,
     setIframeRef,
     applyChangesToFile,

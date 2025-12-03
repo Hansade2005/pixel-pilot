@@ -1296,6 +1296,139 @@ function generateGroupedTailwindSearchReplace(openingTag: string, changes: Style
   return null;
 }
 
+// Generate a search-replace edit to delete an element
+export function generateDeleteElementEdit(
+  fileContent: string,
+  sourceLine: number
+): { searchString: string; replaceString: string } | null {
+  const lines = fileContent.split('\n');
+  
+  // Find the JSX element at the source line
+  const targetLine = lines[sourceLine - 1];
+  if (!targetLine) {
+    console.warn('[Visual Editor] Could not find line', sourceLine);
+    return null;
+  }
+  
+  // Try to find the complete element using findJSXElement
+  const elementResult = findJSXElement(lines, sourceLine - 1);
+  if (!elementResult) {
+    console.warn('[Visual Editor] Could not find JSX element at line', sourceLine);
+    return null;
+  }
+  
+  const { startLine, endLine, openingTag, closingTagLine } = elementResult;
+  
+  // For single-line self-closing elements or complete elements on same line
+  if (startLine === endLine || closingTagLine === startLine) {
+    // Single line element - remove the whole line (or just the element if inline)
+    const line = lines[startLine];
+    
+    // Extract the full element from the line using the opening tag
+    const tagMatch = openingTag.match(/^<(\w+)/);
+    const tagName = tagMatch ? tagMatch[1] : '';
+    const tagStartPos = line.indexOf('<' + tagName);
+    
+    // Find the end of this element (closing tag or self-closing)
+    let elementEnd = line.indexOf('/>', tagStartPos);
+    if (elementEnd === -1) {
+      // Look for closing tag
+      const closingTag = '</' + tagName + '>';
+      elementEnd = line.indexOf(closingTag, tagStartPos);
+      if (elementEnd !== -1) {
+        elementEnd += closingTag.length;
+      }
+    } else {
+      elementEnd += 2; // Include "/>"
+    }
+    
+    if (tagStartPos !== -1 && elementEnd !== -1) {
+      const fullElement = line.substring(tagStartPos, elementEnd);
+      const lineWithoutElement = (line.substring(0, tagStartPos) + line.substring(elementEnd)).trim();
+      
+      if (lineWithoutElement === '') {
+        // Element is the only thing on this line, remove the whole line
+        return {
+          searchString: line,
+          replaceString: '',
+        };
+      } else {
+        // Element is inline with other content, just remove the element
+        return {
+          searchString: fullElement,
+          replaceString: '',
+        };
+      }
+    }
+  }
+  
+  // Multi-line element - remove all lines from startLine to closingTagLine
+  const linesToDelete = lines.slice(startLine, closingTagLine + 1).join('\n');
+  
+  return {
+    searchString: linesToDelete,
+    replaceString: '',
+  };
+}
+
+// Generate a search-replace edit to resize an element
+export function generateResizeElementEdit(
+  fileContent: string,
+  sourceLine: number,
+  width?: string,
+  height?: string
+): { searchString: string; replaceString: string } | null {
+  const lines = fileContent.split('\n');
+  
+  // Find the JSX element at the source line
+  const elementResult = findJSXElement(lines, sourceLine - 1);
+  if (!elementResult) {
+    console.warn('[Visual Editor] Could not find JSX element at line', sourceLine);
+    return null;
+  }
+  
+  const { openingTag } = elementResult;
+  
+  // Build Tailwind width/height changes
+  const changes: StyleChange[] = [];
+  
+  if (width) {
+    const numericWidth = parseInt(width.replace('px', ''), 10);
+    if (!isNaN(numericWidth)) {
+      const tailwindWidth = pixelsToTailwindSpacing(numericWidth, 'w');
+      changes.push({
+        property: 'width',
+        oldValue: '',
+        newValue: width,
+        useTailwind: true,
+        tailwindClass: tailwindWidth,
+      });
+    }
+  }
+  
+  if (height) {
+    const numericHeight = parseInt(height.replace('px', ''), 10);
+    if (!isNaN(numericHeight)) {
+      const tailwindHeight = pixelsToTailwindSpacing(numericHeight, 'h');
+      changes.push({
+        property: 'height',
+        oldValue: '',
+        newValue: height,
+        useTailwind: true,
+        tailwindClass: tailwindHeight,
+      });
+    }
+  }
+  
+  if (changes.length === 0) {
+    return null;
+  }
+  
+  // Generate the updated className
+  const result = generateGroupedTailwindSearchReplace(openingTag, changes);
+  return result;
+}
+
 export default {
   cssToTailwindClass,
   updateClassName,
@@ -1305,4 +1438,6 @@ export default {
   updateCodeWithChanges,
   generateFileUpdate,
   generateSearchReplaceEdit,
+  generateDeleteElementEdit,
+  generateResizeElementEdit,
 };

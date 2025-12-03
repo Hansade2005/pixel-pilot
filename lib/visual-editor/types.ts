@@ -118,7 +118,9 @@ export type VisualEditorTool =
   | 'select'      // Default selection mode
   | 'text'        // Text editing mode
   | 'spacing'     // Margin/padding adjustment mode
-  | 'layout';     // Layout/alignment mode
+  | 'layout'      // Layout/alignment mode
+  | 'resize'      // Resize mode
+  | 'delete';     // Delete mode
 
 export type SidebarPanel = 
   | 'styles'      // General styles panel
@@ -126,6 +128,17 @@ export type SidebarPanel =
   | 'spacing'     // Margins & padding
   | 'typography'  // Font, size, color
   | 'effects';    // Shadows, borders, etc.
+
+// Resize handle positions
+export type ResizeHandle = 
+  | 'n'   // North (top)
+  | 'ne'  // North-east (top-right)
+  | 'e'   // East (right)
+  | 'se'  // South-east (bottom-right)
+  | 's'   // South (bottom)
+  | 'sw'  // South-west (bottom-left)
+  | 'w'   // West (left)
+  | 'nw'; // North-west (top-left)
 
 export interface HistoryEntry {
   timestamp: number;
@@ -144,6 +157,10 @@ export type VisualEditorMessage =
   | { type: 'CLEAR_SELECTION'; payload: {} }
   | { type: 'APPLY_STYLE'; payload: { elementId: string; changes: StyleChange[] } }
   | { type: 'UPDATE_TEXT'; payload: { elementId: string; text: string } }
+  | { type: 'DELETE_ELEMENT'; payload: { elementId: string } }
+  | { type: 'ELEMENT_DELETED'; payload: { elementId: string; success: boolean } }
+  | { type: 'RESIZE_ELEMENT'; payload: { elementId: string; width?: string; height?: string } }
+  | { type: 'ELEMENT_RESIZED'; payload: { elementId: string; newRect: DOMRect } }
   | { type: 'REQUEST_ELEMENT_INFO'; payload: { elementId: string } }
   | { type: 'ELEMENT_INFO_RESPONSE'; payload: { element: ElementInfo } }
   | { type: 'STYLE_APPLIED'; payload: { elementId: string; success: boolean } }
