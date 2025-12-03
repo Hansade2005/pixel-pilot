@@ -755,12 +755,13 @@ function findJSXElement(
 
               // First check if the closing tag is on the same line as the opening tag
               const openingLine = lines[endLine];
-              const openingTagEnd = openingTag.length;
-              const remainingOnOpeningLine = openingLine.substring(openingTagEnd);
+              // Calculate the actual position where the opening tag ends in the line
+              const tagStartInLine = openingLine.indexOf('<' + tagName);
+              const openingTagEndPos = tagStartInLine + openingTag.length;
+              const remainingOnOpeningLine = openingLine.substring(openingTagEndPos);
 
               const sameLineClosingMatch = remainingOnOpeningLine.match(closingTagPattern);
               if (sameLineClosingMatch) {
-                const contentStart = openingTagEnd;
                 const contentEnd = remainingOnOpeningLine.indexOf(sameLineClosingMatch[0]);
                 elementContent = remainingOnOpeningLine.substring(0, contentEnd);
                 closingTagLine = endLine;
@@ -857,12 +858,13 @@ function findJSXElement(
             let tagDepth = 1;
 
             const openingLine = lines[endLine];
-            const openingTagEnd = openingTag.length;
-            const remainingOnOpeningLine = openingLine.substring(openingTagEnd);
+            // Calculate the actual position where the opening tag ends in the line
+            const tagStartInLine = openingLine.indexOf('<' + tagName);
+            const openingTagEndPos = tagStartInLine + openingTag.length;
+            const remainingOnOpeningLine = openingLine.substring(openingTagEndPos);
 
             const sameLineClosingMatch = remainingOnOpeningLine.match(closingTagPattern);
             if (sameLineClosingMatch) {
-              const contentStart = openingTagEnd;
               const contentEnd = remainingOnOpeningLine.indexOf(sameLineClosingMatch[0]);
               elementContent = remainingOnOpeningLine.substring(0, contentEnd);
               closingTagLine = endLine;
@@ -1048,20 +1050,24 @@ export async function generateSearchReplaceEdit(
       if (elementInfo.closingTagLine === elementInfo.endLine) {
         // Content is on the same line as opening tag
         const openingLine = lines[elementInfo.endLine];
-        const openingTagEnd = elementInfo.openingTag.length;
-        const remainingOnLine = openingLine.substring(openingTagEnd);
+        
+        // Find the actual position of the opening tag in the line
+        const tagMatch = elementInfo.openingTag.match(/^<(\w+)/);
+        const tagName = tagMatch ? tagMatch[1] : '';
+        const tagStartPos = openingLine.indexOf('<' + tagName);
+        const openingTagEndPos = tagStartPos + elementInfo.openingTag.length;
+        const remainingOnLine = openingLine.substring(openingTagEndPos);
         
         // Find the closing tag on the same line
-        const closingTagPattern = new RegExp(`</${elementInfo.openingTag.match(/^<(\w+)/)?.[1]}\\s*>`);
+        const closingTagPattern = new RegExp(`</${tagName}\\s*>`);
         const closingMatch = remainingOnLine.match(closingTagPattern);
         
         if (closingMatch) {
-          const contentStart = openingTagEnd;
           const contentEnd = remainingOnLine.indexOf(closingMatch[0]);
-          const currentContent = remainingOnLine.substring(0, contentEnd).trim();
+          const currentContent = remainingOnLine.substring(0, contentEnd);
           
           // Replace the content on the same line
-          const beforeContent = openingLine.substring(0, contentStart);
+          const beforeContent = openingLine.substring(0, openingTagEndPos);
           const afterContent = remainingOnLine.substring(contentEnd);
           const newLine = beforeContent + textChange.newValue + afterContent;
           
@@ -1072,24 +1078,54 @@ export async function generateSearchReplaceEdit(
           });
         }
       } else if (elementInfo.closingTagLine !== -1) {
-        // Content spans multiple lines
+        // Content spans multiple lines - replace the entire content block precisely
         const contentLines = lines.slice(elementInfo.endLine + 1, elementInfo.closingTagLine);
-        const currentContent = contentLines.join('\n').trim();
-
-        // Find the indentation of the content
-        const contentIndent = contentLines.length > 0
-          ? contentLines[0].match(/^(\s*)/)?.[1] || ''
-          : '';
-
-        // Create search string with proper indentation
-        const searchString = contentLines.map(line => line.trim()).join('\n');
-        const replaceString = textChange.newValue;
-
-        operations.push({
-          searchString,
-          replaceString: contentIndent + replaceString,
-          change: textChange,
-        });
+        
+        // Get the exact content as it appears in the file (preserve all whitespace)
+        const exactContentBlock = contentLines.join('\n');
+        
+        // Trim to get the actual text content for comparison
+        const trimmedContent = exactContentBlock.trim();
+        
+        console.log('[SearchReplace] Text content - exact block:', JSON.stringify(exactContentBlock));
+        console.log('[SearchReplace] Text content - trimmed:', JSON.stringify(trimmedContent));
+        console.log('[SearchReplace] Text content - new value:', JSON.stringify(textChange.newValue));
+        
+        // If the trimmed content matches what we're trying to replace, do the replacement
+        if (trimmedContent === textChange.oldValue || trimmedContent.includes(textChange.oldValue)) {
+          // Find the indentation pattern of the first content line
+          const firstContentLine = contentLines.find(line => line.trim().length > 0);
+          const indentMatch = firstContentLine ? firstContentLine.match(/^(\s*)/) : null;
+          const baseIndent = indentMatch ? indentMatch[1] : '';
+          
+          // Replace the entire content block with properly indented new content
+          const indentedNewContent = textChange.newValue.split('\n').map((line, i) => 
+            i === 0 ? baseIndent + line : line
+          ).join('\n');
+          
+          operations.push({
+            searchString: exactContentBlock,
+            replaceString: indentedNewContent,
+            change: textChange,
+          });
+        } else {
+          // Fallback: if we can't match exactly, try to find and replace within the content
+          console.log('[SearchReplace] Could not match content exactly, trying substring replacement');
+          
+          // Look for the old value within the content block
+          const oldValueIndex = exactContentBlock.indexOf(textChange.oldValue);
+          if (oldValueIndex !== -1) {
+            const before = exactContentBlock.substring(0, oldValueIndex);
+            const after = exactContentBlock.substring(oldValueIndex + textChange.oldValue.length);
+            const newContentBlock = before + textChange.newValue + after;
+            
+            operations.push({
+              searchString: exactContentBlock,
+              replaceString: newContentBlock,
+              change: textChange,
+            });
+          }
+        }
       }
     }
 
