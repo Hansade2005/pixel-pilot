@@ -6354,9 +6354,10 @@ module.exports = function visualEditorLoader(source) {
                 );
                 if (hasVeId) return;
 
-                // Create relative path
+                // Create relative path - use non-greedy match to get FIRST occurrence of src/app/components
+                // This ensures src/app/page.tsx stays as src/app/page.tsx (not app/page.tsx)
                 const relativePath = filename
-                  .replace(/^.*[\\\\/](src|app|components)[\\\\/]/, '$1/')
+                  .replace(/^.*?[\\\\/](src|app|components)[\\\\/]/, '$1/')
                   .replace(/\\\\/g, '/');
 
                 // Add data-ve-id attribute
