@@ -162,29 +162,55 @@ export function updateClassName(
   const classes = safeClassName.split(/\s+/).filter(Boolean);
   const classSet = new Set(classes);
 
-  console.log('[updateClassName] Input className:', currentClassName);
-  console.log('[updateClassName] Changes:', changes);
-
   for (const change of changes) {
     if (!change.useTailwind) continue;
 
     // Get the new Tailwind class
     const newClass = change.tailwindClass || cssToTailwindClass(change.property, change.newValue);
-    console.log(`[updateClassName] Property: ${change.property}, Value: ${change.newValue}, TW Class: ${newClass}`);
     
     if (!newClass) {
-      console.warn(`[updateClassName] No Tailwind class generated for ${change.property}: ${change.newValue}`);
       continue;
     }
 
     // Find and remove any existing classes for this property
     const prefix = getTailwindPrefix(change.property);
-    console.log(`[updateClassName] Prefix for ${change.property}: ${prefix}`);
     
     if (prefix) {
       // Remove existing classes with the same prefix
       const classesToRemove = Array.from(classSet).filter(cls => {
-        // Match classes like mt-4, mb-8, text-lg, bg-blue-500, etc.
+        // Special handling for 'text' prefix - distinguish between text color and text size
+        if (prefix === 'text' && change.property === 'color') {
+          // Only remove color-related text classes, not size classes like text-lg, text-xl
+          // Color classes: text-red-500, text-[#fff], text-white, text-black, etc.
+          if (cls.match(/^text-(\[|black|white|transparent|current|inherit|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)/)) {
+            return true;
+          }
+          return false;
+        }
+        // Special handling for 'text' prefix when changing fontSize
+        if (prefix === 'text' && change.property === 'fontSize') {
+          // Only remove size-related text classes: text-xs, text-sm, text-base, text-lg, text-xl, etc.
+          if (cls.match(/^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)$/)) {
+            return true;
+          }
+          return false;
+        }
+        // Special handling for 'font' prefix - distinguish between fontWeight and fontFamily
+        if (prefix === 'font' && change.property === 'fontWeight') {
+          // Only remove weight classes: font-thin, font-light, font-normal, font-medium, font-semibold, font-bold, font-extrabold, font-black
+          if (cls.match(/^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/)) {
+            return true;
+          }
+          return false;
+        }
+        if (prefix === 'font' && change.property === 'fontFamily') {
+          // Only remove family classes: font-sans, font-serif, font-mono, font-[...]
+          if (cls.match(/^font-(sans|serif|mono|\[)/)) {
+            return true;
+          }
+          return false;
+        }
+        // Match classes like mt-4, mb-8, bg-blue-500, etc.
         if (cls.startsWith(`${prefix}-`)) return true;
         if (cls.startsWith(`${prefix}[`)) return true;
         // For display properties, remove exact matches
@@ -194,18 +220,14 @@ export function updateClassName(
         return false;
       });
       
-      console.log(`[updateClassName] Removing classes:`, classesToRemove);
       classesToRemove.forEach(cls => classSet.delete(cls));
     }
 
     // Add the new class
-    console.log(`[updateClassName] Adding class: ${newClass}`);
     classSet.add(newClass);
   }
 
-  const result = Array.from(classSet).join(' ');
-  console.log('[updateClassName] Final className:', result);
-  return result;
+  return Array.from(classSet).join(' ');
 }
 
 // Get Tailwind prefix for a CSS property
@@ -253,12 +275,7 @@ export function generateInlineStyle(changes: StyleChange[]): string {
     return `${change.property}: ${quotedValue}`;
   });
 
-  const result = styles.join(', ');
-  console.log('[generateInlineStyle] Generated:', result);
-  return result;
-}// Convert camelCase to kebab-case
-function camelToKebab(str: string): string {
-  return str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+  return styles.join(', ');
 }
 
 // Parse existing inline style string to object (handles both CSS and JSX syntax)
@@ -317,22 +334,16 @@ export function mergeInlineStyles(
   existing: string,
   changes: StyleChange[]
 ): string {
-  console.log('[mergeInlineStyles] Existing:', existing);
-  console.log('[mergeInlineStyles] Changes:', changes);
-  
   const existingStyles = parseInlineStyle(existing);
-  console.log('[mergeInlineStyles] Parsed existing styles:', existingStyles);
   
   for (const change of changes) {
     if (!change.useTailwind) {
       existingStyles[change.property] = change.newValue;
     }
   }
-  
-  console.log('[mergeInlineStyles] Merged styles:', existingStyles);
 
   // Convert back to JSX object syntax with quoted values - use single quotes to avoid escaping issues
-  const result = Object.entries(existingStyles)
+  return Object.entries(existingStyles)
     .map(([prop, val]) => {
       // Check if it's a pure number
       const isNumeric = /^-?\d+(\.\d+)?$/.test(val);
@@ -340,9 +351,6 @@ export function mergeInlineStyles(
       return `${prop}: ${quotedValue}`;
     })
     .join(', ');
-    
-  console.log('[mergeInlineStyles] Result:', result);
-  return result;
 }
 
 // Simple regex-based code updater (works without full AST parsing)
@@ -545,105 +553,6 @@ export function generateFileUpdate(
 
   // Fall back to regex-based editing (least reliable)
   return updateCodeWithChanges(originalCode, elementId, changes);
-}
-
-// Parse line number from element ID format "file:line:column"
-function parseLineFromElementId(elementId: string): number | null {
-  // Format: "src/App.tsx:11:0" -> extract line number 11
-  const parts = elementId.split(':');
-  if (parts.length >= 2) {
-    const lineNum = parseInt(parts[parts.length - 2], 10);
-    if (!isNaN(lineNum) && lineNum > 0) {
-      return lineNum;
-    }
-  }
-  return null;
-}
-
-// Update element by line number - handles JSX elements that may span multiple lines
-function updateElementByLine(
-  code: string,
-  lineNumber: number,
-  changes: StyleChange[]
-): CodeUpdateResult {
-  const lines = code.split('\n');
-  const targetLineIndex = lineNumber - 1; // Convert to 0-indexed
-  
-  if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
-    return {
-      success: false,
-      updatedCode: code,
-      error: `Line ${lineNumber} is out of range`,
-    };
-  }
-
-  // Separate text content changes from style changes
-  const textChange = changes.find(c => (c.property as string) === 'textContent');
-  const styleChanges = changes.filter(c => (c.property as string) !== 'textContent');
-
-  // Find the JSX element opening tag that starts at or contains this line
-  // We need to handle multi-line elements like:
-  // <div
-  //   className="..."
-  //   style={...}
-  // >
-  
-  const { startLine, endLine, openingTag, closingTagLine, elementContent } = findJSXElement(lines, targetLineIndex);
-  
-  if (startLine === -1 || !openingTag) {
-    return {
-      success: false,
-      updatedCode: code,
-      error: `Could not find JSX element at line ${lineNumber}`,
-    };
-  }
-
-  // Apply style changes to the opening tag
-  const updatedOpeningTag = styleChanges.length > 0 
-    ? applyChangesToOpeningTag(openingTag, styleChanges)
-    : openingTag;
-  
-  // Reconstruct the lines
-  const newLines = [...lines];
-  
-  // Replace the lines containing the opening tag
-  const linesBefore = newLines.slice(0, startLine);
-  
-  // Preserve indentation from the first line
-  const indent = lines[startLine].match(/^(\s*)/)?.[1] || '';
-  const updatedTagLines = updatedOpeningTag.split('\n').map((line: string, i: number) => 
-    i === 0 ? indent + line.trimStart() : line
-  );
-
-  // Handle text content update
-  if (textChange && closingTagLine !== -1) {
-    // Element has a closing tag - update the content between opening and closing
-    const linesAfterOpeningTag = newLines.slice(endLine + 1, closingTagLine);
-    const closingAndAfter = newLines.slice(closingTagLine);
-    
-    // Replace content with new text (preserving indent)
-    const contentIndent = linesAfterOpeningTag.length > 0 
-      ? linesAfterOpeningTag[0].match(/^(\s*)/)?.[1] || indent + '  '
-      : indent + '  ';
-    
-    const result = [
-      ...linesBefore, 
-      ...updatedTagLines, 
-      contentIndent + textChange.newValue,
-      ...closingAndAfter
-    ].join('\n');
-    
-    return { success: true, updatedCode: result };
-  }
-  
-  // No text change, just update the opening tag
-  const linesAfter = newLines.slice(endLine + 1);
-  const result = [...linesBefore, ...updatedTagLines, ...linesAfter].join('\n');
-  
-  return {
-    success: true,
-    updatedCode: result,
-  };
 }
 
 // Find the JSX element including opening tag, content, and closing tag
@@ -900,10 +809,6 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
   const tailwindChanges = changes.filter(c => c.useTailwind);
   const styleChanges = changes.filter(c => !c.useTailwind);
   
-  console.log('[applyChangesToOpeningTag] All changes:', changes);
-  console.log('[applyChangesToOpeningTag] Tailwind changes:', tailwindChanges);
-  console.log('[applyChangesToOpeningTag] Style changes:', styleChanges);
-  
   let result = openingTag;
   
   // Handle className updates
@@ -912,14 +817,9 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
     const classNameMatch = result.match(/className=["']([^"']*)["']/);
     const classNameExprMatch = result.match(/className=\{([^}]+)\}/);
     
-    console.log('[applyChangesToOpeningTag] className match:', classNameMatch);
-    console.log('[applyChangesToOpeningTag] className expr match:', classNameExprMatch);
-    
     if (classNameMatch) {
       // Update existing className string
       const newClassName = updateClassName(classNameMatch[1], tailwindChanges);
-      console.log('[applyChangesToOpeningTag] Old className:', classNameMatch[1]);
-      console.log('[applyChangesToOpeningTag] New className:', newClassName);
       result = result.replace(classNameMatch[0], `className="${newClassName}"`);
     } else if (classNameExprMatch) {
       // Has dynamic className - append our classes using cn() or template literal
@@ -960,18 +860,13 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
   // Handle style updates
   if (styleChanges.length > 0) {
     const newInlineStyle = generateInlineStyle(styleChanges);
-    const styleMatch = result.match(/style=\{\{([^}]*)\}\}/);
-    
-    console.log('[applyChangesToOpeningTag] Style changes:', styleChanges);
-    console.log('[applyChangesToOpeningTag] New inline style:', newInlineStyle);
-    console.log('[applyChangesToOpeningTag] Style match:', styleMatch);
+    // Use a more robust pattern that handles nested braces
+    const styleMatch = result.match(/style=\{\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\}/);
     
     if (styleMatch) {
       // Merge with existing style
       const mergedStyle = mergeInlineStyles(styleMatch[1], styleChanges);
-      const replacement = `style={{ ${mergedStyle} }}`;
-      console.log('[applyChangesToOpeningTag] Replacement:', replacement);
-      result = result.replace(styleMatch[0], replacement);
+      result = result.replace(styleMatch[0], `style={{ ${mergedStyle} }}`);
     } else {
       // Add new style attribute
       const tagNameMatch = result.match(/^<(\w+)/);
@@ -995,20 +890,15 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
               pos++;
             }
           }
-          const styleAttr = ` style={{ ${newInlineStyle} }}`;
-          console.log('[applyChangesToOpeningTag] Adding style after className:', styleAttr);
-          result = result.slice(0, pos) + styleAttr + result.slice(pos);
+          result = result.slice(0, pos) + ` style={{ ${newInlineStyle} }}` + result.slice(pos);
         } else {
           const insertPos = tagNameMatch[0].length;
-          const styleAttr = ` style={{ ${newInlineStyle} }}`;
-          console.log('[applyChangesToOpeningTag] Adding style after tag name:', styleAttr);
-          result = result.slice(0, insertPos) + styleAttr + result.slice(insertPos);
+          result = result.slice(0, insertPos) + ` style={{ ${newInlineStyle} }}` + result.slice(insertPos);
         }
       }
     }
   }
   
-  console.log('[applyChangesToOpeningTag] Final result:', result);
   return result;
 }
 
@@ -1021,9 +911,6 @@ export async function generateSearchReplaceEdit(
   sourceLine: number
 ): Promise<CodeUpdateResult> {
   try {
-    console.log('[SearchReplace] Starting direct search-replace edit');
-    console.log('[SearchReplace] Changes:', changes);
-
     // Find the element in the code using line-based approach
     const elementInfo = findElementByLine(originalCode, sourceLine);
     if (!elementInfo) {
@@ -1033,8 +920,6 @@ export async function generateSearchReplaceEdit(
         error: `Could not locate element at line ${sourceLine}`,
       };
     }
-
-    console.log('[SearchReplace] Found element:', elementInfo);
 
     // Separate text content changes from style changes
     const textChange = changes.find(c => (c.property as string) === 'textContent');
@@ -1087,10 +972,6 @@ export async function generateSearchReplaceEdit(
         // Trim to get the actual text content for comparison
         const trimmedContent = exactContentBlock.trim();
         
-        console.log('[SearchReplace] Text content - exact block:', JSON.stringify(exactContentBlock));
-        console.log('[SearchReplace] Text content - trimmed:', JSON.stringify(trimmedContent));
-        console.log('[SearchReplace] Text content - new value:', JSON.stringify(textChange.newValue));
-        
         // If the trimmed content matches what we're trying to replace, do the replacement
         if (trimmedContent === textChange.oldValue || trimmedContent.includes(textChange.oldValue)) {
           // Find the indentation pattern of the first content line
@@ -1110,8 +991,6 @@ export async function generateSearchReplaceEdit(
           });
         } else {
           // Fallback: if we can't match exactly, try to find and replace within the content
-          console.log('[SearchReplace] Could not match content exactly, trying substring replacement');
-          
           // Look for the old value within the content block
           const oldValueIndex = exactContentBlock.indexOf(textChange.oldValue);
           if (oldValueIndex !== -1) {
@@ -1183,8 +1062,6 @@ export async function generateSearchReplaceEdit(
       };
     }
 
-    console.log('[SearchReplace] Generated operations:', operations.length);
-
     // Apply all operations sequentially
     let currentCode = originalCode;
     const appliedOperations: any[] = [];
@@ -1241,9 +1118,6 @@ export async function generateSearchReplaceEdit(
         });
       }
     }
-
-    console.log('[SearchReplace] Applied operations:', appliedOperations.length);
-    console.log('[SearchReplace] Failed operations:', failedOperations.length);
 
     return {
       success: appliedOperations.length > 0,
@@ -1314,7 +1188,8 @@ function generateSearchReplaceStrings(openingTag: string, change: StyleChange): 
     }
   } else {
     // Handle inline style changes
-    const styleMatch = openingTag.match(/style=\{\{([^}]*)\}\}/);
+    // Use a more robust pattern that handles nested braces
+    const styleMatch = openingTag.match(/style=\{\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\}/);
     const newInlineStyle = generateInlineStyle([change]);
 
     if (styleMatch) {
@@ -1348,7 +1223,6 @@ function generateGroupedTailwindSearchReplace(openingTag: string, changes: Style
   if (styleMatch) {
     // Parse existing inline styles
     const existingStyles = parseInlineStyle(styleMatch[1]);
-    console.log('[generateGroupedTailwindSearchReplace] Converting inline styles to Tailwind:', existingStyles);
 
     // Create changes for existing inline styles
     const inlineStyleChanges = Object.entries(existingStyles).map(([prop, value]) => ({
@@ -1370,8 +1244,10 @@ function generateGroupedTailwindSearchReplace(openingTag: string, changes: Style
       // Replace inline style with className
       const tagStart = openingTag.match(/^<(\w+)/);
       if (tagStart) {
-        const styleAttrPattern = /style=\{\{[^}]*\}\}/;
-        let withoutStyle = openingTag.replace(styleAttrPattern, '').trim();
+        // Use a more robust pattern that handles nested braces
+        const styleAttrPattern = /\s*style=\{\{[^}]*(?:\{[^}]*\}[^}]*)*\}\}\s*/;
+        // Replace style and normalize extra spaces
+        let withoutStyle = openingTag.replace(styleAttrPattern, ' ').replace(/\s+/g, ' ').trim();
 
         // If there's already a className, update it
         if (classNameMatch) {
