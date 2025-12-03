@@ -431,54 +431,52 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
   return (
     <div className="h-full" ref={containerRef}>
       {device ? (
-        <div className="h-full flex items-center justify-center p-2 overflow-hidden">
-          <div className="flex flex-col items-center">
-            {/* Device frame with actual dimensions */}
+        <div className="h-full flex items-center justify-center overflow-hidden">
+          {/* Device frame with actual dimensions */}
+          <div
+            className={cn(
+              "relative overflow-hidden shadow-2xl bg-black",
+              device.type === "mobile" && "rounded-[2rem]",
+              device.type === "tablet" && "rounded-xl",
+              device.type === "desktop" && "rounded-lg"
+            )}
+            style={{
+              width: device.width + (device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12),
+              height: device.height + (device.type === "mobile" ? 40 : device.type === "tablet" ? 32 : 24),
+              paddingTop: device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12,
+              paddingBottom: device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12,
+              paddingLeft: device.type === "mobile" ? 10 : device.type === "tablet" ? 8 : 6,
+              paddingRight: device.type === "mobile" ? 10 : device.type === "tablet" ? 8 : 6,
+              transform: `scale(${scale})`,
+              transformOrigin: 'center center',
+            }}
+          >
+            {/* Screen with exact device dimensions */}
             <div
-              className={cn(
-                "relative overflow-hidden shadow-2xl bg-black",
-                device.type === "mobile" && "rounded-[2rem]",
-                device.type === "tablet" && "rounded-xl",
-                device.type === "desktop" && "rounded-lg"
-              )}
+              className="bg-white rounded-sm overflow-hidden"
               style={{
-                width: device.width + (device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12),
-                height: device.height + (device.type === "mobile" ? 40 : device.type === "tablet" ? 32 : 24),
-                paddingTop: device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12,
-                paddingBottom: device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12,
-                paddingLeft: device.type === "mobile" ? 10 : device.type === "tablet" ? 8 : 6,
-                paddingRight: device.type === "mobile" ? 10 : device.type === "tablet" ? 8 : 6,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top center',
+                width: device.width,
+                height: device.height,
               }}
             >
-              {/* Screen with exact device dimensions */}
-              <div
-                className="bg-white rounded-sm overflow-hidden"
+              <iframe
+                ref={setRefs}
+                className={cn("border-0", className)}
                 style={{
                   width: device.width,
                   height: device.height,
                 }}
-              >
-                <iframe
-                  ref={setRefs}
-                  className={cn("border-0", className)}
-                  style={{
-                    width: device.width,
-                    height: device.height,
-                  }}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                  src={(src ?? url) || undefined}
-                  title="Preview"
-                  {...props}
-                />
-              </div>
-
-              {/* Home indicator for mobile */}
-              {device.type === "mobile" && (
-                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gray-400 rounded-full opacity-50" />
-              )}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                src={(src ?? url) || undefined}
+                title="Preview"
+                {...props}
+              />
             </div>
+
+            {/* Home indicator for mobile */}
+            {device.type === "mobile" && (
+              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gray-400 rounded-full opacity-50" />
+            )}
           </div>
           {loading}
         </div>
