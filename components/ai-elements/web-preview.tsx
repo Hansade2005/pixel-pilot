@@ -372,6 +372,8 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
 }, ref) => {
   const { url, device } = useWebPreview();
   const internalRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
   
   // Combine refs and call the callback
   const setRefs = (iframe: HTMLIFrameElement | null) => {
@@ -389,33 +391,82 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
     onIframeRef?.(iframe);
   };
 
+  // Calculate scale to fit device in container
+  useEffect(() => {
+    if (!device || !containerRef.current) {
+      setScale(1);
+      return;
+    }
+
+    const calculateScale = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const containerWidth = container.clientWidth - 32; // Padding
+      const containerHeight = container.clientHeight - 60; // Padding + label space
+
+      // Add device frame padding
+      const framePaddingH = device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12;
+      const framePaddingV = device.type === "mobile" ? 40 : device.type === "tablet" ? 32 : 24;
+      
+      const totalWidth = device.width + framePaddingH;
+      const totalHeight = device.height + framePaddingV;
+
+      const scaleX = containerWidth / totalWidth;
+      const scaleY = containerHeight / totalHeight;
+      const newScale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+
+      setScale(Math.max(0.1, newScale)); // Minimum scale of 0.1
+    };
+
+    calculateScale();
+
+    // Recalculate on resize
+    const resizeObserver = new ResizeObserver(calculateScale);
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, [device]);
+
   return (
-    <div className="h-full">
+    <div className="h-full" ref={containerRef}>
       {device ? (
-        <div className="h-full p-2">
-          <div className="relative h-full flex flex-col">
-            {/* Device frame - fills available space */}
+        <div className="h-full flex items-center justify-center p-4 overflow-hidden">
+          <div className="flex flex-col items-center">
+            {/* Device frame with actual dimensions */}
             <div
               className={cn(
-                "relative overflow-hidden shadow-2xl bg-black rounded-lg flex-1",
+                "relative overflow-hidden shadow-2xl bg-black",
                 device.type === "mobile" && "rounded-[2rem]",
                 device.type === "tablet" && "rounded-xl",
                 device.type === "desktop" && "rounded-lg"
               )}
               style={{
+                width: device.width + (device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12),
+                height: device.height + (device.type === "mobile" ? 40 : device.type === "tablet" ? 32 : 24),
                 paddingTop: device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12,
                 paddingBottom: device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12,
                 paddingLeft: device.type === "mobile" ? 10 : device.type === "tablet" ? 8 : 6,
                 paddingRight: device.type === "mobile" ? 10 : device.type === "tablet" ? 8 : 6,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top center',
               }}
             >
-              {/* Screen */}
+              {/* Screen with exact device dimensions */}
               <div
-                className="bg-white rounded-sm overflow-hidden w-full h-full"
+                className="bg-white rounded-sm overflow-hidden"
+                style={{
+                  width: device.width,
+                  height: device.height,
+                }}
               >
                 <iframe
                   ref={setRefs}
-                  className={cn("w-full h-full border-0", className)}
+                  className={cn("border-0", className)}
+                  style={{
+                    width: device.width,
+                    height: device.height,
+                  }}
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
                   src={(src ?? url) || undefined}
                   title="Preview"
@@ -429,10 +480,10 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
               )}
             </div>
 
-            {/* Device label - positioned to not take extra space */}
-            <div className="text-center mt-2 flex-shrink-0">
+            {/* Device label */}
+            <div className="text-center mt-2">
               <span className="text-xs text-muted-foreground bg-background px-2 py-1 rounded">
-                {device.name} ({device.width}×{device.height})
+                {device.name} ({device.width}×{device.height}) • {Math.round(scale * 100)}%
               </span>
             </div>
           </div>
