@@ -651,41 +651,174 @@ function findJSXElement(
   lines: string[],
   targetLine: number
 ): { startLine: number; endLine: number; openingTag: string; closingTagLine: number; elementContent: string } {
-  // Look for opening tag starting at target line, or search backward
-  for (let start = targetLine; start >= Math.max(0, targetLine - 5); start--) {
+  // First, try to find an opening tag on the target line itself
+  const targetLineText = lines[targetLine];
+  const openTagMatch = targetLineText.match(/<(\w+)/);
+
+  if (openTagMatch) {
+    const tagName = openTagMatch[1];
+    const tagStartIndex = targetLineText.indexOf('<' + tagName);
+
+    // Check if this is a valid opening tag (not inside quotes or JSX expressions)
+    let isValidTag = true;
+    for (let j = 0; j < tagStartIndex; j++) {
+      const char = targetLineText[j];
+      if (char === '"' || char === "'") {
+        const quote = char;
+        j++;
+        while (j < tagStartIndex && targetLineText[j] !== quote) {
+          if (targetLineText[j] === '\\') j++;
+          j++;
+        }
+        if (j >= tagStartIndex) {
+          isValidTag = false;
+          break;
+        }
+      } else if (char === '{') {
+        let braceDepth = 1;
+        j++;
+        while (j < tagStartIndex && braceDepth > 0) {
+          if (targetLineText[j] === '{') braceDepth++;
+          else if (targetLineText[j] === '}') braceDepth--;
+          j++;
+        }
+        if (braceDepth > 0) {
+          isValidTag = false;
+          break;
+        }
+      }
+    }
+
+    if (isValidTag) {
+      // Found a valid opening tag on the target line, parse it
+      let depth = 0;
+      let tagContent = '';
+      let endLine = targetLine;
+      let isSelfClosing = false;
+
+      for (let i = targetLine; i < lines.length && i <= targetLine + 20; i++) {
+        tagContent += (i > targetLine ? '\n' : '') + lines[i];
+
+        for (let j = (i === targetLine ? tagStartIndex : 0); j < lines[i].length; j++) {
+          const char = lines[i][j];
+
+          // Skip strings
+          if (char === '"' || char === "'") {
+            const quote = char;
+            j++;
+            while (j < lines[i].length && lines[i][j] !== quote) {
+              if (lines[i][j] === '\\') j++;
+              j++;
+            }
+            continue;
+          }
+
+          // Skip template literals and JSX expressions
+          if (char === '{') {
+            let braceDepth = 1;
+            j++;
+            while (j < lines[i].length && braceDepth > 0) {
+              if (lines[i][j] === '{') braceDepth++;
+              else if (lines[i][j] === '}') braceDepth--;
+              j++;
+            }
+            continue;
+          }
+
+          // Check for self-closing tag
+          if (char === '/' && j + 1 < lines[i].length && lines[i][j + 1] === '>') {
+            isSelfClosing = true;
+          }
+
+          if (char === '<') depth++;
+          else if (char === '>') {
+            depth--;
+            if (depth === 0) {
+              endLine = i;
+
+              const fullText = lines.slice(targetLine, endLine + 1).join('\n');
+              const tagEndIndex = fullText.indexOf('>', fullText.indexOf('<' + tagName)) + 1;
+              const openingTag = fullText.substring(
+                fullText.indexOf('<' + tagName),
+                tagEndIndex
+              );
+
+              if (isSelfClosing) {
+                return { startLine: targetLine, endLine, openingTag, closingTagLine: -1, elementContent: '' };
+              }
+
+              // Find the closing tag
+              const closingTagPattern = new RegExp(`</${tagName}\\s*>`);
+              let closingTagLine = -1;
+              let elementContent = '';
+              let tagDepth = 1;
+
+              // First check if the closing tag is on the same line as the opening tag
+              const openingLine = lines[endLine];
+              const openingTagEnd = openingTag.length;
+              const remainingOnOpeningLine = openingLine.substring(openingTagEnd);
+
+              const sameLineClosingMatch = remainingOnOpeningLine.match(closingTagPattern);
+              if (sameLineClosingMatch) {
+                const contentStart = openingTagEnd;
+                const contentEnd = remainingOnOpeningLine.indexOf(sameLineClosingMatch[0]);
+                elementContent = remainingOnOpeningLine.substring(0, contentEnd);
+                closingTagLine = endLine;
+              } else {
+                for (let k = endLine + 1; k < lines.length && k <= endLine + 50; k++) {
+                  const searchLine = lines[k];
+
+                  const openings = (searchLine.match(new RegExp(`<${tagName}[\\s>]`, 'g')) || []).length;
+                  const closings = (searchLine.match(closingTagPattern) || []).length;
+
+                  tagDepth += openings - closings;
+
+                  if (tagDepth === 0) {
+                    closingTagLine = k;
+                    elementContent = lines.slice(endLine + 1, k).join('\n');
+                    break;
+                  }
+                }
+              }
+
+              return { startLine: targetLine, endLine, openingTag, closingTagLine, elementContent };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // If no opening tag found on target line, search backward (fallback)
+  for (let start = targetLine - 1; start >= Math.max(0, targetLine - 5); start--) {
     const line = lines[start];
-    
-    // Check if this line contains an opening tag
     const openTagMatch = line.match(/<(\w+)/);
     if (!openTagMatch) continue;
-    
+
     const tagName = openTagMatch[1];
-    
-    // Find where this tag ends
+
     let depth = 0;
     let tagContent = '';
     let endLine = start;
     let isSelfClosing = false;
-    
+
     for (let i = start; i < lines.length && i <= start + 20; i++) {
       tagContent += (i > start ? '\n' : '') + lines[i];
-      
-      // Count angle brackets to find the end of the opening tag
+
       for (let j = (i === start ? line.indexOf('<' + tagName) : 0); j < lines[i].length; j++) {
         const char = lines[i][j];
-        
+
         // Skip strings
         if (char === '"' || char === "'") {
           const quote = char;
           j++;
           while (j < lines[i].length && lines[i][j] !== quote) {
-            if (lines[i][j] === '\\') j++; // Skip escaped characters
+            if (lines[i][j] === '\\') j++;
             j++;
           }
           continue;
         }
-        
-        // Skip template literals and JSX expressions
+
         if (char === '{') {
           let braceDepth = 1;
           j++;
@@ -696,62 +829,52 @@ function findJSXElement(
           }
           continue;
         }
-        
-        // Check for self-closing tag
+
         if (char === '/' && j + 1 < lines[i].length && lines[i][j + 1] === '>') {
           isSelfClosing = true;
         }
-        
+
         if (char === '<') depth++;
         else if (char === '>') {
           depth--;
           if (depth === 0) {
-            // Found the end of the opening tag
             endLine = i;
-            
-            // Extract just the opening tag
+
             const fullText = lines.slice(start, endLine + 1).join('\n');
             const tagEndIndex = fullText.indexOf('>', fullText.indexOf('<' + tagName)) + 1;
             const openingTag = fullText.substring(
               fullText.indexOf('<' + tagName),
               tagEndIndex
             );
-            
-            // If self-closing, no closing tag
+
             if (isSelfClosing) {
               return { startLine: start, endLine, openingTag, closingTagLine: -1, elementContent: '' };
             }
-            
-            // Find the closing tag
+
             const closingTagPattern = new RegExp(`</${tagName}\\s*>`);
             let closingTagLine = -1;
             let elementContent = '';
             let tagDepth = 1;
-            
-            // First check if the closing tag is on the same line as the opening tag
+
             const openingLine = lines[endLine];
             const openingTagEnd = openingTag.length;
             const remainingOnOpeningLine = openingLine.substring(openingTagEnd);
-            
-            // Check if closing tag is on the same line
+
             const sameLineClosingMatch = remainingOnOpeningLine.match(closingTagPattern);
             if (sameLineClosingMatch) {
-              // Element is entirely on one line
               const contentStart = openingTagEnd;
               const contentEnd = remainingOnOpeningLine.indexOf(sameLineClosingMatch[0]);
               elementContent = remainingOnOpeningLine.substring(0, contentEnd);
               closingTagLine = endLine;
             } else {
-              // Closing tag is on a different line
               for (let k = endLine + 1; k < lines.length && k <= endLine + 50; k++) {
                 const searchLine = lines[k];
-                
-                // Count opening and closing tags of the same name
+
                 const openings = (searchLine.match(new RegExp(`<${tagName}[\\s>]`, 'g')) || []).length;
                 const closings = (searchLine.match(closingTagPattern) || []).length;
-                
+
                 tagDepth += openings - closings;
-                
+
                 if (tagDepth === 0) {
                   closingTagLine = k;
                   elementContent = lines.slice(endLine + 1, k).join('\n');
@@ -759,14 +882,14 @@ function findJSXElement(
                 }
               }
             }
-            
+
             return { startLine: start, endLine, openingTag, closingTagLine, elementContent };
           }
         }
       }
     }
   }
-  
+
   return { startLine: -1, endLine: -1, openingTag: '', closingTagLine: -1, elementContent: '' };
 }
 
