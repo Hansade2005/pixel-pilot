@@ -19,6 +19,7 @@ import type {
   HistoryEntry,
   VisualEditorConfig,
   VisualEditorMessage,
+  DeleteOperation,
 } from './types';
 import { DEFAULT_VISUAL_EDITOR_CONFIG } from './types';
 
@@ -28,6 +29,7 @@ const initialState: VisualEditorState = {
   selectedElements: [],
   hoveredElement: null,
   pendingChanges: new Map(),
+  pendingDeletes: new Map(),
   history: [],
   historyIndex: -1,
   activeTool: 'select',
@@ -45,8 +47,11 @@ type VisualEditorAction =
   | { type: 'SET_SELECTED_ELEMENTS'; payload: ElementSelection[] }
   | { type: 'REMOVE_ELEMENT'; payload: string }
   | { type: 'ADD_PENDING_CHANGE'; payload: { elementId: string; changes: StyleChange[] } }
+  | { type: 'ADD_PENDING_DELETE'; payload: { elementId: string; operation: DeleteOperation } }
+  | { type: 'REMOVE_PENDING_DELETE'; payload: string }
   | { type: 'CLEAR_PENDING_CHANGES' }
   | { type: 'APPLY_CHANGES'; payload: { elementId: string; description: string } }
+  | { type: 'ADD_HISTORY_ENTRY'; payload: HistoryEntry }
   | { type: 'UNDO' }
   | { type: 'REDO' }
   | { type: 'SET_ACTIVE_TOOL'; payload: VisualEditorTool }
@@ -174,21 +179,49 @@ function visualEditorReducer(
       };
     }
 
+    case 'ADD_PENDING_DELETE': {
+      const newPendingDeletes = new Map(state.pendingDeletes);
+      newPendingDeletes.set(action.payload.elementId, action.payload.operation);
+      return {
+        ...state,
+        pendingDeletes: newPendingDeletes,
+      };
+    }
+
+    case 'REMOVE_PENDING_DELETE': {
+      const newPendingDeletes = new Map(state.pendingDeletes);
+      newPendingDeletes.delete(action.payload);
+      return {
+        ...state,
+        pendingDeletes: newPendingDeletes,
+      };
+    }
+
     case 'CLEAR_PENDING_CHANGES':
       return {
         ...state,
         pendingChanges: new Map(),
+        pendingDeletes: new Map(),
       };
 
     case 'APPLY_CHANGES': {
       const changes = state.pendingChanges.get(action.payload.elementId);
       if (!changes || changes.length === 0) return state;
 
+      // Determine operation type based on changes
+      let operationType: HistoryEntry['operationType'] = 'style';
+      if (changes.some(c => c.property === 'textContent' as any)) {
+        operationType = 'text';
+      } else if (changes.some(c => c.property === 'width' || c.property === 'height')) {
+        operationType = 'resize';
+      }
+
       const historyEntry: HistoryEntry = {
         timestamp: Date.now(),
         elementId: action.payload.elementId,
         changes,
         description: action.payload.description,
+        operationType,
       };
 
       // Remove future history if we're not at the end
@@ -204,6 +237,17 @@ function visualEditorReducer(
         history: newHistory.slice(-50), // Keep last 50 entries
         historyIndex: Math.min(newHistory.length - 1, 49),
         pendingChanges: newPendingChanges,
+      };
+    }
+
+    case 'ADD_HISTORY_ENTRY': {
+      // Remove future history if we're not at the end
+      const newHistory = state.history.slice(0, state.historyIndex + 1);
+      newHistory.push(action.payload);
+      return {
+        ...state,
+        history: newHistory.slice(-50),
+        historyIndex: Math.min(newHistory.length - 1, 49),
       };
     }
 
@@ -334,6 +378,8 @@ interface VisualEditorContextValue {
   setIframeRef: (iframe: HTMLIFrameElement | null) => void;
   // File operations
   applyChangesToFile: (elementId: string, changes: StyleChange[]) => Promise<boolean>;
+  applyPendingDeletes: () => Promise<boolean>;
+  hasPendingDeletes: () => boolean;
 }
 
 const VisualEditorContext = createContext<VisualEditorContextValue | null>(null);
@@ -489,13 +535,69 @@ export function VisualEditorProvider({
     dispatch({ type: 'CLEAR_PENDING_CHANGES' });
   }, []);
 
+  // Undo - revert the last change by sending the old values to iframe
   const undo = useCallback(() => {
+    if (state.historyIndex < 0) return;
+    
+    const entry = state.history[state.historyIndex];
+    if (entry) {
+      // Revert the changes by sending old values to iframe
+      const revertedChanges = entry.changes.map(change => ({
+        ...change,
+        newValue: change.oldValue, // Swap new and old
+        oldValue: change.newValue,
+      }));
+      
+      // Send to iframe to revert visual changes
+      if (entry.operationType === 'style' || entry.operationType === 'resize') {
+        sendToIframe({ 
+          type: 'APPLY_STYLE', 
+          payload: { elementId: entry.elementId, changes: revertedChanges } 
+        });
+      } else if (entry.operationType === 'text') {
+        const textChange = revertedChanges.find(c => (c.property as string) === 'textContent');
+        if (textChange) {
+          sendToIframe({ 
+            type: 'UPDATE_TEXT', 
+            payload: { elementId: entry.elementId, text: textChange.newValue } 
+          });
+        }
+      }
+      // Note: delete operations can't be easily undone without page reload
+      
+      console.log('[Visual Editor] Undo:', entry.description);
+    }
+    
     dispatch({ type: 'UNDO' });
-  }, []);
+  }, [state.historyIndex, state.history, sendToIframe]);
 
+  // Redo - re-apply the next change by sending the new values to iframe
   const redo = useCallback(() => {
+    if (state.historyIndex >= state.history.length - 1) return;
+    
+    const entry = state.history[state.historyIndex + 1];
+    if (entry) {
+      // Re-apply the changes
+      if (entry.operationType === 'style' || entry.operationType === 'resize') {
+        sendToIframe({ 
+          type: 'APPLY_STYLE', 
+          payload: { elementId: entry.elementId, changes: entry.changes } 
+        });
+      } else if (entry.operationType === 'text') {
+        const textChange = entry.changes.find(c => (c.property as string) === 'textContent');
+        if (textChange) {
+          sendToIframe({ 
+            type: 'UPDATE_TEXT', 
+            payload: { elementId: entry.elementId, text: textChange.newValue } 
+          });
+        }
+      }
+      
+      console.log('[Visual Editor] Redo:', entry.description);
+    }
+    
     dispatch({ type: 'REDO' });
-  }, []);
+  }, [state.historyIndex, state.history, sendToIframe]);
 
   const setActiveTool = useCallback((tool: VisualEditorTool) => {
     dispatch({ type: 'SET_ACTIVE_TOOL', payload: tool });
@@ -538,20 +640,101 @@ export function VisualEditorProvider({
     });
   }, [sendToIframe]);
 
-  // Delete an element
+  // Delete an element - adds to pending deletes and removes from DOM preview
   const deleteElement = useCallback((elementId: string) => {
-    // Send delete message to iframe
+    // Find the element info before removing from state
+    const selection = state.selectedElements.find(sel => sel.elementId === elementId);
+    
+    if (selection?.element.sourceFile && selection?.element.sourceLine) {
+      // Add to pending deletes for file update
+      const deleteOperation: DeleteOperation = {
+        elementId,
+        sourceFile: selection.element.sourceFile,
+        sourceLine: selection.element.sourceLine,
+        tagName: selection.element.tagName,
+      };
+      dispatch({ type: 'ADD_PENDING_DELETE', payload: { elementId, operation: deleteOperation } });
+      
+      console.log('[Visual Editor] Added pending delete for element:', elementId, 'at line:', selection.element.sourceLine);
+    }
+    
+    // Send delete message to iframe to update preview
     sendToIframe({ type: 'DELETE_ELEMENT', payload: { elementId } });
+    
     // Remove from state
     dispatch({ type: 'REMOVE_ELEMENT', payload: elementId });
-  }, [sendToIframe]);
+  }, [sendToIframe, state.selectedElements]);
 
   // Delete all selected elements
   const deleteSelectedElements = useCallback(() => {
-    state.selectedElements.forEach((sel) => {
+    // Make a copy of selected elements since we're modifying state during iteration
+    const elementsToDelete = [...state.selectedElements];
+    elementsToDelete.forEach((sel) => {
       deleteElement(sel.elementId);
     });
   }, [state.selectedElements, deleteElement]);
+
+  // Check if there are pending deletes
+  const hasPendingDeletes = useCallback(() => {
+    return state.pendingDeletes.size > 0;
+  }, [state.pendingDeletes]);
+
+  // Apply pending delete operations to source files
+  const applyPendingDeletes = useCallback(async (): Promise<boolean> => {
+    if (state.pendingDeletes.size === 0) return true;
+    
+    if (!onApplyChanges) {
+      console.error('[Visual Editor] No onApplyChanges handler provided');
+      return false;
+    }
+    
+    let allSuccess = true;
+    
+    for (const [elementId, operation] of state.pendingDeletes.entries()) {
+      console.log('[Visual Editor] Applying delete for:', elementId, operation);
+      
+      // Create a special _delete change to signal code generator
+      const deleteChange: StyleChange = {
+        property: '_delete' as any,
+        oldValue: operation.tagName,
+        newValue: '', // Empty = delete
+        useTailwind: false,
+      };
+      
+      try {
+        const success = await onApplyChanges(
+          elementId,
+          [deleteChange],
+          operation.sourceFile,
+          operation.sourceLine
+        );
+        
+        if (success) {
+          // Remove from pending deletes
+          dispatch({ type: 'REMOVE_PENDING_DELETE', payload: elementId });
+          
+          // Add to history for potential undo
+          dispatch({
+            type: 'ADD_HISTORY_ENTRY',
+            payload: {
+              timestamp: Date.now(),
+              elementId,
+              changes: [deleteChange],
+              description: `Deleted ${operation.tagName} element`,
+              operationType: 'delete',
+            },
+          });
+        } else {
+          allSuccess = false;
+        }
+      } catch (error) {
+        console.error('[Visual Editor] Failed to apply delete:', error);
+        allSuccess = false;
+      }
+    }
+    
+    return allSuccess;
+  }, [state.pendingDeletes, onApplyChanges]);
 
   // Resize an element
   const resizeElement = useCallback((elementId: string, width: number, height: number) => {
@@ -634,6 +817,8 @@ export function VisualEditorProvider({
     sendToIframe,
     setIframeRef,
     applyChangesToFile,
+    applyPendingDeletes,
+    hasPendingDeletes,
   };
 
   return (

@@ -198,7 +198,7 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   // Create resize handles for an element
   function createResizeHandles(elementId, rect) {
     const handles = [];
-    const handleSize = 8;
+    const handleSize = 10; // Increased from 8 for easier clicking
     const positions = [
       { name: 'nw', cursor: 'nwse-resize', x: -handleSize/2, y: -handleSize/2 },
       { name: 'n', cursor: 'ns-resize', x: rect.width/2 - handleSize/2, y: -handleSize/2 },
@@ -219,19 +219,34 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
         position: fixed;
         width: \${handleSize}px;
         height: \${handleSize}px;
-        background: white;
-        border: 2px solid #2563eb;
+        background: #2563eb;
+        border: 2px solid white;
         border-radius: 2px;
         cursor: \${pos.cursor};
-        z-index: 1000000;
-        pointer-events: auto;
+        z-index: 1000001;
+        pointer-events: auto !important;
         left: \${rect.left + pos.x}px;
         top: \${rect.top + pos.y}px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        transition: transform 0.1s ease;
       \`;
+      
+      // Hover effect
+      handle.addEventListener('mouseenter', () => {
+        handle.style.transform = 'scale(1.2)';
+        handle.style.background = '#1d4ed8';
+      });
+      handle.addEventListener('mouseleave', () => {
+        if (!isResizing) {
+          handle.style.transform = 'scale(1)';
+          handle.style.background = '#2563eb';
+        }
+      });
       
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        console.log('[Visual Editor] Handle mousedown:', pos.name, elementId);
         startResize(elementId, pos.name, e);
       });
       
@@ -246,7 +261,7 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     const handles = resizeHandles.get(elementId);
     if (!handles) return;
 
-    const handleSize = 8;
+    const handleSize = 10; // Match the new size
     const positions = [
       { name: 'nw', x: -handleSize/2, y: -handleSize/2 },
       { name: 'n', x: rect.width/2 - handleSize/2, y: -handleSize/2 },
@@ -282,8 +297,12 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
 
   // Resize functions
   function startResize(elementId, handle, event) {
+    console.log('[Visual Editor] startResize called:', elementId, handle);
     const element = findElementById(elementId);
-    if (!element) return;
+    if (!element) {
+      console.warn('[Visual Editor] Element not found for resize:', elementId);
+      return;
+    }
 
     isResizing = true;
     resizeHandle = handle;
@@ -295,6 +314,8 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     const rect = element.getBoundingClientRect();
     resizeStartWidth = rect.width;
     resizeStartHeight = rect.height;
+    
+    console.log('[Visual Editor] Starting resize - width:', resizeStartWidth, 'height:', resizeStartHeight);
 
     document.body.style.cursor = event.target.style.cursor;
     document.addEventListener('mousemove', handleResizeMove, true);
@@ -492,6 +513,11 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
   function handleClick(event) {
     if (!isEnabled) return;
     if (isResizing) return; // Don't process clicks while resizing
+    
+    // Check if clicking on a resize handle - if so, ignore (handle has its own mousedown)
+    if (event.target.hasAttribute && event.target.hasAttribute('data-ve-handle')) {
+      return;
+    }
     
     const element = document.elementFromPoint(event.clientX, event.clientY);
     if (!element || shouldIgnoreElement(element)) return;

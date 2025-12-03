@@ -56,14 +56,29 @@ import {
   Underline,
   Trash2,
   Scaling,
+  LayoutGrid,
+  Plus,
 } from 'lucide-react';
+import { ThemesPanel } from './panels/themes-panel';
+import { ElementsPanel } from './panels/elements-panel';
+import type { Theme } from './themes';
+import type { DraggableElement } from './draggable-elements';
 
 interface VisualEditorSidebarProps {
   className?: string;
   onSave?: () => Promise<void>;
+  onApplyTheme?: (theme: Theme) => void;
+  onInsertElement?: (element: DraggableElement, targetId?: string, position?: 'before' | 'after' | 'inside') => void;
+  projectType?: 'nextjs' | 'vite' | 'unknown';
 }
 
-export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarProps) {
+export function VisualEditorSidebar({ 
+  className, 
+  onSave, 
+  onApplyTheme,
+  onInsertElement,
+  projectType = 'unknown',
+}: VisualEditorSidebarProps) {
   const {
     state,
     config,
@@ -72,6 +87,8 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
     setSidebarOpen,
     addPendingChange,
     applyChangesToFile,
+    applyPendingDeletes,
+    hasPendingDeletes,
     undo,
     redo,
     clearSelection,
@@ -83,29 +100,40 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
   // Get the first selected element for editing
   const selectedElement = state.selectedElements[0]?.element;
   
-  // Check if there are pending changes for the selected element
+  // Check if there are pending changes for the selected element OR pending deletes
   const hasPendingChanges = selectedElement 
     ? (state.pendingChanges.get(selectedElement.id)?.length ?? 0) > 0
     : false;
+  
+  // Show save button if there are ANY pending changes or deletes
+  const hasAnythingToSave = hasPendingChanges || hasPendingDeletes() || 
+    Array.from(state.pendingChanges.values()).some(c => c.length > 0);
 
   const handleSave = async () => {
-    if (!selectedElement) return;
-    
     console.log('[Sidebar] handleSave clicked');
     console.log('[Sidebar] Selected element:', selectedElement);
-    console.log('[Sidebar] Pending changes for element:', state.pendingChanges.get(selectedElement.id));
+    console.log('[Sidebar] Pending deletes:', state.pendingDeletes.size);
+    console.log('[Sidebar] All pending changes:', state.pendingChanges);
     
     setIsSaving(true);
     try {
-      const changes = state.pendingChanges.get(selectedElement.id) || [];
-      console.log('[Sidebar] Changes to save:', changes);
+      // First apply any pending deletes
+      if (hasPendingDeletes()) {
+        console.log('[Sidebar] Applying pending deletes...');
+        const deleteSuccess = await applyPendingDeletes();
+        console.log('[Sidebar] Delete result:', deleteSuccess);
+      }
       
-      if (changes.length > 0) {
-        console.log('[Sidebar] Calling applyChangesToFile...');
-        const success = await applyChangesToFile(selectedElement.id, changes);
-        console.log('[Sidebar] applyChangesToFile result:', success);
-      } else {
-        console.warn('[Sidebar] No changes to save!');
+      // Then apply style/text changes for selected element
+      if (selectedElement) {
+        const changes = state.pendingChanges.get(selectedElement.id) || [];
+        console.log('[Sidebar] Changes to save:', changes);
+        
+        if (changes.length > 0) {
+          console.log('[Sidebar] Calling applyChangesToFile...');
+          const success = await applyChangesToFile(selectedElement.id, changes);
+          console.log('[Sidebar] applyChangesToFile result:', success);
+        }
       }
       
       if (onSave) {
@@ -140,8 +168,8 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Save button in header - always visible */}
-          {selectedElement && hasPendingChanges && (
+          {/* Save button in header - show when there are any pending changes or deletes */}
+          {hasAnythingToSave && (
             <Button
               size="sm"
               onClick={handleSave}
@@ -241,40 +269,105 @@ export function VisualEditorSidebar({ className, onSave }: VisualEditorSidebarPr
         />
       </div>
 
+      {/* Main Mode Tabs - Edit / Themes / Elements */}
+      <div className="flex border-b bg-muted/20">
+        <button
+          onClick={() => setActivePanel('styles')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
+            ['styles', 'layout', 'spacing', 'typography', 'effects'].includes(state.activePanel)
+              ? 'bg-background text-foreground border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <MousePointer2 className="h-3.5 w-3.5" />
+          Edit
+        </button>
+        <button
+          onClick={() => setActivePanel('themes')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
+            state.activePanel === 'themes'
+              ? 'bg-background text-foreground border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Palette className="h-3.5 w-3.5" />
+          Themes
+        </button>
+        <button
+          onClick={() => setActivePanel('elements')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
+            state.activePanel === 'elements'
+              ? 'bg-background text-foreground border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add
+        </button>
+      </div>
+
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {selectedElement ? (
-            <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
-                <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
-                <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
-                <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
-                <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
-              </TabsList>
+          {/* Themes Panel */}
+          {state.activePanel === 'themes' && (
+            <ThemesPanel 
+              onApplyTheme={onApplyTheme}
+              projectType={projectType}
+            />
+          )}
 
-              <TabsContent value="styles" className="mt-0 space-y-2">
-                <StylesPanel element={selectedElement} />
-              </TabsContent>
+          {/* Elements Panel */}
+          {state.activePanel === 'elements' && (
+            <ElementsPanel 
+              onInsertElement={(element) => {
+                if (onInsertElement) {
+                  const targetId = state.selectedElements[0]?.elementId;
+                  onInsertElement(element, targetId, 'after');
+                }
+              }}
+            />
+          )}
 
-              <TabsContent value="layout" className="mt-0 space-y-2">
-                <LayoutPanel element={selectedElement} />
-              </TabsContent>
+          {/* Edit Panel - Style editing for selected element */}
+          {['styles', 'layout', 'spacing', 'typography', 'effects'].includes(state.activePanel) && (
+            <>
+              {selectedElement ? (
+                <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
+                    <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
+                    <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
+                    <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
+                    <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
+                  </TabsList>
 
-              <TabsContent value="spacing" className="mt-0 space-y-2">
-                <SpacingPanel element={selectedElement} />
-              </TabsContent>
+                  <TabsContent value="styles" className="mt-0 space-y-2">
+                    <StylesPanel element={selectedElement} />
+                  </TabsContent>
 
-              <TabsContent value="typography" className="mt-0 space-y-2">
-                <TypographyPanel element={selectedElement} />
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
-              <MousePointer2 className="h-12 w-12 mb-4 opacity-50" />
-              <p className="text-sm">Select an element to edit</p>
-              <p className="text-xs mt-1">Click on any element in the canvas</p>
-            </div>
+                  <TabsContent value="layout" className="mt-0 space-y-2">
+                    <LayoutPanel element={selectedElement} />
+                  </TabsContent>
+
+                  <TabsContent value="spacing" className="mt-0 space-y-2">
+                    <SpacingPanel element={selectedElement} />
+                  </TabsContent>
+
+                  <TabsContent value="typography" className="mt-0 space-y-2">
+                    <TypographyPanel element={selectedElement} />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
+                  <MousePointer2 className="h-12 w-12 mb-4 opacity-50" />
+                  <p className="text-sm">Select an element to edit</p>
+                  <p className="text-xs mt-1">Click on any element in the canvas</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </ScrollArea>

@@ -80,13 +80,21 @@ export interface ComputedStyleInfo {
 }
 
 export interface StyleChange {
-  property: keyof ComputedStyleInfo;
+  property: keyof ComputedStyleInfo | 'textContent' | '_delete';
   oldValue: string;
   newValue: string;
   // Whether to use Tailwind class or inline style
   useTailwind: boolean;
   // Generated Tailwind class (if applicable)
   tailwindClass?: string;
+}
+
+// Delete operation info (stored alongside style changes)
+export interface DeleteOperation {
+  elementId: string;
+  sourceFile: string;
+  sourceLine: number;
+  tagName: string;
 }
 
 export interface ElementSelection {
@@ -104,6 +112,8 @@ export interface VisualEditorState {
   hoveredElement: ElementInfo | null;
   // Pending changes (not yet saved)
   pendingChanges: Map<string, StyleChange[]>;
+  // Pending delete operations (element IDs -> delete info)
+  pendingDeletes: Map<string, DeleteOperation>;
   // History for undo/redo
   history: HistoryEntry[];
   historyIndex: number;
@@ -127,7 +137,9 @@ export type SidebarPanel =
   | 'layout'      // Layout & positioning
   | 'spacing'     // Margins & padding
   | 'typography'  // Font, size, color
-  | 'effects';    // Shadows, borders, etc.
+  | 'effects'     // Shadows, borders, etc.
+  | 'themes'      // Theme selection and management
+  | 'elements';   // Draggable elements library
 
 // Resize handle positions
 export type ResizeHandle = 
@@ -145,6 +157,12 @@ export interface HistoryEntry {
   elementId: string;
   changes: StyleChange[];
   description: string;
+  // Type of operation for proper undo/redo
+  operationType: 'style' | 'text' | 'delete' | 'resize';
+  // For delete operations - store the removed code so it can be restored
+  deletedCode?: string;
+  // For resize - store original dimensions
+  originalDimensions?: { width: string; height: string };
 }
 
 // Message types for iframe communication
@@ -164,7 +182,17 @@ export type VisualEditorMessage =
   | { type: 'REQUEST_ELEMENT_INFO'; payload: { elementId: string } }
   | { type: 'ELEMENT_INFO_RESPONSE'; payload: { element: ElementInfo } }
   | { type: 'STYLE_APPLIED'; payload: { elementId: string; success: boolean } }
-  | { type: 'DOM_UPDATED'; payload: { elements: ElementInfo[] } };
+  | { type: 'DOM_UPDATED'; payload: { elements: ElementInfo[] } }
+  // Drag & Drop element messages
+  | { type: 'DRAG_ELEMENT_START'; payload: { elementType: string; content: string } }
+  | { type: 'DRAG_ELEMENT_OVER'; payload: { x: number; y: number } }
+  | { type: 'DRAG_ELEMENT_END'; payload: {} }
+  | { type: 'DROP_ELEMENT'; payload: { elementType: string; content: string; targetId?: string; position: 'before' | 'after' | 'inside' } }
+  | { type: 'ELEMENT_DROPPED'; payload: { elementId: string; success: boolean; insertedAt?: { targetId: string; position: string } } }
+  | { type: 'DROP_ZONE_HIGHLIGHT'; payload: { targetId: string; position: 'before' | 'after' | 'inside' } | null }
+  // Theme messages
+  | { type: 'APPLY_THEME_PREVIEW'; payload: { themeCSS: string } }
+  | { type: 'CLEAR_THEME_PREVIEW'; payload: {} };
 
 // Tailwind utility mappings for common CSS properties
 export const TAILWIND_MAPPINGS: Record<string, Record<string, string>> = {

@@ -164,16 +164,19 @@ export function updateClassName(
 
   for (const change of changes) {
     if (!change.useTailwind) continue;
+    
+    // Skip non-style properties like textContent and _delete
+    if (change.property === 'textContent' || change.property === '_delete') continue;
 
     // Get the new Tailwind class
-    const newClass = change.tailwindClass || cssToTailwindClass(change.property, change.newValue);
+    const newClass = change.tailwindClass || cssToTailwindClass(change.property as keyof ComputedStyleInfo, change.newValue);
     
     if (!newClass) {
       continue;
     }
 
     // Find and remove any existing classes for this property
-    const prefix = getTailwindPrefix(change.property);
+    const prefix = getTailwindPrefix(change.property as keyof ComputedStyleInfo);
     
     if (prefix) {
       // Remove existing classes with the same prefix
@@ -825,7 +828,8 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
       // Has dynamic className - append our classes using cn() or template literal
       const existingExpr = classNameExprMatch[1];
       const newClasses = tailwindChanges
-        .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+        .filter(c => c.property !== 'textContent' && c.property !== '_delete')
+        .map(c => c.tailwindClass || cssToTailwindClass(c.property as keyof ComputedStyleInfo, c.newValue))
         .filter(Boolean)
         .join(' ');
       
@@ -844,7 +848,8 @@ function applyChangesToOpeningTag(openingTag: string, changes: StyleChange[]): s
     } else {
       // No className - add one
       const newClassName = tailwindChanges
-        .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+        .filter(c => c.property !== 'textContent' && c.property !== '_delete')
+        .map(c => c.tailwindClass || cssToTailwindClass(c.property as keyof ComputedStyleInfo, c.newValue))
         .filter(Boolean)
         .join(' ');
       
@@ -911,6 +916,42 @@ export async function generateSearchReplaceEdit(
   sourceLine: number
 ): Promise<CodeUpdateResult> {
   try {
+    // Check for delete operation first
+    const deleteChange = changes.find(c => (c.property as string) === '_delete');
+    if (deleteChange) {
+      console.log('[SearchReplace] Processing delete operation at line', sourceLine);
+      
+      const deleteResult = generateDeleteElementEdit(originalCode, sourceLine);
+      if (deleteResult) {
+        console.log('[SearchReplace] Delete search string:', deleteResult.searchString.substring(0, 100));
+        
+        // Apply the delete
+        if (originalCode.includes(deleteResult.searchString)) {
+          const updatedCode = originalCode.replace(deleteResult.searchString, deleteResult.replaceString);
+          
+          // Clean up any resulting empty lines (but keep one blank line)
+          const cleanedCode = updatedCode.replace(/\n\s*\n\s*\n/g, '\n\n');
+          
+          return {
+            success: true,
+            updatedCode: cleanedCode,
+          };
+        } else {
+          return {
+            success: false,
+            updatedCode: originalCode,
+            error: 'Could not find element to delete in source code',
+          };
+        }
+      } else {
+        return {
+          success: false,
+          updatedCode: originalCode,
+          error: 'Could not generate delete operation',
+        };
+      }
+    }
+
     // Find the element in the code using line-based approach
     const elementInfo = findElementByLine(originalCode, sourceLine);
     if (!elementInfo) {
@@ -1174,8 +1215,9 @@ function generateSearchReplaceStrings(openingTag: string, change: StyleChange): 
         replaceString: `className="${newClassName}"`,
       };
     } else {
-      // Add new className
-      const newClassName = change.tailwindClass || cssToTailwindClass(change.property, change.newValue);
+      // Add new className - skip non-style properties
+      if (change.property === 'textContent' || change.property === '_delete') return null;
+      const newClassName = change.tailwindClass || cssToTailwindClass(change.property as keyof ComputedStyleInfo, change.newValue);
       if (newClassName) {
         const tagStart = openingTag.match(/^<(\w+)/);
         if (tagStart) {
@@ -1236,7 +1278,8 @@ function generateGroupedTailwindSearchReplace(openingTag: string, changes: Style
     // Combine with new changes
     const allChanges = [...inlineStyleChanges, ...changes];
     const newClassName = allChanges
-      .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+      .filter(c => c.property !== 'textContent' && c.property !== '_delete')
+      .map(c => c.tailwindClass || cssToTailwindClass(c.property as keyof ComputedStyleInfo, c.newValue))
       .filter(Boolean)
       .join(' ');
 
@@ -1278,7 +1321,8 @@ function generateGroupedTailwindSearchReplace(openingTag: string, changes: Style
   } else {
     // Add new className with all changes
     const newClassName = changes
-      .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+      .filter(c => c.property !== 'textContent' && c.property !== '_delete')
+      .map(c => c.tailwindClass || cssToTailwindClass(c.property as keyof ComputedStyleInfo, c.newValue))
       .filter(Boolean)
       .join(' ');
 
