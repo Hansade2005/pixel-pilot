@@ -921,6 +921,18 @@ export default App`,
         console.log('[VE-Client] Received CLEAR_THEME_PREVIEW message');
         clearThemePreview();
         break;
+      case 'DRAG_ELEMENT_START':
+        console.log('[VE-Client] Received DRAG_ELEMENT_START message');
+        startDragMode(message.payload.elementType, message.payload.content);
+        break;
+      case 'DRAG_ELEMENT_END':
+        console.log('[VE-Client] Received DRAG_ELEMENT_END message');
+        endDragMode();
+        break;
+      case 'INSERT_ELEMENT':
+        console.log('[VE-Client] Received INSERT_ELEMENT message');
+        insertElement(message.payload.content, message.payload.targetElementId, message.payload.position);
+        break;
     }
   }
 
@@ -953,6 +965,246 @@ export default App`,
       console.log('[VE-Client] Theme preview cleared');
     }
     sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
+  }
+
+  // ============================================
+  // DRAG AND DROP FUNCTIONS
+  // ============================================
+  var isDraggingElement = false;
+  var dragElementType = null;
+  var dragElementContent = null;
+  var dropTargetOverlay = null;
+  var currentDropTarget = null;
+  var dropPosition = 'inside';
+
+  function startDragMode(elementType, content) {
+    isDraggingElement = true;
+    dragElementType = elementType;
+    dragElementContent = content;
+    document.body.style.cursor = 'copy';
+    
+    // Create drop target overlay
+    if (!dropTargetOverlay) {
+      dropTargetOverlay = document.createElement('div');
+      dropTargetOverlay.setAttribute('data-ve-overlay', 'true');
+      dropTargetOverlay.id = 've-drop-overlay';
+      dropTargetOverlay.style.cssText = 'position: fixed; pointer-events: none; z-index: 999998; box-sizing: border-box; border: 2px dashed #22c55e; background: rgba(34, 197, 94, 0.1); display: none;';
+      document.body.appendChild(dropTargetOverlay);
+    }
+    
+    // Add drag-specific event listeners
+    document.addEventListener('mousemove', handleDragMove, true);
+    document.addEventListener('click', handleDrop, true);
+    document.addEventListener('keydown', handleDragKeyDown, true);
+    
+    console.log('[VE-Client] Drag mode started:', elementType);
+    sendToParent({ type: 'DRAG_MODE_STARTED', payload: { elementType: elementType } });
+  }
+
+  function endDragMode() {
+    isDraggingElement = false;
+    dragElementType = null;
+    dragElementContent = null;
+    currentDropTarget = null;
+    document.body.style.cursor = isEnabled ? 'crosshair' : '';
+    
+    // Hide drop overlay
+    if (dropTargetOverlay) {
+      dropTargetOverlay.style.display = 'none';
+    }
+    
+    // Remove drag event listeners
+    document.removeEventListener('mousemove', handleDragMove, true);
+    document.removeEventListener('click', handleDrop, true);
+    document.removeEventListener('keydown', handleDragKeyDown, true);
+    
+    console.log('[VE-Client] Drag mode ended');
+  }
+
+  function handleDragMove(event) {
+    if (!isDraggingElement) return;
+    
+    var target = document.elementFromPoint(event.clientX, event.clientY);
+    if (!target || shouldIgnoreElement(target)) {
+      if (dropTargetOverlay) dropTargetOverlay.style.display = 'none';
+      currentDropTarget = null;
+      return;
+    }
+    
+    // Find valid drop container
+    var foundDropTarget = findDropTarget(target);
+    if (!foundDropTarget) {
+      if (dropTargetOverlay) dropTargetOverlay.style.display = 'none';
+      currentDropTarget = null;
+      return;
+    }
+    
+    currentDropTarget = foundDropTarget;
+    
+    // Determine drop position based on mouse position
+    var rect = foundDropTarget.getBoundingClientRect();
+    var mouseY = event.clientY;
+    var relativeY = (mouseY - rect.top) / rect.height;
+    
+    if (relativeY < 0.25) {
+      dropPosition = 'before';
+    } else if (relativeY > 0.75) {
+      dropPosition = 'after';
+    } else {
+      dropPosition = 'inside';
+    }
+    
+    // Update drop overlay
+    if (dropTargetOverlay) {
+      dropTargetOverlay.style.display = 'block';
+      
+      if (dropPosition === 'before') {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = (rect.top - 2) + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = '4px';
+        dropTargetOverlay.style.background = '#22c55e';
+        dropTargetOverlay.style.border = 'none';
+      } else if (dropPosition === 'after') {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = (rect.bottom - 2) + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = '4px';
+        dropTargetOverlay.style.background = '#22c55e';
+        dropTargetOverlay.style.border = 'none';
+      } else {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = rect.top + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = rect.height + 'px';
+        dropTargetOverlay.style.background = 'rgba(34, 197, 94, 0.1)';
+        dropTargetOverlay.style.border = '2px dashed #22c55e';
+      }
+    }
+  }
+
+  function findDropTarget(element) {
+    var validContainers = ['DIV', 'SECTION', 'ARTICLE', 'MAIN', 'ASIDE', 'HEADER', 'FOOTER', 'NAV', 'FORM', 'UL', 'OL', 'BODY'];
+    
+    var current = element;
+    while (current && current !== document.body) {
+      if (validContainers.indexOf(current.tagName) !== -1 && !current.hasAttribute('data-ve-overlay')) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    
+    return document.body;
+  }
+
+  function handleDrop(event) {
+    if (!isDraggingElement || !currentDropTarget || !dragElementContent) {
+      endDragMode();
+      return;
+    }
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Parse the JSX content and create HTML element
+    var htmlContent = jsxToHtml(dragElementContent);
+    
+    // Create a temporary container to parse the HTML
+    var temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    var newElement = temp.firstElementChild;
+    
+    if (!newElement) {
+      console.warn('[VE-Client] Failed to create element');
+      endDragMode();
+      return;
+    }
+    
+    // Generate unique ID for the new element
+    var elementId = 've-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    newElement.setAttribute('data-ve-id', elementId);
+    
+    // Insert element based on position
+    if (dropPosition === 'before') {
+      currentDropTarget.parentNode.insertBefore(newElement, currentDropTarget);
+    } else if (dropPosition === 'after') {
+      currentDropTarget.parentNode.insertBefore(newElement, currentDropTarget.nextSibling);
+    } else {
+      currentDropTarget.appendChild(newElement);
+    }
+    
+    // Notify parent about the insertion
+    sendToParent({
+      type: 'ELEMENT_INSERTED',
+      payload: {
+        elementId: elementId,
+        content: dragElementContent,
+        position: dropPosition,
+        parentTag: currentDropTarget.tagName
+      }
+    });
+    
+    console.log('[VE-Client] Element inserted:', elementId, 'position:', dropPosition);
+    
+    endDragMode();
+  }
+
+  function handleDragKeyDown(event) {
+    if (event.key === 'Escape') {
+      endDragMode();
+      sendToParent({ type: 'DRAG_CANCELLED', payload: {} });
+    }
+  }
+
+  function jsxToHtml(jsx) {
+    if (!jsx) return '';
+    
+    return jsx
+      .replace(/className=/g, 'class=')
+      .replace(/htmlFor=/g, 'for=')
+      .replace(/\\{[^}]*\\}/g, '')
+      .replace(/<(\\w+)([^>]*)\\/>/g, '<$1$2></$1>')
+      .replace(/\\s+/g, ' ')
+      .trim();
+  }
+
+  function insertElement(content, targetElementId, position) {
+    var target = targetElementId ? findElementById(targetElementId) : document.body;
+    if (!target) {
+      target = document.body;
+    }
+    
+    var htmlContent = jsxToHtml(content);
+    var temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    var newElement = temp.firstElementChild;
+    
+    if (!newElement) {
+      console.warn('[VE-Client] Failed to create element for insertion');
+      return;
+    }
+    
+    var elementId = 've-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    newElement.setAttribute('data-ve-id', elementId);
+    
+    if (position === 'before') {
+      target.parentNode.insertBefore(newElement, target);
+    } else if (position === 'after') {
+      target.parentNode.insertBefore(newElement, target.nextSibling);
+    } else {
+      target.appendChild(newElement);
+    }
+    
+    sendToParent({
+      type: 'ELEMENT_INSERTED',
+      payload: {
+        elementId: elementId,
+        content: content,
+        position: position || 'inside'
+      }
+    });
+    
+    console.log('[VE-Client] Element inserted via INSERT_ELEMENT:', elementId);
   }
 
   // Initialize
@@ -6934,6 +7186,18 @@ export default function Home() {
         console.log('[VE-Client] Received CLEAR_THEME_PREVIEW message');
         clearThemePreview();
         break;
+      case 'DRAG_ELEMENT_START':
+        console.log('[VE-Client] Received DRAG_ELEMENT_START message');
+        startDragMode(message.payload.elementType, message.payload.content);
+        break;
+      case 'DRAG_ELEMENT_END':
+        console.log('[VE-Client] Received DRAG_ELEMENT_END message');
+        endDragMode();
+        break;
+      case 'INSERT_ELEMENT':
+        console.log('[VE-Client] Received INSERT_ELEMENT message');
+        insertElement(message.payload.content, message.payload.targetElementId, message.payload.position);
+        break;
     }
   }
 
@@ -6966,6 +7230,246 @@ export default function Home() {
       console.log('[VE-Client] Theme preview cleared');
     }
     sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
+  }
+
+  // ============================================
+  // DRAG AND DROP FUNCTIONS
+  // ============================================
+  var isDraggingElement = false;
+  var dragElementType = null;
+  var dragElementContent = null;
+  var dropTargetOverlay = null;
+  var currentDropTarget = null;
+  var dropPosition = 'inside';
+
+  function startDragMode(elementType, content) {
+    isDraggingElement = true;
+    dragElementType = elementType;
+    dragElementContent = content;
+    document.body.style.cursor = 'copy';
+    
+    // Create drop target overlay
+    if (!dropTargetOverlay) {
+      dropTargetOverlay = document.createElement('div');
+      dropTargetOverlay.setAttribute('data-ve-overlay', 'true');
+      dropTargetOverlay.id = 've-drop-overlay';
+      dropTargetOverlay.style.cssText = 'position: fixed; pointer-events: none; z-index: 999998; box-sizing: border-box; border: 2px dashed #22c55e; background: rgba(34, 197, 94, 0.1); display: none;';
+      document.body.appendChild(dropTargetOverlay);
+    }
+    
+    // Add drag-specific event listeners
+    document.addEventListener('mousemove', handleDragMove, true);
+    document.addEventListener('click', handleDrop, true);
+    document.addEventListener('keydown', handleDragKeyDown, true);
+    
+    console.log('[VE-Client] Drag mode started:', elementType);
+    sendToParent({ type: 'DRAG_MODE_STARTED', payload: { elementType: elementType } });
+  }
+
+  function endDragMode() {
+    isDraggingElement = false;
+    dragElementType = null;
+    dragElementContent = null;
+    currentDropTarget = null;
+    document.body.style.cursor = isEnabled ? 'crosshair' : '';
+    
+    // Hide drop overlay
+    if (dropTargetOverlay) {
+      dropTargetOverlay.style.display = 'none';
+    }
+    
+    // Remove drag event listeners
+    document.removeEventListener('mousemove', handleDragMove, true);
+    document.removeEventListener('click', handleDrop, true);
+    document.removeEventListener('keydown', handleDragKeyDown, true);
+    
+    console.log('[VE-Client] Drag mode ended');
+  }
+
+  function handleDragMove(event) {
+    if (!isDraggingElement) return;
+    
+    var target = document.elementFromPoint(event.clientX, event.clientY);
+    if (!target || shouldIgnoreElement(target)) {
+      if (dropTargetOverlay) dropTargetOverlay.style.display = 'none';
+      currentDropTarget = null;
+      return;
+    }
+    
+    // Find valid drop container
+    var foundDropTarget = findDropTarget(target);
+    if (!foundDropTarget) {
+      if (dropTargetOverlay) dropTargetOverlay.style.display = 'none';
+      currentDropTarget = null;
+      return;
+    }
+    
+    currentDropTarget = foundDropTarget;
+    
+    // Determine drop position based on mouse position
+    var rect = foundDropTarget.getBoundingClientRect();
+    var mouseY = event.clientY;
+    var relativeY = (mouseY - rect.top) / rect.height;
+    
+    if (relativeY < 0.25) {
+      dropPosition = 'before';
+    } else if (relativeY > 0.75) {
+      dropPosition = 'after';
+    } else {
+      dropPosition = 'inside';
+    }
+    
+    // Update drop overlay
+    if (dropTargetOverlay) {
+      dropTargetOverlay.style.display = 'block';
+      
+      if (dropPosition === 'before') {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = (rect.top - 2) + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = '4px';
+        dropTargetOverlay.style.background = '#22c55e';
+        dropTargetOverlay.style.border = 'none';
+      } else if (dropPosition === 'after') {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = (rect.bottom - 2) + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = '4px';
+        dropTargetOverlay.style.background = '#22c55e';
+        dropTargetOverlay.style.border = 'none';
+      } else {
+        dropTargetOverlay.style.left = rect.left + 'px';
+        dropTargetOverlay.style.top = rect.top + 'px';
+        dropTargetOverlay.style.width = rect.width + 'px';
+        dropTargetOverlay.style.height = rect.height + 'px';
+        dropTargetOverlay.style.background = 'rgba(34, 197, 94, 0.1)';
+        dropTargetOverlay.style.border = '2px dashed #22c55e';
+      }
+    }
+  }
+
+  function findDropTarget(element) {
+    var validContainers = ['DIV', 'SECTION', 'ARTICLE', 'MAIN', 'ASIDE', 'HEADER', 'FOOTER', 'NAV', 'FORM', 'UL', 'OL', 'BODY'];
+    
+    var current = element;
+    while (current && current !== document.body) {
+      if (validContainers.indexOf(current.tagName) !== -1 && !current.hasAttribute('data-ve-overlay')) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    
+    return document.body;
+  }
+
+  function handleDrop(event) {
+    if (!isDraggingElement || !currentDropTarget || !dragElementContent) {
+      endDragMode();
+      return;
+    }
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Parse the JSX content and create HTML element
+    var htmlContent = jsxToHtml(dragElementContent);
+    
+    // Create a temporary container to parse the HTML
+    var temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    var newElement = temp.firstElementChild;
+    
+    if (!newElement) {
+      console.warn('[VE-Client] Failed to create element');
+      endDragMode();
+      return;
+    }
+    
+    // Generate unique ID for the new element
+    var elementId = 've-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    newElement.setAttribute('data-ve-id', elementId);
+    
+    // Insert element based on position
+    if (dropPosition === 'before') {
+      currentDropTarget.parentNode.insertBefore(newElement, currentDropTarget);
+    } else if (dropPosition === 'after') {
+      currentDropTarget.parentNode.insertBefore(newElement, currentDropTarget.nextSibling);
+    } else {
+      currentDropTarget.appendChild(newElement);
+    }
+    
+    // Notify parent about the insertion
+    sendToParent({
+      type: 'ELEMENT_INSERTED',
+      payload: {
+        elementId: elementId,
+        content: dragElementContent,
+        position: dropPosition,
+        parentTag: currentDropTarget.tagName
+      }
+    });
+    
+    console.log('[VE-Client] Element inserted:', elementId, 'position:', dropPosition);
+    
+    endDragMode();
+  }
+
+  function handleDragKeyDown(event) {
+    if (event.key === 'Escape') {
+      endDragMode();
+      sendToParent({ type: 'DRAG_CANCELLED', payload: {} });
+    }
+  }
+
+  function jsxToHtml(jsx) {
+    if (!jsx) return '';
+    
+    return jsx
+      .replace(/className=/g, 'class=')
+      .replace(/htmlFor=/g, 'for=')
+      .replace(/\\{[^}]*\\}/g, '')
+      .replace(/<(\\w+)([^>]*)\\/>/g, '<$1$2></$1>')
+      .replace(/\\s+/g, ' ')
+      .trim();
+  }
+
+  function insertElement(content, targetElementId, position) {
+    var target = targetElementId ? findElementById(targetElementId) : document.body;
+    if (!target) {
+      target = document.body;
+    }
+    
+    var htmlContent = jsxToHtml(content);
+    var temp = document.createElement('div');
+    temp.innerHTML = htmlContent;
+    var newElement = temp.firstElementChild;
+    
+    if (!newElement) {
+      console.warn('[VE-Client] Failed to create element for insertion');
+      return;
+    }
+    
+    var elementId = 've-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    newElement.setAttribute('data-ve-id', elementId);
+    
+    if (position === 'before') {
+      target.parentNode.insertBefore(newElement, target);
+    } else if (position === 'after') {
+      target.parentNode.insertBefore(newElement, target.nextSibling);
+    } else {
+      target.appendChild(newElement);
+    }
+    
+    sendToParent({
+      type: 'ELEMENT_INSERTED',
+      payload: {
+        elementId: elementId,
+        content: content,
+        position: position || 'inside'
+      }
+    });
+    
+    console.log('[VE-Client] Element inserted via INSERT_ELEMENT:', elementId);
   }
 
   // Initialize
