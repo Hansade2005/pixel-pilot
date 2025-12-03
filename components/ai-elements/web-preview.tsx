@@ -22,7 +22,7 @@ export type DevicePreset = {
   name: string;
   width: number;
   height: number;
-  type: "mobile" | "tablet" | "desktop";
+  type: "mobile" | "tablet";
   icon: ReactNode;
 };
 
@@ -38,11 +38,6 @@ export const DEVICE_PRESETS: DevicePreset[] = [
   { name: "iPad", width: 768, height: 1024, type: "tablet", icon: <Tablet className="h-4 w-4" /> },
   { name: "iPad Pro", width: 1024, height: 1366, type: "tablet", icon: <Tablet className="h-4 w-4" /> },
   { name: "Surface Pro 7", width: 912, height: 1368, type: "tablet", icon: <Tablet className="h-4 w-4" /> },
-
-  // Desktop
-  { name: "Desktop", width: 1440, height: 900, type: "desktop", icon: <Monitor className="h-4 w-4" /> },
-  { name: "Desktop HD", width: 1920, height: 1080, type: "desktop", icon: <Monitor className="h-4 w-4" /> },
-  { name: "Full HD", width: 1920, height: 1080, type: "desktop", icon: <Monitor className="h-4 w-4" /> },
 ];
 
 export type WebPreviewContextValue = {
@@ -336,23 +331,6 @@ export const WebPreviewDeviceSelector = ({
             </span>
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Desktop</DropdownMenuLabel>
-        {DEVICE_PRESETS.filter(d => d.type === "desktop").map((preset) => (
-          <DropdownMenuItem
-            key={preset.name}
-            onClick={() => setDevice(preset)}
-            className="flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              {preset.icon}
-              <span>{preset.name}</span>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {preset.width}×{preset.height}
-            </span>
-          </DropdownMenuItem>
-        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -417,7 +395,7 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
       
       // For desktop, allow scaling up to fill container (like responsive mode)
       // For mobile/tablet, don't scale up beyond 1 to maintain realistic device size
-      const maxScale = device.type === "desktop" ? 2 : 1;
+      const maxScale = 1;
       const newScale = Math.min(scaleX, scaleY, maxScale);
 
       setScale(Math.max(0.1, newScale)); // Minimum scale of 0.1
@@ -442,7 +420,6 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
               "relative overflow-hidden shadow-2xl bg-black",
               device.type === "mobile" && "rounded-[2rem]",
               device.type === "tablet" && "rounded-xl",
-              device.type === "desktop" && "rounded-lg"
             )}
             style={{
               width: device.width + (device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12),
