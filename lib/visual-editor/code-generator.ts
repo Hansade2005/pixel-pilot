@@ -924,9 +924,29 @@ export async function generateSearchReplaceEdit(
       });
     }
 
-    // Handle style changes - group Tailwind changes together
-    const tailwindChanges = styleChanges.filter(c => c.useTailwind);
-    const inlineChanges = styleChanges.filter(c => !c.useTailwind);
+    // Handle style changes - convert inline styles to Tailwind when possible
+    const tailwindChanges: StyleChange[] = [];
+    const inlineChanges: StyleChange[] = [];
+
+    for (const change of styleChanges) {
+      // Convert color and background changes to Tailwind even if useTailwind is false
+      if (!change.useTailwind && (change.property === 'color' || change.property === 'backgroundColor')) {
+        const tailwindClass = cssToTailwindClass(change.property, change.newValue);
+        if (tailwindClass) {
+          tailwindChanges.push({
+            ...change,
+            useTailwind: true,
+            tailwindClass,
+          });
+        } else {
+          inlineChanges.push(change);
+        }
+      } else if (change.useTailwind) {
+        tailwindChanges.push(change);
+      } else {
+        inlineChanges.push(change);
+      }
+    }
 
     if (tailwindChanges.length > 0) {
       const searchReplace = generateGroupedTailwindSearchReplace(elementInfo.openingTag, tailwindChanges);
@@ -939,7 +959,7 @@ export async function generateSearchReplaceEdit(
       }
     }
 
-    // Handle individual inline style changes
+    // Handle remaining inline style changes
     for (const change of inlineChanges) {
       const searchReplace = generateSearchReplaceStrings(elementInfo.openingTag, change);
       if (searchReplace) {
@@ -1117,6 +1137,56 @@ function generateSearchReplaceStrings(openingTag: string, change: StyleChange): 
 // Generate grouped search-replace for multiple Tailwind changes
 function generateGroupedTailwindSearchReplace(openingTag: string, changes: StyleChange[]): { searchString: string; replaceString: string } | null {
   const classNameMatch = openingTag.match(/className=["']([^"']*)["']/);
+  const styleMatch = openingTag.match(/style=\{\{([^}]*)\}\}/);
+
+  // If element has inline styles, try to convert them to Tailwind classes
+  if (styleMatch) {
+    // Parse existing inline styles
+    const existingStyles = parseInlineStyle(styleMatch[1]);
+    console.log('[generateGroupedTailwindSearchReplace] Converting inline styles to Tailwind:', existingStyles);
+
+    // Create changes for existing inline styles
+    const inlineStyleChanges = Object.entries(existingStyles).map(([prop, value]) => ({
+      property: prop as keyof ComputedStyleInfo,
+      oldValue: value,
+      newValue: value,
+      useTailwind: true,
+      tailwindClass: cssToTailwindClass(prop as keyof ComputedStyleInfo, value) || undefined,
+    }));
+
+    // Combine with new changes
+    const allChanges = [...inlineStyleChanges, ...changes];
+    const newClassName = allChanges
+      .map(c => c.tailwindClass || cssToTailwindClass(c.property, c.newValue))
+      .filter(Boolean)
+      .join(' ');
+
+    if (newClassName) {
+      // Replace inline style with className
+      const tagStart = openingTag.match(/^<(\w+)/);
+      if (tagStart) {
+        const styleAttrPattern = /style=\{\{[^}]*\}\}/;
+        let withoutStyle = openingTag.replace(styleAttrPattern, '').trim();
+
+        // If there's already a className, update it
+        if (classNameMatch) {
+          const oldClassName = classNameMatch[1];
+          const updatedClassName = updateClassName(oldClassName, allChanges);
+          withoutStyle = withoutStyle.replace(`className="${oldClassName}"`, `className="${updatedClassName}"`);
+        } else {
+          // Add new className
+          withoutStyle = `${tagStart[0]} className="${newClassName}"${withoutStyle.slice(tagStart[0].length)}`;
+        }
+
+        return {
+          searchString: openingTag,
+          replaceString: withoutStyle,
+        };
+      }
+    }
+  }
+
+  // Normal className handling (no inline styles to convert)
   if (classNameMatch) {
     const oldClassName = classNameMatch[1];
     const newClassName = updateClassName(oldClassName, changes);
