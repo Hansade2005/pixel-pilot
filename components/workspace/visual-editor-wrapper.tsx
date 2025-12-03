@@ -18,6 +18,9 @@ import {
   injectVisualEditorScript,
   generateFileUpdate,
   type StyleChange,
+  type Theme,
+  generateGlobalsCSSForNextJS,
+  generateAppCSSForVite,
 } from '@/lib/visual-editor';
 import { Edit3, Wand2 } from 'lucide-react';
 
@@ -28,6 +31,8 @@ interface VisualEditorWrapperProps {
   isEnabled?: boolean;
   onToggle?: (enabled: boolean) => void;
   onSaveChanges?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string; sourceLine?: number }) => Promise<boolean>;
+  onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
+  projectType?: 'nextjs' | 'vite' | 'unknown';
   className?: string;
 }
 
@@ -39,6 +44,8 @@ function VisualEditorInner({
   isEnabled: externalIsEnabled,
   onToggle,
   onSaveChanges,
+  onApplyTheme,
+  projectType = 'unknown',
   className,
 }: VisualEditorWrapperProps) {
   const { 
@@ -135,6 +142,29 @@ function VisualEditorInner({
     }
   }, [state.isEnabled, isIframeReady, sendToIframe]);
 
+  // Handle theme application
+  const handleThemeApply = useCallback(async (theme: Theme) => {
+    console.log('[Visual Editor Wrapper] Applying theme:', theme.name);
+    
+    // Generate appropriate CSS based on project type
+    const cssContent = projectType === 'vite' 
+      ? generateAppCSSForVite(theme)
+      : generateGlobalsCSSForNextJS(theme);
+    
+    console.log('[Visual Editor Wrapper] Generated CSS content length:', cssContent.length);
+    
+    if (onApplyTheme) {
+      const success = await onApplyTheme(theme, cssContent);
+      console.log('[Visual Editor Wrapper] Theme applied result:', success);
+      return success;
+    } else {
+      console.warn('[Visual Editor Wrapper] onApplyTheme callback not provided');
+      // Log the CSS so user can at least copy it
+      console.log('[Visual Editor Wrapper] Generated theme CSS:', cssContent);
+      return false;
+    }
+  }, [projectType, onApplyTheme]);
+
   return (
     <div className={cn('relative h-full w-full', className)}>
       {/* Main content area */}
@@ -148,6 +178,8 @@ function VisualEditorInner({
       {/* Sidebar - positioned as fixed overlay on left side */}
       {state.isEnabled && (
         <VisualEditorSidebar
+          projectType={projectType}
+          onApplyTheme={handleThemeApply}
           onSave={async () => {
             if (!onSaveChanges) return;
             
@@ -176,6 +208,8 @@ export function VisualEditorWrapper({
   isEnabled,
   onToggle,
   onSaveChanges,
+  onApplyTheme,
+  projectType,
   className,
 }: VisualEditorWrapperProps) {
   // Handle saving changes to source files
@@ -199,6 +233,8 @@ export function VisualEditorWrapper({
         isEnabled={isEnabled}
         onToggle={onToggle}
         onSaveChanges={onSaveChanges}
+        onApplyTheme={onApplyTheme}
+        projectType={projectType}
         className={className}
       >
         {children}

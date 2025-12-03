@@ -44,7 +44,7 @@ import {
   VisualEditorWrapper,
   VisualEditorToggle,
 } from "./visual-editor-wrapper";
-import type { StyleChange } from "@/lib/visual-editor";
+import type { StyleChange, Theme } from "@/lib/visual-editor";
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -103,6 +103,7 @@ interface CodePreviewPanelProps {
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
   onVisualEditorSave?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string }) => Promise<boolean>;
+  onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
 }
 
 export interface CodePreviewPanelRef {
@@ -124,7 +125,7 @@ interface PreviewState {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -1528,6 +1529,8 @@ export default function TodoApp() {
             isEnabled={isVisualEditorEnabled}
             onToggle={setIsVisualEditorEnabled}
             onSaveChanges={onVisualEditorSave}
+            projectType="nextjs"
+            onApplyTheme={onApplyTheme}
             className="h-full"
           >
           <WebPreview

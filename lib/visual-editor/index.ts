@@ -35,3 +35,14 @@ export {
   generateFileUpdate,
   type CodeUpdateResult,
 } from './code-generator';
+
+// Theme utilities
+export {
+  type Theme,
+  type ThemeColors,
+  BUILT_IN_THEMES,
+  generateThemeCSS,
+  generateGlobalsCSSForNextJS,
+  generateAppCSSForVite,
+  parseThemeFromCSS,
+} from './themes';

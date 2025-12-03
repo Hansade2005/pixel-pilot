@@ -87,18 +87,41 @@ export function ThemesPanel({
   };
 
   const handleThemeSelect = useCallback((theme: Theme) => {
+    console.log('[Themes Panel] Theme selected:', theme.name, theme.id);
     setSelectedThemeId(theme.id);
+    setLastConfirmation(null); // Clear previous confirmation
+    
     // Send preview to iframe
     const previewCSS = generateThemeCSS(theme, previewMode === 'dark');
-    console.log('[Themes Panel] Sending theme preview, CSS length:', previewCSS.length);
-    console.log('[Themes Panel] Theme:', theme.name, 'Mode:', previewMode);
-    sendToIframe({ type: 'APPLY_THEME_PREVIEW', payload: { themeCSS: previewCSS } });
+    console.log('[Themes Panel] Generated CSS length:', previewCSS.length);
+    console.log('[Themes Panel] sendToIframe function exists:', !!sendToIframe);
+    
+    if (sendToIframe) {
+      sendToIframe({ type: 'APPLY_THEME_PREVIEW', payload: { themeCSS: previewCSS } });
+      console.log('[Themes Panel] Theme preview message sent');
+    } else {
+      console.error('[Themes Panel] sendToIframe is not available!');
+    }
   }, [sendToIframe, previewMode]);
 
   const handleApplyTheme = useCallback(() => {
+    console.log('[Themes Panel] Apply Theme clicked, selectedThemeId:', selectedThemeId);
     const theme = BUILT_IN_THEMES.find((t: Theme) => t.id === selectedThemeId);
-    if (theme && onApplyTheme) {
+    console.log('[Themes Panel] Found theme:', theme?.name);
+    console.log('[Themes Panel] onApplyTheme callback exists:', !!onApplyTheme);
+    
+    if (!theme) {
+      console.warn('[Themes Panel] No theme selected');
+      return;
+    }
+    
+    if (onApplyTheme) {
+      console.log('[Themes Panel] Calling onApplyTheme with theme:', theme.name);
       onApplyTheme(theme);
+      setLastConfirmation(`Theme "${theme.name}" applied to project`);
+    } else {
+      console.warn('[Themes Panel] onApplyTheme callback not provided - theme cannot be saved to project files');
+      setLastConfirmation(`⚠️ Theme selected but save callback not configured`);
     }
   }, [selectedThemeId, onApplyTheme]);
 
@@ -168,10 +191,13 @@ export function ThemesPanel({
         </div>
       </div>
 
-      {/* Debug Status - Remove in production */}
+      {/* Status Indicator */}
       {lastConfirmation && (
-        <div className="text-xs text-green-600 bg-green-50 rounded px-2 py-1">
-          ✅ Preview: {lastConfirmation}
+        <div className={cn(
+          "text-xs rounded px-2 py-1",
+          lastConfirmation.includes('⚠️') ? "text-yellow-600 bg-yellow-50" : "text-green-600 bg-green-50"
+        )}>
+          {lastConfirmation.includes('⚠️') ? lastConfirmation : `✅ ${lastConfirmation}`}
         </div>
       )}
 

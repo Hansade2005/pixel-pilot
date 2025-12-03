@@ -177,6 +177,87 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
+  // Visual Editor theme save handler - applies theme to CSS files
+  const handleVisualEditorThemeSave = async (theme: { name: string; id: string }, cssContent: string): Promise<boolean> => {
+    try {
+      if (!selectedProject) {
+        console.warn('[VisualEditor] Cannot save theme: no project selected')
+        return false
+      }
+
+      // Determine the CSS file path based on project type
+      // Next.js uses app/globals.css, Vite uses src/App.css or src/index.css
+      const possiblePaths = [
+        'app/globals.css',
+        'src/globals.css', 
+        'src/App.css',
+        'src/index.css',
+        'styles/globals.css',
+      ]
+
+      let targetFile = null
+      let targetPath = ''
+
+      for (const path of possiblePaths) {
+        const file = await storageManager.getFile(selectedProject.id, path)
+        if (file) {
+          targetFile = file
+          targetPath = path
+          break
+        }
+      }
+
+      if (!targetFile || !targetPath) {
+        console.warn('[VisualEditor] Could not find CSS file to update')
+        toast({
+          title: 'CSS file not found',
+          description: 'Could not find globals.css or App.css in your project',
+          variant: 'destructive',
+        })
+        return false
+      }
+
+      console.log('[VisualEditor] Saving theme to:', targetPath)
+
+      // Save the CSS content to storage
+      await storageManager.updateFile(selectedProject.id, targetPath, {
+        content: cssContent,
+        updatedAt: new Date().toISOString(),
+      })
+
+      // Trigger file explorer refresh
+      setFileExplorerKey(prev => prev + 1)
+      
+      // Dispatch files-changed event to notify other components
+      window.dispatchEvent(new CustomEvent('files-changed', {
+        detail: { 
+          projectId: selectedProject.id,
+          action: 'theme-update',
+          path: targetPath,
+        }
+      }))
+
+      // Trigger auto backup
+      triggerAutoBackup(`Theme applied: ${theme.name}`)
+
+      toast({
+        title: 'Theme applied',
+        description: `"${theme.name}" theme saved to ${targetPath}`,
+      })
+
+      console.log('[VisualEditor] Successfully saved theme to:', targetPath)
+      return true
+    } catch (error) {
+      console.error('[VisualEditor] Error saving theme:', error)
+      toast({
+        title: 'Theme save failed',
+        description: 'An error occurred while saving the theme',
+        variant: 'destructive',
+      })
+      return false
+    }
+  }
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
@@ -1158,6 +1239,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         syncedUrl={syncedPreview.url || customUrl}
                         onUrlChange={setCustomUrl}
                         onVisualEditorSave={handleVisualEditorSave}
+                        onApplyTheme={handleVisualEditorThemeSave}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
@@ -1536,6 +1618,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       syncedUrl={syncedPreview.url || customUrl}
                       onUrlChange={setCustomUrl}
                       onVisualEditorSave={handleVisualEditorSave}
+                      onApplyTheme={handleVisualEditorThemeSave}
                     />
                   </div>
                 </TabsContent>
