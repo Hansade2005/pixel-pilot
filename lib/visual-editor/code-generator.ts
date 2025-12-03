@@ -728,19 +728,35 @@ function findJSXElement(
             let elementContent = '';
             let tagDepth = 1;
             
-            for (let k = endLine + 1; k < lines.length && k <= endLine + 50; k++) {
-              const searchLine = lines[k];
-              
-              // Count opening and closing tags of the same name
-              const openings = (searchLine.match(new RegExp(`<${tagName}[\\s>]`, 'g')) || []).length;
-              const closings = (searchLine.match(closingTagPattern) || []).length;
-              
-              tagDepth += openings - closings;
-              
-              if (tagDepth === 0) {
-                closingTagLine = k;
-                elementContent = lines.slice(endLine + 1, k).join('\n');
-                break;
+            // First check if the closing tag is on the same line as the opening tag
+            const openingLine = lines[endLine];
+            const openingTagEnd = openingTag.length;
+            const remainingOnOpeningLine = openingLine.substring(openingTagEnd);
+            
+            // Check if closing tag is on the same line
+            const sameLineClosingMatch = remainingOnOpeningLine.match(closingTagPattern);
+            if (sameLineClosingMatch) {
+              // Element is entirely on one line
+              const contentStart = openingTagEnd;
+              const contentEnd = remainingOnOpeningLine.indexOf(sameLineClosingMatch[0]);
+              elementContent = remainingOnOpeningLine.substring(0, contentEnd);
+              closingTagLine = endLine;
+            } else {
+              // Closing tag is on a different line
+              for (let k = endLine + 1; k < lines.length && k <= endLine + 50; k++) {
+                const searchLine = lines[k];
+                
+                // Count opening and closing tags of the same name
+                const openings = (searchLine.match(new RegExp(`<${tagName}[\\s>]`, 'g')) || []).length;
+                const closings = (searchLine.match(closingTagPattern) || []).length;
+                
+                tagDepth += openings - closings;
+                
+                if (tagDepth === 0) {
+                  closingTagLine = k;
+                  elementContent = lines.slice(endLine + 1, k).join('\n');
+                  break;
+                }
               }
             }
             
@@ -903,25 +919,55 @@ export async function generateSearchReplaceEdit(
     const operations: Array<{ searchString: string; replaceString: string; change: StyleChange }> = [];
 
     // Handle text content changes
-    if (textChange && elementInfo.closingTagLine !== -1) {
+    if (textChange) {
       const lines = originalCode.split('\n');
-      const contentLines = lines.slice(elementInfo.endLine + 1, elementInfo.closingTagLine);
-      const currentContent = contentLines.join('\n').trim();
+      
+      if (elementInfo.closingTagLine === elementInfo.endLine) {
+        // Content is on the same line as opening tag
+        const openingLine = lines[elementInfo.endLine];
+        const openingTagEnd = elementInfo.openingTag.length;
+        const remainingOnLine = openingLine.substring(openingTagEnd);
+        
+        // Find the closing tag on the same line
+        const closingTagPattern = new RegExp(`</${elementInfo.openingTag.match(/^<(\w+)/)?.[1]}\\s*>`);
+        const closingMatch = remainingOnLine.match(closingTagPattern);
+        
+        if (closingMatch) {
+          const contentStart = openingTagEnd;
+          const contentEnd = remainingOnLine.indexOf(closingMatch[0]);
+          const currentContent = remainingOnLine.substring(0, contentEnd).trim();
+          
+          // Replace the content on the same line
+          const beforeContent = openingLine.substring(0, contentStart);
+          const afterContent = remainingOnLine.substring(contentEnd);
+          const newLine = beforeContent + textChange.newValue + afterContent;
+          
+          operations.push({
+            searchString: openingLine,
+            replaceString: newLine,
+            change: textChange,
+          });
+        }
+      } else if (elementInfo.closingTagLine !== -1) {
+        // Content spans multiple lines
+        const contentLines = lines.slice(elementInfo.endLine + 1, elementInfo.closingTagLine);
+        const currentContent = contentLines.join('\n').trim();
 
-      // Find the indentation of the content
-      const contentIndent = contentLines.length > 0
-        ? contentLines[0].match(/^(\s*)/)?.[1] || ''
-        : '';
+        // Find the indentation of the content
+        const contentIndent = contentLines.length > 0
+          ? contentLines[0].match(/^(\s*)/)?.[1] || ''
+          : '';
 
-      // Create search string with proper indentation
-      const searchString = contentLines.map(line => line.trim()).join('\n');
-      const replaceString = textChange.newValue;
+        // Create search string with proper indentation
+        const searchString = contentLines.map(line => line.trim()).join('\n');
+        const replaceString = textChange.newValue;
 
-      operations.push({
-        searchString,
-        replaceString: contentIndent + replaceString,
-        change: textChange,
-      });
+        operations.push({
+          searchString,
+          replaceString: contentIndent + replaceString,
+          change: textChange,
+        });
+      }
     }
 
     // Handle style changes - convert inline styles to Tailwind when possible
