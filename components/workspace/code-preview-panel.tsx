@@ -794,12 +794,14 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   }
 
   const refreshPreview = () => {
-    if (preview.url) {
-      // Force iframe reload
-      const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
-      if (iframe) {
-        iframe.src = iframe.src
-      }
+    if (preview.url && previewIframeRef.current) {
+      // Force iframe reload by updating src with cache-busting param
+      const iframe = previewIframeRef.current;
+      const currentSrc = iframe.src;
+      // Add or update timestamp to force reload
+      const url = new URL(currentSrc);
+      url.searchParams.set('_refresh', Date.now().toString());
+      iframe.src = url.toString();
     }
   }
 
@@ -1570,15 +1572,6 @@ export default function TodoApp() {
               />
               
               <WebPreviewDeviceSelector />
-
-              <WebPreviewNavigationButton
-                onClick={openStackBlitz}
-                disabled={!project}
-                tooltip="Open in StackBlitz"
-              >
-                <Zap className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-
               <WebPreviewUrl
                 onRefresh={refreshPreview}
                 onOpenExternal={() => {

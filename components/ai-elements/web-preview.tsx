@@ -402,8 +402,8 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
       const container = containerRef.current;
       if (!container) return;
 
-      const containerWidth = container.clientWidth - 32; // Padding
-      const containerHeight = container.clientHeight - 16; // Padding only, no label space
+      const containerWidth = container.clientWidth - 16; // Small padding
+      const containerHeight = container.clientHeight - 16; // Small padding
 
       // Add device frame padding
       const framePaddingH = device.type === "mobile" ? 20 : device.type === "tablet" ? 16 : 12;
@@ -414,7 +414,11 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
 
       const scaleX = containerWidth / totalWidth;
       const scaleY = containerHeight / totalHeight;
-      const newScale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+      
+      // For desktop, allow scaling up to fill container (like responsive mode)
+      // For mobile/tablet, don't scale up beyond 1 to maintain realistic device size
+      const maxScale = device.type === "desktop" ? 2 : 1;
+      const newScale = Math.min(scaleX, scaleY, maxScale);
 
       setScale(Math.max(0.1, newScale)); // Minimum scale of 0.1
     };
