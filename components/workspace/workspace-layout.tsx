@@ -78,6 +78,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
   const [projectFiles, setProjectFiles] = useState<File[]>([])
+  
+  // Tagged component from visual editor for chat context
+  const [taggedComponent, setTaggedComponent] = useState<{
+    id: string;
+    tagName: string;
+    sourceFile?: string;
+    sourceLine?: number;
+    className: string;
+    textContent?: string;
+  } | null>(null)
 
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
@@ -1132,8 +1142,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
-
                       initialPrompt={initialChatPrompt}
+                      taggedComponent={taggedComponent}
+                      onClearTaggedComponent={() => setTaggedComponent(null)}
                     />
                   </div>
                 </ResizablePanel>
@@ -1240,6 +1251,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         onUrlChange={setCustomUrl}
                         onVisualEditorSave={handleVisualEditorSave}
                         onApplyTheme={handleVisualEditorThemeSave}
+                        onTagToChat={(component) => {
+                          setTaggedComponent(component)
+                          toast({
+                            title: 'Component Tagged',
+                            description: `<${component.tagName}> added as context for your next message`,
+                          })
+                        }}
+                        onPublish={() => {
+                          // Trigger preview creation
+                          codePreviewRef.current?.createPreview()
+                        }}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
@@ -1572,6 +1594,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onClearChat={handleClearChat}
                       aiMode={aiMode}
                       initialPrompt={initialChatPrompt}
+                      taggedComponent={taggedComponent}
+                      onClearTaggedComponent={() => setTaggedComponent(null)}
                     />
                   </div>
                 </TabsContent>

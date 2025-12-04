@@ -6266,7 +6266,7 @@ const nextConfig = {
     appDir: true,
   },
   images: {
-    domains: ['localhost'],
+    domains: ['localhost','api.a0.dev'],
   },
   async rewrites() {
     return [

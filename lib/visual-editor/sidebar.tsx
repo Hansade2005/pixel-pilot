@@ -3,8 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useVisualEditor } from './context';
-import { ElementTree } from './overlay';
-import type { StyleChange, SidebarPanel, ComputedStyleInfo } from './types';
+import type { SidebarPanel } from './types';
 import {
   TAILWIND_MAPPINGS,
   TAILWIND_SPACING,
@@ -36,9 +35,6 @@ import {
   Redo2,
   Save,
   MousePointer2,
-  Type,
-  Move,
-  Square,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -47,37 +43,38 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
-  Maximize2,
   ChevronUp,
   ChevronDown,
-  Palette,
   Bold,
-  Italic,
   Underline,
   Trash2,
-  Scaling,
-  LayoutGrid,
-  Plus,
+  Tag,
+  Upload,
 } from 'lucide-react';
-import { ThemesPanel } from './panels/themes-panel';
-import { ElementsPanel } from './panels/elements-panel';
-import type { Theme } from './themes';
-import type { DraggableElement } from './draggable-elements';
 
 interface VisualEditorSidebarProps {
   className?: string;
   onSave?: () => Promise<void>;
-  onApplyTheme?: (theme: Theme) => void;
-  onInsertElement?: (element: DraggableElement, targetId?: string, position?: 'before' | 'after' | 'inside') => void;
+  onTagToChat?: (elementInfo: {
+    id: string;
+    tagName: string;
+    sourceFile?: string;
+    sourceLine?: number;
+    className: string;
+    textContent?: string;
+  }) => void;
+  onPublish?: () => void;
   projectType?: 'nextjs' | 'vite' | 'unknown';
+  hasUnsavedChanges?: boolean;
 }
 
 export function VisualEditorSidebar({ 
   className, 
   onSave, 
-  onApplyTheme,
-  onInsertElement,
+  onTagToChat,
+  onPublish,
   projectType = 'unknown',
+  hasUnsavedChanges = false,
 }: VisualEditorSidebarProps) {
   const {
     state,
@@ -218,37 +215,13 @@ export function VisualEditorSidebar({
         </div>
       </div>
 
-      {/* Tools - Compact */}
+      {/* Tools - Select and Delete */}
       <div className="flex items-center justify-center gap-1 p-2 border-b bg-muted/30">
         <ToolButton
           icon={<MousePointer2 className="h-4 w-4" />}
           isActive={state.activeTool === 'select'}
           onClick={() => setActiveTool('select')}
-          tooltip="Select (V)"
-        />
-        <ToolButton
-          icon={<Type className="h-4 w-4" />}
-          isActive={state.activeTool === 'text'}
-          onClick={() => setActiveTool('text')}
-          tooltip="Text (T)"
-        />
-        <ToolButton
-          icon={<Move className="h-4 w-4" />}
-          isActive={state.activeTool === 'spacing'}
-          onClick={() => setActiveTool('spacing')}
-          tooltip="Spacing (S)"
-        />
-        <ToolButton
-          icon={<Square className="h-4 w-4" />}
-          isActive={state.activeTool === 'layout'}
-          onClick={() => setActiveTool('layout')}
-          tooltip="Layout (L)"
-        />
-        <ToolButton
-          icon={<Scaling className="h-4 w-4" />}
-          isActive={state.activeTool === 'resize'}
-          onClick={() => setActiveTool('resize')}
-          tooltip="Resize (R)"
+          tooltip="Select (V) - Click elements to edit"
         />
         {/* Delete button - only enabled when element is selected */}
         <ToolButton
@@ -269,7 +242,7 @@ export function VisualEditorSidebar({
         />
       </div>
 
-      {/* Main Mode Tabs - Edit / Themes / Elements */}
+      {/* Main Mode Tabs - Edit only */}
       <div className="flex border-b bg-muted/20">
         <button
           onClick={() => setActivePanel('styles')}
@@ -283,83 +256,65 @@ export function VisualEditorSidebar({
           <MousePointer2 className="h-3.5 w-3.5" />
           Edit
         </button>
-        <button
-          onClick={() => setActivePanel('themes')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
-            state.activePanel === 'themes'
-              ? 'bg-background text-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <Palette className="h-3.5 w-3.5" />
-          Themes
-        </button>
-        <button
-          onClick={() => setActivePanel('elements')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
-            state.activePanel === 'elements'
-              ? 'bg-background text-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add
-        </button>
       </div>
 
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-2">
-          {/* Themes Panel */}
-          {state.activePanel === 'themes' && (
-            <ThemesPanel 
-              onApplyTheme={onApplyTheme}
-              projectType={projectType}
-            />
-          )}
-
-          {/* Elements Panel */}
-          {state.activePanel === 'elements' && (
-            <ElementsPanel 
-              onInsertElement={(element) => {
-                if (onInsertElement) {
-                  const targetId = state.selectedElements[0]?.elementId;
-                  onInsertElement(element, targetId, 'after');
-                }
-              }}
-            />
-          )}
-
           {/* Edit Panel - Style editing for selected element */}
           {['styles', 'layout', 'spacing', 'typography', 'effects'].includes(state.activePanel) && (
             <>
               {selectedElement ? (
-                <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
-                    <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
-                    <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
-                    <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
-                    <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
-                  </TabsList>
+                <>
+                  {/* Tag to Chat Button */}
+                  <div className="mb-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                      onClick={() => {
+                        if (onTagToChat && selectedElement) {
+                          onTagToChat({
+                            id: selectedElement.id,
+                            tagName: selectedElement.tagName,
+                            sourceFile: selectedElement.sourceFile,
+                            sourceLine: selectedElement.sourceLine,
+                            className: selectedElement.className,
+                            textContent: selectedElement.textContent,
+                          });
+                        }
+                      }}
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                      Tag to Chat
+                    </Button>
+                  </div>
+                  
+                  <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
+                    <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
+                      <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
+                      <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
+                      <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
+                      <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
+                    </TabsList>
 
-                  <TabsContent value="styles" className="mt-0 space-y-2">
-                    <StylesPanel element={selectedElement} />
-                  </TabsContent>
+                    <TabsContent value="styles" className="mt-0 space-y-2">
+                      <StylesPanel element={selectedElement} />
+                    </TabsContent>
 
-                  <TabsContent value="layout" className="mt-0 space-y-2">
-                    <LayoutPanel element={selectedElement} />
-                  </TabsContent>
+                    <TabsContent value="layout" className="mt-0 space-y-2">
+                      <LayoutPanel element={selectedElement} />
+                    </TabsContent>
 
-                  <TabsContent value="spacing" className="mt-0 space-y-2">
-                    <SpacingPanel element={selectedElement} />
-                  </TabsContent>
+                    <TabsContent value="spacing" className="mt-0 space-y-2">
+                      <SpacingPanel element={selectedElement} />
+                    </TabsContent>
 
-                  <TabsContent value="typography" className="mt-0 space-y-2">
-                    <TypographyPanel element={selectedElement} />
-                  </TabsContent>
-                </Tabs>
+                    <TabsContent value="typography" className="mt-0 space-y-2">
+                      <TypographyPanel element={selectedElement} />
+                    </TabsContent>
+                  </Tabs>
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
                   <MousePointer2 className="h-12 w-12 mb-4 opacity-50" />
@@ -372,8 +327,19 @@ export function VisualEditorSidebar({
         </div>
       </ScrollArea>
 
-      {/* Footer - Compact */}
-      <div className="p-2 border-t bg-muted/30">
+      {/* Footer with Publish button */}
+      <div className="p-2 border-t bg-muted/30 space-y-2">
+        {/* Publish button - shows after edits are saved */}
+        {hasUnsavedChanges === false && onPublish && (
+          <Button
+            size="sm"
+            className="w-full gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+            onClick={onPublish}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Publish Preview
+          </Button>
+        )}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Changes: {Array.from(state.pendingChanges.values()).reduce((total, changes) => total + changes.length, 0)}</span>
           <span>Selected: {state.selectedElements.length}</span>

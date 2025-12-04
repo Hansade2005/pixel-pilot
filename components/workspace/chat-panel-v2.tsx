@@ -876,6 +876,16 @@ interface AttachedUploadedFile {
   size: number
 }
 
+// Tagged component from visual editor
+interface TaggedComponent {
+  id: string
+  tagName: string
+  sourceFile?: string
+  sourceLine?: number
+  className: string
+  textContent?: string
+}
+
 interface ChatPanelV2Props {
   project: any
   isMobile?: boolean
@@ -884,6 +894,8 @@ interface ChatPanelV2Props {
   onModeChange?: (mode: string) => void
   onClearChat?: () => void
   initialPrompt?: string
+  taggedComponent?: TaggedComponent | null
+  onClearTaggedComponent?: () => void
 }
 
 export function ChatPanelV2({
@@ -893,7 +905,9 @@ export function ChatPanelV2({
   aiMode = 'code',
   onModeChange,
   onClearChat,
-  initialPrompt
+  initialPrompt,
+  taggedComponent,
+  onClearTaggedComponent
 }: ChatPanelV2Props) {
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -2807,6 +2821,25 @@ export function ChatPanelV2({
       }
     }
 
+    // Add tagged component context from visual editor (shown to AI, displayed to user)
+    if (taggedComponent) {
+      const componentContext = `
+--- Tagged Component from Visual Editor ---
+Element: <${taggedComponent.tagName}>
+${taggedComponent.sourceFile ? `File: ${taggedComponent.sourceFile}${taggedComponent.sourceLine ? `:${taggedComponent.sourceLine}` : ''}` : ''}
+Classes: ${taggedComponent.className || 'none'}
+${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"` : ''}
+--- End Tagged Component ---`
+      
+      enhancedContent = `${enhancedContent}\n\n=== TAGGED COMPONENT CONTEXT ===${componentContext}\n=== END TAGGED COMPONENT ===`
+      displayContent = `${displayContent}\n\n[Component: <${taggedComponent.tagName}>${taggedComponent.sourceFile ? ` in ${taggedComponent.sourceFile}` : ''}]`
+      
+      // Clear the tagged component after including it
+      if (onClearTaggedComponent) {
+        onClearTaggedComponent()
+      }
+    }
+
     // Clear attachments
     setAttachedFiles([])
     setAttachedImages([])
@@ -3858,6 +3891,35 @@ export function ChatPanelV2({
         ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
         : 'p-4'
         }`}>
+        {/* Tagged Component Context Pill */}
+        {taggedComponent && (
+          <div className="mb-2">
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-full text-xs">
+              <Square className="size-3 text-blue-600 dark:text-blue-400" />
+              <span className="font-medium text-blue-800 dark:text-blue-200">
+                &lt;{taggedComponent.tagName}&gt;
+              </span>
+              {taggedComponent.sourceFile && (
+                <span className="text-blue-600/70 dark:text-blue-400/70">
+                  {taggedComponent.sourceFile}
+                  {taggedComponent.sourceLine && `:${taggedComponent.sourceLine}`}
+                </span>
+              )}
+              {taggedComponent.textContent && (
+                <span className="text-blue-600/60 dark:text-blue-400/60 truncate max-w-[100px]" title={taggedComponent.textContent}>
+                  "{taggedComponent.textContent.slice(0, 20)}{taggedComponent.textContent.length > 20 ? '...' : ''}"
+                </span>
+              )}
+              <button 
+                onClick={onClearTaggedComponent}
+                className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
+              >
+                <X className="size-3 text-blue-600 dark:text-blue-400" />
+              </button>
+            </div>
+          </div>
+        )}
+        
         {/* Attachments Display */}
         {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0) && (
           <div className="mb-2 flex flex-wrap gap-2">

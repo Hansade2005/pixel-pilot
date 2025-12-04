@@ -104,6 +104,8 @@ interface CodePreviewPanelProps {
   onUrlChange?: (url: string) => void;
   onVisualEditorSave?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string }) => Promise<boolean>;
   onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
+  onTagToChat?: (component: { id: string; tagName: string; sourceFile?: string; sourceLine?: number; className: string; textContent?: string }) => void;
+  onPublish?: () => void;
 }
 
 export interface CodePreviewPanelRef {
@@ -125,7 +127,7 @@ interface PreviewState {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -1531,6 +1533,8 @@ export default function TodoApp() {
             onSaveChanges={onVisualEditorSave}
             projectType="nextjs"
             onApplyTheme={onApplyTheme}
+            onTagToChat={onTagToChat}
+            onPublish={onPublish}
             className="h-full"
           >
           <WebPreview

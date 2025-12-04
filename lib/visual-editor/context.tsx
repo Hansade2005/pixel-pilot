@@ -380,6 +380,9 @@ interface VisualEditorContextValue {
   applyChangesToFile: (elementId: string, changes: StyleChange[]) => Promise<boolean>;
   applyPendingDeletes: () => Promise<boolean>;
   hasPendingDeletes: () => boolean;
+  // Unsaved changes check
+  hasUnsavedChangesForCurrentSelection: () => boolean;
+  getCurrentSelectionPendingChanges: () => StyleChange[];
 }
 
 const VisualEditorContext = createContext<VisualEditorContextValue | null>(null);
@@ -389,16 +392,30 @@ interface VisualEditorProviderProps {
   children: ReactNode;
   config?: Partial<VisualEditorConfig>;
   onApplyChanges?: (elementId: string, changes: StyleChange[], sourceFile?: string, sourceLine?: number) => Promise<boolean>;
+  onSelectionBlocked?: () => void; // Called when selection is blocked due to unsaved changes
 }
 
 export function VisualEditorProvider({
   children,
   config: configOverrides = {},
   onApplyChanges,
+  onSelectionBlocked,
 }: VisualEditorProviderProps) {
   const [state, dispatch] = useReducer(visualEditorReducer, initialState);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const config = { ...DEFAULT_VISUAL_EDITOR_CONFIG, ...configOverrides };
+  
+  // Ref to track the callback for blocked selection (allows it to be updated without recreating effects)
+  const onSelectionBlockedRef = useRef(onSelectionBlocked);
+  useEffect(() => {
+    onSelectionBlockedRef.current = onSelectionBlocked;
+  }, [onSelectionBlocked]);
+  
+  // Ref to track current state for use in message handler (avoids stale closure)
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Detect OS for multi-select key
   useEffect(() => {
@@ -423,7 +440,28 @@ export function VisualEditorProvider({
         case 'ELEMENT_HOVERED':
           dispatch({ type: 'SET_HOVERED_ELEMENT', payload: message.payload.element });
           break;
-        case 'ELEMENT_SELECTED':
+        case 'ELEMENT_SELECTED': {
+          // Check if current selection has unsaved changes
+          const currentState = stateRef.current;
+          const hasUnsavedChanges = currentState.selectedElements.length > 0 &&
+            (() => {
+              const currentElementId = currentState.selectedElements[0].elementId;
+              const pendingChanges = currentState.pendingChanges.get(currentElementId);
+              return pendingChanges !== undefined && pendingChanges.length > 0;
+            })();
+          
+          // Check if selecting a different element
+          const isSelectingDifferentElement = message.payload.elements.length > 0 &&
+            currentState.selectedElements.length > 0 &&
+            message.payload.elements[0].id !== currentState.selectedElements[0].elementId;
+          
+          // Block selection if there are unsaved changes and selecting a different element
+          if (hasUnsavedChanges && isSelectingDifferentElement) {
+            console.log('[Visual Editor] Selection blocked - unsaved changes exist');
+            onSelectionBlockedRef.current?.();
+            return;
+          }
+          
           message.payload.elements.forEach((element, index) => {
             dispatch({
               type: 'SELECT_ELEMENT',
@@ -434,6 +472,7 @@ export function VisualEditorProvider({
             });
           });
           break;
+        }
         case 'ELEMENT_DESELECTED':
           dispatch({ type: 'DESELECT_ELEMENT', payload: message.payload.elementId });
           break;
@@ -701,6 +740,23 @@ export function VisualEditorProvider({
     return state.pendingDeletes.size > 0;
   }, [state.pendingDeletes]);
 
+  // Check if current selection has unsaved changes
+  const hasUnsavedChangesForCurrentSelection = useCallback(() => {
+    if (state.selectedElements.length === 0) return false;
+    
+    const currentElementId = state.selectedElements[0].elementId;
+    const pendingChanges = state.pendingChanges.get(currentElementId);
+    return pendingChanges !== undefined && pendingChanges.length > 0;
+  }, [state.selectedElements, state.pendingChanges]);
+
+  // Get pending changes for current selection
+  const getCurrentSelectionPendingChanges = useCallback(() => {
+    if (state.selectedElements.length === 0) return [];
+    
+    const currentElementId = state.selectedElements[0].elementId;
+    return state.pendingChanges.get(currentElementId) || [];
+  }, [state.selectedElements, state.pendingChanges]);
+
   // Apply pending delete operations to source files
   const applyPendingDeletes = useCallback(async (): Promise<boolean> => {
     if (state.pendingDeletes.size === 0) return true;
@@ -841,6 +897,8 @@ export function VisualEditorProvider({
     applyChangesToFile,
     applyPendingDeletes,
     hasPendingDeletes,
+    hasUnsavedChangesForCurrentSelection,
+    getCurrentSelectionPendingChanges,
   };
 
   return (

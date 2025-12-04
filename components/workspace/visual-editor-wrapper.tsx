@@ -19,10 +19,12 @@ import {
   generateFileUpdate,
   type StyleChange,
   type Theme,
+  type TaggedComponent,
   generateGlobalsCSSForNextJS,
   generateAppCSSForVite,
 } from '@/lib/visual-editor';
-import { Edit3, Wand2 } from 'lucide-react';
+import { Edit3, Wand2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface VisualEditorWrapperProps {
   children: React.ReactNode;
@@ -32,6 +34,9 @@ interface VisualEditorWrapperProps {
   onToggle?: (enabled: boolean) => void;
   onSaveChanges?: (changes: { elementId: string; changes: StyleChange[]; sourceFile?: string; sourceLine?: number }) => Promise<boolean>;
   onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
+  onTagToChat?: (component: TaggedComponent) => void;
+  onPublish?: () => void;
+  onSelectionBlocked?: () => void;
   projectType?: 'nextjs' | 'vite' | 'unknown';
   className?: string;
 }
@@ -45,6 +50,9 @@ function VisualEditorInner({
   onToggle,
   onSaveChanges,
   onApplyTheme,
+  onTagToChat,
+  onPublish,
+  onSelectionBlocked,
   projectType = 'unknown',
   className,
 }: VisualEditorWrapperProps) {
@@ -179,7 +187,9 @@ function VisualEditorInner({
       {state.isEnabled && (
         <VisualEditorSidebar
           projectType={projectType}
-          onApplyTheme={handleThemeApply}
+          onTagToChat={onTagToChat}
+          onPublish={onPublish}
+          hasUnsavedChanges={state.pendingChanges.size > 0}
           onSave={async () => {
             if (!onSaveChanges) return;
             
@@ -209,6 +219,8 @@ export function VisualEditorWrapper({
   onToggle,
   onSaveChanges,
   onApplyTheme,
+  onTagToChat,
+  onPublish,
   projectType,
   className,
 }: VisualEditorWrapperProps) {
@@ -225,8 +237,19 @@ export function VisualEditorWrapper({
     return false;
   }, [onSaveChanges]);
 
+  // Handle blocked selection due to unsaved changes
+  const handleSelectionBlocked = useCallback(() => {
+    toast.warning('Save Changes First', {
+      description: 'You have unsaved changes on the current element. Please save or discard them before selecting another element.',
+      duration: 4000,
+    });
+  }, []);
+
   return (
-    <VisualEditorProvider onApplyChanges={handleApplyChanges}>
+    <VisualEditorProvider 
+      onApplyChanges={handleApplyChanges}
+      onSelectionBlocked={handleSelectionBlocked}
+    >
       <VisualEditorInner
         iframeRef={iframeRef}
         previewUrl={previewUrl}
@@ -234,6 +257,8 @@ export function VisualEditorWrapper({
         onToggle={onToggle}
         onSaveChanges={onSaveChanges}
         onApplyTheme={onApplyTheme}
+        onTagToChat={onTagToChat}
+        onPublish={onPublish}
         projectType={projectType}
         className={className}
       >

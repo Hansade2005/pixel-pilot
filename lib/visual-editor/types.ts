@@ -1,6 +1,16 @@
 // Visual Editor Types - Core type definitions for the visual editing system
 // Supports both Vite React and Next.js templates
 
+// Tagged component info for chat context pills
+export interface TaggedComponent {
+  id: string;
+  tagName: string;
+  sourceFile?: string;
+  sourceLine?: number;
+  className: string;
+  textContent?: string;
+}
+
 export interface ElementInfo {
   // Unique identifier for the element (data attribute or path)
   id: string;
