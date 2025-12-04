@@ -104,7 +104,7 @@ const convertCustomThemesToThemes = (): Theme[] => {
 const CUSTOM_THEMES_ARRAY = convertCustomThemesToThemes();
 
 interface ThemesPanelProps {
-  onApplyTheme?: (theme: Theme) => void;
+  onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
   onImportTheme?: (cssContent: string) => void;
   onExportTheme?: () => void;
   projectType?: 'nextjs' | 'vite' | 'unknown';
@@ -188,7 +188,7 @@ export function ThemesPanel({
     }
   }, [sendToIframe, previewMode, projectType]);
 
-  const handleApplyTheme = useCallback(() => {
+  const handleApplyTheme = useCallback(async () => {
     console.log('[Themes Panel] Apply Theme clicked, selectedThemeId:', selectedThemeId);
     const theme = CUSTOM_THEMES_ARRAY.find((t: Theme) => t.id === selectedThemeId);
     console.log('[Themes Panel] Found theme:', theme?.name);
@@ -201,8 +201,17 @@ export function ThemesPanel({
     
     if (onApplyTheme) {
       console.log('[Themes Panel] Calling onApplyTheme with theme:', theme.name);
-      onApplyTheme(theme);
-      setLastConfirmation(`Theme "${theme.name}" applied to project`);
+      
+      // Generate full CSS content for the theme
+      const cssContent = generateVanillaCSS(theme);
+      console.log('[Themes Panel] Generated CSS content length:', cssContent.length);
+      
+      const success = await onApplyTheme(theme, cssContent);
+      if (success) {
+        setLastConfirmation(`Theme "${theme.name}" applied to project`);
+      } else {
+        setLastConfirmation(`⚠️ Failed to save theme to project files`);
+      }
     } else {
       console.warn('[Themes Panel] onApplyTheme callback not provided - theme cannot be saved to project files');
       setLastConfirmation(`⚠️ Theme selected but save callback not configured`);

@@ -79,6 +79,7 @@ interface VisualEditorSidebarProps {
   onPublish?: () => void;
   projectType?: 'nextjs' | 'vite' | 'unknown';
   hasUnsavedChanges?: boolean;
+  onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
 }
 
 export function VisualEditorSidebar({ 
@@ -88,6 +89,7 @@ export function VisualEditorSidebar({
   onPublish,
   projectType = 'unknown',
   hasUnsavedChanges = false,
+  onApplyTheme,
 }: VisualEditorSidebarProps) {
   const {
     state,
@@ -360,8 +362,10 @@ export function VisualEditorSidebar({
                       <TabsTrigger value="themes" className="text-xs px-1">Themes</TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="styles" className="mt-0 space-y-2">
-                      <StylesPanel element={selectedElement} />
+                    <TabsContent value="styles" className="mt-0">
+                      <ScrollArea className="h-64">
+                        <StylesPanel element={selectedElement} />
+                      </ScrollArea>
                     </TabsContent>
 
                     <TabsContent value="layout" className="mt-0 space-y-2">
@@ -382,7 +386,10 @@ export function VisualEditorSidebar({
 
                     <TabsContent value="themes" className="mt-0">
                       <ScrollArea className="h-64">
-                        <ThemesPanel />
+                        <ThemesPanel 
+                          onApplyTheme={onApplyTheme}
+                          projectType={projectType}
+                        />
                       </ScrollArea>
                     </TabsContent>
                   </Tabs>
