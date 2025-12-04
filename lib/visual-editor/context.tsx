@@ -293,6 +293,27 @@ function visualEditorReducer(
 
     case 'UNDO_PENDING_CHANGE':
       if (state.pendingChangesHistoryIndex < 0) return state;
+      
+      const undoEntry = state.pendingChangesHistory[state.pendingChangesHistoryIndex];
+      if (undoEntry) {
+        // Remove the change from pendingChanges map
+        const newPendingChanges = new Map(state.pendingChanges);
+        const elementChanges = newPendingChanges.get(undoEntry.elementId) || [];
+        const filteredChanges = elementChanges.filter(c => c.property !== undoEntry.change.property);
+        
+        if (filteredChanges.length === 0) {
+          newPendingChanges.delete(undoEntry.elementId);
+        } else {
+          newPendingChanges.set(undoEntry.elementId, filteredChanges);
+        }
+        
+        return {
+          ...state,
+          pendingChanges: newPendingChanges,
+          pendingChangesHistoryIndex: state.pendingChangesHistoryIndex - 1,
+        };
+      }
+      
       return {
         ...state,
         pendingChangesHistoryIndex: state.pendingChangesHistoryIndex - 1,
@@ -300,6 +321,31 @@ function visualEditorReducer(
 
     case 'REDO_PENDING_CHANGE':
       if (state.pendingChangesHistoryIndex >= state.pendingChangesHistory.length - 1) return state;
+      
+      const redoEntry = state.pendingChangesHistory[state.pendingChangesHistoryIndex + 1];
+      if (redoEntry) {
+        // Add the change back to pendingChanges map
+        const newPendingChanges = new Map(state.pendingChanges);
+        const elementChanges = newPendingChanges.get(redoEntry.elementId) || [];
+        const existingIndex = elementChanges.findIndex(c => c.property === redoEntry.change.property);
+        
+        if (existingIndex >= 0) {
+          // Replace existing change
+          elementChanges[existingIndex] = redoEntry.change;
+        } else {
+          // Add new change
+          elementChanges.push(redoEntry.change);
+        }
+        
+        newPendingChanges.set(redoEntry.elementId, elementChanges);
+        
+        return {
+          ...state,
+          pendingChanges: newPendingChanges,
+          pendingChangesHistoryIndex: state.pendingChangesHistoryIndex + 1,
+        };
+      }
+      
       return {
         ...state,
         pendingChangesHistoryIndex: state.pendingChangesHistoryIndex + 1,
@@ -1004,8 +1050,8 @@ export function VisualEditorProvider({
       payload: { elementId, changes: revertedChanges } 
     });
 
-    // Remove the pending changes
-    dispatch({ type: 'ADD_PENDING_CHANGE', payload: { elementId, changes: [] } });
+    // Remove the pending changes and history
+    dispatch({ type: 'DISCARD_CHANGES_FOR_ELEMENT', payload: elementId });
   }, [state.pendingChanges, sendToIframe]);
 
   const contextValue: VisualEditorContextValue = {
