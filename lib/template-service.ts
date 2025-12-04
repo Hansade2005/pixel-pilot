@@ -915,7 +915,7 @@ export default App`,
         break;
       case 'APPLY_THEME_PREVIEW':
         console.log('[VE-Client] Received APPLY_THEME_PREVIEW message');
-        applyThemePreview(message.payload.themeCSS);
+        applyThemePreview(message.payload.themeVars);
         break;
       case 'CLEAR_THEME_PREVIEW':
         console.log('[VE-Client] Received CLEAR_THEME_PREVIEW message');
@@ -936,34 +936,47 @@ export default App`,
     }
   }
 
-  // Apply theme preview - inject CSS variables
-  function applyThemePreview(themeCSS) {
-    console.log('[VE-Client] applyThemePreview called with CSS:', themeCSS ? themeCSS.substring(0, 100) + '...' : 'null');
+  // Apply theme preview - set CSS variables directly on :root (like thmeswitcher.html)
+  function applyThemePreview(themeVars) {
+    console.log('[VE-Client] applyThemePreview called with vars:', themeVars ? Object.keys(themeVars).length + ' variables' : 'null');
     
-    // Remove existing preview style
-    var existing = document.getElementById('visual-editor-theme-preview');
-    if (existing) {
-      existing.remove();
+    if (!themeVars || typeof themeVars !== 'object') {
+      console.warn('[VE-Client] No theme variables provided');
+      return;
     }
     
-    // Create and inject new theme CSS
-    var style = document.createElement('style');
-    style.id = 'visual-editor-theme-preview';
-    style.setAttribute('data-visual-editor', 'theme-preview');
-    style.textContent = themeCSS;
-    document.head.appendChild(style);
+    // Apply CSS variables directly to :root using setProperty (same as thmeswitcher.html)
+    var root = document.documentElement;
+    Object.entries(themeVars).forEach(function(entry) {
+      var key = entry[0];
+      var value = entry[1];
+      root.style.setProperty(key, value);
+    });
     
-    console.log('[VE-Client] Theme preview applied, style element added to head');
-    sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true } });
+    console.log('[VE-Client] Theme preview applied via setProperty,', Object.keys(themeVars).length, 'CSS variables set');
+    sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true, varsCount: Object.keys(themeVars).length } });
   }
 
-  // Clear theme preview
+  // Clear theme preview - remove CSS variables from :root
   function clearThemePreview() {
-    var existing = document.getElementById('visual-editor-theme-preview');
-    if (existing) {
-      existing.remove();
-      console.log('[VE-Client] Theme preview cleared');
+    var root = document.documentElement;
+    var computedStyle = window.getComputedStyle(root);
+    var propsToRemove = [];
+    
+    // Collect all CSS custom properties
+    for (var i = 0; i < root.style.length; i++) {
+      var prop = root.style[i];
+      if (prop.startsWith('--')) {
+        propsToRemove.push(prop);
+      }
     }
+    
+    // Remove them
+    propsToRemove.forEach(function(prop) {
+      root.style.removeProperty(prop);
+    });
+    
+    console.log('[VE-Client] Theme preview cleared, removed', propsToRemove.length, 'CSS variables');
     sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
   }
 
@@ -7181,7 +7194,7 @@ export default function Home() {
         break;
       case 'APPLY_THEME_PREVIEW':
         console.log('[VE-Client] Received APPLY_THEME_PREVIEW message');
-        applyThemePreview(message.payload.themeCSS);
+        applyThemePreview(message.payload.themeVars);
         break;
       case 'CLEAR_THEME_PREVIEW':
         console.log('[VE-Client] Received CLEAR_THEME_PREVIEW message');
@@ -7202,34 +7215,47 @@ export default function Home() {
     }
   }
 
-  // Apply theme preview - inject CSS variables
-  function applyThemePreview(themeCSS) {
-    console.log('[VE-Client] applyThemePreview called with CSS:', themeCSS ? themeCSS.substring(0, 100) + '...' : 'null');
+  // Apply theme preview - set CSS variables directly on :root (like thmeswitcher.html)
+  function applyThemePreview(themeVars) {
+    console.log('[VE-Client] applyThemePreview called with vars:', themeVars ? Object.keys(themeVars).length + ' variables' : 'null');
     
-    // Remove existing preview style
-    var existing = document.getElementById('visual-editor-theme-preview');
-    if (existing) {
-      existing.remove();
+    if (!themeVars || typeof themeVars !== 'object') {
+      console.warn('[VE-Client] No theme variables provided');
+      return;
     }
     
-    // Create and inject new theme CSS
-    var style = document.createElement('style');
-    style.id = 'visual-editor-theme-preview';
-    style.setAttribute('data-visual-editor', 'theme-preview');
-    style.textContent = themeCSS;
-    document.head.appendChild(style);
+    // Apply CSS variables directly to :root using setProperty (same as thmeswitcher.html)
+    var root = document.documentElement;
+    Object.entries(themeVars).forEach(function(entry) {
+      var key = entry[0];
+      var value = entry[1];
+      root.style.setProperty(key, value);
+    });
     
-    console.log('[VE-Client] Theme preview applied, style element added to head');
-    sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true } });
+    console.log('[VE-Client] Theme preview applied via setProperty,', Object.keys(themeVars).length, 'CSS variables set');
+    sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true, varsCount: Object.keys(themeVars).length } });
   }
 
-  // Clear theme preview
+  // Clear theme preview - remove CSS variables from :root
   function clearThemePreview() {
-    var existing = document.getElementById('visual-editor-theme-preview');
-    if (existing) {
-      existing.remove();
-      console.log('[VE-Client] Theme preview cleared');
+    var root = document.documentElement;
+    var computedStyle = window.getComputedStyle(root);
+    var propsToRemove = [];
+    
+    // Collect all CSS custom properties
+    for (var i = 0; i < root.style.length; i++) {
+      var prop = root.style[i];
+      if (prop.startsWith('--')) {
+        propsToRemove.push(prop);
+      }
     }
+    
+    // Remove them
+    propsToRemove.forEach(function(prop) {
+      root.style.removeProperty(prop);
+    });
+    
+    console.log('[VE-Client] Theme preview cleared, removed', propsToRemove.length, 'CSS variables');
     sendToParent({ type: 'THEME_PREVIEW_CLEARED', payload: { success: true } });
   }
 
