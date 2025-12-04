@@ -280,7 +280,7 @@ export function VisualEditorSidebar({
       </div>
 
       {/* Main Mode Tabs - Edit only */}
-      <div className="flex border-b bg-muted/20">
+      {/* <div className="flex border-b bg-muted/20">
         <button
           onClick={() => setActivePanel('styles')}
           className={cn(
@@ -293,7 +293,7 @@ export function VisualEditorSidebar({
           <MousePointer2 className="h-3.5 w-3.5" />
           Edit
         </button>
-      </div>
+      </div> */}
 
       {/* Content */}
       <ScrollArea className="flex-1">
