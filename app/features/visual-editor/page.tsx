@@ -204,12 +204,15 @@ export default function VisualEditorPage() {
             className="mt-16 relative"
           >
             <div className="relative rounded-xl overflow-hidden border border-violet-500/20 shadow-2xl shadow-violet-500/10">
-              <div className="aspect-video bg-gradient-to-br from-violet-950/50 to-purple-950/50 flex items-center justify-center">
-                <div className="text-center">
-                  <MousePointer2 className="w-20 h-20 text-violet-400 mx-auto mb-4 animate-pulse" />
-                  <p className="text-violet-300 text-lg">Visual Editor Demo Preview</p>
-                  <p className="text-violet-400/60 text-sm mt-2">Click elements • Edit styles • Save changes</p>
-                </div>
+              <div className="aspect-video bg-gradient-to-br from-violet-950/50 to-purple-950/50">
+                <iframe
+                  src="https://drive.google.com/file/d/1itLVYWFtqnLfJaYLEgOArlYb3cWpC31V/preview"
+                  width="100%"
+                  height="100%"
+                  allow="autoplay"
+                  className="w-full h-full"
+                  title="Visual Editor Demo Video"
+                ></iframe>
               </div>
               
               {/* Floating UI Elements */}

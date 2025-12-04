@@ -1749,6 +1749,68 @@ function TypographyPanel({ element }: StylesPanelProps) {
   );
 }
 
+// Color conversion utility
+function colorToHex(color: string): string {
+  // If already hex, return as is
+  if (color.startsWith('#')) {
+    return color;
+  }
+
+  // Handle rgb/rgba
+  const rgbMatch = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)$/);
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1], 10);
+    const g = parseInt(rgbMatch[2], 10);
+    const b = parseInt(rgbMatch[3], 10);
+    
+    const toHex = (n: number) => {
+      const hex = n.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+    
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  // Handle hsl
+  const hslMatch = color.match(/^hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)$/);
+  if (hslMatch) {
+    // Convert HSL to RGB first, then to hex
+    const h = parseInt(hslMatch[1], 10) / 360;
+    const s = parseInt(hslMatch[2], 10) / 100;
+    const l = parseInt(hslMatch[3], 10) / 100;
+    
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    
+    let r, g, b;
+    if (s === 0) {
+      r = g = b = l;
+    } else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    
+    const toHex = (n: number) => {
+      const hex = Math.round(n * 255).toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+    
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  // Fallback to black
+  return '#000000';
+}
+
 // Color Picker Component
 interface ColorPickerProps {
   value: string | undefined;
@@ -1756,8 +1818,9 @@ interface ColorPickerProps {
 }
 
 function ColorPicker({ value, onChange }: ColorPickerProps) {
-  // Safe handling of undefined/null values
-  const safeValue = value || '#000000';
+  // Convert color to hex for the input
+  const hexValue = colorToHex(value || '#000000');
+  const displayValue = value || '#000000';
   const presetColors = [
     '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308',
     '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899',
@@ -1769,9 +1832,9 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
         <Button variant="outline" className="w-full h-8 justify-start gap-2">
           <div
             className="w-4 h-4 rounded border"
-            style={{ backgroundColor: safeValue }}
+            style={{ backgroundColor: displayValue }}
           />
-          <span className="text-xs font-mono truncate">{safeValue}</span>
+          <span className="text-xs font-mono truncate">{displayValue}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-60">
@@ -1782,7 +1845,7 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
                 key={color}
                 className={cn(
                   'w-8 h-8 rounded border-2 transition-all',
-                  safeValue === color ? 'border-blue-500 scale-110' : 'border-transparent hover:scale-105'
+                  hexValue === color ? 'border-blue-500 scale-110' : 'border-transparent hover:scale-105'
                 )}
                 style={{ backgroundColor: color }}
                 onClick={() => onChange(color)}
@@ -1791,15 +1854,25 @@ function ColorPicker({ value, onChange }: ColorPickerProps) {
           </div>
           <Input
             type="color"
-            value={safeValue}
+            value={hexValue}
             onChange={(e) => onChange(e.target.value)}
             className="h-8 p-1"
           />
           <Input
             type="text"
-            value={safeValue}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="#000000"
+            value={displayValue}
+            onChange={(e) => {
+              // Allow any valid color format in text input
+              const inputValue = e.target.value.trim();
+              // Basic validation - allow hex, rgb, rgba, hsl, named colors
+              if (inputValue.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) || 
+                  inputValue.match(/^rgb(a?\([^)]+\))$/i) || 
+                  inputValue.match(/^hsl(a?\([^)]+\))$/i) ||
+                  inputValue.match(/^[a-z]+$/i)) {
+                onChange(inputValue);
+              }
+            }}
+            placeholder="#000000 or rgba(0,0,0,0.5)"
             className="h-8 font-mono text-xs"
           />
         </div>

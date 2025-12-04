@@ -145,8 +145,15 @@ function colorToTailwindClass(color: string, prefix: 'bg' | 'text'): string | nu
     return `${prefix}-[${color}]`;
   }
 
-  if (color.startsWith('rgb')) {
+  // For rgb colors without alpha, use bracket notation
+  if (color.startsWith('rgb(') && !color.includes('rgba')) {
     return `${prefix}-[${color}]`;
+  }
+
+  // For rgba colors, don't convert to Tailwind to avoid parsing issues
+  // Keep as inline styles instead
+  if (color.startsWith('rgba(')) {
+    return null;
   }
 
   return null;
