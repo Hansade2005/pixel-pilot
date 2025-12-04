@@ -2,12 +2,24 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, useAnimation } from 'framer-motion';
-import { Database, Building2, Users, Server, Workflow, Figma, Cpu, Shield, Bot, FolderOpen, Import, ChevronLeft, ChevronRight, Play, Pause } from "lucide-react";
+import { Database, Building2, Users, Server, Workflow, Figma, Cpu, Shield, Bot, FolderOpen, Import, ChevronLeft, ChevronRight, Play, Pause, MousePointer2, Palette, Type, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const features = [
+  {
+    id: "visual-editor",
+    title: "Visual Editor",
+    description: "Edit your apps visually with real-time preview. Click elements, change styles, colors, fonts, and see changes instantly.",
+    icon: <MousePointer2 className="w-8 h-8 text-violet-500" />,
+    secondaryIcon: <Sparkles className="w-6 h-6 text-violet-400" />,
+    badges: ["New", "Live Preview"],
+    highlights: ["Click-to-edit elements", "100+ Google Fonts", "Real-time style changes", "Instant theme switching"],
+    cta: "Try Visual Editor",
+    gradient: "from-violet-500 to-purple-500",
+    link: "/features/visual-editor"
+  },
   {
     id: "pipilot-db",
     title: "PiPilot DB",

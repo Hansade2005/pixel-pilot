@@ -21,6 +21,7 @@ import {
   Eye,
   Heart,
   ChevronDown,
+  ChevronRight,
   ExternalLink,
   Users,
   Download,
@@ -28,7 +29,9 @@ import {
   Building2,
   Server,
   Workflow,
-  Figma
+  Figma,
+  Wand2,
+  MousePointer2
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -60,6 +63,7 @@ export default function LandingPage() {
   const templatesPerPage = 8
 
   const badgeItems = [
+    { icon: <Wand2 className="w-4 h-4 text-cyan-400" />, text: "Visual Editor Now Live! 🎨" },
     { icon: <Database className="w-4 h-4 text-blue-400" />, text: "Introducing PiPilot DB 🎉" },
     { icon: <Building2 className="w-4 h-4 text-purple-400" />, text: "PiPilot Enterprise now live 🚀" },
     { icon: <Users className="w-4 h-4 text-green-400" />, text: "PiPilot Teams Coming soon 🎉" },
@@ -331,11 +335,33 @@ export default function LandingPage() {
             Create apps and websites by chatting with AI
           </p>
           
-          {/* Product Hunt Badge */}
-          <div className="flex justify-center mb-8">
+          {/* Product Hunt Badge & Visual Editor Button */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
               <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
             </a>
+            
+            {/* Visual Editor Vibe Card Button */}
+            <Link 
+              href="/features/visual-editor"
+              className="group relative flex items-center gap-3 px-5 py-3 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-500/30 hover:border-cyan-400/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20"
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 shadow-lg">
+                <Wand2 className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                  Visual Editor
+                </span>
+                <span className="text-xs text-white/60">
+                  Now Live 🎨
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+              
+              {/* Animated glow effect */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
+            </Link>
           </div>
         </div>
 
