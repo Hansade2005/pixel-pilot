@@ -832,6 +832,18 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     // This ensures consistent behavior with pending style changes
     applyRootStyles(themeVars);
     
+    // Also apply background directly to body as fallback for apps that don't use CSS variables
+    var backgroundValue = themeVars['--background'];
+    var foregroundValue = themeVars['--foreground'];
+    if (backgroundValue) {
+      document.body.style.backgroundColor = 'hsl(' + backgroundValue + ')';
+      console.log('[Visual Editor] Also set body background to:', 'hsl(' + backgroundValue + ')');
+    }
+    if (foregroundValue) {
+      document.body.style.color = 'hsl(' + foregroundValue + ')';
+      console.log('[Visual Editor] Also set body color to:', 'hsl(' + foregroundValue + ')');
+    }
+    
     console.log('[Visual Editor] Theme preview applied successfully');
     console.log('[Visual Editor] Applied', Object.keys(themeVars).length, 'CSS variables');
   }

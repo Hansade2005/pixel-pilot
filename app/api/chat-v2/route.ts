@@ -178,6 +178,17 @@ Follow project's routing pattern:
   • Comprehensive error boundaries at strategic points
   • Use error.tsx for Next.js App Router or ErrorBoundary components
   • Graceful degradation strategies
+
+🎯 THEMING & CSS VARIABLES (CRITICAL FOR VISUAL EDITOR)
+  • **ALWAYS use CSS variables for colors** - enables instant theme switching
+  • **Define colors in :root** with HSL format: --background: 0 0% 100%
+  • **Use Tailwind utility classes** that reference CSS variables (bg-background, text-foreground, border-border)
+  • **NEVER hardcode colors** (no bg-white, text-black, bg-blue-500) unless for static decorative elements
+  • **Pattern**: Tailwind config maps to CSS vars → bg-background resolves to hsl(var(--background))
+  • **Required CSS variables**: --background, --foreground, --primary, --secondary, --muted, --accent, --destructive, --border, --input, --ring
+  • **Dark mode support**: Use .dark class with alternate variable definitions
+  • **Component styling**: Prefer Tailwind utilities (bg-card, text-card-foreground) over custom CSS
+  • **Why**: Visual editor themes apply via root.style.setProperty() - only works with CSS variables
   • User-friendly error messages (no stack traces to users)
   • Loading states for all async operations (loading.tsx for Next.js or Suspense)
   • Empty states and zero-data scenarios
@@ -2603,6 +2614,26 @@ Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engagi
 - **Responsive Design**: Test on multiple screen sizes, ensure mobile-first approach
 - **Error Handling**: Implement proper error boundaries and user-friendly error messages
 - **Loading States**: Add skeleton loaders and progress indicators for better UX
+
+## 🎨 CSS Variables & Theming (Critical for Visual Editor)
+**ALWAYS use CSS variables for all colors to enable instant theme switching:**
+- **Define colors in :root** with HSL format: \`--background: 0 0% 100%;\` \`--primary: 222 47% 11%;\`
+- **Use Tailwind utilities** that map to CSS vars: \`bg-background\`, \`text-foreground\`, \`border-border\`, \`bg-primary\`
+- **NEVER hardcode colors** like \`bg-white\`, \`text-black\`, \`bg-blue-500\`, \`text-gray-900\` (except for static decorative elements)
+- **Pattern**: Tailwind config maps to CSS vars → \`bg-background\` resolves to \`hsl(var(--background))\`
+- **Required CSS variables**:
+  - Layout: \`--background\`, \`--foreground\`, \`--card\`, \`--card-foreground\`, \`--popover\`, \`--popover-foreground\`
+  - UI Elements: \`--primary\`, \`--primary-foreground\`, \`--secondary\`, \`--secondary-foreground\`, \`--muted\`, \`--muted-foreground\`
+  - Interactive: \`--accent\`, \`--accent-foreground\`, \`--destructive\`, \`--destructive-foreground\`
+  - Borders/Inputs: \`--border\`, \`--input\`, \`--ring\`, \`--radius\`
+- **Dark mode**: Use \`.dark\` class with alternate CSS variable values in :root
+- **Component patterns**: \`bg-card text-card-foreground\`, \`bg-primary text-primary-foreground\`, \`border-border\`
+- **Why it matters**: Visual editor themes apply via \`root.style.setProperty()\` - only works with CSS variables
+- **Setup checklist**:
+  ✓ Define all color variables in \`index.css\` or \`globals.css\` under \`:root\` and \`.dark\`
+  ✓ Configure \`tailwind.config.js\` to map colors to \`hsl(var(--variable-name))\`
+  ✓ Use semantic Tailwind utilities in components (bg-background, not bg-white)
+  ✓ Test theme switching works by changing CSS variable values
 ## 🚫 Critical Non-Negotiables
 - ❌ No HTML comments in TypeScript/JSX files
 - 📚 Always study existing code before making changes
