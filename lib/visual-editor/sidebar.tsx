@@ -293,34 +293,6 @@ export function VisualEditorSidebar({
         />
       </div>
 
-      {/* Main Mode Tabs */}
-      <div className="flex border-b bg-muted/20">
-        <button
-          onClick={() => setActivePanel('styles')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
-            ['styles', 'layout', 'spacing', 'typography'].includes(state.activePanel)
-              ? 'bg-background text-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <MousePointer2 className="h-3.5 w-3.5" />
-          Edit
-        </button>
-        <button
-          onClick={() => setActivePanel('themes')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
-            state.activePanel === 'themes'
-              ? 'bg-background text-foreground border-b-2 border-primary'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <Palette className="h-3.5 w-3.5" />
-          Themes
-        </button>
-      </div>
-
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-2">
@@ -354,12 +326,12 @@ export function VisualEditorSidebar({
                   </div>
                   
                   <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-5 h-8 mb-3">
+                    <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
                       <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
                       <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
                       <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
                       <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
-                      <TabsTrigger value="themes" className="text-xs px-1">Themes</TabsTrigger>
+                      {/* <TabsTrigger value="themes" className="text-xs px-1">Themes</TabsTrigger> */}
                     </TabsList>
 
                     <TabsContent value="styles" className="mt-0">
@@ -384,6 +356,7 @@ export function VisualEditorSidebar({
                       </ScrollArea>
                     </TabsContent>
 
+                    {/* Themes panel temporarily disabled
                     <TabsContent value="themes" className="mt-0">
                       <ScrollArea className="h-64">
                         <ThemesPanel 
@@ -392,6 +365,7 @@ export function VisualEditorSidebar({
                         />
                       </ScrollArea>
                     </TabsContent>
+                    */}
                   </Tabs>
                 </>
               ) : (
@@ -1325,6 +1299,23 @@ function TypographyPanel({ element }: StylesPanelProps) {
         <Select
           value={displayFontFamily}
           onValueChange={(value) => {
+            // Load Google Font dynamically if it's not a system font
+            const systemFonts = ['system-ui', 'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Tahoma', 'ui-sans-serif', 'ui-serif', 'ui-monospace'];
+            const isGoogleFont = !systemFonts.includes(value) && !value.includes('ui-') && !value.includes('system');
+            
+            if (isGoogleFont) {
+              // Check if font is already loaded
+              const fontId = `google-font-${value.replace(/\s+/g, '-').toLowerCase()}`;
+              if (!document.getElementById(fontId)) {
+                const link = document.createElement('link');
+                link.id = fontId;
+                link.rel = 'stylesheet';
+                link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(value)}:wght@300;400;500;600;700&display=swap`;
+                document.head.appendChild(link);
+                console.log('[Typography] Loaded Google Font:', value);
+              }
+            }
+            
             addPendingChange(element.id, [{
               property: 'fontFamily',
               oldValue: fontFamily,

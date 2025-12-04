@@ -408,6 +408,28 @@ export default {
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
+    
+    <!-- Google Fonts Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Google Fonts - All supported font families -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Nunito:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&family=Urbanist:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Lexend:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Figtree:wght@300;400;500;600;700&family=Cabin:wght@400;500;600;700&family=PT+Sans:wght@400;700&family=Manrope:wght@300;400;500;600;700&family=Mulish:wght@300;400;500;600;700&family=Sofia+Sans:wght@300;400;500;600;700&family=Josefin+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Serif Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Playfair+Display:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Domine:wght@400;500;600;700&family=Crimson+Text:wght@400;600;700&family=DM+Serif+Display&family=DM+Serif+Text&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Cardo:wght@400;700&family=Libre+Baskerville:wght@400;700&family=Spectral:wght@300;400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Old+Standard+TT:wght@400;700&family=Bodoni+Moda:wght@400;500;600;700&family=Cormorant:wght@300;400;500;600;700&family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=Forum&family=Tenor+Sans&family=Gilda+Display&family=Fraunces:wght@300;400;500;600;700&family=Rosarivo&display=swap" rel="stylesheet">
+    
+    <!-- Monospace Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Cousine:wght@400;700&family=Noto+Sans+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Handwritten & Script Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&family=Sacramento&family=Shantell+Sans:wght@300;400;500;600;700&family=Amatic+SC:wght@400;700&family=Great+Vibes&family=Parisienne&family=Shadows+Into+Light&family=Yellowtail&family=Satisfy&family=Allura&family=Indie+Flower&family=Kristi&family=Bad+Script&family=Mrs+Saint+Delafield&family=Marck+Script&display=swap" rel="stylesheet">
+    
+    <!-- Display & Decorative Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Anton&family=Abril+Fatface&family=Bungee&family=Alfa+Slab+One&family=Lobster&family=Rubik+Dirt&family=Playball&family=Fredoka:wght@300;400;500;600;700&family=Monoton&family=Righteous&family=Ultra&family=Press+Start+2P&family=Rampart+One&display=swap" rel="stylesheet">
+    
+    <!-- Futuristic & Tech Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=Audiowide&family=Oxanium:wght@300;400;500;600;700&family=Quantico:wght@400;700&family=Syncopate:wght@400;700&family=Teko:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Changa:wght@300;400;500;600;700&family=Michroma&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
@@ -938,12 +960,46 @@ export default App`,
     }
   }
 
+  // Load a Google Font dynamically
+  function loadGoogleFont(fontFamily) {
+    // Skip system fonts
+    var systemFonts = ['system-ui', 'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Tahoma', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'sans-serif', 'serif', 'monospace'];
+    if (systemFonts.some(function(sf) { return fontFamily.toLowerCase().includes(sf.toLowerCase()); })) {
+      return;
+    }
+    
+    // Clean font name (remove fallbacks like "Inter, sans-serif")
+    var cleanFont = fontFamily.split(',')[0].trim().replace(/['"]/g, '');
+    if (!cleanFont) return;
+    
+    // Check if already loaded
+    var fontId = 'google-font-' + cleanFont.replace(/\\s+/g, '-').toLowerCase();
+    if (document.getElementById(fontId)) {
+      console.log('[VE-Client] Font already loaded:', cleanFont);
+      return;
+    }
+    
+    // Create link element
+    var link = document.createElement('link');
+    link.id = fontId;
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(cleanFont) + ':wght@300;400;500;600;700&display=swap';
+    document.head.appendChild(link);
+    console.log('[VE-Client] Loaded Google Font:', cleanFont);
+  }
+
   // Apply style changes from parent
   function applyStyleChanges(elementId, changes) {
     const element = findElementById(elementId);
     if (!element) return false;
     changes.forEach(function(change) {
       const prop = change.property.replace(/([A-Z])/g, '-$1').toLowerCase();
+      
+      // If it's a font-family change, load the Google Font first
+      if (prop === 'font-family') {
+        loadGoogleFont(change.newValue);
+      }
+      
       element.style.setProperty(prop, change.newValue);
     });
     const overlay = selectionOverlays.get(elementId);
@@ -6789,6 +6845,29 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Google Fonts Preconnect */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        
+        {/* Sans-serif Fonts */}
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Nunito:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&family=Urbanist:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Lexend:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Figtree:wght@300;400;500;600;700&family=Cabin:wght@400;500;600;700&family=PT+Sans:wght@400;700&family=Manrope:wght@300;400;500;600;700&family=Mulish:wght@300;400;500;600;700&family=Sofia+Sans:wght@300;400;500;600;700&family=Josefin+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        
+        {/* Serif Fonts */}
+        <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Playfair+Display:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Domine:wght@400;500;600;700&family=Crimson+Text:wght@400;600;700&family=DM+Serif+Display&family=DM+Serif+Text&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Cardo:wght@400;700&family=Libre+Baskerville:wght@400;700&family=Spectral:wght@300;400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Old+Standard+TT:wght@400;700&family=Bodoni+Moda:wght@400;500;600;700&family=Cormorant:wght@300;400;500;600;700&family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=Forum&family=Tenor+Sans&family=Gilda+Display&family=Fraunces:wght@300;400;500;600;700&family=Rosarivo&display=swap" rel="stylesheet" />
+        
+        {/* Monospace Fonts */}
+        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Cousine:wght@400;700&family=Noto+Sans+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        
+        {/* Handwritten & Script Fonts */}
+        <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&family=Sacramento&family=Shantell+Sans:wght@300;400;500;600;700&family=Amatic+SC:wght@400;700&family=Great+Vibes&family=Parisienne&family=Shadows+Into+Light&family=Yellowtail&family=Satisfy&family=Allura&family=Indie+Flower&family=Kristi&family=Bad+Script&family=Mrs+Saint+Delafield&family=Marck+Script&display=swap" rel="stylesheet" />
+        
+        {/* Display & Decorative Fonts */}
+        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Anton&family=Abril+Fatface&family=Bungee&family=Alfa+Slab+One&family=Lobster&family=Rubik+Dirt&family=Playball&family=Fredoka:wght@300;400;500;600;700&family=Monoton&family=Righteous&family=Ultra&family=Press+Start+2P&family=Rampart+One&display=swap" rel="stylesheet" />
+        
+        {/* Futuristic & Tech Fonts */}
+        <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=Audiowide&family=Oxanium:wght@300;400;500;600;700&family=Quantico:wght@400;700&family=Syncopate:wght@400;700&family=Teko:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Changa:wght@300;400;500;600;700&family=Michroma&display=swap" rel="stylesheet" />
+      </head>
       <body className={inter.className}>
         {children}
         {/* Visual Editor Client - enables visual editing when loaded in pipilot.dev iframe */}
@@ -7196,12 +7275,46 @@ export default function RootLayout({
     }
   }
 
+  // Load a Google Font dynamically
+  function loadGoogleFont(fontFamily) {
+    // Skip system fonts
+    var systemFonts = ['system-ui', 'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Tahoma', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'sans-serif', 'serif', 'monospace'];
+    if (systemFonts.some(function(sf) { return fontFamily.toLowerCase().includes(sf.toLowerCase()); })) {
+      return;
+    }
+    
+    // Clean font name (remove fallbacks like "Inter, sans-serif")
+    var cleanFont = fontFamily.split(',')[0].trim().replace(/['"]/g, '');
+    if (!cleanFont) return;
+    
+    // Check if already loaded
+    var fontId = 'google-font-' + cleanFont.replace(/\\s+/g, '-').toLowerCase();
+    if (document.getElementById(fontId)) {
+      console.log('[VE-Client] Font already loaded:', cleanFont);
+      return;
+    }
+    
+    // Create link element
+    var link = document.createElement('link');
+    link.id = fontId;
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(cleanFont) + ':wght@300;400;500;600;700&display=swap';
+    document.head.appendChild(link);
+    console.log('[VE-Client] Loaded Google Font:', cleanFont);
+  }
+
   // Apply style changes from parent
   function applyStyleChanges(elementId, changes) {
     const element = findElementById(elementId);
     if (!element) return false;
     changes.forEach(function(change) {
       const prop = change.property.replace(/([A-Z])/g, '-\$1').toLowerCase();
+      
+      // If it's a font-family change, load the Google Font first
+      if (prop === 'font-family') {
+        loadGoogleFont(change.newValue);
+      }
+      
       element.style.setProperty(prop, change.newValue);
     });
     const overlay = selectionOverlays.get(elementId);
