@@ -1336,18 +1336,128 @@ function TypographyPanel({ element }: StylesPanelProps) {
           <SelectTrigger className="h-8">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[400px]">
+            {/* Built-in Tailwind Fonts */}
+            <SelectItem value="ui-sans-serif, system-ui, -apple-system, sans-serif" className="font-medium text-muted-foreground">— Tailwind Defaults —</SelectItem>
+            <SelectItem value="Inter, ui-sans-serif, system-ui">font-sans (Inter)</SelectItem>
+            <SelectItem value="ui-serif, Georgia, Cambria, serif">font-serif</SelectItem>
+            <SelectItem value="ui-monospace, SFMono-Regular, Menlo, monospace">font-mono</SelectItem>
+            
+            {/* Popular Sans-serif Google Fonts */}
+            <SelectItem value="separator-sans" disabled className="font-medium text-muted-foreground">— Sans-serif —</SelectItem>
             <SelectItem value="Inter">Inter</SelectItem>
+            <SelectItem value="Poppins">Poppins</SelectItem>
             <SelectItem value="Roboto">Roboto</SelectItem>
             <SelectItem value="Open Sans">Open Sans</SelectItem>
             <SelectItem value="Montserrat">Montserrat</SelectItem>
             <SelectItem value="Lato">Lato</SelectItem>
-            <SelectItem value="Poppins">Poppins</SelectItem>
+            <SelectItem value="Nunito">Nunito</SelectItem>
             <SelectItem value="Raleway">Raleway</SelectItem>
             <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
-            <SelectItem value="Nunito">Nunito</SelectItem>
-            <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+            <SelectItem value="Work Sans">Work Sans</SelectItem>
+            <SelectItem value="Urbanist">Urbanist</SelectItem>
+            <SelectItem value="Outfit">Outfit</SelectItem>
+            <SelectItem value="DM Sans">DM Sans</SelectItem>
+            <SelectItem value="Plus Jakarta Sans">Plus Jakarta Sans</SelectItem>
+            <SelectItem value="Lexend">Lexend</SelectItem>
+            <SelectItem value="Space Grotesk">Space Grotesk</SelectItem>
+            <SelectItem value="Figtree">Figtree</SelectItem>
+            <SelectItem value="Cabin">Cabin</SelectItem>
+            <SelectItem value="PT Sans">PT Sans</SelectItem>
+            <SelectItem value="Manrope">Manrope</SelectItem>
+            <SelectItem value="Mulish">Mulish</SelectItem>
+            <SelectItem value="Sofia Sans">Sofia Sans</SelectItem>
+            <SelectItem value="Josefin Sans">Josefin Sans</SelectItem>
+            
+            {/* Serif Fonts */}
+            <SelectItem value="separator-serif" disabled className="font-medium text-muted-foreground">— Serif —</SelectItem>
             <SelectItem value="Merriweather">Merriweather</SelectItem>
+            <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+            <SelectItem value="Lora">Lora</SelectItem>
+            <SelectItem value="Domine">Domine</SelectItem>
+            <SelectItem value="Crimson Text">Crimson Text</SelectItem>
+            <SelectItem value="DM Serif Display">DM Serif Display</SelectItem>
+            <SelectItem value="DM Serif Text">DM Serif Text</SelectItem>
+            <SelectItem value="Cormorant Garamond">Cormorant Garamond</SelectItem>
+            <SelectItem value="Cardo">Cardo</SelectItem>
+            <SelectItem value="Libre Baskerville">Libre Baskerville</SelectItem>
+            <SelectItem value="Spectral">Spectral</SelectItem>
+            <SelectItem value="EB Garamond">EB Garamond</SelectItem>
+            <SelectItem value="Old Standard TT">Old Standard TT</SelectItem>
+            <SelectItem value="Bodoni Moda">Bodoni Moda</SelectItem>
+            <SelectItem value="Cormorant">Cormorant</SelectItem>
+            <SelectItem value="Cinzel">Cinzel</SelectItem>
+            <SelectItem value="Cinzel Decorative">Cinzel Decorative</SelectItem>
+            <SelectItem value="Forum">Forum</SelectItem>
+            <SelectItem value="Tenor Sans">Tenor Sans</SelectItem>
+            <SelectItem value="Gilda Display">Gilda Display</SelectItem>
+            <SelectItem value="Fraunces">Fraunces</SelectItem>
+            <SelectItem value="Rosarivo">Rosarivo</SelectItem>
+            
+            {/* Monospace Fonts */}
+            <SelectItem value="separator-mono" disabled className="font-medium text-muted-foreground">— Monospace —</SelectItem>
+            <SelectItem value="JetBrains Mono">JetBrains Mono</SelectItem>
+            <SelectItem value="Fira Code">Fira Code</SelectItem>
+            <SelectItem value="Source Code Pro">Source Code Pro</SelectItem>
+            <SelectItem value="IBM Plex Mono">IBM Plex Mono</SelectItem>
+            <SelectItem value="Inconsolata">Inconsolata</SelectItem>
+            <SelectItem value="Space Mono">Space Mono</SelectItem>
+            <SelectItem value="Cousine">Cousine</SelectItem>
+            <SelectItem value="Noto Sans Mono">Noto Sans Mono</SelectItem>
+            
+            {/* Handwritten / Script Fonts */}
+            <SelectItem value="separator-script" disabled className="font-medium text-muted-foreground">— Handwritten / Script —</SelectItem>
+            <SelectItem value="Pacifico">Pacifico</SelectItem>
+            <SelectItem value="Dancing Script">Dancing Script</SelectItem>
+            <SelectItem value="Caveat">Caveat</SelectItem>
+            <SelectItem value="Sacramento">Sacramento</SelectItem>
+            <SelectItem value="Shantell Sans">Shantell Sans</SelectItem>
+            <SelectItem value="Amatic SC">Amatic SC</SelectItem>
+            <SelectItem value="Great Vibes">Great Vibes</SelectItem>
+            <SelectItem value="Parisienne">Parisienne</SelectItem>
+            <SelectItem value="Shadows Into Light">Shadows Into Light</SelectItem>
+            <SelectItem value="Yellowtail">Yellowtail</SelectItem>
+            <SelectItem value="Satisfy">Satisfy</SelectItem>
+            <SelectItem value="Allura">Allura</SelectItem>
+            <SelectItem value="Indie Flower">Indie Flower</SelectItem>
+            <SelectItem value="Kristi">Kristi</SelectItem>
+            <SelectItem value="Bad Script">Bad Script</SelectItem>
+            <SelectItem value="Mrs Saint Delafield">Mrs Saint Delafield</SelectItem>
+            <SelectItem value="Marck Script">Marck Script</SelectItem>
+            
+            {/* Display / Decorative Fonts */}
+            <SelectItem value="separator-display" disabled className="font-medium text-muted-foreground">— Display / Decorative —</SelectItem>
+            <SelectItem value="Bebas Neue">Bebas Neue</SelectItem>
+            <SelectItem value="Oswald">Oswald</SelectItem>
+            <SelectItem value="Anton">Anton</SelectItem>
+            <SelectItem value="Abril Fatface">Abril Fatface</SelectItem>
+            <SelectItem value="Bungee">Bungee</SelectItem>
+            <SelectItem value="Alfa Slab One">Alfa Slab One</SelectItem>
+            <SelectItem value="Lobster">Lobster</SelectItem>
+            <SelectItem value="Rubik Dirt">Rubik Dirt</SelectItem>
+            <SelectItem value="Playball">Playball</SelectItem>
+            <SelectItem value="Fredoka One">Fredoka One</SelectItem>
+            <SelectItem value="Monoton">Monoton</SelectItem>
+            <SelectItem value="Righteous">Righteous</SelectItem>
+            <SelectItem value="Ultra">Ultra</SelectItem>
+            <SelectItem value="Press Start 2P">Press Start 2P</SelectItem>
+            <SelectItem value="Rampart One">Rampart One</SelectItem>
+            
+            {/* Futuristic / Tech Fonts */}
+            <SelectItem value="separator-tech" disabled className="font-medium text-muted-foreground">— Futuristic / Tech —</SelectItem>
+            <SelectItem value="Orbitron">Orbitron</SelectItem>
+            <SelectItem value="Exo 2">Exo 2</SelectItem>
+            <SelectItem value="Audiowide">Audiowide</SelectItem>
+            <SelectItem value="Oxanium">Oxanium</SelectItem>
+            <SelectItem value="Quantico">Quantico</SelectItem>
+            <SelectItem value="Syncopate">Syncopate</SelectItem>
+            <SelectItem value="Teko">Teko</SelectItem>
+            <SelectItem value="Rajdhani">Rajdhani</SelectItem>
+            <SelectItem value="Changa">Changa</SelectItem>
+            <SelectItem value="Michroma">Michroma</SelectItem>
+            
+            {/* System Fonts */}
+            <SelectItem value="separator-system" disabled className="font-medium text-muted-foreground">— System Fonts —</SelectItem>
             <SelectItem value="system-ui">System UI</SelectItem>
             <SelectItem value="Arial">Arial</SelectItem>
             <SelectItem value="Helvetica">Helvetica</SelectItem>
@@ -1356,9 +1466,6 @@ function TypographyPanel({ element }: StylesPanelProps) {
             <SelectItem value="Courier New">Courier New</SelectItem>
             <SelectItem value="Verdana">Verdana</SelectItem>
             <SelectItem value="Tahoma">Tahoma</SelectItem>
-            <SelectItem value="monospace">Monospace</SelectItem>
-            <SelectItem value="JetBrains Mono">JetBrains Mono</SelectItem>
-            <SelectItem value="Fira Code">Fira Code</SelectItem>
           </SelectContent>
         </Select>
       </div>

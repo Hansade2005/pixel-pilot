@@ -188,6 +188,7 @@ function VisualEditorInner({
           projectType={projectType}
           onTagToChat={onTagToChat}
           onPublish={onPublish}
+          onApplyTheme={onApplyTheme}
           hasUnsavedChanges={state.pendingChanges.size > 0}
           onSave={async () => {
             if (!onSaveChanges) return;
