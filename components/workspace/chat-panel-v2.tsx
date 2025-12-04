@@ -2832,7 +2832,10 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 --- End Tagged Component ---`
       
       enhancedContent = `${enhancedContent}\n\n=== TAGGED COMPONENT CONTEXT ===${componentContext}\n=== END TAGGED COMPONENT ===`
-      displayContent = `${displayContent}\n\n[Component: <${taggedComponent.tagName}>${taggedComponent.sourceFile ? ` in ${taggedComponent.sourceFile}` : ''}]`
+      
+      // Display content should also include the rich context for user visibility
+      const displayComponentContext = `\n\n📌 **Tagged Component:**\n- Element: \`<${taggedComponent.tagName}>\`${taggedComponent.sourceFile ? `\n- File: \`${taggedComponent.sourceFile}${taggedComponent.sourceLine ? `:${taggedComponent.sourceLine}` : ''}\`` : ''}${taggedComponent.className ? `\n- Classes: \`${taggedComponent.className}\`` : ''}${taggedComponent.textContent ? `\n- Content: "${taggedComponent.textContent}"` : ''}`
+      displayContent = `${displayContent}${displayComponentContext}`
       
       // Clear the tagged component after including it
       if (onClearTaggedComponent) {
