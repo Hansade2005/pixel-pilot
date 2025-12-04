@@ -93,6 +93,7 @@ export function VisualEditorSidebar({
   } = useVisualEditor();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [hasEverSavedChanges, setHasEverSavedChanges] = useState(false);
 
   // Get the first selected element for editing
   const selectedElement = state.selectedElements[0]?.element;
@@ -137,6 +138,7 @@ export function VisualEditorSidebar({
         console.log('[Sidebar] Calling onSave callback...');
         await onSave();
       }
+      setHasEverSavedChanges(true);
     } catch (error) {
       console.error('[Sidebar] handleSave error:', error);
     } finally {
@@ -150,7 +152,7 @@ export function VisualEditorSidebar({
     <div
       className={cn(
         'fixed left-0 top-0 z-50 h-screen bg-background border-r shadow-lg flex flex-col',
-        'w-72 sm:w-80 md:w-80 lg:w-80 xl:w-80', // Responsive width - narrower on mobile
+        'w-64 sm:w-72 md:w-80 lg:w-80 xl:w-80', // More narrow on mobile for better responsiveness
         className
       )}
     >
@@ -306,12 +308,16 @@ export function VisualEditorSidebar({
                       <LayoutPanel element={selectedElement} />
                     </TabsContent>
 
-                    <TabsContent value="spacing" className="mt-0 space-y-2">
-                      <SpacingPanel element={selectedElement} />
+                    <TabsContent value="spacing" className="mt-0">
+                      <ScrollArea className="h-64">
+                        <SpacingPanel element={selectedElement} />
+                      </ScrollArea>
                     </TabsContent>
 
-                    <TabsContent value="typography" className="mt-0 space-y-2">
-                      <TypographyPanel element={selectedElement} />
+                    <TabsContent value="typography" className="mt-0">
+                      <ScrollArea className="h-64">
+                        <TypographyPanel element={selectedElement} />
+                      </ScrollArea>
                     </TabsContent>
                   </Tabs>
                 </>
@@ -329,8 +335,8 @@ export function VisualEditorSidebar({
 
       {/* Footer with Publish button */}
       <div className="p-2 border-t bg-muted/30 space-y-2">
-        {/* Publish button - shows after edits are saved */}
-        {hasUnsavedChanges === false && onPublish && (
+        {/* Publish button - shows only after changes have been made and saved */}
+        {hasEverSavedChanges && hasUnsavedChanges === false && onPublish && (
           <Button
             size="sm"
             className="w-full gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
