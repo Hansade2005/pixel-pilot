@@ -50,6 +50,7 @@ import {
   Trash2,
   Tag,
   Upload,
+  RotateCcw,
 } from 'lucide-react';
 
 interface VisualEditorSidebarProps {
@@ -88,8 +89,13 @@ export function VisualEditorSidebar({
     hasPendingDeletes,
     undo,
     redo,
+    undoPendingChange,
+    redoPendingChange,
+    canUndoPending,
+    canRedoPending,
     clearSelection,
     deleteSelectedElements,
+    discardChangesForElement,
   } = useVisualEditor();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -185,12 +191,34 @@ export function VisualEditorSidebar({
               )}
             </Button>
           )}
+          {/* Discard button - show when there are pending changes for the selected element */}
+          {selectedElement && hasPendingChanges && (
+            <Button
+              size="sm"
+              onClick={() => {
+                if (confirm('Discard all unsaved changes for this element?')) {
+                  discardChangesForElement(selectedElement.id);
+                }
+              }}
+              className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700 text-white"
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Discard
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={undo}
-            disabled={state.historyIndex < 0}
+            onClick={() => {
+              // Use pending changes undo if there are pending changes, otherwise use saved history undo
+              if (canUndoPending()) {
+                undoPendingChange();
+              } else {
+                undo();
+              }
+            }}
+            disabled={!canUndoPending() && state.historyIndex < 0}
             title="Undo (Ctrl+Z)"
           >
             <Undo2 className="h-3 w-3" />
@@ -199,8 +227,15 @@ export function VisualEditorSidebar({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={redo}
-            disabled={state.historyIndex >= state.history.length - 1}
+            onClick={() => {
+              // Use pending changes redo if there are pending changes, otherwise use saved history redo
+              if (canRedoPending()) {
+                redoPendingChange();
+              } else {
+                redo();
+              }
+            }}
+            disabled={!canRedoPending() && state.historyIndex >= state.history.length - 1}
             title="Redo (Ctrl+Shift+Z)"
           >
             <Redo2 className="h-3 w-3" />

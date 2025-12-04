@@ -122,6 +122,9 @@ export interface VisualEditorState {
   hoveredElement: ElementInfo | null;
   // Pending changes (not yet saved)
   pendingChanges: Map<string, StyleChange[]>;
+  // Pending changes history for undo/redo (stack of individual change operations)
+  pendingChangesHistory: PendingChangeEntry[];
+  pendingChangesHistoryIndex: number;
   // Pending delete operations (element IDs -> delete info)
   pendingDeletes: Map<string, DeleteOperation>;
   // History for undo/redo
@@ -173,6 +176,13 @@ export interface HistoryEntry {
   deletedCode?: string;
   // For resize - store original dimensions
   originalDimensions?: { width: string; height: string };
+}
+
+export interface PendingChangeEntry {
+  timestamp: number;
+  elementId: string;
+  change: StyleChange;
+  description: string;
 }
 
 // Message types for iframe communication

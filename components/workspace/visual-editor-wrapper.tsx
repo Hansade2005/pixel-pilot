@@ -24,7 +24,6 @@ import {
   generateAppCSSForVite,
 } from '@/lib/visual-editor';
 import { Edit3, Wand2, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface VisualEditorWrapperProps {
   children: React.ReactNode;
@@ -239,10 +238,8 @@ export function VisualEditorWrapper({
 
   // Handle blocked selection due to unsaved changes
   const handleSelectionBlocked = useCallback(() => {
-    toast.warning('Save Changes First', {
-      description: 'You have unsaved changes on the current element. Please save or discard them before selecting another element.',
-      duration: 4000,
-    });
+    console.log('[Visual Editor Wrapper] Selection blocked - showing alert');
+    alert('Save changes before selecting another element');
   }, []);
 
   return (

@@ -17,6 +17,7 @@ import type {
   VisualEditorTool,
   SidebarPanel,
   HistoryEntry,
+  PendingChangeEntry,
   VisualEditorConfig,
   VisualEditorMessage,
   DeleteOperation,
@@ -29,6 +30,8 @@ const initialState: VisualEditorState = {
   selectedElements: [],
   hoveredElement: null,
   pendingChanges: new Map(),
+  pendingChangesHistory: [],
+  pendingChangesHistoryIndex: -1,
   pendingDeletes: new Map(),
   history: [],
   historyIndex: -1,
@@ -54,12 +57,15 @@ type VisualEditorAction =
   | { type: 'ADD_HISTORY_ENTRY'; payload: HistoryEntry }
   | { type: 'UNDO' }
   | { type: 'REDO' }
+  | { type: 'UNDO_PENDING_CHANGE' }
+  | { type: 'REDO_PENDING_CHANGE' }
   | { type: 'SET_ACTIVE_TOOL'; payload: VisualEditorTool }
   | { type: 'SET_SIDEBAR_OPEN'; payload: boolean }
   | { type: 'SET_ACTIVE_PANEL'; payload: SidebarPanel }
   | { type: 'UPDATE_ELEMENT_RECT'; payload: { elementId: string; rect: DOMRect } }
   | { type: 'UPDATE_ELEMENT_STYLE'; payload: { elementId: string; property: string; value: string } }
-  | { type: 'UPDATE_ELEMENT_TEXT'; payload: { elementId: string; text: string } };
+  | { type: 'UPDATE_ELEMENT_TEXT'; payload: { elementId: string; text: string } }
+  | { type: 'DISCARD_CHANGES_FOR_ELEMENT'; payload: string }
 
 // Reducer function
 function visualEditorReducer(
@@ -173,9 +179,27 @@ function visualEditorReducer(
       }
       
       newPendingChanges.set(action.payload.elementId, mergedChanges);
+
+      // Add to pending changes history for undo/redo
+      const newPendingHistory = [...state.pendingChangesHistory];
+      // Remove future history if we're not at the end
+      const trimmedHistory = newPendingHistory.slice(0, state.pendingChangesHistoryIndex + 1);
+      
+      // Add each change as a separate history entry
+      for (const change of action.payload.changes) {
+        trimmedHistory.push({
+          timestamp: Date.now(),
+          elementId: action.payload.elementId,
+          change,
+          description: `Changed ${change.property}`,
+        });
+      }
+
       return {
         ...state,
         pendingChanges: newPendingChanges,
+        pendingChangesHistory: trimmedHistory.slice(-50), // Keep last 50 entries
+        pendingChangesHistoryIndex: Math.min(trimmedHistory.length - 1, 49),
       };
     }
 
@@ -202,6 +226,8 @@ function visualEditorReducer(
         ...state,
         pendingChanges: new Map(),
         pendingDeletes: new Map(),
+        pendingChangesHistory: [],
+        pendingChangesHistoryIndex: -1,
       };
 
     case 'APPLY_CHANGES': {
@@ -263,6 +289,20 @@ function visualEditorReducer(
       return {
         ...state,
         historyIndex: state.historyIndex + 1,
+      };
+
+    case 'UNDO_PENDING_CHANGE':
+      if (state.pendingChangesHistoryIndex < 0) return state;
+      return {
+        ...state,
+        pendingChangesHistoryIndex: state.pendingChangesHistoryIndex - 1,
+      };
+
+    case 'REDO_PENDING_CHANGE':
+      if (state.pendingChangesHistoryIndex >= state.pendingChangesHistory.length - 1) return state;
+      return {
+        ...state,
+        pendingChangesHistoryIndex: state.pendingChangesHistoryIndex + 1,
       };
 
     case 'SET_ACTIVE_TOOL':
@@ -343,6 +383,26 @@ function visualEditorReducer(
       };
     }
 
+    case 'DISCARD_CHANGES_FOR_ELEMENT': {
+      const newPendingChanges = new Map(state.pendingChanges);
+      newPendingChanges.delete(action.payload);
+      
+      // Also remove history entries for this element
+      const newPendingHistory = state.pendingChangesHistory.filter(
+        entry => entry.elementId !== action.payload
+      );
+      
+      return {
+        ...state,
+        pendingChanges: newPendingChanges,
+        pendingChangesHistory: newPendingHistory,
+        pendingChangesHistoryIndex: Math.min(
+          state.pendingChangesHistoryIndex,
+          newPendingHistory.length - 1
+        ),
+      };
+    }
+
     default:
       return state;
   }
@@ -363,6 +423,10 @@ interface VisualEditorContextValue {
   clearPendingChanges: () => void;
   undo: () => void;
   redo: () => void;
+  undoPendingChange: () => void;
+  redoPendingChange: () => void;
+  canUndoPending: () => boolean;
+  canRedoPending: () => boolean;
   setActiveTool: (tool: VisualEditorTool) => void;
   setSidebarOpen: (open: boolean) => void;
   setActivePanel: (panel: SidebarPanel) => void;
@@ -383,6 +447,8 @@ interface VisualEditorContextValue {
   // Unsaved changes check
   hasUnsavedChangesForCurrentSelection: () => boolean;
   getCurrentSelectionPendingChanges: () => StyleChange[];
+  // Discard changes
+  discardChangesForElement: (elementId: string) => void;
 }
 
 const VisualEditorContext = createContext<VisualEditorContextValue | null>(null);
@@ -455,14 +521,12 @@ export function VisualEditorProvider({
             currentState.selectedElements.length > 0 &&
             message.payload.elements[0].id !== currentState.selectedElements[0].elementId;
           
-          // Block selection if there are unsaved changes and selecting a different element
-          if (hasUnsavedChanges && isSelectingDifferentElement) {
-            console.log('[Visual Editor] Selection blocked - unsaved changes exist');
-            onSelectionBlockedRef.current?.();
-            return;
-          }
-          
-          message.payload.elements.forEach((element, index) => {
+  // Block selection if there are unsaved changes and selecting a different element
+  if (hasUnsavedChanges && isSelectingDifferentElement) {
+    console.log('[Visual Editor] Selection blocked - unsaved changes exist, calling onSelectionBlocked');
+    onSelectionBlockedRef.current?.();
+    return;
+  }          message.payload.elements.forEach((element, index) => {
             dispatch({
               type: 'SELECT_ELEMENT',
               payload: {
@@ -659,6 +723,58 @@ export function VisualEditorProvider({
     
     dispatch({ type: 'REDO' });
   }, [state.historyIndex, state.history, sendToIframe]);
+
+  // Undo pending change - revert the last pending change
+  const undoPendingChange = useCallback(() => {
+    if (state.pendingChangesHistoryIndex < 0) return;
+    
+    const entry = state.pendingChangesHistory[state.pendingChangesHistoryIndex];
+    if (entry) {
+      // Revert the change by sending the old value to iframe
+      const revertedChange = {
+        ...entry.change,
+        newValue: entry.change.oldValue, // Swap new and old
+        oldValue: entry.change.newValue,
+      };
+      
+      sendToIframe({ 
+        type: 'APPLY_STYLE', 
+        payload: { elementId: entry.elementId, changes: [revertedChange] } 
+      });
+      
+      console.log('[Visual Editor] Undo pending change:', entry.description);
+    }
+    
+    dispatch({ type: 'UNDO_PENDING_CHANGE' });
+  }, [state.pendingChangesHistoryIndex, state.pendingChangesHistory, sendToIframe]);
+
+  // Redo pending change - re-apply the next pending change
+  const redoPendingChange = useCallback(() => {
+    if (state.pendingChangesHistoryIndex >= state.pendingChangesHistory.length - 1) return;
+    
+    const entry = state.pendingChangesHistory[state.pendingChangesHistoryIndex + 1];
+    if (entry) {
+      // Re-apply the change
+      sendToIframe({ 
+        type: 'APPLY_STYLE', 
+        payload: { elementId: entry.elementId, changes: [entry.change] } 
+      });
+      
+      console.log('[Visual Editor] Redo pending change:', entry.description);
+    }
+    
+    dispatch({ type: 'REDO_PENDING_CHANGE' });
+  }, [state.pendingChangesHistoryIndex, state.pendingChangesHistory, sendToIframe]);
+
+  // Check if can undo pending changes
+  const canUndoPending = useCallback(() => {
+    return state.pendingChangesHistoryIndex >= 0;
+  }, [state.pendingChangesHistoryIndex]);
+
+  // Check if can redo pending changes
+  const canRedoPending = useCallback(() => {
+    return state.pendingChangesHistoryIndex < state.pendingChangesHistory.length - 1;
+  }, [state.pendingChangesHistoryIndex, state.pendingChangesHistory.length]);
 
   const setActiveTool = useCallback((tool: VisualEditorTool) => {
     dispatch({ type: 'SET_ACTIVE_TOOL', payload: tool });
@@ -870,6 +986,28 @@ export function VisualEditorProvider({
     }
   }, [state.selectedElements, onApplyChanges, applyChanges]);
 
+  // Discard changes for a specific element
+  const discardChangesForElement = useCallback((elementId: string) => {
+    const changes = state.pendingChanges.get(elementId);
+    if (!changes || changes.length === 0) return;
+
+    // Revert the changes by sending old values to iframe
+    const revertedChanges = changes.map(change => ({
+      ...change,
+      newValue: change.oldValue, // Swap new and old
+      oldValue: change.newValue,
+    }));
+
+    // Send to iframe to revert visual changes
+    sendToIframe({ 
+      type: 'APPLY_STYLE', 
+      payload: { elementId, changes: revertedChanges } 
+    });
+
+    // Remove the pending changes
+    dispatch({ type: 'ADD_PENDING_CHANGE', payload: { elementId, changes: [] } });
+  }, [state.pendingChanges, sendToIframe]);
+
   const contextValue: VisualEditorContextValue = {
     state,
     config,
@@ -883,6 +1021,10 @@ export function VisualEditorProvider({
     clearPendingChanges,
     undo,
     redo,
+    undoPendingChange,
+    redoPendingChange,
+    canUndoPending,
+    canRedoPending,
     setActiveTool,
     setSidebarOpen,
     setActivePanel,
@@ -899,6 +1041,7 @@ export function VisualEditorProvider({
     hasPendingDeletes,
     hasUnsavedChangesForCurrentSelection,
     getCurrentSelectionPendingChanges,
+    discardChangesForElement,
   };
 
   return (
