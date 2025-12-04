@@ -636,7 +636,7 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     handleScroll();
   }
 
-  // Apply style changes from parent
+  // Apply style changes from parent (for individual elements)
   function applyStyleChanges(elementId, changes) {
     const element = findElementById(elementId);
     if (!element) return false;
@@ -653,6 +653,15 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     }
 
     sendToParent({ type: 'STYLE_APPLIED', payload: { elementId, success: true } });
+    return true;
+  }
+
+  // Apply CSS variables to root (for themes) - uses same setProperty pattern as applyStyleChanges
+  function applyRootStyles(cssVars) {
+    const root = document.documentElement;
+    Object.entries(cssVars).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
     return true;
   }
 
@@ -777,9 +786,9 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
 
       // Theme preview handlers
       case 'APPLY_THEME_PREVIEW':
-        applyThemePreview(message.payload.themeCSS);
+        applyThemePreview(message.payload.themeVars);
         // Send confirmation back to parent
-        sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true, cssLength: message.payload.themeCSS?.length || 0 } });
+        sendToParent({ type: 'THEME_PREVIEW_APPLIED', payload: { success: true, varsCount: Object.keys(message.payload.themeVars || {}).length } });
         break;
 
       case 'CLEAR_THEME_PREVIEW':
@@ -810,45 +819,42 @@ export const VISUAL_EDITOR_INJECTION_SCRIPT = `
     }
   }
 
-  // Theme preview functions
-  function applyThemePreview(themeCSS) {
-    console.log('[Visual Editor] Applying theme preview, CSS length:', themeCSS?.length);
-    console.log('[Visual Editor] Theme CSS content (first 500 chars):', themeCSS?.substring(0, 500));
+  // Theme preview functions - uses applyRootStyles for consistency with applyStyleChanges pattern
+  function applyThemePreview(themeVars) {
+    console.log('[Visual Editor] Applying theme preview, vars count:', themeVars ? Object.keys(themeVars).length : 0);
     
-    if (!themeCSS) {
-      console.warn('[Visual Editor] No theme CSS provided');
+    if (!themeVars || typeof themeVars !== 'object') {
+      console.warn('[Visual Editor] No theme variables provided');
       return;
     }
     
-    // Remove existing preview style tag
-    let existingTag = document.getElementById('ve-theme-preview');
-    if (existingTag) {
-      existingTag.remove();
-    }
-    
-    // Create new style tag
-    const styleTag = document.createElement('style');
-    styleTag.id = 've-theme-preview';
-    styleTag.setAttribute('data-visual-editor', 'theme-preview');
-    
-    // Add !important to all CSS rules for higher specificity
-    const enhancedCSS = themeCSS.replace(/: ([^;]+);/g, ': $1 !important;');
-    styleTag.textContent = enhancedCSS;
-    
-    // Insert at the END of head to override other styles
-    document.head.appendChild(styleTag);
+    // Apply theme variables using the same setProperty pattern as applyStyleChanges
+    // This ensures consistent behavior with pending style changes
+    applyRootStyles(themeVars);
     
     console.log('[Visual Editor] Theme preview applied successfully');
-    console.log('[Visual Editor] Style tag in DOM:', !!document.getElementById('ve-theme-preview'));
-    console.log('[Visual Editor] Style tag content length:', document.getElementById('ve-theme-preview')?.textContent?.length);
+    console.log('[Visual Editor] Applied', Object.keys(themeVars).length, 'CSS variables');
   }
 
   function clearThemePreview() {
-    const styleTag = document.getElementById('ve-theme-preview');
-    if (styleTag) {
-      styleTag.remove();
-      console.log('[Visual Editor] Theme preview cleared');
+    const root = document.documentElement;
+    const computedStyle = window.getComputedStyle(root);
+    
+    // Get all CSS custom properties that start with '--'
+    const existingVars = [];
+    for (let i = 0; i < computedStyle.length; i++) {
+      const prop = computedStyle[i];
+      if (prop.startsWith('--')) {
+        existingVars.push(prop);
+      }
     }
+    
+    // Remove all theme variables
+    existingVars.forEach(prop => {
+      root.style.removeProperty(prop);
+    });
+    
+    console.log('[Visual Editor] Theme preview cleared, removed', existingVars.length, 'CSS variables');
   }
 
   // Drag and drop functions

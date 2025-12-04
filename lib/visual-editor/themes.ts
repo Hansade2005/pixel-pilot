@@ -45,6 +45,7 @@ export interface ThemeColors {
 
 export interface ThemeTypography {
   fontFamily: string;
+  fontFamilySerif: string;
   fontFamilyMono: string;
   fontSizeBase: string;
   lineHeightBase: string;
@@ -127,6 +128,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'JetBrains Mono, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.5',
@@ -190,6 +192,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'Fira Code, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.6',
@@ -253,6 +256,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Nunito Sans, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'JetBrains Mono, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.6',
@@ -316,6 +320,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Poppins, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'Source Code Pro, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.5',
@@ -379,6 +384,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Space Grotesk, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'Fira Code, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.6',
@@ -442,6 +448,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'DM Sans, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'JetBrains Mono, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.6',
@@ -505,6 +512,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'Fira Code, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.6',
@@ -568,6 +576,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Orbitron, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'Fira Code, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.5',
@@ -631,6 +640,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'Lora, Georgia, serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'JetBrains Mono, monospace',
       fontSizeBase: '17px',
       lineHeightBase: '1.7',
@@ -694,6 +704,7 @@ export const BUILT_IN_THEMES: Theme[] = [
     },
     typography: {
       fontFamily: 'IBM Plex Sans, system-ui, sans-serif',
+      fontFamilySerif: 'Georgia, serif',
       fontFamilyMono: 'IBM Plex Mono, monospace',
       fontSizeBase: '16px',
       lineHeightBase: '1.6',
@@ -1367,6 +1378,7 @@ export function parseThemeFromCSS(cssContent: string): Partial<Theme> | null {
       },
       typography: {
         fontFamily: fontSans,
+        fontFamilySerif: 'Georgia, serif',
         fontFamilyMono: fontMono,
         fontSizeBase: '16px',
         lineHeightBase: '1.5',

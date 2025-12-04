@@ -216,8 +216,8 @@ export type VisualEditorMessage =
   | { type: 'ELEMENT_INSERTED'; payload: { elementId: string; content: string; targetElementId?: string; position: string; parentTag?: string } }
   | { type: 'INSERT_ELEMENT'; payload: { content: string; targetElementId?: string; position: 'before' | 'after' | 'inside' } }
   | { type: 'DRAG_CANCELLED'; payload: {} }
-  // Theme messages
-  | { type: 'APPLY_THEME_PREVIEW'; payload: { themeCSS: string } }
+  // Theme messages - themeVars is a Record of CSS variable key-value pairs (like {'--background': '0 0% 96%'})
+  | { type: 'APPLY_THEME_PREVIEW'; payload: { themeVars: Record<string, string> } }
   | { type: 'CLEAR_THEME_PREVIEW'; payload: {} };
 
 // Tailwind utility mappings for common CSS properties

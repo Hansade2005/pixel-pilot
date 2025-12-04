@@ -10,6 +10,12 @@ import {
   TAILWIND_FONT_SIZES,
   TAILWIND_BORDER_RADIUS,
 } from './types';
+import {
+  BUILT_IN_THEMES,
+  generateVanillaCSS,
+  type Theme,
+} from './themes';
+import { CUSTOM_THEMES } from './custom-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,7 +57,9 @@ import {
   Tag,
   Upload,
   RotateCcw,
+  Palette,
 } from 'lucide-react';
+import { ThemesPanel } from './panels/themes-panel'
 
 interface VisualEditorSidebarProps {
   className?: string;
@@ -279,13 +287,13 @@ export function VisualEditorSidebar({
         />
       </div>
 
-      {/* Main Mode Tabs - Edit only */}
-      {/* <div className="flex border-b bg-muted/20">
+      {/* Main Mode Tabs */}
+      <div className="flex border-b bg-muted/20">
         <button
           onClick={() => setActivePanel('styles')}
           className={cn(
             'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
-            ['styles', 'layout', 'spacing', 'typography', 'effects'].includes(state.activePanel)
+            ['styles', 'layout', 'spacing', 'typography'].includes(state.activePanel)
               ? 'bg-background text-foreground border-b-2 border-primary'
               : 'text-muted-foreground hover:text-foreground'
           )}
@@ -293,13 +301,25 @@ export function VisualEditorSidebar({
           <MousePointer2 className="h-3.5 w-3.5" />
           Edit
         </button>
-      </div> */}
+        <button
+          onClick={() => setActivePanel('themes')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
+            state.activePanel === 'themes'
+              ? 'bg-background text-foreground border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Palette className="h-3.5 w-3.5" />
+          Themes
+        </button>
+      </div>
 
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-2">
           {/* Edit Panel - Style editing for selected element */}
-          {['styles', 'layout', 'spacing', 'typography', 'effects'].includes(state.activePanel) && (
+          {['styles', 'layout', 'spacing', 'typography', 'themes'].includes(state.activePanel) && (
             <>
               {selectedElement ? (
                 <>
@@ -328,11 +348,12 @@ export function VisualEditorSidebar({
                   </div>
                   
                   <Tabs value={state.activePanel} onValueChange={(v) => setActivePanel(v as SidebarPanel)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 h-8 mb-3">
+                    <TabsList className="grid w-full grid-cols-5 h-8 mb-3">
                       <TabsTrigger value="styles" className="text-xs px-1">Styles</TabsTrigger>
                       <TabsTrigger value="layout" className="text-xs px-1">Layout</TabsTrigger>
                       <TabsTrigger value="spacing" className="text-xs px-1">Spacing</TabsTrigger>
                       <TabsTrigger value="typography" className="text-xs px-1">Text</TabsTrigger>
+                      <TabsTrigger value="themes" className="text-xs px-1">Themes</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="styles" className="mt-0 space-y-2">
@@ -352,6 +373,12 @@ export function VisualEditorSidebar({
                     <TabsContent value="typography" className="mt-0">
                       <ScrollArea className="h-64">
                         <TypographyPanel element={selectedElement} />
+                      </ScrollArea>
+                    </TabsContent>
+
+                    <TabsContent value="themes" className="mt-0">
+                      <ScrollArea className="h-64">
+                        <ThemesPanel />
                       </ScrollArea>
                     </TabsContent>
                   </Tabs>
