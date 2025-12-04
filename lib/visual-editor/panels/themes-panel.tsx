@@ -25,6 +25,7 @@ import {
   Sparkles,
   Download,
   FileCode,
+  Save,
   // Category icons
   Target,
   Zap,
@@ -273,6 +274,18 @@ export function ThemesPanel({
             >
               {previewMode === 'light' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
             </Button>
+            {selectedThemeId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 bg-primary/10 hover:bg-primary/20 text-primary"
+                onClick={handleApplyTheme}
+                title="Apply theme to project files"
+              >
+                <Save className="h-3 w-3" />
+                Apply
+              </Button>
+            )}
           </div>
         </div>
 

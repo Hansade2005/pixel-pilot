@@ -196,12 +196,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
 
       // Determine the CSS file path based on project type
-      // Next.js uses app/globals.css, Vite uses src/App.css or src/index.css
+      // Next.js uses src/app/globals.css, Vite uses src/index.css
       const possiblePaths = [
+        'src/app/globals.css',
         'app/globals.css',
+        'src/index.css',
         'src/globals.css', 
         'src/App.css',
-        'src/index.css',
         'styles/globals.css',
       ]
 

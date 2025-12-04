@@ -45,7 +45,16 @@ export interface ComputedStyleInfo {
   flexDirection?: string;
   justifyContent?: string;
   alignItems?: string;
+  alignSelf?: string;
   gap?: string;
+  zIndex?: string;
+  overflow?: string;
+  flexWrap?: string;
+  order?: string;
+  
+  // Grid properties
+  gridTemplateColumns?: string;
+  gridTemplateRows?: string;
   
   // Spacing
   marginTop: string;
@@ -69,10 +78,14 @@ export interface ComputedStyleInfo {
   fontSize: string;
   fontWeight: string;
   fontFamily: string;
+  fontStyle?: string;
   lineHeight: string;
   letterSpacing?: string;
   textAlign?: string;
   textDecoration?: string;
+  textTransform?: string;
+  textShadow?: string;
+  wordSpacing?: string;
   
   // Colors
   color: string;
@@ -87,6 +100,8 @@ export interface ComputedStyleInfo {
   // Effects
   boxShadow?: string;
   opacity?: string;
+  transform?: string;
+  backdropFilter?: string;
 }
 
 export interface StyleChange {

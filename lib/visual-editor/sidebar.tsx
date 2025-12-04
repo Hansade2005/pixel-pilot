@@ -58,6 +58,10 @@ import {
   Upload,
   RotateCcw,
   Palette,
+  Italic,
+  Strikethrough,
+  Type,
+  Move,
 } from 'lucide-react';
 import { ThemesPanel } from './panels/themes-panel'
 
@@ -507,6 +511,75 @@ function StylesPanel({ element }: StylesPanelProps) {
 
       {/* Border */}
       <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Border Width</Label>
+        <Select
+          value={element.computedStyles.borderWidth || '0px'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'borderWidth',
+              oldValue: element.computedStyles.borderWidth || '0px',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === '0px' ? 'border-0' : value === '1px' ? 'border' : value === '2px' ? 'border-2' : value === '4px' ? 'border-4' : 'border-8',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0px">None</SelectItem>
+            <SelectItem value="1px">1px</SelectItem>
+            <SelectItem value="2px">2px</SelectItem>
+            <SelectItem value="4px">4px</SelectItem>
+            <SelectItem value="8px">8px</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Border Style</Label>
+        <Select
+          value={element.computedStyles.borderStyle || 'solid'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'borderStyle',
+              oldValue: element.computedStyles.borderStyle || 'solid',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === 'solid' ? 'border-solid' : value === 'dashed' ? 'border-dashed' : value === 'dotted' ? 'border-dotted' : value === 'double' ? 'border-double' : 'border-none',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="solid">Solid</SelectItem>
+            <SelectItem value="dashed">Dashed</SelectItem>
+            <SelectItem value="dotted">Dotted</SelectItem>
+            <SelectItem value="double">Double</SelectItem>
+            <SelectItem value="none">None</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Border Color</Label>
+        <ColorPicker
+          value={element.computedStyles.borderColor}
+          onChange={(color) => {
+            addPendingChange(element.id, [{
+              property: 'borderColor',
+              oldValue: element.computedStyles.borderColor || 'transparent',
+              newValue: color,
+              useTailwind: false,
+            }]);
+          }}
+        />
+      </div>
+
+      <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Border Radius</Label>
         <Select
           value={element.computedStyles.borderRadius || '0px'}
@@ -529,6 +602,89 @@ function StylesPanel({ element }: StylesPanelProps) {
                 {tw} ({px})
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
+      {/* Box Shadow */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Box Shadow</Label>
+        <Select
+          value={element.computedStyles.boxShadow || 'none'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'boxShadow',
+              oldValue: element.computedStyles.boxShadow || 'none',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === 'none' ? 'shadow-none' : value === '0 1px 2px 0 rgb(0 0 0 / 0.05)' ? 'shadow-sm' : value === '0 1px 3px 0 rgb(0 0 0 / 0.1)' ? 'shadow' : value === '0 4px 6px -1px rgb(0 0 0 / 0.1)' ? 'shadow-md' : value === '0 10px 15px -3px rgb(0 0 0 / 0.1)' ? 'shadow-lg' : value === '0 20px 25px -5px rgb(0 0 0 / 0.1)' ? 'shadow-xl' : 'shadow-2xl',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="0 1px 2px 0 rgb(0 0 0 / 0.05)">Small</SelectItem>
+            <SelectItem value="0 1px 3px 0 rgb(0 0 0 / 0.1)">Base</SelectItem>
+            <SelectItem value="0 4px 6px -1px rgb(0 0 0 / 0.1)">Medium</SelectItem>
+            <SelectItem value="0 10px 15px -3px rgb(0 0 0 / 0.1)">Large</SelectItem>
+            <SelectItem value="0 20px 25px -5px rgb(0 0 0 / 0.1)">XL</SelectItem>
+            <SelectItem value="0 25px 50px -12px rgb(0 0 0 / 0.25)">2XL</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Transform Scale */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">
+          Scale: {Math.round((parseFloat(element.computedStyles.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1') * 100))}%
+        </Label>
+        <Slider
+          value={[parseFloat(element.computedStyles.transform?.match(/scale\(([^)]+)\)/)?.[1] || '1') * 100]}
+          min={0}
+          max={200}
+          step={5}
+          onValueChange={([value]) => {
+            addPendingChange(element.id, [{
+              property: 'transform',
+              oldValue: element.computedStyles.transform || 'none',
+              newValue: `scale(${value / 100})`,
+              useTailwind: true,
+              tailwindClass: `scale-[${value}]`,
+            }]);
+          }}
+        />
+      </div>
+
+      {/* Backdrop Filter */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Backdrop Blur</Label>
+        <Select
+          value={element.computedStyles.backdropFilter || 'none'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'backdropFilter',
+              oldValue: element.computedStyles.backdropFilter || 'none',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === 'none' ? 'backdrop-blur-none' : value === 'blur(4px)' ? 'backdrop-blur-sm' : value === 'blur(8px)' ? 'backdrop-blur' : value === 'blur(12px)' ? 'backdrop-blur-md' : value === 'blur(16px)' ? 'backdrop-blur-lg' : 'backdrop-blur-xl',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="blur(4px)">Small</SelectItem>
+            <SelectItem value="blur(8px)">Base</SelectItem>
+            <SelectItem value="blur(12px)">Medium</SelectItem>
+            <SelectItem value="blur(16px)">Large</SelectItem>
+            <SelectItem value="blur(24px)">XL</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -576,6 +732,82 @@ function LayoutPanel({ element }: StylesPanelProps) {
 
   return (
     <div className="space-y-4">
+      {/* Position */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Position</Label>
+        <Select
+          value={element.computedStyles.position || 'static'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'position',
+              oldValue: element.computedStyles.position || 'static',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === 'static' ? 'static' : value === 'relative' ? 'relative' : value === 'absolute' ? 'absolute' : value === 'fixed' ? 'fixed' : 'sticky',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="static">Static</SelectItem>
+            <SelectItem value="relative">Relative</SelectItem>
+            <SelectItem value="absolute">Absolute</SelectItem>
+            <SelectItem value="fixed">Fixed</SelectItem>
+            <SelectItem value="sticky">Sticky</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Z-Index */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Z-Index</Label>
+        <Input
+          type="number"
+          className="h-8"
+          value={element.computedStyles.zIndex || 'auto'}
+          onChange={(e) => {
+            addPendingChange(element.id, [{
+              property: 'zIndex',
+              oldValue: element.computedStyles.zIndex || 'auto',
+              newValue: e.target.value,
+              useTailwind: true,
+              tailwindClass: `z-[${e.target.value}]`,
+            }]);
+          }}
+        />
+      </div>
+
+      {/* Overflow */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Overflow</Label>
+        <Select
+          value={element.computedStyles.overflow || 'visible'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'overflow',
+              oldValue: element.computedStyles.overflow || 'visible',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === 'visible' ? 'overflow-visible' : value === 'hidden' ? 'overflow-hidden' : value === 'scroll' ? 'overflow-scroll' : 'overflow-auto',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="visible">Visible</SelectItem>
+            <SelectItem value="hidden">Hidden</SelectItem>
+            <SelectItem value="scroll">Scroll</SelectItem>
+            <SelectItem value="auto">Auto</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
       {/* Display */}
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Display</Label>
@@ -636,6 +868,31 @@ function LayoutPanel({ element }: StylesPanelProps) {
           </div>
 
           <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Flex Wrap</Label>
+            <Select
+              value={element.computedStyles.flexWrap || 'nowrap'}
+              onValueChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'flexWrap',
+                  oldValue: element.computedStyles.flexWrap || 'nowrap',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: value === 'nowrap' ? 'flex-nowrap' : value === 'wrap' ? 'flex-wrap' : 'flex-wrap-reverse',
+                }]);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nowrap">No Wrap</SelectItem>
+                <SelectItem value="wrap">Wrap</SelectItem>
+                <SelectItem value="wrap-reverse">Wrap Reverse</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Justify Content</Label>
             <div className="flex gap-1">
               {[
@@ -688,6 +945,128 @@ function LayoutPanel({ element }: StylesPanelProps) {
                 <SelectItem value="flex-end">End</SelectItem>
                 <SelectItem value="baseline">Baseline</SelectItem>
                 <SelectItem value="stretch">Stretch</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Align Self</Label>
+            <Select
+              value={element.computedStyles.alignSelf || 'auto'}
+              onValueChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'alignSelf',
+                  oldValue: element.computedStyles.alignSelf || 'auto',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: value === 'auto' ? 'self-auto' : value === 'flex-start' ? 'self-start' : value === 'center' ? 'self-center' : value === 'flex-end' ? 'self-end' : 'self-stretch',
+                }]);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto</SelectItem>
+                <SelectItem value="flex-start">Start</SelectItem>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="flex-end">End</SelectItem>
+                <SelectItem value="stretch">Stretch</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Order</Label>
+            <Input
+              type="number"
+              className="h-8"
+              value={parseInt(element.computedStyles.order || '0', 10)}
+              onChange={(e) => {
+                addPendingChange(element.id, [{
+                  property: 'order',
+                  oldValue: element.computedStyles.order || '0',
+                  newValue: e.target.value,
+                  useTailwind: true,
+                  tailwindClass: `order-[${e.target.value}]`,
+                }]);
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Gap</Label>
+            <SpacingInput
+              value={element.computedStyles.gap || '0px'}
+              onChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'gap',
+                  oldValue: element.computedStyles.gap || '0px',
+                  newValue: value,
+                  useTailwind: true,
+                }]);
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Grid Layout (only if display is grid) */}
+      {display === 'grid' && (
+        <>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Grid Columns</Label>
+            <Select
+              value={element.computedStyles.gridTemplateColumns || 'none'}
+              onValueChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'gridTemplateColumns',
+                  oldValue: element.computedStyles.gridTemplateColumns || 'none',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: value === 'none' ? 'grid-cols-none' : `grid-cols-${value}`,
+                }]);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="1">1 Column</SelectItem>
+                <SelectItem value="2">2 Columns</SelectItem>
+                <SelectItem value="3">3 Columns</SelectItem>
+                <SelectItem value="4">4 Columns</SelectItem>
+                <SelectItem value="6">6 Columns</SelectItem>
+                <SelectItem value="12">12 Columns</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Grid Rows</Label>
+            <Select
+              value={element.computedStyles.gridTemplateRows || 'none'}
+              onValueChange={(value) => {
+                addPendingChange(element.id, [{
+                  property: 'gridTemplateRows',
+                  oldValue: element.computedStyles.gridTemplateRows || 'none',
+                  newValue: value,
+                  useTailwind: true,
+                  tailwindClass: value === 'none' ? 'grid-rows-none' : `grid-rows-${value}`,
+                }]);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="1">1 Row</SelectItem>
+                <SelectItem value="2">2 Rows</SelectItem>
+                <SelectItem value="3">3 Rows</SelectItem>
+                <SelectItem value="4">4 Rows</SelectItem>
+                <SelectItem value="6">6 Rows</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -952,12 +1331,27 @@ function TypographyPanel({ element }: StylesPanelProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Inter">Inter</SelectItem>
+            <SelectItem value="Roboto">Roboto</SelectItem>
+            <SelectItem value="Open Sans">Open Sans</SelectItem>
+            <SelectItem value="Montserrat">Montserrat</SelectItem>
+            <SelectItem value="Lato">Lato</SelectItem>
+            <SelectItem value="Poppins">Poppins</SelectItem>
+            <SelectItem value="Raleway">Raleway</SelectItem>
+            <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
+            <SelectItem value="Nunito">Nunito</SelectItem>
+            <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+            <SelectItem value="Merriweather">Merriweather</SelectItem>
             <SelectItem value="system-ui">System UI</SelectItem>
             <SelectItem value="Arial">Arial</SelectItem>
             <SelectItem value="Helvetica">Helvetica</SelectItem>
             <SelectItem value="Georgia">Georgia</SelectItem>
             <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+            <SelectItem value="Courier New">Courier New</SelectItem>
+            <SelectItem value="Verdana">Verdana</SelectItem>
+            <SelectItem value="Tahoma">Tahoma</SelectItem>
             <SelectItem value="monospace">Monospace</SelectItem>
+            <SelectItem value="JetBrains Mono">JetBrains Mono</SelectItem>
+            <SelectItem value="Fira Code">Fira Code</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1084,8 +1478,27 @@ function TypographyPanel({ element }: StylesPanelProps) {
                 tailwindClass: newWeight === '700' ? 'font-bold' : 'font-normal',
               }]);
             }}
+            title="Bold"
           >
             <Bold className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={element.computedStyles.fontStyle === 'italic' ? 'secondary' : 'outline'}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => {
+              const newStyle = element.computedStyles.fontStyle === 'italic' ? 'normal' : 'italic';
+              addPendingChange(element.id, [{
+                property: 'fontStyle',
+                oldValue: element.computedStyles.fontStyle || 'normal',
+                newValue: newStyle,
+                useTailwind: true,
+                tailwindClass: newStyle === 'italic' ? 'italic' : 'not-italic',
+              }]);
+            }}
+            title="Italic"
+          >
+            <Italic className="h-4 w-4" />
           </Button>
           <Button
             variant={element.computedStyles.textDecoration === 'underline' ? 'secondary' : 'outline'}
@@ -1101,10 +1514,131 @@ function TypographyPanel({ element }: StylesPanelProps) {
                 tailwindClass: newDecoration === 'underline' ? 'underline' : 'no-underline',
               }]);
             }}
+            title="Underline"
           >
             <Underline className="h-4 w-4" />
           </Button>
+          <Button
+            variant={element.computedStyles.textDecoration === 'line-through' ? 'secondary' : 'outline'}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => {
+              const newDecoration = element.computedStyles.textDecoration === 'line-through' ? 'none' : 'line-through';
+              addPendingChange(element.id, [{
+                property: 'textDecoration',
+                oldValue: element.computedStyles.textDecoration || 'none',
+                newValue: newDecoration,
+                useTailwind: true,
+                tailwindClass: newDecoration === 'line-through' ? 'line-through' : 'no-underline',
+              }]);
+            }}
+            title="Strikethrough"
+          >
+            <Strikethrough className="h-4 w-4" />
+          </Button>
         </div>
+      </div>
+
+      {/* Text Transform */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Text Transform</Label>
+        <Select
+          value={element.computedStyles.textTransform || 'none'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'textTransform',
+              oldValue: element.computedStyles.textTransform || 'none',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === 'none' ? 'normal-case' : value === 'uppercase' ? 'uppercase' : value === 'lowercase' ? 'lowercase' : 'capitalize',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Normal</SelectItem>
+            <SelectItem value="uppercase">UPPERCASE</SelectItem>
+            <SelectItem value="lowercase">lowercase</SelectItem>
+            <SelectItem value="capitalize">Capitalize</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Letter Spacing */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Letter Spacing</Label>
+        <Select
+          value={element.computedStyles.letterSpacing || 'normal'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'letterSpacing',
+              oldValue: element.computedStyles.letterSpacing || 'normal',
+              newValue: value,
+              useTailwind: true,
+              tailwindClass: value === '-0.05em' ? 'tracking-tighter' : value === '-0.025em' ? 'tracking-tight' : value === 'normal' ? 'tracking-normal' : value === '0.025em' ? 'tracking-wide' : value === '0.05em' ? 'tracking-wider' : 'tracking-widest',
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="-0.05em">Tighter</SelectItem>
+            <SelectItem value="-0.025em">Tight</SelectItem>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="0.025em">Wide</SelectItem>
+            <SelectItem value="0.05em">Wider</SelectItem>
+            <SelectItem value="0.1em">Widest</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Word Spacing */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Word Spacing</Label>
+        <Input
+          type="number"
+          className="h-8"
+          value={parseFloat(element.computedStyles.wordSpacing || '0') || 0}
+          onChange={(e) => {
+            addPendingChange(element.id, [{
+              property: 'wordSpacing',
+              oldValue: element.computedStyles.wordSpacing || '0px',
+              newValue: `${e.target.value}px`,
+              useTailwind: false,
+            }]);
+          }}
+          step={0.5}
+        />
+      </div>
+
+      {/* Text Shadow */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Text Shadow</Label>
+        <Select
+          value={element.computedStyles.textShadow || 'none'}
+          onValueChange={(value) => {
+            addPendingChange(element.id, [{
+              property: 'textShadow',
+              oldValue: element.computedStyles.textShadow || 'none',
+              newValue: value,
+              useTailwind: false,
+            }]);
+          }}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="1px 1px 2px rgba(0,0,0,0.1)">Light</SelectItem>
+            <SelectItem value="2px 2px 4px rgba(0,0,0,0.2)">Medium</SelectItem>
+            <SelectItem value="3px 3px 6px rgba(0,0,0,0.3)">Heavy</SelectItem>
+            <SelectItem value="0 0 10px rgba(0,0,0,0.5)">Glow</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
