@@ -20,7 +20,7 @@ export function Footer() {
               <li><Link href="/pricing" className="text-gray-400 hover:text-white transition-colors">Plans</Link></li>
               <li><Link href="/enterprise" className="text-gray-400 hover:text-white transition-colors">Business</Link></li>
               <li><Link href="/showcase" className="text-gray-400 hover:text-white transition-colors">Showcase</Link></li>
-              <li><Link href="/integrations" className="text-gray-400 hover:text-white transition-colors">Integrations</Link></li>
+              <li><Link href="/features/integrations" className="text-gray-400 hover:text-white transition-colors">Integrations</Link></li>
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Student discount</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Solutions</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Changelog</Link></li> */}

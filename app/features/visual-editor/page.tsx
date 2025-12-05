@@ -541,6 +541,12 @@ export default function VisualEditorPage() {
                   Open Workspace
                 </Button>
               </Link>
+              <Link href="/features/integrations">
+                <Button size="lg" variant="outline" className="gap-2">
+                  <Settings className="w-4 h-4" />
+                  View Integrations
+                </Button>
+              </Link>
               <Link href="/docs">
                 <Button size="lg" variant="outline" className="gap-2">
                   <MessageSquare className="w-4 h-4" />
