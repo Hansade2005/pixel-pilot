@@ -42,10 +42,11 @@ const GitHubIcon = ({ className }: { className?: string }) => (
 )
 
 const VercelIcon = ({ className }: { className?: string }) => (
-  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <title>Vercel</title>
-    <path d="m12 1.608 12 20.784H0Z" />
-  </svg>
+  <img
+    src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/vercel.svg"
+    alt="Vercel"
+    className={className}
+  />
 )
 
 const NetlifyIcon = ({ className }: { className?: string }) => (
@@ -56,15 +57,18 @@ const NetlifyIcon = ({ className }: { className?: string }) => (
 )
 
 const SupabaseIcon = ({ className }: { className?: string }) => (
-  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <title>Supabase</title>
-    <path d="M21.362 9.354H12V.396a.396.396 0 0 0-.716-.233L2.724 9.355H.642A.643.643 0 0 0 0 10v4a.64.64 0 0 0 .643.643h2.724l8.56 9.192a.396.396 0 0 0 .716-.233V14.61h9.362a.643.643 0 0 0 .643-.643v-4a.643.643 0 0 0-.643-.643Z" />
-  </svg>)
+  <img
+    src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/supabase.svg"
+    alt="Supabase"
+    className={className}
+  />
+)
 const StripeIcon = ({ className }: { className?: string }) => (
-  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <title>Stripe</title>
-    <path d="M13.976 9.15c-1.37 0-2.313.917-2.313 2.445 0 2.807 4.878 1.47 4.878 4.435 0 .871-.776 1.428-1.958 1.428-1.618 0-2.413-.854-2.413-2.165h-2.03c0 2.145 1.618 3.507 4.443 3.507 1.618 0 2.783-.661 2.783-2.445 0-2.806-4.878-1.47-4.878-4.435 0-.661.465-1.244 1.754-1.244 1.244 0 1.863.661 1.863 1.754h2.03c0-1.754-1.37-2.807-3.559-2.807zm7.024 8.85h2.03V6.22h-2.03v11.78z" />
-  </svg>
+  <img
+    src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/stripe.svg"
+    alt="Stripe"
+    className={className}
+  />
 )
 
 const integrations = [
@@ -224,7 +228,7 @@ export default function IntegrationsPage() {
             <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               Seamless Integrations
             </h1>
-            
+            <br></br>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               Connect your favorite tools and services. Deploy to Vercel or Netlify, 
               manage databases with Supabase, process payments with Stripe, and more.

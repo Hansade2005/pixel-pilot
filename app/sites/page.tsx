@@ -1,4 +1,5 @@
 import React from 'react';
+import BuiltOnBadge from '@/components/built-on-badge'
 
 export default function SitesPage() {
   // This page will be used to display hosted sites
@@ -9,6 +10,8 @@ export default function SitesPage() {
         <h1 style={{ color: '#333', marginBottom: '10px' }}>Hosted Site</h1>
         <p style={{ color: '#666' }}>Loading your hosted website...</p>
       </div>
+      {/* Built on badge */}
+      <BuiltOnBadge href="https://pipilot.dev" />
     </div>
   );
 }
