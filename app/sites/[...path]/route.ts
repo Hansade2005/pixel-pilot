@@ -96,12 +96,63 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     const arrayBuffer = await data.arrayBuffer();
     const contentType = detectContentType(joinedPath);
     
+    let responseBuffer = Buffer.from(arrayBuffer);
+    
+    // Inject built-on badge for HTML files
+    if (contentType.includes('text/html')) {
+      const htmlContent = responseBuffer.toString('utf-8');
+      const badgeHtml = `
+<div id="pipilot-badge" style="position: fixed; bottom: 16px; right: 16px; z-index: 50; display: none;">
+  <div style="position: relative; display: inline-flex; align-items: center; background-color: rgb(17 24 39); color: white; border-radius: 9999px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); padding: 8px 12px; border: 1px solid rgb(255 255 255 / 0.1);">
+    <a href="https://pipilot.dev" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
+      <img src="https://pipilot.dev/logo.png" alt="piPilot" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover;" width="20" height="20" />
+      <span style="font-size: 12px; font-weight: 500;">Built on PiPilot</span>
+    </a>
+    <button id="close-badge" aria-label="Close built on badge" style="position: absolute; top: -8px; right: -8px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background-color: rgb(31 41 55); border: 1px solid rgb(255 255 255 / 0.1); width: 28px; height: 28px; cursor: pointer; color: white; font-size: 14px; line-height: 1;">
+      ×
+    </button>
+  </div>
+</div>
+<script>
+  (function() {
+    const badge = document.getElementById('pipilot-badge');
+    const closeBtn = document.getElementById('close-badge');
+    const storageKey = 'pipilot-built-on-badge-hidden';
+    
+    // Check if badge was previously hidden
+    try {
+      const hidden = localStorage.getItem(storageKey) === 'true';
+      if (!hidden) {
+        badge.style.display = 'block';
+      }
+    } catch (e) {
+      badge.style.display = 'block';
+    }
+    
+    // Close badge handler
+    closeBtn.addEventListener('click', function() {
+      badge.style.display = 'none';
+      try {
+        localStorage.setItem(storageKey, 'true');
+      } catch (e) {
+        // ignore
+      }
+    });
+  })();
+</script>
+`;
+      
+      // Insert before </body>
+      const modifiedHtml = htmlContent.replace(/<\/body>/i, badgeHtml + '</body>');
+      responseBuffer = Buffer.from(modifiedHtml, 'utf-8');
+    }
+    
     // Set appropriate cache headers
     const cacheControl = contentType.includes('html')
       ? 'public, max-age=0, must-revalidate'
       : 'public, max-age=31536000, immutable';
 
-    return new NextResponse(Buffer.from(arrayBuffer), {
+    return new NextResponse(responseBuffer, {
       headers: { 
         'Content-Type': contentType,
         'Cache-Control': cacheControl,
