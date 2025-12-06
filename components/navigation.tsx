@@ -38,7 +38,8 @@ import {
   CreditCard,
   TrendingUp,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Server
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -387,6 +388,12 @@ export function Navigation() {
                            <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                              <Database className="w-4 h-4 mr-2" />
                              Database
+                           </DropdownMenuItem>
+                         </Link>
+                         <Link href="/sites/manage">
+                           <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                             <Server className="w-4 h-4 mr-2" />
+                             Sites
                            </DropdownMenuItem>
                          </Link>
                          <Link href="/workspace/deployment">

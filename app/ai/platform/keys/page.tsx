@@ -245,7 +245,7 @@ export default function ApiKeysPage() {
                         <div>
                             <CardTitle className="text-white">Active Keys</CardTitle>
                             <CardDescription className="text-gray-400">
-                                Manage your API keys for accessing the PiPilot AI platform
+                                Manage your API keys for accessing the PiPilot AI Models
                             </CardDescription>
                         </div>
                         <Button
@@ -312,7 +312,7 @@ export default function ApiKeysPage() {
                     <DialogHeader>
                         <DialogTitle className="text-white">Create API Key</DialogTitle>
                         <DialogDescription className="text-gray-400">
-                            Create a new API key for accessing the PiPilot AI platform
+                            Create a new API key for accessing the PiPilot AI Models
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">

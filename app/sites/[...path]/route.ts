@@ -33,38 +33,71 @@ function getSubdomain(hostname: string): string | null {
   return null; // No subdomain
 }
 
+// Check if hostname is a custom domain and return siteId
+async function getCustomDomainSiteId(hostname: string, supabase: any): Promise<string | null> {
+  const host = hostname.split(':')[0];
+  
+  // Skip if it's pipilot.dev or localhost
+  if (host.endsWith('pipilot.dev') || host === 'localhost' || host === '127.0.0.1') {
+    return null;
+  }
+  
+  // Query custom_domains table
+  const { data, error } = await supabase
+    .from('custom_domains')
+    .select('site_id')
+    .eq('domain', host)
+    .eq('verified', true)
+    .single();
+  
+  if (error || !data) {
+    return null;
+  }
+  
+  return data.site_id;
+}
+
 // Serves files from Supabase Storage bucket "sites" with SPA fallback
 export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
   try {
     const hostname = request.headers.get('host') || '';
     const path = params.path || [];
     
-    // Extract subdomain for multi-tenant routing
-    const subdomain = getSubdomain(hostname);
+    const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);
+    
+    // Check for custom domain first
+    const customSiteId = await getCustomDomainSiteId(hostname, supabase);
     
     let siteId: string;
     let filePath: string[];
     
-    if (subdomain) {
-      // Multi-tenant subdomain mode: subdomain.pipilot.dev/path
-      siteId = subdomain;
-      // For subdomains, the path might start with the siteId due to middleware rewrite
-      // Remove the siteId from the beginning if it matches
-      filePath = path[0] === subdomain ? path.slice(1) : path;
+    if (customSiteId) {
+      // Custom domain mode: customdomain.com/path
+      siteId = customSiteId;
+      filePath = path; // Path is directly after domain
     } else {
-      // Direct /sites/siteId/path access
-      if (path.length === 0) {
-        return new NextResponse('Site ID required', { status: 400 });
+      // Extract subdomain for multi-tenant routing
+      const subdomain = getSubdomain(hostname);
+      
+      if (subdomain) {
+        // Multi-tenant subdomain mode: subdomain.pipilot.dev/path
+        siteId = subdomain;
+        // For subdomains, the path might start with the siteId due to middleware rewrite
+        // Remove the siteId from the beginning if it matches
+        filePath = path[0] === subdomain ? path.slice(1) : path;
+      } else {
+        // Direct /sites/siteId/path access
+        if (path.length === 0) {
+          return new NextResponse('Site ID required', { status: 400 });
+        }
+        siteId = path[0]; // First segment is the siteId
+        filePath = path.slice(1); // Everything after siteId
       }
-      siteId = path[0]; // First segment is the siteId
-      filePath = path.slice(1); // Everything after siteId
     }
     
     const joinedPath = filePath.join('/') || 'index.html';
 
     console.log(`[Sites Route] Serving ${siteId}/${joinedPath} for ${hostname}`);
-
-    const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);
 
     // Try to fetch the requested file
     const storagePath = `sites/${siteId}/${joinedPath}`;
@@ -102,7 +135,7 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     if (contentType.includes('text/html')) {
       const htmlContent = responseBuffer.toString('utf-8');
       const badgeHtml = `
-<div id="pipilot-badge" style="position: fixed; bottom: 16px; right: 16px; z-index: 50; display: none;">
+<div id="pipilot-badge" style="position: fixed; bottom: 16px; right: 16px; z-index: 9999; display: block;">
   <div style="position: relative; display: inline-flex; align-items: center; background-color: rgb(17 24 39); color: white; border-radius: 9999px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); padding: 8px 12px; border: 1px solid rgb(255 255 255 / 0.1);">
     <a href="https://pipilot.dev" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
       <img src="https://pipilot.dev/logo.png" alt="piPilot" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover;" width="20" height="20" />
@@ -115,35 +148,59 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
 </div>
 <script>
   (function() {
-    const badge = document.getElementById('pipilot-badge');
-    const closeBtn = document.getElementById('close-badge');
-    const storageKey = 'pipilot-built-on-badge-hidden';
-    
-    // Check if badge was previously hidden
-    try {
-      const hidden = localStorage.getItem(storageKey) === 'true';
-      if (!hidden) {
-        badge.style.display = 'block';
+    // Wait for DOM to be ready
+    function initBadge() {
+      const badge = document.getElementById('pipilot-badge');
+      const closeBtn = document.getElementById('close-badge');
+      
+      if (!badge || !closeBtn) {
+        // Retry after a short delay
+        setTimeout(initBadge, 100);
+        return;
       }
-    } catch (e) {
-      badge.style.display = 'block';
+      
+      const storageKey = 'pipilot-built-on-badge-hidden';
+      
+      // Check if badge was previously hidden
+      try {
+        const hidden = localStorage.getItem(storageKey) === 'true';
+        if (hidden) {
+          badge.style.display = 'none';
+        }
+      } catch (e) {
+        // Show by default
+      }
+      
+      // Close badge handler
+      closeBtn.addEventListener('click', function() {
+        badge.style.display = 'none';
+        try {
+          localStorage.setItem(storageKey, 'true');
+        } catch (e) {
+          // ignore
+        }
+      });
     }
     
-    // Close badge handler
-    closeBtn.addEventListener('click', function() {
-      badge.style.display = 'none';
-      try {
-        localStorage.setItem(storageKey, 'true');
-      } catch (e) {
-        // ignore
-      }
-    });
+    // Initialize immediately or after DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initBadge);
+    } else {
+      initBadge();
+    }
   })();
 </script>
 `;
       
-      // Insert before </body>
-      const modifiedHtml = htmlContent.replace(/<\/body>/i, badgeHtml + '</body>');
+      // Insert after the React root div or before </body>
+      let modifiedHtml;
+      if (htmlContent.includes('<div id="root"></div>')) {
+        // For React apps, inject after the root div
+        modifiedHtml = htmlContent.replace('<div id="root"></div>', '<div id="root"></div>' + badgeHtml);
+      } else {
+        // For regular HTML, inject before </body>
+        modifiedHtml = htmlContent.replace(/<\/body>/i, badgeHtml + '</body>');
+      }
       responseBuffer = Buffer.from(modifiedHtml, 'utf-8');
     }
     

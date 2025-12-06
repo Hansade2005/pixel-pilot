@@ -680,7 +680,7 @@ export function AIPplatformTab({ user }: AIPplatformTabProps) {
                                     <CardHeader>
                                         <CardTitle className="text-white flex items-center">
                                             <Sparkles className="w-5 h-5 mr-2 text-purple-400" />
-                                            Welcome to PiPilot AI Platform
+                                            Welcome to PiPilot AI
                                         </CardTitle>
                                         <CardDescription className="text-gray-400">
                                             Create your first team to get started with AI API management.

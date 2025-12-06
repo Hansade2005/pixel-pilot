@@ -19,8 +19,11 @@ yarn-error.log*
 # env files
 #.env*
 
+
 # vercel
 .vercel
+.vscode/mcp.json
+.env
 
 # typescript
 *.tsbuildinfo
