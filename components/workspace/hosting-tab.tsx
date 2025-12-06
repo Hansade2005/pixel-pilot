@@ -238,12 +238,19 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
             To host your production site, you need to connect a custom domain first.
             Go to the Project settings to add and verify your custom domain.
           </p>
-          <Alert className="text-left">
+          <Alert className="text-left mb-4">
             <LinkIcon className="h-4 w-4" />
             <AlertDescription>
               Navigate to <strong>Project → Custom Domain</strong> section to connect your domain
             </AlertDescription>
           </Alert>
+          <Button
+            onClick={() => window.open(`/workspace/projects/${selectedProject.slug}`, '_blank')}
+            className="w-full"
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open Project Settings
+          </Button>
         </div>
       </div>
     )

@@ -72,26 +72,27 @@ export async function POST(req: Request) {
 
       console.log(`[Domain Manager] Domain verified: ${isVerified}, Misconfigured: ${isMisconfigured}`)
 
-      // Step 5: Add to Supabase custom_domains table (only if verified)
+      // Step 5: Add to Supabase custom_domains table
+      // Add domain even if misconfigured (DNS not pointed yet) - user needs the ID to verify/delete later
+      const { data: domainRecord, error: dbError } = await supabase
+        .from('custom_domains')
+        .insert({
+          domain: domain.toLowerCase().trim(),
+          project_id: projectId,
+          user_id: userId,
+          verified: isVerified && !isMisconfigured,
+          vercel_domain_id: addDomainResponse.name || domain,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('[Domain Manager] Database error:', dbError)
+        throw dbError
+      }
+
       if (isVerified && !isMisconfigured) {
-        const { data: domainRecord, error: dbError } = await supabase
-          .from('custom_domains')
-          .insert({
-            domain: domain.toLowerCase().trim(),
-            project_id: projectId,
-            user_id: userId,
-            verified: true,
-            vercel_domain_id: addDomainResponse.name || domain,
-            created_at: new Date().toISOString(),
-          })
-          .select()
-          .single()
-
-        if (dbError) {
-          console.error('[Domain Manager] Database error:', dbError)
-          throw dbError
-        }
-
         return NextResponse.json({
           success: true,
           verified: true,
@@ -104,17 +105,12 @@ export async function POST(req: Request) {
           },
         })
       } else {
-        // Domain added but not verified - return verification instructions
+        // Domain added but needs DNS configuration
         return NextResponse.json({
           success: true,
           verified: false,
           requiresVerification: true,
-          domain: {
-            domain: domain.toLowerCase().trim(),
-            project_id: projectId,
-            user_id: userId,
-            verified: false,
-          },
+          domain: domainRecord,
           verificationInstructions: {
             type: 'A',
             name: '@',
@@ -182,26 +178,40 @@ export async function DELETE(req: Request) {
     try {
       // Step 1 & 2: Remove from Vercel project AND delete from Vercel account
       // Following Vercel's multi-tenant guide - both operations in parallel
-      await Promise.all([
-        vercel.projects.removeProjectDomain({
-          idOrName: VERCEL_PROJECT_NAME,
-          teamId: VERCEL_TEAM_ID,
-          domain: domain.toLowerCase().trim(),
-        }),
-        vercel.domains.deleteDomain({
-          domain: domain.toLowerCase().trim(),
-          teamId: VERCEL_TEAM_ID,
-        }),
-      ])
-
-      console.log(`[Domain Manager] Domain removed from Vercel project and account`)
+      try {
+        await Promise.all([
+          vercel.projects.removeProjectDomain({
+            idOrName: VERCEL_PROJECT_NAME,
+            teamId: VERCEL_TEAM_ID,
+            domain: domain.toLowerCase().trim(),
+          }),
+          vercel.domains.deleteDomain({
+            domain: domain.toLowerCase().trim(),
+            teamId: VERCEL_TEAM_ID,
+          }),
+        ])
+        console.log(`[Domain Manager] Domain removed from Vercel project and account`)
+      } catch (vercelError: any) {
+        // Domain might already be deleted from Vercel - that's okay, continue to cleanup DB
+        if (vercelError.statusCode === 404) {
+          console.log(`[Domain Manager] Domain ${domain} not found in Vercel (already deleted)`)
+        } else {
+          throw vercelError
+        }
+      }
 
       // Step 3 (Final step): Remove from Supabase database
-      const { error: dbError } = await supabase
-        .from('custom_domains')
-        .delete()
-        .eq('id', domainId)
-        .eq('user_id', user.id)
+      // Use domain name instead of ID if ID is invalid/undefined
+      let query = supabase.from('custom_domains').delete()
+      
+      if (domainId && domainId !== 'undefined' && domainId !== 'null') {
+        query = query.eq('id', domainId)
+      } else {
+        // Fallback: use domain name to find and delete
+        query = query.eq('domain', domain.toLowerCase().trim())
+      }
+      
+      const { error: dbError } = await query.eq('user_id', user.id)
 
       if (dbError) {
         console.error('[Domain Manager] Database error:', dbError)
@@ -212,29 +222,43 @@ export async function DELETE(req: Request) {
         success: true,
         message: 'Domain disconnected successfully',
       })
-    } catch (vercelError: any) {
-      console.error('[Domain Manager] Vercel API error:', vercelError)
+    } catch (error: any) {
+      console.error('[Domain Manager] Error in DELETE:', error)
       
-      // If domain not found in Vercel, still remove from database
-      if (vercelError.statusCode === 404) {
-        const { error: dbError } = await supabase
-          .from('custom_domains')
-          .delete()
-          .eq('id', domainId)
-          .eq('user_id', user.id)
+      // If domain not found in Vercel, still try to remove from database
+      if (error.statusCode === 404) {
+        try {
+          let query = supabase.from('custom_domains').delete()
+          
+          if (domainId && domainId !== 'undefined' && domainId !== 'null') {
+            query = query.eq('id', domainId)
+          } else {
+            query = query.eq('domain', domain.toLowerCase().trim())
+          }
+          
+          const { error: dbError } = await query.eq('user_id', user.id)
 
-        if (!dbError) {
-          return NextResponse.json({
-            success: true,
-            message: 'Domain removed from database (not found in Vercel)',
-          })
+          if (!dbError) {
+            return NextResponse.json({
+              success: true,
+              message: 'Domain removed from database (already deleted from Vercel)',
+            })
+          }
+        } catch (cleanupError) {
+          console.error('[Domain Manager] Database cleanup error:', cleanupError)
         }
       }
 
-      throw vercelError
+      return NextResponse.json(
+        { 
+          error: 'Failed to remove domain', 
+          details: error.message || 'Unknown error' 
+        },
+        { status: 500 }
+      )
     }
   } catch (error: any) {
-    console.error('[Domain Manager] Error:', error)
+    console.error('[Domain Manager] Outer error:', error)
     return NextResponse.json(
       { 
         error: 'Failed to remove domain', 

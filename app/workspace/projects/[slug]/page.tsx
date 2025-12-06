@@ -221,7 +221,8 @@ export default function ProjectPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || 'Failed to connect domain')
+        const errorMsg = data.error || data.details || data.message || 'Failed to connect domain'
+        throw new Error(errorMsg)
       }
 
       if (data.verified) {
@@ -280,7 +281,8 @@ export default function ProjectPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || 'Verification failed')
+        const errorMsg = data.error || data.details || data.message || 'Verification failed'
+        throw new Error(errorMsg)
       }
 
       if (data.verified) {
@@ -327,7 +329,8 @@ export default function ProjectPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || 'Failed to disconnect domain')
+        const errorMsg = data.error || data.details || data.message || 'Failed to disconnect domain'
+        throw new Error(errorMsg)
       }
       
       setCustomDomainData(null)
