@@ -42,19 +42,62 @@ async function getCustomDomainSiteId(hostname: string, supabase: any): Promise<s
     return null;
   }
   
-  // Query custom_domains table
+  // Query custom_domains table with JOIN to sites table
+  // Only serve production sites for custom domains
   const { data, error } = await supabase
     .from('custom_domains')
-    .select('site_id')
+    .select('site_id, sites!inner(id, site_type, is_active)')
     .eq('domain', host)
     .eq('verified', true)
+    .eq('sites.site_type', 'production')
+    .eq('sites.is_active', true)
     .single();
   
   if (error || !data) {
+    console.log(`[Custom Domain] No production site found for ${host}`, error);
     return null;
   }
   
+  console.log(`[Custom Domain] Serving production site ${data.site_id} for ${host}`);
   return data.site_id;
+}
+
+// Get site by project_slug - prefer production over preview
+async function getSiteByProjectSlug(projectSlug: string, supabase: any): Promise<string | null> {
+  // Try production first
+  const { data: prodData, error: prodError } = await supabase
+    .from('sites')
+    .select('project_id')
+    .eq('project_slug', projectSlug)
+    .eq('site_type', 'production')
+    .eq('is_active', true)
+    .order('deployed_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!prodError && prodData) {
+    console.log(`[Project Slug] Found production site for ${projectSlug}: ${prodData.project_id}`);
+    return prodData.project_id;
+  }
+  
+  // Fallback to preview
+  const { data: previewData, error: previewError } = await supabase
+    .from('sites')
+    .select('project_id')
+    .eq('project_slug', projectSlug)
+    .eq('site_type', 'preview')
+    .eq('is_active', true)
+    .order('deployed_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (!previewError && previewData) {
+    console.log(`[Project Slug] Found preview site for ${projectSlug}: ${previewData.project_id}`);
+    return previewData.project_id;
+  }
+  
+  console.log(`[Project Slug] No active site found for ${projectSlug}`);
+  return null;
 }
 
 // Serves files from Supabase Storage bucket "sites" with SPA fallback
@@ -81,7 +124,9 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
       
       if (subdomain) {
         // Multi-tenant subdomain mode: subdomain.pipilot.dev/path
-        siteId = subdomain;
+        // Try to resolve as project_slug first, fallback to direct siteId
+        const resolvedSiteId = await getSiteByProjectSlug(subdomain, supabase);
+        siteId = resolvedSiteId || subdomain; // Use resolved or original
         // For subdomains, the path might start with the siteId due to middleware rewrite
         // Remove the siteId from the beginning if it matches
         filePath = path[0] === subdomain ? path.slice(1) : path;
@@ -90,8 +135,12 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
         if (path.length === 0) {
           return new NextResponse('Site ID required', { status: 400 });
         }
-        siteId = path[0]; // First segment is the siteId
-        filePath = path.slice(1); // Everything after siteId
+        const identifier = path[0]; // First segment could be siteId or project_slug
+        
+        // Try to resolve as project_slug first
+        const resolvedSiteId = await getSiteByProjectSlug(identifier, supabase);
+        siteId = resolvedSiteId || identifier; // Use resolved or treat as direct siteId
+        filePath = path.slice(1); // Everything after identifier
       }
     }
     
@@ -129,80 +178,10 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     const arrayBuffer = await data.arrayBuffer();
     const contentType = detectContentType(joinedPath);
     
-    let responseBuffer = Buffer.from(arrayBuffer);
+    const responseBuffer = Buffer.from(arrayBuffer);
     
-    // Inject built-on badge for HTML files
-    if (contentType.includes('text/html')) {
-      const htmlContent = responseBuffer.toString('utf-8');
-      const badgeHtml = `
-<div id="pipilot-badge" style="position: fixed; bottom: 16px; right: 16px; z-index: 9999; display: block;">
-  <div style="position: relative; display: inline-flex; align-items: center; background-color: rgb(17 24 39); color: white; border-radius: 9999px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); padding: 8px 12px; border: 1px solid rgb(255 255 255 / 0.1);">
-    <a href="https://pipilot.dev" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
-      <img src="https://pipilot.dev/logo.png" alt="piPilot" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover;" width="20" height="20" />
-      <span style="font-size: 12px; font-weight: 500;">Built on PiPilot</span>
-    </a>
-    <button id="close-badge" aria-label="Close built on badge" style="position: absolute; top: -8px; right: -8px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background-color: rgb(31 41 55); border: 1px solid rgb(255 255 255 / 0.1); width: 28px; height: 28px; cursor: pointer; color: white; font-size: 14px; line-height: 1;">
-      ×
-    </button>
-  </div>
-</div>
-<script>
-  (function() {
-    // Wait for DOM to be ready
-    function initBadge() {
-      const badge = document.getElementById('pipilot-badge');
-      const closeBtn = document.getElementById('close-badge');
-      
-      if (!badge || !closeBtn) {
-        // Retry after a short delay
-        setTimeout(initBadge, 100);
-        return;
-      }
-      
-      const storageKey = 'pipilot-built-on-badge-hidden';
-      
-      // Check if badge was previously hidden
-      try {
-        const hidden = localStorage.getItem(storageKey) === 'true';
-        if (hidden) {
-          badge.style.display = 'none';
-        }
-      } catch (e) {
-        // Show by default
-      }
-      
-      // Close badge handler
-      closeBtn.addEventListener('click', function() {
-        badge.style.display = 'none';
-        try {
-          localStorage.setItem(storageKey, 'true');
-        } catch (e) {
-          // ignore
-        }
-      });
-    }
-    
-    // Initialize immediately or after DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initBadge);
-    } else {
-      initBadge();
-    }
-  })();
-</script>
-`;
-      
-      // Insert after the React root div or before </body>
-      let modifiedHtml;
-      if (htmlContent.includes('<div id="root"></div>')) {
-        // For React apps, inject after the root div
-        modifiedHtml = htmlContent.replace('<div id="root"></div>', '<div id="root"></div>' + badgeHtml);
-      } else {
-        // For regular HTML, inject before </body>
-        modifiedHtml = htmlContent.replace(/<\/body>/i, badgeHtml + '</body>');
-      }
-      responseBuffer = Buffer.from(modifiedHtml, 'utf-8');
-    }
+    // Badge is now injected during upload phase, not at serve time
+    // This improves performance and ensures consistent rendering
     
     // Set appropriate cache headers
     const cacheControl = contentType.includes('html')

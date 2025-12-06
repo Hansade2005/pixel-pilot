@@ -6,6 +6,9 @@ import type { CookieOptions } from '@supabase/ssr'
 // Admin email for role-based access
 const ADMIN_EMAIL = 'hanscadx8@gmail.com'
 
+// Reserved subdomains that should NOT be treated as site subdomains
+const RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'admin', 'auth', 'dashboard']
+
 // Extract subdomain from hostname for multi-tenant routing
 function getSubdomain(hostname: string): string | null {
   // Remove port if present
@@ -16,13 +19,25 @@ function getSubdomain(hostname: string): string | null {
     return null;
   }
 
+  // Only apply subdomain routing for pipilot.dev domains
+  if (!host.endsWith('pipilot.dev')) {
+    return null;
+  }
+
   // Split by dots and check if we have a subdomain
   const parts = host.split('.');
 
-  // If we have more than 2 parts and it's not an IP, we have a subdomain
-  // e.g., subscontrol.pipilot.dev -> ['subscontrol', 'pipilot', 'dev']
-  if (parts.length > 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-    return parts[0]; // Return the first part as subdomain
+  // If we have more than 2 parts, we have a subdomain
+  // e.g., myproject.pipilot.dev -> ['myproject', 'pipilot', 'dev']
+  if (parts.length > 2) {
+    const subdomain = parts[0];
+    
+    // Skip reserved subdomains (main app routes)
+    if (RESERVED_SUBDOMAINS.includes(subdomain)) {
+      return null;
+    }
+    
+    return subdomain; // Return the first part as subdomain
   }
 
   return null; // No subdomain

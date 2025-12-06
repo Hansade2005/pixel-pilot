@@ -559,7 +559,8 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       const compressedData = await compressProjectFiles(filteredFiles, [], [], { 
         project,
         authUserId,
-        authUsername
+        authUsername,
+        isProduction: false // This is a preview site, should show badge
       })
 
       // Create a streaming request with EventSource-like handling

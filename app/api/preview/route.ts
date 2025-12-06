@@ -231,6 +231,54 @@ Output: <link href="./assets/style.css">`
 // AI-powered JavaScript asset path fixer for JS/TS files - REMOVED
 // This function has been removed to disable JS assets processing
 
+// Inject "Built on PiPilot" badge into HTML
+function injectPiPilotBadge(htmlContent: string): string {
+  const badgeHtml = `
+  <!-- PiPilot Badge -->
+  <a id="pipilot-badge" style="position: fixed; bottom: 10px; right: 10px; padding: 5px 17px 5px 9px; background-color: #111827; color: #fff; font-size: 12px; border-radius: 5px; font-family: sans-serif; display: flex; align-items: center; gap: 4px; z-index: 1000000; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15);" target="_blank" href="https://pipilot.dev?utm_source=pipilot-badge">
+    <span style="color: #b9b9bb;">Built on</span>
+    <svg width="60" height="14" viewBox="0 0 60 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="11" font-family="Arial, sans-serif" font-size="11" font-weight="600" fill="#fff">PiPilot</text>
+    </svg>
+    <button id="pipilot-badge-close" style="position: absolute; top: -2px; right: 5px; cursor: pointer; font-size: 14px; color: #A1A1AA; background: none; border: none; line-height: 1;">&times;</button>
+  </a>
+  <script>
+    (function() {
+      const badge = document.getElementById('pipilot-badge');
+      const closeBtn = document.getElementById('pipilot-badge-close');
+      const storageKey = 'pipilot-badge-hidden';
+      
+      // Check if badge was previously hidden
+      if (localStorage.getItem(storageKey) === 'true') {
+        badge.style.display = 'none';
+      }
+      
+      // Close badge handler
+      closeBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        badge.style.display = 'none';
+        localStorage.setItem(storageKey, 'true');
+      });
+    })();
+  </script>
+  <!-- End PiPilot Badge -->
+`;
+
+  // Try to inject before </body>
+  if (htmlContent.includes('</body>')) {
+    return htmlContent.replace('</body>', badgeHtml + '</body>');
+  }
+  
+  // Fallback: inject before </html>
+  if (htmlContent.includes('</html>')) {
+    return htmlContent.replace('</html>', badgeHtml + '</html>');
+  }
+  
+  // Last resort: append to end
+  return htmlContent + badgeHtml;
+}
+
 // AI-powered SEO metadata enhancer for HTML files
 export async function addSEOMetadata(htmlContent: string, projectSlug: string): Promise<string> {
   try {
@@ -379,7 +427,7 @@ async function collectAllFiles(e2bSandbox: any, dirPath: string): Promise<any[]>
   return allFiles
 }
 
-async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supabase: any) {
+async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supabase: any, isProduction: boolean = false) {
   try {
     console.log('[Vite Hosting] Starting upload of built files...')
     
@@ -418,7 +466,15 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
             // Then add comprehensive SEO metadata
             processedContent = await addSEOMetadata(processedContent, projectSlug)
             
-            console.log(`[Vite Hosting] AI processed and SEO enhanced HTML file ${relativePath}`)
+            // Only inject badge for preview sites (not production)
+            if (!isProduction) {
+              processedContent = injectPiPilotBadge(processedContent)
+              console.log(`[Vite Hosting] Badge injected for preview site: ${relativePath}`)
+            } else {
+              console.log(`[Vite Hosting] Skipping badge injection for production site: ${relativePath}`)
+            }
+            
+            console.log(`[Vite Hosting] AI processed and SEO enhanced for ${relativePath}`)
           } else if (relativePath.endsWith('.js') || relativePath.endsWith('.ts')) {
             console.log(`[Vite Hosting] Skipping JS/TS file ${relativePath} (JS assets processing disabled)`)
 
@@ -600,6 +656,8 @@ async function handleStreamingPreview(req: Request) {
     let files: any[]
     let authUserId: string | undefined
     let authUsername: string | undefined
+    let isProduction = false
+    let customDomainId: string | undefined
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -612,6 +670,8 @@ async function handleStreamingPreview(req: Request) {
       // Extract auth info from metadata if available
       authUserId = extractedData.metadata?.authUserId
       authUsername = extractedData.metadata?.authUsername
+      isProduction = extractedData.metadata?.isProduction || false
+      customDomainId = extractedData.metadata?.customDomainId
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data')
@@ -620,13 +680,17 @@ async function handleStreamingPreview(req: Request) {
         projectSlug: jsonProjectSlug, 
         files: jsonFiles,
         authUserId: parsedAuthUserId,
-        authUsername: parsedAuthUsername 
+        authUsername: parsedAuthUsername,
+        isProduction: jsonIsProduction,
+        customDomainId: jsonCustomDomainId
       } = await req.json()
       projectId = jsonProjectId
       projectSlug = jsonProjectSlug || projectId // fallback to projectId
       files = jsonFiles
       authUserId = parsedAuthUserId
       authUsername = parsedAuthUsername
+      isProduction = jsonIsProduction || false
+      customDomainId = jsonCustomDomainId
     }
 
     if (!projectId || !files?.length) {
@@ -795,7 +859,7 @@ async function handleStreamingPreview(req: Request) {
             send({ type: "log", message: "Build completed successfully" })
             
             // Upload built files to Supabase using the final slug
-            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, finalSlug, externalSupabase)
+            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, finalSlug, externalSupabase, isProduction)
             
             if (!uploadSuccess) {
               send({ type: "error", message: "Failed to upload built files to hosting" })
@@ -807,6 +871,63 @@ async function handleStreamingPreview(req: Request) {
             
             send({ type: "log", message: `Vite project hosted at: ${hostedUrl}` })
             
+            // Create or update site record in the sites table
+            if (authUserId) {
+              try {
+                const siteType = isProduction ? 'production' : 'preview';
+                const autoDelete = !isProduction;
+                
+                const { data: existingSite } = await externalSupabase
+                  .from('sites')
+                  .select('*')
+                  .eq('project_id', projectId)
+                  .eq('site_type', siteType)
+                  .eq('user_id', authUserId)
+                  .maybeSingle();
+                
+                if (existingSite) {
+                  await externalSupabase
+                    .from('sites')
+                    .update({
+                      url: hostedUrl,
+                      project_slug: finalSlug,
+                      custom_domain_id: customDomainId || null,
+                      last_updated: new Date().toISOString(),
+                      is_active: true
+                    })
+                    .eq('id', existingSite.id);
+                  
+                  send({ type: "log", message: `Updated ${siteType} site record` });
+                } else {
+                  await externalSupabase
+                    .from('sites')
+                    .insert({
+                      user_id: authUserId,
+                      project_id: projectId,
+                      project_slug: finalSlug,
+                      site_type: siteType,
+                      url: hostedUrl,
+                      custom_domain_id: customDomainId || null,
+                      is_active: true,
+                      auto_delete: autoDelete,
+                      deployed_at: new Date().toISOString(),
+                      metadata: { framework: 'vite', deployed_from: 'pixelpilot' }
+                    });
+                  
+                  send({ type: "log", message: `Created ${siteType} site record` });
+                }
+                
+                if (customDomainId) {
+                  await externalSupabase
+                    .from('custom_domains')
+                    .update({ site_id: existingSite?.id })
+                    .eq('id', customDomainId);
+                }
+              } catch (siteError) {
+                send({ type: "error", message: `Site record error: ${siteError}` });
+              }
+            }
+            
             send({
               type: "ready",
               message: "Vite project hosted successfully",
@@ -815,7 +936,8 @@ async function handleStreamingPreview(req: Request) {
               finalSlug: finalSlug,
               originalSlug: originalSlug,
               processId: null,
-              hosted: true
+              hosted: true,
+              isProduction: isProduction
             })
 
             // Keep-alive heartbeat for hosted projects too
@@ -910,6 +1032,9 @@ async function handleRegularPreview(req: Request) {
     let authUserId: string | undefined
     let authUsername: string | undefined
 
+    let isProduction = false;
+    let customDomainId: string | undefined;
+
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
       console.log('[Preview] 📦 Received compressed binary data for regular preview')
@@ -921,6 +1046,8 @@ async function handleRegularPreview(req: Request) {
       // Extract auth info from metadata if available
       authUserId = extractedData.metadata?.authUserId
       authUsername = extractedData.metadata?.authUsername
+      isProduction = extractedData.metadata?.isProduction || false
+      customDomainId = extractedData.metadata?.customDomainId
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data for regular preview')
@@ -929,13 +1056,17 @@ async function handleRegularPreview(req: Request) {
         projectSlug: jsonProjectSlug, 
         files: jsonFiles,
         authUserId: parsedAuthUserId,
-        authUsername: parsedAuthUsername 
+        authUsername: parsedAuthUsername,
+        isProduction: jsonIsProduction,
+        customDomainId: jsonCustomDomainId
       } = await req.json()
       projectId = jsonProjectId
       projectSlug = jsonProjectSlug || projectId // fallback to projectId
       files = jsonFiles
       authUserId = parsedAuthUserId
       authUsername = parsedAuthUsername
+      isProduction = jsonIsProduction || false
+      customDomainId = jsonCustomDomainId
     }
 
     if (!projectId) {
@@ -1195,7 +1326,7 @@ devDependencies:
         console.log('[Preview] Build completed successfully')
         
         // Upload built files to Supabase
-        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, finalSlug, externalSupabase)
+        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, finalSlug, externalSupabase, isProduction)
         
         if (!uploadSuccess) {
           throw new Error('Failed to upload built files to hosting')
@@ -1206,13 +1337,71 @@ devDependencies:
         
         console.log(`[Preview] Vite project hosted at: ${hostedUrl}`)
         
+        // Create or update site record in the sites table
+        if (authUserId) {
+          try {
+            const siteType = isProduction ? 'production' : 'preview';
+            const autoDelete = !isProduction;
+            
+            const { data: existingSite } = await externalSupabase
+              .from('sites')
+              .select('*')
+              .eq('project_id', projectId)
+              .eq('site_type', siteType)
+              .eq('user_id', authUserId)
+              .maybeSingle();
+            
+            if (existingSite) {
+              await externalSupabase
+                .from('sites')
+                .update({
+                  url: hostedUrl,
+                  project_slug: finalSlug,
+                  custom_domain_id: customDomainId || null,
+                  last_updated: new Date().toISOString(),
+                  is_active: true
+                })
+                .eq('id', existingSite.id);
+              
+              console.log(`[Site Record] Updated ${siteType} site for project ${projectId}`);
+            } else {
+              await externalSupabase
+                .from('sites')
+                .insert({
+                  user_id: authUserId,
+                  project_id: projectId,
+                  project_slug: finalSlug,
+                  site_type: siteType,
+                  url: hostedUrl,
+                  custom_domain_id: customDomainId || null,
+                  is_active: true,
+                  auto_delete: autoDelete,
+                  deployed_at: new Date().toISOString(),
+                  metadata: { framework: 'vite', deployed_from: 'pixelpilot' }
+                });
+              
+              console.log(`[Site Record] Created ${siteType} site for project ${projectId}`);
+            }
+            
+            if (customDomainId) {
+              await externalSupabase
+                .from('custom_domains')
+                .update({ site_id: existingSite?.id })
+                .eq('id', customDomainId);
+            }
+          } catch (siteError) {
+            console.error('[Site Record] Error:', siteError);
+          }
+        }
+        
         return Response.json({
           sandboxId: sandbox.id,
           url: hostedUrl,
           finalSlug: finalSlug,
           originalSlug: originalSlug,
-          processId: null, // No process for hosted version
-          hosted: true // Flag to indicate this is hosted
+          processId: null,
+          hosted: true,
+          isProduction: isProduction
         })
       }
 

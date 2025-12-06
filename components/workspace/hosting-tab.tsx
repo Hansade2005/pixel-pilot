@@ -7,15 +7,14 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
+// Lucide React icons for UI
 import { 
   Globe, 
   ExternalLink, 
   RefreshCw, 
   AlertCircle, 
   CheckCircle,
-  Plus,
-  Trash2,
-  Copy,
+  Rocket,
   Link as LinkIcon
 } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
@@ -27,12 +26,17 @@ interface HostingTabProps {
   selectedProject: Workspace | null
 }
 
-interface ProjectHostingInfo {
-  customDomain: string | null
-  defaultDomain: string
-  isCustomDomainConnected: boolean
-  isCustomDomainVerified: boolean
-  customDomainAddedAt: string | null
+interface Site {
+  id: string
+  site_type: 'preview' | 'production'
+  url: string
+  deployed_at: string
+  is_active: boolean
+  custom_domain_id: string | null
+  custom_domains?: {
+    domain: string
+    verified: boolean
+  }
 }
 
 export function HostingTab({ user, selectedProject }: HostingTabProps) {
@@ -40,55 +44,45 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
   const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
-  const [hostingInfo, setHostingInfo] = useState<ProjectHostingInfo | null>(null)
-  const [newDomain, setNewDomain] = useState("")
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [isRemoving, setIsRemoving] = useState(false)
+  const [sites, setSites] = useState<Site[]>([])
+  const [customDomain, setCustomDomain] = useState<string | null>(null)
+  const [isDomainVerified, setIsDomainVerified] = useState(false)
 
   useEffect(() => {
     if (selectedProject?.id) {
-      loadHostingInfo()
+      loadSites()
+      loadCustomDomain()
     }
   }, [selectedProject?.id])
 
-  const loadHostingInfo = async () => {
+  const loadSites = async () => {
     if (!selectedProject?.id) return
 
     setLoading(true)
     try {
-      // Get custom domain from supabase_projects table
       const { data, error } = await supabase
-        .from('supabase_projects')
-        .select('custom_domain, custom_domain_verified, custom_domain_added_at')
-        .eq('pixelpilot_project_id', selectedProject.id)
+        .from('sites')
+        .select('*, custom_domains(domain, verified)')
+        .eq('project_id', selectedProject.id)
         .eq('user_id', user.id)
-        .single()
+        .order('deployed_at', { ascending: false })
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading hosting info:', error)
+      if (error) {
+        console.error('Error loading sites:', error)
         toast({
           title: "Error",
-          description: "Failed to load hosting information",
+          description: "Failed to load sites",
           variant: "destructive",
         })
         return
       }
 
-      const customDomain = data?.custom_domain || null
-      const defaultDomain = `${selectedProject.id}.pipilot.dev`
-
-      setHostingInfo({
-        customDomain,
-        defaultDomain,
-        isCustomDomainConnected: !!customDomain,
-        isCustomDomainVerified: data?.custom_domain_verified || false,
-        customDomainAddedAt: data?.custom_domain_added_at || null
-      })
+      setSites(data || [])
     } catch (error) {
-      console.error('Error loading hosting info:', error)
+      console.error('Error loading sites:', error)
       toast({
         title: "Error",
-        description: "Failed to load hosting information",
+        description: "Failed to load sites",
         variant: "destructive",
       })
     } finally {
@@ -96,119 +90,34 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
     }
   }
 
-  const connectCustomDomain = async () => {
-    if (!newDomain.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a domain name",
-        variant: "destructive",
-      })
-      return
-    }
-
+  const loadCustomDomain = async () => {
     if (!selectedProject?.id) return
 
-    // Basic domain validation
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
-    if (!domainRegex.test(newDomain)) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid domain name",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsConnecting(true)
     try {
-      // Update custom_domain in supabase_projects
-      const { error } = await supabase
+      const { data } = await supabase
         .from('supabase_projects')
-        .update({ 
-          custom_domain: newDomain.trim(),
-          custom_domain_verified: false,
-          custom_domain_added_at: new Date().toISOString()
-        })
+        .select('custom_domain, custom_domain_verified')
         .eq('pixelpilot_project_id', selectedProject.id)
         .eq('user_id', user.id)
+        .single()
 
-      if (error) {
-        // If no existing row, insert one
-        if (error.code === 'PGRST116') {
-          const { error: insertError } = await supabase
-            .from('supabase_projects')
-            .insert({
-              pixelpilot_project_id: selectedProject.id,
-              user_id: user.id,
-              supabase_project_id: 'N/A',
-              supabase_project_name: selectedProject.name || 'Project',
-              custom_domain: newDomain.trim(),
-              custom_domain_verified: false,
-              custom_domain_added_at: new Date().toISOString()
-            })
-
-          if (insertError) throw insertError
-        } else {
-          throw error
-        }
+      if (data?.custom_domain) {
+        setCustomDomain(data.custom_domain)
+        setIsDomainVerified(data.custom_domain_verified || false)
       }
-
-      toast({
-        title: "Success",
-        description: `Custom domain ${newDomain} connected successfully`,
-      })
-
-      setNewDomain("")
-      loadHostingInfo()
     } catch (error) {
-      console.error('Error connecting custom domain:', error)
-      toast({
-        title: "Error",
-        description: "Failed to connect custom domain",
-        variant: "destructive",
-      })
-    } finally {
-      setIsConnecting(false)
+      console.error('Error loading custom domain:', error)
     }
   }
 
-  const removeCustomDomain = async () => {
-    if (!selectedProject?.id) return
-
-    if (!confirm('Are you sure you want to remove the custom domain?')) {
-      return
-    }
-
-    setIsRemoving(true)
-    try {
-      const { error } = await supabase
-        .from('supabase_projects')
-        .update({ 
-          custom_domain: null,
-          custom_domain_verified: false,
-          custom_domain_added_at: null
-        })
-        .eq('pixelpilot_project_id', selectedProject.id)
-        .eq('user_id', user.id)
-
-      if (error) throw error
-
-      toast({
-        title: "Success",
-        description: "Custom domain removed successfully",
-      })
-
-      loadHostingInfo()
-    } catch (error) {
-      console.error('Error removing custom domain:', error)
-      toast({
-        title: "Error",
-        description: "Failed to remove custom domain",
-        variant: "destructive",
-      })
-    } finally {
-      setIsRemoving(false)
-    }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   const copyToClipboard = (text: string) => {
@@ -241,6 +150,9 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
     )
   }
 
+  const previewSites = sites.filter(s => s.site_type === 'preview')
+  const productionSites = sites.filter(s => s.site_type === 'production')
+
   return (
     <div className="h-full overflow-auto p-6">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -248,193 +160,149 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Globe className="h-6 w-6" />
-            Project Hosting
+            Site Management
           </h2>
           <p className="text-muted-foreground mt-1">
-            Manage custom domains for {selectedProject.name || 'your project'}
+            View and manage all deployed sites for {selectedProject.name || 'your project'}
           </p>
         </div>
 
-        {/* Default Domain Card */}
+        {/* Production Sites */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Default Domain
+              <Globe className="h-5 w-5 text-green-500" />
+              Production Sites
             </CardTitle>
             <CardDescription>
-              Your project is automatically available at this domain
+              Live sites available to everyone
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <code className="text-sm font-mono">{hostingInfo?.defaultDomain}</code>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(`https://${hostingInfo?.defaultDomain}`)}
-                >
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(`https://${hostingInfo?.defaultDomain}`, '_blank')}
-                >
-                  <ExternalLink className="h-3 w-3 mr-1" />
-                  Visit
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Custom Domain Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <LinkIcon className="h-5 w-5" />
-              Custom Domain
-            </CardTitle>
-            <CardDescription>
-              Connect your own domain to this project for a professional appearance
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {hostingInfo?.isCustomDomainConnected ? (
-              <div>
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg mb-4">
-                  <div className="flex items-center gap-2">
-                    {hostingInfo.isCustomDomainVerified ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-yellow-500" />
-                    )}
-                    <code className="text-sm font-mono">{hostingInfo.customDomain}</code>
-                    {hostingInfo.isCustomDomainVerified ? (
-                      <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
-                        Verified
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
-                        Pending Verification
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
+            {productionSites.length > 0 ? (
+              <div className="space-y-3">
+                {productionSites.map((site) => (
+                  <div key={site.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <a 
+                          href={site.url} 
+                          target="_blank"
+                          className="text-blue-600 hover:underline font-mono text-sm"
+                        >
+                          {site.url}
+                        </a>
+                        <Badge variant={site.is_active ? 'default' : 'secondary'}>
+                          {site.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      {site.custom_domains && (
+                        <div className="flex items-center gap-2 ml-6 text-sm">
+                          <LinkIcon className="h-3 w-3 text-purple-500" />
+                          <span className="text-muted-foreground">Custom domain:</span>
+                          <span className="font-mono">{site.custom_domains.domain}</span>
+                          {site.custom_domains.verified ? (
+                            <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                              Verified
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground ml-6 mt-1">
+                        Deployed {formatDate(site.deployed_at)}
+                      </p>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => copyToClipboard(`https://${hostingInfo.customDomain}`)}
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copy
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`https://${hostingInfo.customDomain}`, '_blank')}
+                      onClick={() => window.open(site.url, '_blank')}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Visit
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={removeCustomDomain}
-                      disabled={isRemoving}
-                    >
-                      {isRemoving ? (
-                        <RefreshCw className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <>
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Remove
-                        </>
-                      )}
-                    </Button>
                   </div>
-                </div>
-
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Make sure your DNS records point to your hosting provider.
-                    For full domain management including DNS verification, visit the{' '}
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto"
-                      onClick={() => window.location.href = `/sites/${selectedProject.id}/domains`}
-                    >
-                      Domain Management Page
-                    </Button>
-                  </AlertDescription>
-                </Alert>
+                ))}
               </div>
             ) : (
-              <div>
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    placeholder="example.com"
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && connectCustomDomain()}
-                  />
-                  <Button
-                    onClick={connectCustomDomain}
-                    disabled={isConnecting}
-                  >
-                    {isConnecting ? (
-                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Plus className="h-4 w-4 mr-2" />
-                    )}
-                    Connect
-                  </Button>
-                </div>
-
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    After connecting a custom domain, you'll need to configure DNS records.
-                    Visit the{' '}
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto"
-                      onClick={() => window.location.href = `/sites/${selectedProject.id}/domains`}
-                    >
-                      Domain Management Page
-                    </Button>
-                    {' '}for detailed DNS instructions and verification.
-                  </AlertDescription>
-                </Alert>
+              <div className="text-center py-8 text-muted-foreground">
+                <Globe className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No production sites deployed yet</p>
+                <p className="text-sm mt-1">Deploy your project to production from the project page</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Info Card */}
-        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-          <CardContent className="pt-6">
-            <div className="flex gap-3">
-              <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
-                <p className="font-medium">About Custom Domains</p>
-                <ul className="space-y-1 list-disc list-inside">
-                  <li>Free custom domains for all projects</li>
-                  <li>Automatic SSL certificates</li>
-                  <li>DNS configuration required at your registrar</li>
-                  <li>Full verification and management in Domain Management page</li>
-                </ul>
+        {/* Preview Sites */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Rocket className="h-5 w-5 text-blue-500" />
+              Preview Sites
+            </CardTitle>
+            <CardDescription>
+              Temporary sites for testing (auto-deleted after 7 days)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {previewSites.length > 0 ? (
+              <div className="space-y-3">
+                {previewSites.map((site) => (
+                  <div key={site.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="h-4 w-4 text-blue-500" />
+                        <a 
+                          href={site.url} 
+                          target="_blank"
+                          className="text-blue-600 hover:underline font-mono text-sm"
+                        >
+                          {site.url}
+                        </a>
+                        <Badge variant={site.is_active ? 'default' : 'secondary'}>
+                          {site.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground ml-6">
+                        Deployed {formatDate(site.deployed_at)}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(site.url, '_blank')}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Visit
+                    </Button>
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Rocket className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No preview sites deployed yet</p>
+                <p className="text-sm mt-1">Deploy a preview from the project page to test your changes</p>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Custom Domain Info */}
+        {customDomain && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Custom domain <code className="font-mono">{customDomain}</code> is {isDomainVerified ? 'verified' : 'pending verification'}.
+              To link it to a production site, deploy to production from the project page.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
     </div>
   )

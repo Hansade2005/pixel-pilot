@@ -61,6 +61,10 @@ export default function ProjectPage() {
     isSecret: false
   })
   const [showAddEnvForm, setShowAddEnvForm] = useState(false)
+  const [previewSite, setPreviewSite] = useState<any>(null)
+  const [productionSite, setProductionSite] = useState<any>(null)
+  const [isDeploying, setIsDeploying] = useState(false)
+  const [deploymentType, setDeploymentType] = useState<'preview' | 'production'>('preview')
 
   useEffect(() => {
     getCurrentUser()
@@ -133,6 +137,9 @@ export default function ProjectPage() {
         recentActivity
       })
 
+      // Load sites (preview and production)
+      await loadSites(foundProject.id)
+
     } catch (error) {
       console.error('Error loading project:', error)
       toast({
@@ -142,6 +149,97 @@ export default function ProjectPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadSites = async (projectId: string) => {
+    try {
+      const supabase = createClient()
+      
+      // Load preview site
+      const { data: previewData } = await supabase
+        .from('sites')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('site_type', 'preview')
+        .eq('user_id', currentUserId)
+        .order('deployed_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      setPreviewSite(previewData)
+      
+      // Load production site
+      const { data: productionData } = await supabase
+        .from('sites')
+        .select('*, custom_domains(domain, verified)')
+        .eq('project_id', projectId)
+        .eq('site_type', 'production')
+        .eq('user_id', currentUserId)
+        .single()
+      
+      setProductionSite(productionData)
+    } catch (error) {
+      console.error('Error loading sites:', error)
+    }
+  }
+
+  const deployProject = async (isProduction: boolean) => {
+    if (!project?.id) return
+
+    setIsDeploying(true)
+    setDeploymentType(isProduction ? 'production' : 'preview')
+
+    try {
+      // Get project files from storage
+      const files = await storageManager.getFiles(project.id)
+      
+      if (!files || files.length === 0) {
+        toast({
+          title: "No Files",
+          description: "Project has no files to deploy",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Call preview API with isProduction parameter
+      const response = await fetch('/api/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          projectSlug: project.slug,
+          files,
+          authUserId: currentUserId,
+          authUsername: project.name || 'user',
+          isProduction,
+          customDomainId: isProduction && productionSite?.custom_domain_id ? productionSite.custom_domain_id : undefined
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.url) {
+        toast({
+          title: isProduction ? "Production Deployed!" : "Preview Deployed!",
+          description: `Site is live at ${data.url}`
+        })
+        
+        // Reload sites
+        await loadSites(project.id)
+      } else {
+        throw new Error(data.error || 'Deployment failed')
+      }
+    } catch (error) {
+      console.error('Deployment error:', error)
+      toast({
+        title: "Deployment Failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive"
+      })
+    } finally {
+      setIsDeploying(false)
     }
   }
 
@@ -466,16 +564,136 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 mb-6">
-              <Button
-                onClick={() => router.push(`/workspace/deployment?project=${project.id}`)}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Rocket className="h-4 w-4 mr-2" />
-                Deploy Project
-              </Button>
+            {/* Deployment Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Preview Deployment */}
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Rocket className="h-5 w-5 text-blue-400" />
+                    <span>Preview Site</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Test your changes before going live
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {previewSite ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-400">Preview URL</p>
+                          <a 
+                            href={previewSite.url} 
+                            target="_blank"
+                            className="text-blue-400 hover:underline text-sm truncate block"
+                          >
+                            {previewSite.url}
+                          </a>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(previewSite.url, '_blank')}
+                          className="ml-2 flex-shrink-0"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">Last deployed</span>
+                        <span className="text-white">{formatDate(previewSite.deployed_at)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No preview deployed yet</p>
+                  )}
+                  <Button
+                    onClick={() => deployProject(false)}
+                    disabled={isDeploying}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isDeploying && deploymentType === 'preview' ? (
+                      <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Deploying...</>
+                    ) : (
+                      <><Rocket className="h-4 w-4 mr-2" />Deploy Preview</>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
 
+              {/* Production Deployment */}
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Globe className="h-5 w-5 text-green-400" />
+                    <span>Production Site</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Your live site available to everyone
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {productionSite ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-400">Production URL</p>
+                          <a 
+                            href={productionSite.url} 
+                            target="_blank"
+                            className="text-green-400 hover:underline text-sm truncate block"
+                          >
+                            {productionSite.url}
+                          </a>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(productionSite.url, '_blank')}
+                          className="ml-2 flex-shrink-0"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {productionSite.custom_domains && (
+                        <div className="p-3 bg-purple-900/20 border border-purple-700 rounded">
+                          <p className="text-xs text-purple-400 mb-1">Custom Domain</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-white">{productionSite.custom_domains.domain}</span>
+                            {productionSite.custom_domains.verified ? (
+                              <Badge variant="default" className="bg-green-600">Verified</Badge>
+                            ) : (
+                              <Badge variant="secondary">Pending</Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">Last deployed</span>
+                        <span className="text-white">{formatDate(productionSite.deployed_at)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No production site deployed yet</p>
+                  )}
+                  <Button
+                    onClick={() => deployProject(true)}
+                    disabled={isDeploying}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {isDeploying && deploymentType === 'production' ? (
+                      <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Deploying...</>
+                    ) : (
+                      <><Globe className="h-4 w-4 mr-2" />{productionSite ? 'Update Production' : 'Deploy to Production'}</>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex flex-wrap gap-3 mb-6">
               <Button
                 onClick={() => router.push(`/workspace/${project.id}/database`)}
                 className="bg-purple-600 hover:bg-purple-700"
@@ -484,28 +702,6 @@ export default function ProjectPage() {
                 <span className="hidden sm:inline">Database</span>
                 <span className="sm:hidden">DB</span>
               </Button>
-
-              {project.vercelDeploymentUrl && (
-                <Button
-                  variant="outline"
-                  onClick={() => window.open(project.vercelDeploymentUrl, '_blank')}
-                  className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View on Vercel
-                </Button>
-              )}
-
-              {project.netlifyDeploymentUrl && (
-                <Button
-                  variant="outline"
-                  onClick={() => window.open(project.netlifyDeploymentUrl, '_blank')}
-                  className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View on Netlify
-                </Button>
-              )}
 
               <Button
                 variant="outline"
