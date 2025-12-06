@@ -65,6 +65,10 @@ export default function ProjectPage() {
   const [productionSite, setProductionSite] = useState<any>(null)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploymentType, setDeploymentType] = useState<'preview' | 'production'>('preview')
+  const [isViteProject, setIsViteProject] = useState(false)
+  const [customDomainData, setCustomDomainData] = useState<any>(null)
+  const [newDomain, setNewDomain] = useState('')
+  const [isDomainLoading, setIsDomainLoading] = useState(false)
 
   useEffect(() => {
     getCurrentUser()
@@ -91,12 +95,34 @@ export default function ProjectPage() {
     }
   }
 
+  const detectFramework = async (projectId: string) => {
+    try {
+      await storageManager.init()
+      const files = await storageManager.getFiles(projectId)
+      
+      // Check for Vite config files
+      const hasViteConfig = files.some((f: any) => 
+        f.path === 'vite.config.js' || 
+        f.path === 'vite.config.ts' || 
+        f.path === 'vite.config.mjs'
+      )
+      
+      setIsViteProject(hasViteConfig)
+      return hasViteConfig
+    } catch (error) {
+      console.error('Error detecting framework:', error)
+      return false
+    }
+  }
+
   const loadProject = async () => {
     if (!slug || typeof slug !== 'string') return
 
     setIsLoading(true)
     try {
       await storageManager.init()
+      
+      // Detect framework first
 
       // Load projects
       const projects = await storageManager.getWorkspaces(currentUserId)
@@ -139,6 +165,12 @@ export default function ProjectPage() {
 
       // Load sites (preview and production)
       await loadSites(foundProject.id)
+      
+      // Detect framework
+      await detectFramework(foundProject.id)
+      
+      // Load custom domain
+      await loadCustomDomain(foundProject.id)
 
     } catch (error) {
       console.error('Error loading project:', error)
@@ -149,6 +181,119 @@ export default function ProjectPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadCustomDomain = async (projectId: string) => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('custom_domains')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('user_id', currentUserId)
+        .maybeSingle()
+      
+      setCustomDomainData(data)
+    } catch (error) {
+      console.error('Error loading custom domain:', error)
+    }
+  }
+
+  const connectDomain = async () => {
+    if (!newDomain || !project) return
+    
+    setIsDomainLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('custom_domains')
+        .insert({
+          domain: newDomain.toLowerCase().trim(),
+          project_id: project.id,
+          user_id: currentUserId,
+          verified: false
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      setCustomDomainData(data)
+      setNewDomain('')
+      toast({
+        title: "Domain Connected",
+        description: "Please configure DNS settings to verify your domain"
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to connect domain",
+        variant: "destructive"
+      })
+    } finally {
+      setIsDomainLoading(false)
+    }
+  }
+
+  const verifyDomain = async () => {
+    if (!customDomainData) return
+    
+    setIsDomainLoading(true)
+    try {
+      // Simple DNS verification - check if domain resolves
+      const response = await fetch(`https://${customDomainData.domain}`, { method: 'HEAD' })
+      
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('custom_domains')
+        .update({ verified: true })
+        .eq('id', customDomainData.id)
+      
+      if (error) throw error
+      
+      setCustomDomainData({ ...customDomainData, verified: true })
+      toast({
+        title: "Domain Verified",
+        description: "Your domain is now active"
+      })
+    } catch (error) {
+      toast({
+        title: "Verification Failed",
+        description: "Please check your DNS settings and try again",
+        variant: "destructive"
+      })
+    } finally {
+      setIsDomainLoading(false)
+    }
+  }
+
+  const disconnectDomain = async () => {
+    if (!customDomainData) return
+    
+    setIsDomainLoading(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('custom_domains')
+        .delete()
+        .eq('id', customDomainData.id)
+      
+      if (error) throw error
+      
+      setCustomDomainData(null)
+      toast({
+        title: "Domain Disconnected",
+        description: "Your domain has been removed from this project"
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to disconnect domain",
+        variant: "destructive"
+      })
+    } finally {
+      setIsDomainLoading(false)
     }
   }
 
@@ -564,133 +709,123 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Deployment Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {/* Preview Deployment */}
-              <Card className="bg-gray-800 border-gray-700">
+            {/* Custom Domain Connection - Only for Vite projects */}
+            {isViteProject && (
+              <Card className="bg-gray-800 border-gray-700 mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-white">
-                    <Rocket className="h-5 w-5 text-blue-400" />
-                    <span>Preview Site</span>
+                    <Globe className="h-5 w-5 text-purple-400" />
+                    <span>Custom Domain</span>
                   </CardTitle>
                   <CardDescription className="text-gray-400">
-                    Test your changes before going live
+                    Connect your own domain to this project
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {previewSite ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-400">Preview URL</p>
-                          <a 
-                            href={previewSite.url} 
-                            target="_blank"
-                            className="text-blue-400 hover:underline text-sm truncate block"
-                          >
-                            {previewSite.url}
-                          </a>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(previewSite.url, '_blank')}
-                          className="ml-2 flex-shrink-0"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-400">Last deployed</span>
-                        <span className="text-white">{formatDate(previewSite.deployed_at)}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-400">No preview deployed yet</p>
-                  )}
-                  <Button
-                    onClick={() => deployProject(false)}
-                    disabled={isDeploying}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                  >
-                    {isDeploying && deploymentType === 'preview' ? (
-                      <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Deploying...</>
-                    ) : (
-                      <><Rocket className="h-4 w-4 mr-2" />Deploy Preview</>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Production Deployment */}
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-white">
-                    <Globe className="h-5 w-5 text-green-400" />
-                    <span>Production Site</span>
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Your live site available to everyone
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {productionSite ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-400">Production URL</p>
-                          <a 
-                            href={productionSite.url} 
-                            target="_blank"
-                            className="text-green-400 hover:underline text-sm truncate block"
-                          >
-                            {productionSite.url}
-                          </a>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(productionSite.url, '_blank')}
-                          className="ml-2 flex-shrink-0"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      {productionSite.custom_domains && (
-                        <div className="p-3 bg-purple-900/20 border border-purple-700 rounded">
-                          <p className="text-xs text-purple-400 mb-1">Custom Domain</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-white">{productionSite.custom_domains.domain}</span>
-                            {productionSite.custom_domains.verified ? (
-                              <Badge variant="default" className="bg-green-600">Verified</Badge>
+                  {customDomainData ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-700 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-purple-400" />
+                            <span className="text-white font-mono text-sm">{customDomainData.domain}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {customDomainData.verified ? (
+                              <Badge className="bg-green-600">Verified</Badge>
                             ) : (
                               <Badge variant="secondary">Pending</Badge>
                             )}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={disconnectDomain}
+                              disabled={isDomainLoading}
+                            >
+                              Disconnect
+                            </Button>
                           </div>
                         </div>
-                      )}
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-400">Last deployed</span>
-                        <span className="text-white">{formatDate(productionSite.deployed_at)}</span>
+                        
+                        {!customDomainData.verified && (
+                          <div className="space-y-3 mt-4 p-3 bg-gray-800 rounded">
+                            <p className="text-sm text-gray-300 font-medium">DNS Configuration Required</p>
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Type:</span>
+                                <code className="text-blue-400">CNAME</code>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Name:</span>
+                                <code className="text-blue-400">@</code>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Value:</span>
+                                <code className="text-blue-400">{productionSite?.project_slug}.pipilot.dev</code>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={verifyDomain}
+                              disabled={isDomainLoading}
+                              className="w-full mt-3"
+                              size="sm"
+                            >
+                              {isDomainLoading ? (
+                                <><RefreshCw className="h-3 w-3 mr-2 animate-spin" />Verifying...</>
+                              ) : (
+                                <><CheckCircle className="h-3 w-3 mr-2" />Verify DNS</>
+                              )}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">No production site deployed yet</p>
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="yourdomain.com"
+                          value={newDomain}
+                          onChange={(e) => setNewDomain(e.target.value)}
+                          className="bg-gray-700 border-gray-600 text-white"
+                        />
+                        <Button
+                          onClick={connectDomain}
+                          disabled={isDomainLoading || !newDomain}
+                          className="bg-purple-600 hover:bg-purple-700"
+                        >
+                          {isDomainLoading ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Connect"
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        You'll need to configure DNS settings after connecting
+                      </p>
+                    </div>
                   )}
-                  <Button
-                    onClick={() => deployProject(true)}
-                    disabled={isDeploying}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    {isDeploying && deploymentType === 'production' ? (
-                      <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Deploying...</>
-                    ) : (
-                      <><Globe className="h-4 w-4 mr-2" />{productionSite ? 'Update Production' : 'Deploy to Production'}</>
-                    )}
-                  </Button>
                 </CardContent>
               </Card>
-            </div>
+            )}
+
+            {!isViteProject && (
+              <Card className="bg-gray-800 border-gray-700 mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <AlertCircle className="h-5 w-5 text-yellow-400" />
+                    <span>Hosting Not Available</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-400">
+                    Custom hosting is currently only available for Vite projects. 
+                    This project appears to be using a different framework.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Quick Actions */}
             <div className="flex flex-wrap gap-3 mb-6">
