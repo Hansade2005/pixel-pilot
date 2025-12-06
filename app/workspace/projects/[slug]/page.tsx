@@ -26,7 +26,9 @@ import {
   GitBranch,
   Clock,
   Plus,
-  Database
+  Database,
+  Trash2,
+  CheckCircle2
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -205,27 +207,49 @@ export default function ProjectPage() {
     
     setIsDomainLoading(true)
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('custom_domains')
-        .insert({
+      // Step 1-4: Add to Vercel account, project, verify, and add to Supabase
+      const response = await fetch('/api/domains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           domain: newDomain.toLowerCase().trim(),
-          project_id: project.id,
-          user_id: currentUserId,
-          verified: false
+          projectId: project.id,
+          userId: currentUserId,
         })
-        .select()
-        .single()
-      
-      if (error) throw error
-      
-      setCustomDomainData(data)
-      setNewDomain('')
-      toast({
-        title: "Domain Connected",
-        description: "Please configure DNS settings to verify your domain"
       })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Failed to connect domain')
+      }
+
+      if (data.verified) {
+        // Domain verified immediately!
+        setCustomDomainData(data.domain)
+        setNewDomain('')
+        toast({
+          title: "🎉 Domain Connected!",
+          description: `${newDomain} is verified and active`
+        })
+      } else {
+        // Domain added but requires verification
+        setCustomDomainData({
+          ...data.domain,
+          verificationInstructions: data.verificationInstructions
+        })
+        setNewDomain('')
+        toast({
+          title: "Domain Added",
+          description: "Please configure DNS settings to verify your domain",
+          variant: "default"
+        })
+      }
+
+      // Reload sites to show updated domain info
+      await loadSites(project.id)
     } catch (error: any) {
+      console.error('Domain connection error:', error)
       toast({
         title: "Error",
         description: error.message || "Failed to connect domain",
@@ -241,26 +265,48 @@ export default function ProjectPage() {
     
     setIsDomainLoading(true)
     try {
-      // Simple DNS verification - check if domain resolves
-      const response = await fetch(`https://${customDomainData.domain}`, { method: 'HEAD' })
-      
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('custom_domains')
-        .update({ verified: true })
-        .eq('id', customDomainData.id)
-      
-      if (error) throw error
-      
-      setCustomDomainData({ ...customDomainData, verified: true })
-      toast({
-        title: "Domain Verified",
-        description: "Your domain is now active"
+      // Verify domain through Vercel API
+      const response = await fetch('/api/domains', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domainId: customDomainData.id,
+          domain: customDomainData.domain,
+          projectId: project?.id,
+          userId: currentUserId,
+        })
       })
-    } catch (error) {
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Verification failed')
+      }
+
+      if (data.verified) {
+        setCustomDomainData(data.domain)
+        toast({
+          title: "🎉 Domain Verified!",
+          description: "Your domain is now active and connected"
+        })
+      } else {
+        // Update verification instructions if provided
+        if (data.verificationInstructions) {
+          setCustomDomainData({
+            ...customDomainData,
+            verificationInstructions: data.verificationInstructions
+          })
+        }
+        toast({
+          title: "Verification Pending",
+          description: data.message || "Please check your DNS settings and try again",
+          variant: "default"
+        })
+      }
+    } catch (error: any) {
       toast({
         title: "Verification Failed",
-        description: "Please check your DNS settings and try again",
+        description: error.message || "Please check your DNS settings and try again",
         variant: "destructive"
       })
     } finally {
@@ -273,23 +319,26 @@ export default function ProjectPage() {
     
     setIsDomainLoading(true)
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('custom_domains')
-        .delete()
-        .eq('id', customDomainData.id)
-      
-      if (error) throw error
+      // Remove from Vercel and database
+      const response = await fetch(`/api/domains?id=${customDomainData.id}&domain=${customDomainData.domain}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Failed to disconnect domain')
+      }
       
       setCustomDomainData(null)
       toast({
         title: "Domain Disconnected",
-        description: "Your domain has been removed from this project"
+        description: "Your domain has been removed from Vercel and this project"
       })
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to disconnect domain",
+        description: error.message || "Failed to disconnect domain",
         variant: "destructive"
       })
     } finally {
@@ -724,58 +773,97 @@ export default function ProjectPage() {
                 <CardContent className="space-y-4">
                   {customDomainData ? (
                     <div className="space-y-4">
-                      <div className="p-4 bg-gray-700 rounded-lg">
+                      <div className="p-4 bg-gray-700 rounded-lg border-2 border-gray-600">
                         <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Globe className="h-4 w-4 text-purple-400" />
-                            <span className="text-white font-mono text-sm">{customDomainData.domain}</span>
+                          <div className="flex items-center gap-3">
+                            {customDomainData.verified ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-400" />
+                            ) : (
+                              <Clock className="h-5 w-5 text-yellow-400 animate-pulse" />
+                            )}
+                            <div>
+                              <span className="text-white font-mono text-sm block">{customDomainData.domain}</span>
+                              <span className="text-xs text-gray-400">
+                                {customDomainData.verified ? 'Active & Connected' : 'Pending Verification'}
+                              </span>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {customDomainData.verified ? (
-                              <Badge className="bg-green-600">Verified</Badge>
+                              <Badge className="bg-green-600 hover:bg-green-700">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Verified
+                              </Badge>
                             ) : (
-                              <Badge variant="secondary">Pending</Badge>
+                              <Badge variant="secondary" className="bg-yellow-600/20 text-yellow-400 border-yellow-600">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pending
+                              </Badge>
                             )}
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={disconnectDomain}
                               disabled={isDomainLoading}
+                              className="gap-1"
                             >
-                              Disconnect
+                              <Trash2 className="h-3 w-3" />
+                              Remove
                             </Button>
                           </div>
                         </div>
                         
                         {!customDomainData.verified && (
-                          <div className="space-y-3 mt-4 p-3 bg-gray-800 rounded">
-                            <p className="text-sm text-gray-300 font-medium">DNS Configuration Required</p>
-                            <div className="space-y-2 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Type:</span>
-                                <code className="text-blue-400">CNAME</code>
+                          <div className="space-y-3 mt-4 p-4 bg-gray-800 rounded border border-yellow-600/30">
+                            <div className="flex items-center gap-2 mb-2">
+                              <AlertCircle className="h-4 w-4 text-yellow-400" />
+                              <p className="text-sm text-yellow-400 font-medium">DNS Configuration Required</p>
+                            </div>
+                            <p className="text-xs text-gray-400 mb-3">
+                              The DNS records at your provider must match the following records to verify and connect your domain to PiPilot.
+                            </p>
+                            <div className="bg-gray-900/50 rounded-lg overflow-hidden border border-gray-700">
+                              <div className="grid grid-cols-3 gap-3 px-3 py-2 bg-gray-800/80 text-xs font-semibold text-gray-300">
+                                <div>Type</div>
+                                <div>Name</div>
+                                <div>Value</div>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Name:</span>
-                                <code className="text-blue-400">@</code>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Value:</span>
-                                <code className="text-blue-400">{productionSite?.project_slug}.pipilot.dev</code>
+                              <div className="grid grid-cols-3 gap-3 px-3 py-3 text-xs">
+                                <code className="text-blue-400 font-mono">
+                                  {customDomainData.verificationInstructions?.type || 'A'}
+                                </code>
+                                <code className="text-blue-400 font-mono">
+                                  {customDomainData.verificationInstructions?.name || '@'}
+                                </code>
+                                <code className="text-blue-400 font-mono break-all">
+                                  {customDomainData.verificationInstructions?.value || '76.76.21.21'}
+                                </code>
                               </div>
                             </div>
                             <Button
                               onClick={verifyDomain}
                               disabled={isDomainLoading}
-                              className="w-full mt-3"
+                              className="w-full mt-3 bg-green-600 hover:bg-green-700"
                               size="sm"
                             >
                               {isDomainLoading ? (
                                 <><RefreshCw className="h-3 w-3 mr-2 animate-spin" />Verifying...</>
                               ) : (
-                                <><CheckCircle className="h-3 w-3 mr-2" />Verify DNS</>
+                                <><CheckCircle2 className="h-3 w-3 mr-2" />Verify DNS Configuration</>
                               )}
                             </Button>
+                          </div>
+                        )}
+                        
+                        {customDomainData.verified && (
+                          <div className="mt-3 p-3 bg-green-900/20 border border-green-600/30 rounded flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
+                            <p className="text-xs text-green-400">
+                              Domain is verified and connected to Vercel. Your site is accessible at{' '}
+                              <a href={`https://${customDomainData.domain}`} target="_blank" className="underline hover:text-green-300">
+                                {customDomainData.domain}
+                              </a>
+                            </p>
                           </div>
                         )}
                       </div>
@@ -787,17 +875,17 @@ export default function ProjectPage() {
                           placeholder="yourdomain.com"
                           value={newDomain}
                           onChange={(e) => setNewDomain(e.target.value)}
-                          className="bg-gray-700 border-gray-600 text-white"
+                          className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400"
                         />
                         <Button
                           onClick={connectDomain}
                           disabled={isDomainLoading || !newDomain}
-                          className="bg-purple-600 hover:bg-purple-700"
+                          className="bg-purple-600 hover:bg-purple-700 gap-1"
                         >
                           {isDomainLoading ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
                           ) : (
-                            "Connect"
+                            <><Plus className="h-4 w-4" />Connect</>
                           )}
                         </Button>
                       </div>
