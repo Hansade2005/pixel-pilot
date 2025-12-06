@@ -88,7 +88,7 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
       const { data, error } = await supabase
         .from('custom_domains')
         .select('domain, verified')
-        .eq('project_id', selectedProject.id)
+        .eq('site_id', selectedProject.id)
         .eq('user_id', user.id)
         .eq('verified', true)
         .maybeSingle()
@@ -152,7 +152,7 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
       const { data } = await supabase
         .from('custom_domains')
         .select('domain, verified')
-        .eq('project_id', selectedProject.id)
+        .eq('site_id', selectedProject.id)
         .eq('user_id', user.id)
         .maybeSingle()
 

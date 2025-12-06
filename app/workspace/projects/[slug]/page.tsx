@@ -192,7 +192,7 @@ export default function ProjectPage() {
       const { data } = await supabase
         .from('custom_domains')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('site_id', projectId)
         .eq('user_id', currentUserId)
         .maybeSingle()
       

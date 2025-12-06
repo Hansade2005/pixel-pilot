@@ -78,10 +78,9 @@ export async function POST(req: Request) {
         .from('custom_domains')
         .insert({
           domain: domain.toLowerCase().trim(),
-          project_id: projectId,
+          site_id: projectId, // Fixed: use site_id instead of project_id
           user_id: userId,
           verified: isVerified && !isMisconfigured,
-          vercel_domain_id: addDomainResponse.name || domain,
           created_at: new Date().toISOString(),
         })
         .select()
