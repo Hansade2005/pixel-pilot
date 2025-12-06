@@ -116,11 +116,9 @@ export async function POST(req: Request) {
             verified: false,
           },
           verificationInstructions: {
-            type: configResponse.configuredBy === 'CNAME' ? 'CNAME' : 'TXT',
-            name: configResponse.configuredBy === 'CNAME' ? '@' : '_vercel',
-            value: configResponse.configuredBy === 'CNAME' 
-              ? `cname.vercel-dns.com` 
-              : 'vercel-dns-verification',
+            type: 'A',
+            name: '@',
+            value: '76.76.21.21',
           },
           message: 'Domain added, verification required',
           vercelData: {
@@ -179,25 +177,26 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log(`[Domain Manager] Removing domain ${domain} from Vercel project...`)
+    console.log(`[Domain Manager] Removing domain ${domain} from Vercel...`)
 
     try {
-      // Step 1: Remove from Vercel project
-      await vercel.projects.removeProjectDomain({
-        idOrName: VERCEL_PROJECT_NAME,
-        teamId: VERCEL_TEAM_ID,
-        domain: domain.toLowerCase().trim(),
-      })
+      // Step 1 & 2: Remove from Vercel project AND delete from Vercel account
+      // Following Vercel's multi-tenant guide - both operations in parallel
+      await Promise.all([
+        vercel.projects.removeProjectDomain({
+          idOrName: VERCEL_PROJECT_NAME,
+          teamId: VERCEL_TEAM_ID,
+          domain: domain.toLowerCase().trim(),
+        }),
+        vercel.domains.deleteDomain({
+          domain: domain.toLowerCase().trim(),
+          teamId: VERCEL_TEAM_ID,
+        }),
+      ])
 
-      console.log(`[Domain Manager] Domain removed from Vercel project`)
+      console.log(`[Domain Manager] Domain removed from Vercel project and account`)
 
-      // Step 2: Optionally delete from Vercel account entirely (uncomment if needed)
-      // await vercel.domains.deleteDomain({
-      //   domain: domain.toLowerCase().trim(),
-      //   teamId: VERCEL_TEAM_ID,
-      // })
-
-      // Step 3: Remove from Supabase database
+      // Step 3 (Final step): Remove from Supabase database
       const { error: dbError } = await supabase
         .from('custom_domains')
         .delete()
@@ -271,20 +270,46 @@ export async function PATCH(req: Request) {
     console.log(`[Domain Manager] Verifying domain ${domain}...`)
 
     try {
-      // Verify domain in Vercel
-      const verifyResponse = await vercel.projects.verifyProjectDomain({
-        idOrName: VERCEL_PROJECT_NAME,
-        teamId: VERCEL_TEAM_ID,
-        domain: domain.toLowerCase().trim(),
-      })
+      // Verify domain in Vercel - following Vercel's multi-tenant guide
+      // Get domain info and verify in parallel
+      const [domainResponse, verifyResponse] = await Promise.all([
+        vercel.projects.getProjectDomain({
+          idOrName: VERCEL_PROJECT_NAME,
+          teamId: VERCEL_TEAM_ID,
+          domain: domain.toLowerCase().trim(),
+        }),
+        vercel.projects.verifyProjectDomain({
+          idOrName: VERCEL_PROJECT_NAME,
+          teamId: VERCEL_TEAM_ID,
+          domain: domain.toLowerCase().trim(),
+        }),
+      ])
 
-      // Check domain configuration
+      console.log(`[Domain Manager] Verification response:`, verifyResponse)
+
+      const isVerified = verifyResponse.verified || false
+
+      // If not verified, check what needs to be done
+      if (!isVerified) {
+        console.log(`[Domain Manager] Domain verification required for ${domain}`)
+        return NextResponse.json({
+          success: false,
+          verified: false,
+          message: 'Domain verification failed. Please check DNS settings.',
+          verificationInstructions: {
+            type: 'A',
+            name: '@',
+            value: '76.76.21.21',
+          },
+        }, { status: 400 })
+      }
+
+      // Domain is verified - check configuration
       const configResponse = await vercel.domains.getDomainConfig({
         domain: domain.toLowerCase().trim(),
         teamId: VERCEL_TEAM_ID,
       })
 
-      const isVerified = verifyResponse.verified || false
       const isMisconfigured = configResponse.misconfigured || false
 
       if (isVerified && !isMisconfigured) {
@@ -306,16 +331,15 @@ export async function PATCH(req: Request) {
           message: 'Domain verified successfully!',
         })
       } else {
+        // Verified but misconfigured
         return NextResponse.json({
           success: false,
           verified: false,
-          message: 'Domain verification failed. Please check DNS settings.',
+          message: 'Domain is misconfigured. Please check DNS settings.',
           verificationInstructions: {
-            type: configResponse.configuredBy === 'CNAME' ? 'CNAME' : 'TXT',
-            name: configResponse.configuredBy === 'CNAME' ? '@' : '_vercel',
-            value: configResponse.configuredBy === 'CNAME' 
-              ? `cname.vercel-dns.com` 
-              : 'vercel-dns-verification',
+            type: 'A',
+            name: '@',
+            value: '76.76.21.21',
           },
         }, { status: 400 })
       }

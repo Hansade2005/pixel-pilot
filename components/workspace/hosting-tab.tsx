@@ -49,12 +49,12 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
   const [isDomainVerified, setIsDomainVerified] = useState(false)
   const [isViteProject, setIsViteProject] = useState(false)
   const [checkingFramework, setCheckingFramework] = useState(true)
+  const [hasCustomDomain, setHasCustomDomain] = useState(false)
 
   useEffect(() => {
     if (selectedProject?.id) {
       detectFramework()
-      loadSites()
-      loadCustomDomain()
+      checkCustomDomain()
     }
   }, [selectedProject?.id])
 
@@ -78,6 +78,35 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
       console.error('Error detecting framework:', error)
     } finally {
       setCheckingFramework(false)
+    }
+  }
+
+  const checkCustomDomain = async () => {
+    if (!selectedProject?.id) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('custom_domains')
+        .select('domain, verified')
+        .eq('project_id', selectedProject.id)
+        .eq('user_id', user.id)
+        .eq('verified', true)
+        .maybeSingle()
+
+      if (data) {
+        setHasCustomDomain(true)
+        setCustomDomain(data.domain)
+        setIsDomainVerified(data.verified)
+        // Only load sites if custom domain is connected
+        loadSites()
+      } else {
+        setHasCustomDomain(false)
+        setLoading(false)
+      }
+    } catch (error) {
+      console.error('Error checking custom domain:', error)
+      setHasCustomDomain(false)
+      setLoading(false)
     }
   }
 
@@ -121,15 +150,15 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
 
     try {
       const { data } = await supabase
-        .from('supabase_projects')
-        .select('custom_domain, custom_domain_verified')
-        .eq('pixelpilot_project_id', selectedProject.id)
+        .from('custom_domains')
+        .select('domain, verified')
+        .eq('project_id', selectedProject.id)
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (data?.custom_domain) {
-        setCustomDomain(data.custom_domain)
-        setIsDomainVerified(data.custom_domain_verified || false)
+      if (data?.domain) {
+        setCustomDomain(data.domain)
+        setIsDomainVerified(data.verified || false)
       }
     } catch (error) {
       console.error('Error loading custom domain:', error)
@@ -194,6 +223,27 @@ export function HostingTab({ user, selectedProject }: HostingTabProps) {
             Custom hosting is currently only available for Vite projects. 
             This project appears to be using a different framework.
           </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!hasCustomDomain) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <Globe className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-50" />
+          <h3 className="text-xl font-semibold mb-3">Custom Domain Required</h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            To host your production site, you need to connect a custom domain first.
+            Go to the Project settings to add and verify your custom domain.
+          </p>
+          <Alert className="text-left">
+            <LinkIcon className="h-4 w-4" />
+            <AlertDescription>
+              Navigate to <strong>Project → Custom Domain</strong> section to connect your domain
+            </AlertDescription>
+          </Alert>
         </div>
       </div>
     )
