@@ -24,6 +24,7 @@ yarn-error.log*
 .vercel
 .vscode/mcp.json
 .env
+leads.md
 
 # typescript
 *.tsbuildinfo
