@@ -557,10 +557,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         // Project not found, might be a newly created project that's not loaded yet
         console.log('WorkspaceLayout: Project not found in current projects, might be newly created')
       }
-    } else if (clientProjects.length > 0 && !selectedProject && !isLoadingProjects) {
-      // If no project is selected but we have projects, select the first one
-      console.log('WorkspaceLayout: No project selected, selecting first project:', clientProjects[0].name)
-      setSelectedProject(clientProjects[0])
+    // Removed auto project selection logic. No project will be auto-selected when projects exist.
 
       // Update URL to reflect the first project
       const params = new URLSearchParams(searchParams.toString())
@@ -955,114 +952,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       {/* Desktop Layout */}
       {!isMobile && (
         <>
-          {/* Sidebar - Conditional rendering based on useModernSidebar flag */}
-          {useModernSidebar && clientProjects.length === 0 ? (
-            <ModernSidebar
-              user={user}
-              projects={clientProjects}
-              selectedProject={selectedProject}
-              onSelectProject={(project) => {
-                setSelectedProject(project)
-                setSelectedFile(null)
-                
-                const params = new URLSearchParams(searchParams.toString())
-                params.set('projectId', project.id)
-                router.push(`/workspace?${params.toString()}`)
-              }}
-              isExpanded={!sidebarCollapsed}
-              onToggleExpanded={() => setSidebarCollapsed(!sidebarCollapsed)}
-            />
-          ) : (
-            <Sidebar
-              user={user}
-              projects={clientProjects}
-              selectedProject={selectedProject}
+          {/* Always use ModernSidebar for desktop */}
+          <ModernSidebar
+            user={user}
+            projects={clientProjects}
+            selectedProject={selectedProject}
             onSelectProject={(project) => {
               setSelectedProject(project)
-              setSelectedFile(null) // Clear selected file when switching projects
-              
-              // Update URL to reflect selected project
+              setSelectedFile(null)
               const params = new URLSearchParams(searchParams.toString())
               params.set('projectId', project.id)
               router.push(`/workspace?${params.toString()}`)
-              
-              console.log('WorkspaceLayout: Project selected, URL updated:', project.name, project.id)
             }}
-            onProjectCreated={async (newProject) => {
-              // Refresh projects when a new one is created
-              try {
-                await storageManager.init()
-                const workspaces = await storageManager.getWorkspaces(user.id)
-                setClientProjects(workspaces || [])
-                console.log('WorkspaceLayout: Refreshed projects after creation:', workspaces?.length || 0)
-                
-                // Automatically select the newly created project
-                if (newProject) {
-                  setSelectedProject(newProject)
-                  setSelectedFile(null)
-                  
-                  // Update URL to reflect the new project with BOTH projectId AND newProject params
-                  // The newProject param signals to skip auto-restore (prevents file contamination)
-                  const params = new URLSearchParams(searchParams.toString())
-                  params.set('projectId', newProject.id)
-                  params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
-                  router.push(`/workspace?${params.toString()}`)
-                  
-                  console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
-                  
-                  // Prevent auto-restore for newly created project
-                  setJustCreatedProject(true)
-                  
-                  // Trigger backup after project creation
-                  if (triggerInstantBackup) {
-                    await triggerInstantBackup('Project created')
-                  }
-                  
-                  // Reset the flag after a short delay
-                  setTimeout(() => setJustCreatedProject(false), 2000)
-                  
-                  console.log('WorkspaceLayout: Auto-selected new project:', newProject.name)
-                }
-              } catch (error) {
-                console.error('Error refreshing projects after creation:', error)
-              }
-            }}
-            onProjectDeleted={async (deletedProjectId) => {
-              // Refresh projects when one is deleted
-              try {
-                await storageManager.init()
-                const workspaces = await storageManager.getWorkspaces(user.id)
-                setClientProjects(workspaces || [])
-                console.log('WorkspaceLayout: Refreshed projects after deletion:', workspaces?.length || 0)
-                
-                // If the deleted project was selected, navigate away from it
-                if (selectedProject?.id === deletedProjectId) {
-                  const params = new URLSearchParams(searchParams.toString())
-                  params.delete('projectId')
-                  router.push(`/workspace?${params.toString()}`)
-                  setSelectedProject(null)
-                  setSelectedFile(null)
-                }
-              } catch (error) {
-                console.error('Error refreshing projects after deletion:', error)
-              }
-            }}
-            onProjectUpdated={async () => {
-              // Refresh projects when one is updated (renamed, pinned, etc.)
-              try {
-                await storageManager.init()
-                const workspaces = await storageManager.getWorkspaces(user.id)
-                setClientProjects(workspaces || [])
-                console.log('WorkspaceLayout: Refreshed projects after update:', workspaces?.length || 0)
-              } catch (error) {
-                console.error('Error refreshing projects after update:', error)
-              }
-            }}
-              collapsed={sidebarCollapsed}
-              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-              onTriggerBackup={triggerBackup}
-            />
-          )}
+            isExpanded={!sidebarCollapsed}
+            onToggleExpanded={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
 
           {/* Main Content */}
           <div className="flex-1 flex flex-col min-w-0">
@@ -1421,26 +1325,23 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       {/* Mobile Layout */}
       {isMobile && (
         <div className="h-full w-full flex flex-col">
-          {/* Modern Sidebar for Mobile */}
-          {useModernSidebar && clientProjects.length === 0 ? (
-            <ModernSidebar
-              user={user}
-              projects={clientProjects}
-              selectedProject={selectedProject}
-              onSelectProject={(project) => {
-                setSelectedProject(project)
-                setSelectedFile(null)
-                setIsMobileSidebarOpen(false)
-                
-                const params = new URLSearchParams(searchParams.toString())
-                params.set('projectId', project.id)
-                router.push(`/workspace?${params.toString()}`)
-              }}
-              isMobileOpen={isMobileSidebarOpen}
-              onMobileClose={() => setIsMobileSidebarOpen(false)}
-              isMobile={true}
-            />
-          ) : null}
+          {/* Always use ModernSidebar for mobile */}
+          <ModernSidebar
+            user={user}
+            projects={clientProjects}
+            selectedProject={selectedProject}
+            onSelectProject={(project) => {
+              setSelectedProject(project)
+              setSelectedFile(null)
+              setIsMobileSidebarOpen(false)
+              const params = new URLSearchParams(searchParams.toString())
+              params.set('projectId', project.id)
+              router.push(`/workspace?${params.toString()}`)
+            }}
+            isMobileOpen={isMobileSidebarOpen}
+            onMobileClose={() => setIsMobileSidebarOpen(false)}
+            isMobile={true}
+          />
 
           {/* Fixed Mobile Header */}
           <div className="fixed top-0 left-0 right-0 h-14 border-b border-border bg-card flex items-center justify-between px-4 z-40">
@@ -1638,26 +1539,37 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           {/* Mobile Content with top padding for fixed header and bottom padding for fixed tabs */}
           <div className="flex-1 min-h-0 pt-14 pb-12">
             {clientProjects.length === 0 ? (
-              /* Empty State - No Projects */
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="text-center max-w-md mx-auto">
-                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
-                    <Plus className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <h2 className="text-2xl font-semibold text-foreground mb-2">No projects yet</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Create your first project to start building amazing web applications with AI.
-                  </p>
-                  <Button
-                    onClick={() => setIsCreateDialogOpen(true)}
-                    size="lg"
-                    className="px-8"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Project
-                  </Button>
-                </div>
-              </div>
+              <EmptyWorkspaceView
+                onAuthRequired={() => router.push('/auth/login')}
+                onProjectCreated={async (newProject) => {
+                  // Refresh projects when a new one is created
+                  try {
+                    await storageManager.init()
+                    const workspaces = await storageManager.getWorkspaces(user.id)
+                    setClientProjects(workspaces || [])
+                    // Automatically select the newly created project
+                    if (newProject) {
+                      setSelectedProject(newProject)
+                      setSelectedFile(null)
+                      // Update URL to reflect the new project with BOTH projectId AND newProject params
+                      const params = new URLSearchParams(searchParams.toString())
+                      params.set('projectId', newProject.id)
+                      params.set('newProject', newProject.id)
+                      router.push(`/workspace?${params.toString()}`)
+                      // Prevent auto-restore for newly created project
+                      setJustCreatedProject(true)
+                      // Trigger backup after project creation
+                      if (triggerInstantBackup) {
+                        await triggerInstantBackup('Project created')
+                      }
+                      setTimeout(() => setJustCreatedProject(false), 2000)
+                    }
+                  } catch (error) {
+                    console.error('Error refreshing projects after creation:', error)
+                  }
+                }}
+                recentProjects={[]}
+              />
             ) : (
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
@@ -1769,15 +1681,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               >
                 <Eye className="h-4 w-4" />
                 <span className="text-xs">Preview</span>
-              </button>
-              <button
-                onClick={() => setMobileTab("cloud")}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "cloud" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Cloud className="h-4 w-4" />
-                <span className="text-xs">Cloud</span>
               </button>
             </div>
           </div>
