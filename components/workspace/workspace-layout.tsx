@@ -10,6 +10,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import type { Workspace, File } from "@/lib/storage-manager"
 import { Sidebar } from "./sidebar"
+import { ModernSidebar } from "./modern-sidebar"
+import { EmptyWorkspaceView } from "./empty-workspace-view"
 import { ChatPanel } from "./chat-panel"
 import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
@@ -70,6 +72,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [clientProjects, setClientProjects] = useState<Workspace[]>(projects)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [fileExplorerKey, setFileExplorerKey] = useState<number>(0) // Force file explorer refresh
+  
+  // Modern sidebar state
+  const [useModernSidebar, setUseModernSidebar] = useState(true)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   
   // Mobile-specific state
   const isMobile = useIsMobile()
@@ -949,11 +955,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       {/* Desktop Layout */}
       {!isMobile && (
         <>
-          {/* Sidebar */}
-          <Sidebar
-            user={user}
-            projects={clientProjects}
-            selectedProject={selectedProject}
+          {/* Sidebar - Conditional rendering based on useModernSidebar flag */}
+          {useModernSidebar && clientProjects.length === 0 ? (
+            <ModernSidebar
+              user={user}
+              projects={clientProjects}
+              selectedProject={selectedProject}
+              onSelectProject={(project) => {
+                setSelectedProject(project)
+                setSelectedFile(null)
+                
+                const params = new URLSearchParams(searchParams.toString())
+                params.set('projectId', project.id)
+                router.push(`/workspace?${params.toString()}`)
+              }}
+              isExpanded={!sidebarCollapsed}
+              onToggleExpanded={() => setSidebarCollapsed(!sidebarCollapsed)}
+            />
+          ) : (
+            <Sidebar
+              user={user}
+              projects={clientProjects}
+              selectedProject={selectedProject}
             onSelectProject={(project) => {
               setSelectedProject(project)
               setSelectedFile(null) // Clear selected file when switching projects
@@ -1035,10 +1058,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 console.error('Error refreshing projects after update:', error)
               }
             }}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-            onTriggerBackup={triggerBackup}
-          />
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onTriggerBackup={triggerBackup}
+            />
+          )}
 
           {/* Main Content */}
           <div className="flex-1 flex flex-col min-w-0">
@@ -1278,25 +1302,43 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Empty State - No Projects */}
             {!isLoadingProjects && clientProjects.length === 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center max-w-md mx-auto p-8">
-                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
-                    <Plus className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <h2 className="text-2xl font-semibold text-foreground mb-2">No projects yet</h2>
-                  <p className="text-muted-foreground mb-6">
-                    Create your first project to start building amazing web applications with AI.
-                  </p>
-                  <Button
-                    onClick={() => setIsCreateDialogOpen(true)}
-                    size="lg"
-                    className="px-8"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Project
-                  </Button>
-                </div>
-              </div>
+              <EmptyWorkspaceView
+                onAuthRequired={() => router.push('/auth/login')}
+                onProjectCreated={async (newProject) => {
+                  // Refresh projects when a new one is created
+                  try {
+                    await storageManager.init()
+                    const workspaces = await storageManager.getWorkspaces(user.id)
+                    setClientProjects(workspaces || [])
+                    console.log('WorkspaceLayout: Refreshed projects after creation:', workspaces?.length || 0)
+                    
+                    // Automatically select the newly created project
+                    if (newProject) {
+                      setSelectedProject(newProject)
+                      setSelectedFile(null)
+                      
+                      // Update URL to reflect the new project with BOTH projectId AND newProject params
+                      const params = new URLSearchParams(searchParams.toString())
+                      params.set('projectId', newProject.id)
+                      params.set('newProject', newProject.id)
+                      router.push(`/workspace?${params.toString()}`)
+                      
+                      // Prevent auto-restore for newly created project
+                      setJustCreatedProject(true)
+                      
+                      // Trigger backup after project creation
+                      if (triggerInstantBackup) {
+                        await triggerInstantBackup('Project created')
+                      }
+                      
+                      setTimeout(() => setJustCreatedProject(false), 2000)
+                    }
+                  } catch (error) {
+                    console.error('Error refreshing projects after creation:', error)
+                  }
+                }}
+                recentProjects={[]}
+              />
             )}
 
             {/* Status Bar */}
@@ -1379,20 +1421,51 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       {/* Mobile Layout */}
       {isMobile && (
         <div className="h-full w-full flex flex-col">
+          {/* Modern Sidebar for Mobile */}
+          {useModernSidebar && clientProjects.length === 0 ? (
+            <ModernSidebar
+              user={user}
+              projects={clientProjects}
+              selectedProject={selectedProject}
+              onSelectProject={(project) => {
+                setSelectedProject(project)
+                setSelectedFile(null)
+                setIsMobileSidebarOpen(false)
+                
+                const params = new URLSearchParams(searchParams.toString())
+                params.set('projectId', project.id)
+                router.push(`/workspace?${params.toString()}`)
+              }}
+              isMobileOpen={isMobileSidebarOpen}
+              onMobileClose={() => setIsMobileSidebarOpen(false)}
+              isMobile={true}
+            />
+          ) : null}
+
           {/* Fixed Mobile Header */}
           <div className="fixed top-0 left-0 right-0 h-14 border-b border-border bg-card flex items-center justify-between px-4 z-40">
             <div className="flex items-center space-x-3">
-              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen} modal={true}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <PanelLeft className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-80">
-                  <Sidebar
-                    user={user}
-                    projects={clientProjects}
-                    selectedProject={selectedProject}
+              {useModernSidebar && clientProjects.length === 0 ? (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen} modal={true}>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <PanelLeft className="h-4 w-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-80">
+                    <Sidebar
+                      user={user}
+                      projects={clientProjects}
+                      selectedProject={selectedProject}
                     onSelectProject={(project) => {
                       setSelectedProject(project)
                       setSelectedFile(null)
@@ -1477,6 +1550,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   />
                 </SheetContent>
               </Sheet>
+              )}
               
               <div className="flex flex-col min-w-0">
                 <h1 className="text-sm font-semibold truncate">

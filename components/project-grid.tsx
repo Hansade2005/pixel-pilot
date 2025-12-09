@@ -231,43 +231,53 @@ export function ProjectGrid() {
         {displayedProjects.map((project) => (
           <div key={project.id} className="relative group">
             <Link href={`/workspace?projectId=${project.id}`} className="group">
-              <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
-                <div className="relative aspect-video overflow-hidden">
+              <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer overflow-hidden">
+                <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
                   <Image
                     src={project.thumbnail}
                     alt={project.name}
                     fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-300"
+                    className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                   <div className="absolute top-3 right-3">
-                    <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                    <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 border-white/30 font-medium shadow-lg">
                       {project.category}
                     </Badge>
                   </div>
-                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <ExternalLink className="w-5 h-5 text-white" />
+                  <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                    <div className="p-2 bg-blue-500 rounded-full shadow-lg">
+                      <ExternalLink className="w-4 h-4 text-white" />
+                    </div>
                   </div>
                 </div>
-                <CardContent className="p-4">
-                  <h3 className="text-white font-semibold text-lg mb-2 group-hover:text-blue-400 transition-colors">
+                <CardContent className="p-5 bg-gradient-to-b from-white/5 to-transparent">
+                  <h3 className="text-white font-bold text-lg mb-2 group-hover:text-blue-400 transition-colors line-clamp-1">
                     {project.name}
                   </h3>
-                  <p className="text-white/70 text-sm line-clamp-2">
+                  <p className="text-white/60 text-sm line-clamp-2 mb-3">
                     {project.description}
                   </p>
-                  <div className="mt-3 text-xs text-white/50">
-                    Created {timeAgo(project.createdAt)}
+                  <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                    <div className="text-xs text-white/50 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {timeAgo(project.createdAt)}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-xs text-blue-400 font-medium">Open →</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </Link>
             <button
               onClick={(e) => handleDeleteProject(project.id, e)}
-              className="absolute top-2 left-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+              className="absolute top-3 left-3 p-2 bg-red-500/90 hover:bg-red-600 backdrop-blur-sm text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
               title="Delete project"
             >
-              <Trash2 className="w-4 h-4 fill-current" />
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         ))}
