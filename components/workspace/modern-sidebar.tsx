@@ -166,10 +166,10 @@ export function ModernSidebar({
             )}
           </div>
 
-          {/* Close Button - Only shown on mobile sidebar */}
-          {isMobile && isMobileOpen && onMobileClose && (
+          {/* Close Button - shown on mobile sidebar or when desktop is expanded */}
+          {((isMobile && isMobileOpen) || (!isMobile && shouldExpand)) && (onMobileClose || onToggleExpanded) && (
             <button
-              onClick={onMobileClose}
+              onClick={isMobile ? onMobileClose : onToggleExpanded}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
               aria-label="Close sidebar"
             >
@@ -406,7 +406,7 @@ export function ModernSidebar({
         {/* Mobile Overlay */}
         {isMobileOpen && (
           <div
-            className="lg:hidden fixed inset-0 bg-black/50 z-40"
+            className="lg:hidden fixed inset-0 bg-black/50 z-[60]"
             onClick={onMobileClose}
             aria-hidden="true"
           />
@@ -415,7 +415,7 @@ export function ModernSidebar({
         {/* Mobile Sidebar - only renders when open */}
         {isMobileOpen && (
           <aside
-            className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-black flex flex-col border-r border-gray-800"
+            className="lg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-black flex flex-col border-r border-gray-800"
             role="dialog"
             aria-modal="true"
           >
@@ -425,7 +425,7 @@ export function ModernSidebar({
 
         {/* Search Modal */}
         <Dialog open={showSearchModal} onOpenChange={setShowSearchModal}>
-          <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl">
+          <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl z-[80]">
             <DialogHeader>
               <DialogTitle className="text-white">Search Projects</DialogTitle>
             </DialogHeader>

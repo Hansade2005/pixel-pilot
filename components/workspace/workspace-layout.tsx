@@ -1060,7 +1060,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
 
             {/* Main Workspace */}
-            {!isLoadingProjects && clientProjects.length > 0 && (
+            {!isLoadingProjects && clientProjects.length > 0 && selectedProject && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
                 <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
@@ -1202,8 +1202,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </ResizablePanelGroup>
             )}
 
-            {/* Empty State - No Projects */}
-            {!isLoadingProjects && clientProjects.length === 0 && (
+            {/* Empty State - No Projects OR No Project Selected */}
+            {!isLoadingProjects && (clientProjects.length === 0 || !selectedProject) && (
               <EmptyWorkspaceView
                 onAuthRequired={() => router.push('/auth/login')}
                 onProjectCreated={async (newProject) => {
