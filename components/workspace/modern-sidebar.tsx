@@ -285,7 +285,7 @@ export function ModernSidebar({
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-2 pb-2">
-                  <div className="space-y-1 max-h-64 overflow-y-auto">
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
                     {projects.slice(0, 10).map((project) => (
                       <button
                         key={project.id}
@@ -362,7 +362,7 @@ export function ModernSidebar({
         </button>
 
         {/* User Profile */}
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <button 
               className={`flex items-center w-full h-10 px-2 ${shouldExpand ? 'justify-start' : 'justify-center'} hover:bg-gray-800 rounded-md transition-colors`}
@@ -485,11 +485,14 @@ export function ModernSidebar({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Toggle button on hover or when expanded */}
-        {(isHovered || isExpanded) && onToggleExpanded && (
+        {/* Toggle button - always visible */}
+        {onToggleExpanded && (
           <button
-            onClick={onToggleExpanded}
-            className="absolute top-5 right-0 transform translate-x-1/2 z-50 p-1.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300 hover:bg-gray-700 transition-all shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpanded();
+            }}
+            className="absolute top-5 -right-3 z-50 p-1.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300 hover:bg-gray-700 transition-all shadow-lg"
             aria-label="Toggle sidebar width"
           >
             <PanelLeft size={16} className={`${isExpanded ? 'rotate-180' : ''} transition-transform`} />

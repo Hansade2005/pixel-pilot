@@ -766,10 +766,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       if (newProject) {
         setSelectedProject(newProject)
       }
-    } else if (clientProjects.length > 0) {
-      console.log('Setting first project as selected:', clientProjects[0])
-      setSelectedProject(clientProjects[0])
     }
+    // Removed auto project selection - no project will be auto-selected when projects exist
   }, [newProjectId, clientProjects])
 
   // Debug selected project changes
@@ -1346,16 +1344,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           {/* Fixed Mobile Header */}
           <div className="fixed top-0 left-0 right-0 h-14 border-b border-border bg-card flex items-center justify-between px-4 z-40">
             <div className="flex items-center space-x-3">
-              {useModernSidebar && clientProjects.length === 0 ? (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 w-8 p-0"
-                  onClick={() => setIsMobileSidebarOpen(true)}
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </Button>
-              ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0"
+                onClick={() => setIsMobileSidebarOpen(true)}
+              >
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+              {false && (
                 <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen} modal={true}>
                   <SheetTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
