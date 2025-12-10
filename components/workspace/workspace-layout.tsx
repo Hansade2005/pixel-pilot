@@ -1231,78 +1231,80 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
 
             {/* Status Bar */}
-            <div className="h-8 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
-              <div className="flex items-center space-x-4">
-                {/* GitHub Status */}
-                <div className="flex items-center space-x-1">
-                  <Github className="h-3 w-3" />
-                  <span>
-                    GitHub: {(() => {
-                      if (selectedProject?.githubRepoUrl && gitHubConnected) {
-                        return <span className="text-green-600 dark:text-green-400">Connected</span>
-                      }
-                      if (gitHubConnected) {
-                        return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
-                      }
-                      return <span className="text-muted-foreground">Not Connected</span>
-                    })()}
-                  </span>
+            {selectedProject && (
+              <div className="h-8 border-t border-border bg-muted/50 flex items-center justify-between px-4 text-xs">
+                <div className="flex items-center space-x-4">
+                  {/* GitHub Status */}
+                  <div className="flex items-center space-x-1">
+                    <Github className="h-3 w-3" />
+                    <span>
+                      GitHub: {(() => {
+                        if (selectedProject?.githubRepoUrl && gitHubConnected) {
+                          return <span className="text-green-600 dark:text-green-400">Connected</span>
+                        }
+                        if (gitHubConnected) {
+                          return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
+                        }
+                        return <span className="text-muted-foreground">Not Connected</span>
+                      })()}
+                    </span>
+                  </div>
+
+                  {/* Deployment Status */}
+                  <div className="flex items-center space-x-1">
+                    <Globe className="h-3 w-3" />
+                    <span>
+                      Deployment: {(() => {
+                        switch (selectedProject?.deploymentStatus) {
+                          case 'deployed':
+                            return <span className="text-green-600 dark:text-green-400">Live</span>
+                          case 'in_progress':
+                            return <span className="text-yellow-600 dark:text-yellow-400">In Progress</span>
+                          case 'failed':
+                            return <span className="text-red-600 dark:text-red-400">Failed</span>
+                          default:
+                            return <span className="text-muted-foreground">Not Deployed</span>
+                        }
+                      })()}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Deployment Status */}
-                <div className="flex items-center space-x-1">
-                  <Globe className="h-3 w-3" />
-                  <span>
-                    Deployment: {(() => {
-                      switch (selectedProject?.deploymentStatus) {
-                        case 'deployed':
-                          return <span className="text-green-600 dark:text-green-400">Live</span>
-                        case 'in_progress':
-                          return <span className="text-yellow-600 dark:text-yellow-400">In Progress</span>
-                        case 'failed':
-                          return <span className="text-red-600 dark:text-red-400">Failed</span>
-                        default:
-                          return <span className="text-muted-foreground">Not Deployed</span>
-                      }
-                    })()}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                {selectedProject?.vercelDeploymentUrl && (
+                <div className="flex items-center space-x-2">
+                  {selectedProject?.vercelDeploymentUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => window.open(selectedProject.vercelDeploymentUrl, '_blank')}
+                    >
+                      View Live
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-xs"
-                    onClick={() => window.open(selectedProject.vercelDeploymentUrl, '_blank')}
+                    onClick={() => window.open('/workspace/management', '_blank')}
                   >
-                    View Live
+                    <Settings className="h-3 w-3 mr-1" />
+                    Manage
                   </Button>
-                )}
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => window.open('/workspace/management', '_blank')}
-                >
-                  <Settings className="h-3 w-3 mr-1" />
-                  Manage
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
-                  disabled={!selectedProject}
-                >
-                  <Rocket className="h-3 w-3 mr-1" />
-                  Deploy
-                </Button>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
+                    disabled={!selectedProject}
+                  >
+                    <Rocket className="h-3 w-3 mr-1" />
+                    Deploy
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </>
       )}
