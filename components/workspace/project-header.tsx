@@ -368,7 +368,7 @@ export function ProjectHeader({
                     size="sm" 
                     variant="outline" 
                     className="h-8 px-3"
-                    onClick={() => setIsCreateDialogOpen(true)}
+                    onClick={() => window.location.href = '/workspace'}
                   >
                     <Plus className="h-4 w-4" />
                     <span className="ml-2">New</span>
