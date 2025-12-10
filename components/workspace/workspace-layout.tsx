@@ -557,12 +557,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         // Project not found, might be a newly created project that's not loaded yet
         console.log('WorkspaceLayout: Project not found in current projects, might be newly created')
       }
-    // Removed auto project selection logic. No project will be auto-selected when projects exist.
-
-      // Update URL to reflect the first project
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('projectId', clientProjects[0].id)
-      router.push(`/workspace?${params.toString()}`)
     }
   }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
 
