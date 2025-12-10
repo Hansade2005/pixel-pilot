@@ -141,9 +141,8 @@ export function ModernSidebar({
   }
 
   const handleProjectSelect = (project: Project) => {
-    if (onSelectProject) {
-      onSelectProject(project)
-    }
+    // Navigate to project URL instead of handling internally
+    router.push(`/workspace?projectId=${project.id}`)
     setShowSearchModal(false)
     
     // Close mobile sidebar after selection
