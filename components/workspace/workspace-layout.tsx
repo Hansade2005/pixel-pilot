@@ -1514,7 +1514,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
           {/* Mobile Content with top padding for fixed header and bottom padding for fixed tabs */}
           <div className="flex-1 min-h-0 pt-14 pb-12">
-            {clientProjects.length === 0 ? (
+            {clientProjects.length === 0 || !selectedProject ? (
               <EmptyWorkspaceView
                 onAuthRequired={() => router.push('/auth/login')}
                 onProjectCreated={async (newProject) => {
@@ -1544,7 +1544,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     console.error('Error refreshing projects after creation:', error)
                   }
                 }}
-                recentProjects={[]}
+                recentProjects={clientProjects.map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  description: p.description,
+                  lastActivity: p.lastActivity
+                }))}
               />
             ) : (
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">

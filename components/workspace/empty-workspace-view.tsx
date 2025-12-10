@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { ChatInput } from '@/components/chat-input'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, Star, Sparkles } from 'lucide-react'
+import { ArrowUp, Star, Sparkles, Filter, SortAsc, SortDesc } from 'lucide-react'
+import { ProjectGrid } from '@/components/project-grid'
 import type { Workspace } from '@/lib/storage-manager'
 
 interface EmptyWorkspaceViewProps {
@@ -23,12 +24,74 @@ export function EmptyWorkspaceView({
   recentProjects = []
 }: EmptyWorkspaceViewProps) {
   const [isLoaded, setIsLoaded] = useState(false)
-  const [activeTab, setActiveTab] = useState<'recently' | 'projects'>('recently')
+  const [activeTab, setActiveTab] = useState<'recently' | 'projects'>('projects')
+  const [sortBy, setSortBy] = useState<'name' | 'date' | 'activity'>('activity')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [filterBy, setFilterBy] = useState<'all' | 'recent' | 'week' | 'month'>('all')
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoaded(true), 100)
     return () => clearTimeout(t)
   }, [])
+
+  // Filter and sort projects
+  const getFilteredAndSortedProjects = () => {
+    let filtered = [...recentProjects]
+
+    // Apply time-based filter
+    if (filterBy !== 'all') {
+      const now = new Date()
+      const filterDate = new Date()
+
+      switch (filterBy) {
+        case 'recent':
+          filterDate.setHours(now.getHours() - 24) // Last 24 hours
+          break
+        case 'week':
+          filterDate.setDate(now.getDate() - 7) // Last 7 days
+          break
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1) // Last 30 days
+          break
+      }
+
+      filtered = filtered.filter(project => 
+        new Date(project.lastActivity) >= filterDate
+      )
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: string | Date
+      let bValue: string | Date
+
+      switch (sortBy) {
+        case 'name':
+          aValue = a.name.toLowerCase()
+          bValue = b.name.toLowerCase()
+          break
+        case 'date':
+          aValue = new Date(a.lastActivity)
+          bValue = new Date(b.lastActivity)
+          break
+        case 'activity':
+        default:
+          aValue = new Date(a.lastActivity)
+          bValue = new Date(b.lastActivity)
+          break
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
+      }
+    })
+
+    return filtered
+  }
+
+  const filteredProjects = getFilteredAndSortedProjects()
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -64,7 +127,7 @@ export function EmptyWorkspaceView({
 
       {/* Projects Section */}
       <div className="bg-gray-900 px-4 sm:px-6 py-4 sm:py-6 flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
             <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
               <button
@@ -85,52 +148,52 @@ export function EmptyWorkspaceView({
               </button>
             </div>
 
-            <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm">
-              <span>Browse all</span>
-              <ArrowUp size={14} className="rotate-45 sm:w-4 sm:h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Filter Dropdown */}
+              <div className="relative">
+                <select
+                  value={filterBy}
+                  onChange={(e) => setFilterBy(e.target.value as any)}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All time</option>
+                  <option value="recent">Last 24h</option>
+                  <option value="week">Last week</option>
+                  <option value="month">Last month</option>
+                </select>
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="activity">Last activity</option>
+                  <option value="name">Name</option>
+                  <option value="date">Created date</option>
+                </select>
+              </div>
+
+              {/* Sort Order Toggle */}
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="p-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+                title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+              >
+                {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
+              </button>
+
+              <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm">
+                <span>Browse all</span>
+                <ArrowUp size={14} className="rotate-45 sm:w-4 sm:h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Empty State for Projects */}
-          {recentProjects.length === 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {/* Placeholder cards */}
-              <div className="bg-gray-800/50 rounded-xl h-40 sm:h-48 flex items-center justify-center border border-gray-700/50 hover:border-gray-600 transition-colors">
-                <div className="text-center p-4">
-                  <Sparkles className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm">No projects yet</p>
-                </div>
-              </div>
-              <div className="bg-gray-800/50 rounded-xl h-40 sm:h-48 hidden sm:flex items-center justify-center border border-gray-700/50"></div>
-              <div className="bg-gray-800/50 rounded-xl h-40 sm:h-48 hidden lg:flex items-center justify-center border border-gray-700/50"></div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {recentProjects.slice(0, 3).map((project) => (
-                <div 
-                  key={project.id}
-                  className="bg-gray-800 rounded-xl h-40 sm:h-48 p-4 flex flex-col justify-between hover:bg-gray-700 transition-colors cursor-pointer border border-gray-700 hover:border-gray-600"
-                >
-                  <div>
-                    <div className="flex items-start justify-between mb-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span className="text-xs text-gray-400">
-                        {new Date(project.lastActivity).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">
-                      {project.name}
-                    </h3>
-                    {project.description && (
-                      <p className="text-gray-400 text-xs line-clamp-2">
-                        {project.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Project Grid */}
+          <ProjectGrid />
         </div>
       </div>
     </div>

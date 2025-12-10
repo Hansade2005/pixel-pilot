@@ -165,10 +165,10 @@ export function ModernSidebar({
             )}
           </div>
 
-          {/* Close Button - shown on mobile sidebar or when desktop is expanded */}
-          {((isMobile && isMobileOpen) || (!isMobile && shouldExpand)) && (onMobileClose || onToggleExpanded) && (
+          {/* Close Button - only shown on mobile sidebar */}
+          {isMobile && isMobileOpen && onMobileClose && (
             <button
-              onClick={isMobile ? onMobileClose : onToggleExpanded}
+              onClick={onMobileClose}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
               aria-label="Close sidebar"
             >
@@ -374,7 +374,7 @@ export function ModernSidebar({
               {shouldExpand && <span className="ml-3 text-sm text-gray-400">Profile</span>}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-800">
+          <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-800 z-[100]">
             <DropdownMenuItem 
               onClick={() => {
                 handleNavigation('/workspace/account')
