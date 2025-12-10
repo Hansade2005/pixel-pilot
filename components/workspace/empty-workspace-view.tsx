@@ -155,6 +155,19 @@ export function EmptyWorkspaceView({
                 </select>
               </div>
 
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="activity">Last activity</option>
+                  <option value="name">Name</option>
+                  <option value="date">Created date</option>
+                </select>
+              </div>
+
               {/* Sort Order Toggle */}
               <button
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -168,7 +181,11 @@ export function EmptyWorkspaceView({
           </div>
 
           {/* Project Grid */}
-          <ProjectGrid />
+          <ProjectGrid
+            filterBy={filterBy}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+          />
         </div>
       </div>
     </div>

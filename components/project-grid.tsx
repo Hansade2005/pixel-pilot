@@ -27,6 +27,12 @@ interface Project {
   createdAt: string
 }
 
+interface ProjectGridProps {
+  filterBy?: 'all' | 'recent' | 'week' | 'month'
+  sortBy?: 'name' | 'date' | 'activity'
+  sortOrder?: 'asc' | 'desc'
+}
+
 // Helper function to generate thumbnail URLs
 const generateThumbnailUrl = (projectName: string, description: string, seed: string) => {
   // Create a descriptive prompt based on project name and description
@@ -34,7 +40,7 @@ const generateThumbnailUrl = (projectName: string, description: string, seed: st
   return `https://api.a0.dev/assets/image?text=${encodeURIComponent(prompt)}&aspect=16:9&seed=${seed}`
 }
 
-export function ProjectGrid() {
+export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder = 'desc' }: ProjectGridProps = {}) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -84,7 +90,7 @@ export function ProjectGrid() {
         const workspaces = await storageManager.getWorkspaces(user.id)
 
         // Convert workspaces to Project format
-        const projectData: Project[] = workspaces
+        let projectData: Project[] = workspaces
           .filter(workspace => !workspace.isTemplate) // Only show user projects, not templates
           .map(workspace => {
             const seed = workspace.id.slice(-3) // Use last 3 chars of ID as seed for consistency
@@ -103,6 +109,56 @@ export function ProjectGrid() {
               createdAt: workspace.createdAt
             }
           })
+
+        // Apply filtering
+        if (filterBy !== 'all') {
+          const now = new Date()
+          const filterDate = new Date()
+
+          switch (filterBy) {
+            case 'recent':
+              filterDate.setHours(now.getHours() - 24) // Last 24 hours
+              break
+            case 'week':
+              filterDate.setDate(now.getDate() - 7) // Last 7 days
+              break
+            case 'month':
+              filterDate.setMonth(now.getMonth() - 1) // Last 30 days
+              break
+          }
+
+          projectData = projectData.filter(project =>
+            new Date(project.createdAt) >= filterDate
+          )
+        }
+
+        // Apply sorting
+        projectData.sort((a, b) => {
+          let aValue: string | Date
+          let bValue: string | Date
+
+          switch (sortBy) {
+            case 'name':
+              aValue = a.name.toLowerCase()
+              bValue = b.name.toLowerCase()
+              break
+            case 'date':
+              aValue = new Date(a.createdAt)
+              bValue = new Date(b.createdAt)
+              break
+            case 'activity':
+            default:
+              aValue = new Date(a.createdAt) // Using createdAt as activity for now
+              bValue = new Date(b.createdAt)
+              break
+          }
+
+          if (sortOrder === 'asc') {
+            return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+          } else {
+            return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
+          }
+        })
 
         setProjects(projectData)
         setCurrentPage(1)
@@ -141,7 +197,7 @@ export function ProjectGrid() {
     }
 
     fetchProjects()
-  }, [])
+  }, [filterBy, sortBy, sortOrder])
 
   if (loading) {
     return (
