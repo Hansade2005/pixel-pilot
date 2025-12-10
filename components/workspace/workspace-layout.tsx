@@ -955,13 +955,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             user={user}
             projects={clientProjects}
             selectedProject={selectedProject}
-            onSelectProject={(project) => {
-              setSelectedProject(project)
-              setSelectedFile(null)
-              const params = new URLSearchParams(searchParams.toString())
-              params.set('projectId', project.id)
-              router.push(`/workspace?${params.toString()}`)
-            }}
             isExpanded={!sidebarCollapsed}
             onToggleExpanded={() => setSidebarCollapsed(!sidebarCollapsed)}
           />
@@ -1328,14 +1321,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             user={user}
             projects={clientProjects}
             selectedProject={selectedProject}
-            onSelectProject={(project) => {
-              setSelectedProject(project)
-              setSelectedFile(null)
-              setIsMobileSidebarOpen(false)
-              const params = new URLSearchParams(searchParams.toString())
-              params.set('projectId', project.id)
-              router.push(`/workspace?${params.toString()}`)
-            }}
             isMobileOpen={isMobileSidebarOpen}
             onMobileClose={() => setIsMobileSidebarOpen(false)}
             isMobile={true}
