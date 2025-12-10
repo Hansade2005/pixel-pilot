@@ -187,7 +187,7 @@ export function ModernSidebar({
             }`}
           >
             <Home size={18} />
-            {shouldExpand && <span className="ml-3 text-sm">Home</span>}
+            {shouldExpand && <span className="ml-3 text-sm">Dashoard</span>}
           </button>
 
           {/* Credits Accordion */}

@@ -10,6 +10,15 @@ import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
 import { timeAgo } from "@/lib/utils"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -47,6 +56,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [user, setUser] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
   // Helper function to format user's name with possessive
   const getUserProjectsTitle = () => {
@@ -67,17 +78,26 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
     event.preventDefault() // Prevent navigation to project
     event.stopPropagation() // Prevent event bubbling
 
-    if (!user) return
+    // Find the project to delete
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setProjectToDelete(project)
+      setDeleteDialogOpen(true)
+    }
+  }
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete || !user) return
 
     try {
       // Delete the project from storage
-      await storageManager.deleteWorkspace(projectId)
+      await storageManager.deleteWorkspace(projectToDelete.id)
 
       // Remove from local state
-      setProjects(prev => prev.filter(p => p.id !== projectId))
+      setProjects(prev => prev.filter(p => p.id !== projectToDelete.id))
 
       // Adjust current page if necessary
-      const remainingProjects = projects.filter(p => p.id !== projectId)
+      const remainingProjects = projects.filter(p => p.id !== projectToDelete.id)
       const maxPage = Math.ceil(remainingProjects.length / itemsPerPage)
       if (currentPage > maxPage && maxPage > 0) {
         setCurrentPage(maxPage)
@@ -85,6 +105,9 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
     } catch (error) {
       console.error("Error deleting project:", error)
       // You could add a toast notification here
+    } finally {
+      setDeleteDialogOpen(false)
+      setProjectToDelete(null)
     }
   }
 
@@ -217,8 +240,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
   if (loading) {
     return (
-      <section className="w-full max-w-7xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
+      <section className="w-full max-w-7xl mx-auto px-4 py-6">
+        <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-white mb-4">
             Featured Projects
           </h2>
@@ -244,8 +267,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
   if (!user) {
     return (
-      <section className="w-full max-w-7xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
+      <section className="w-full max-w-7xl mx-auto px-4 py-6">
+        <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-white mb-4">
             {getUserProjectsTitle()}
           </h2>
@@ -265,8 +288,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
   if (projects.length === 0) {
     return (
-      <section className="w-full max-w-7xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
+      <section className="w-full max-w-7xl mx-auto px-4 py-6">
+        <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-white mb-4">
             {getUserProjectsTitle()}
           </h2>
@@ -289,8 +312,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const displayedProjects = projects.slice(startIndex, startIndex + itemsPerPage)
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 py-16">
-      <div className="text-center mb-12">
+    <section className="w-full max-w-7xl mx-auto px-4 py-6">
+      <div className="text-center mb-6">
         <h2 className="text-3xl font-bold text-white mb-4">
           {getUserProjectsTitle()}
         </h2>
@@ -386,6 +409,57 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           </Pagination>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        project={projectToDelete}
+        onConfirm={confirmDeleteProject}
+      />
     </section>
+  )
+}
+
+// Confirmation Dialog for Project Deletion
+function DeleteConfirmationDialog({ 
+  open, 
+  onOpenChange, 
+  project, 
+  onConfirm 
+}: { 
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  project: Project | null
+  onConfirm: () => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-gray-900 border-gray-800 text-white">
+        <DialogHeader>
+          <DialogTitle className="text-red-400">Delete Project</DialogTitle>
+          <DialogDescription className="text-gray-300">
+            Are you sure you want to delete <span className="font-semibold text-white">"{project?.name}"</span>? 
+            This action cannot be undone and will permanently remove the project and all its data.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            className="border-gray-600 text-gray-300 hover:bg-gray-800"
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="destructive" 
+            onClick={onConfirm}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete Project
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
