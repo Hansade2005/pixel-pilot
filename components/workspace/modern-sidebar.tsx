@@ -488,13 +488,15 @@ export function ModernSidebar({
         {onToggleExpanded && (
           <button
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
+              console.log('Toggle button clicked');
               onToggleExpanded();
             }}
-            className="absolute top-5 -right-3 z-50 p-1.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300 hover:bg-gray-700 transition-all shadow-lg"
+            className="absolute top-5 -right-3 z-[100] p-1.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300 hover:bg-gray-700 transition-all shadow-lg hover:scale-110"
             aria-label="Toggle sidebar width"
           >
-            <PanelLeft size={16} className={`${isExpanded ? 'rotate-180' : ''} transition-transform`} />
+            <PanelLeft size={16} className={`${shouldExpand ? 'rotate-180' : ''} transition-transform`} />
           </button>
         )}
         <SidebarContent />

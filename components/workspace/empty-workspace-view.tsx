@@ -94,10 +94,10 @@ export function EmptyWorkspaceView({
   const filteredProjects = getFilteredAndSortedProjects()
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-auto">
       {/* Hero Section with Gradient */}
       <div
-        className={`relative flex-1 bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 pt-16 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 transition-all duration-1000 ${
+        className={`relative flex-shrink-0 bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 pt-16 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 transition-all duration-1000 ${
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
@@ -126,7 +126,7 @@ export function EmptyWorkspaceView({
       </div>
 
       {/* Projects Section */}
-      <div className="bg-gray-900 px-4 sm:px-6 py-4 sm:py-6 flex-shrink-0">
+      <div className="bg-gray-900 px-4 sm:px-6 py-4 sm:py-6 flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
             <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
