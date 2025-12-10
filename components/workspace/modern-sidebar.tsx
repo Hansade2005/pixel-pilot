@@ -161,7 +161,7 @@ export function ModernSidebar({
               <img src="https://pipilot.dev/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
             </div>
             {shouldExpand && (
-              <span className="ml-3 text-sm font-semibold text-white">PiPilot</span>
+              <span className="ml-3 text-sm font-semibold text-white"></span>
             )}
           </div>
 
@@ -285,7 +285,7 @@ export function ModernSidebar({
                 </AccordionTrigger>
                 <AccordionContent className="px-2 pb-2">
                   <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {projects.slice(0, 10).map((project) => (
+                    {projects.map((project) => (
                       <button
                         key={project.id}
                         onClick={() => handleProjectSelect(project)}

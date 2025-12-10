@@ -346,7 +346,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
             </Link>
             <button
               onClick={(e) => handleDeleteProject(project.id, e)}
-              className="absolute top-3 left-3 p-2 bg-red-500/90 hover:bg-red-600 backdrop-blur-sm text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              className="absolute top-3 left-3 p-2 bg-red-500/90 hover:bg-red-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
               title="Delete project"
             >
               <Trash2 className="w-4 h-4" />

@@ -1626,47 +1626,49 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
           </div>
 
-          {/* Fixed Mobile Bottom Tab Navigation */}
-          <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-            <div className="grid grid-cols-4 h-12">
-              <button
-                onClick={() => setMobileTab("chat")}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <MessageSquare className="h-4 w-4" />
-                <span className="text-xs">Chat</span>
-              </button>
-              <button
-                onClick={() => setMobileTab("files")}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "files" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <FileText className="h-4 w-4" />
-                <span className="text-xs">Files</span>
-              </button>
-              <button
-                onClick={() => setMobileTab("editor")}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "editor" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Code className="h-4 w-4" />
-                <span className="text-xs">Editor</span>
-              </button>
-              <button
-                onClick={() => setMobileTab("preview")}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  mobileTab === "preview" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Eye className="h-4 w-4" />
-                <span className="text-xs">Preview</span>
-              </button>
+          {/* Fixed Mobile Bottom Tab Navigation - only show when project is selected */}
+          {selectedProject && (
+            <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
+              <div className="grid grid-cols-4 h-12">
+                <button
+                  onClick={() => setMobileTab("chat")}
+                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
+                    mobileTab === "chat" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="text-xs">Chat</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("files")}
+                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
+                    mobileTab === "files" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="text-xs">Files</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("editor")}
+                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
+                    mobileTab === "editor" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Code className="h-4 w-4" />
+                  <span className="text-xs">Editor</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("preview")}
+                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
+                    mobileTab === "preview" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="text-xs">Preview</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
