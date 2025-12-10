@@ -94,10 +94,10 @@ export function EmptyWorkspaceView({
   const filteredProjects = getFilteredAndSortedProjects()
 
   return (
-    <div className="flex-1 flex flex-col overflow-auto">
+    <div className="h-full overflow-y-auto">
       {/* Hero Section with Gradient */}
       <div
-        className={`relative flex-shrink-0 bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 pt-16 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 transition-all duration-1000 ${
+        className={`relative bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 pt-16 lg:pt-0 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 transition-all duration-1000 ${
           isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
@@ -106,9 +106,9 @@ export function EmptyWorkspaceView({
 
         <div className="relative z-10 w-full max-w-4xl">
           {/* Title */}
-            <h1 className="text-3xl font-bold text-white text-center mb-8 sm:mb-12 tracking-tight leading-tight px-2 sm:px-4 whitespace-nowrap overflow-x-auto">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white text-center mb-6 sm:mb-8 sm:mb-12 tracking-tight leading-tight px-2 sm:px-4">
               Ready to build something amazing?
-              <span className="block text-xs sm:text-sm text-pink-300 mt-2 font-normal whitespace-normal">Let PiPilot create your next web app in seconds.</span>
+              <span className="block text-xs sm:text-sm text-pink-300 mt-2 font-normal">Let PiPilot create your next web app in seconds.</span>
             </h1>
 
           {/* Chat Input Component */}
@@ -126,18 +126,10 @@ export function EmptyWorkspaceView({
       </div>
 
       {/* Projects Section */}
-      <div className="bg-gray-900 px-4 sm:px-6 py-4 sm:py-6 flex-1 overflow-auto">
+      <div className="bg-gray-900 px-4 sm:px-6 py-4 sm:py-6 flex-shrink-0">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
             <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
-              <button
-                onClick={() => setActiveTab('recently')}
-                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                  activeTab === 'recently' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Recently viewed
-              </button>
               <button
                 onClick={() => setActiveTab('projects')}
                 className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
@@ -163,19 +155,6 @@ export function EmptyWorkspaceView({
                 </select>
               </div>
 
-              {/* Sort Dropdown */}
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="activity">Last activity</option>
-                  <option value="name">Name</option>
-                  <option value="date">Created date</option>
-                </select>
-              </div>
-
               {/* Sort Order Toggle */}
               <button
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -185,10 +164,6 @@ export function EmptyWorkspaceView({
                 {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
               </button>
 
-              <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm">
-                <span>Browse all</span>
-                <ArrowUp size={14} className="rotate-45 sm:w-4 sm:h-4" />
-              </button>
             </div>
           </div>
 
