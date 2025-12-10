@@ -1431,7 +1431,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               
               <div className="flex flex-col min-w-0">
                 <h1 className="text-sm font-semibold truncate">
-                  {selectedProject?.name ? (selectedProject.name.length > 12 ? `${selectedProject.name.substring(0, 12)}...` : selectedProject.name) : 'No Project'}
+                  {selectedProject?.name ? (selectedProject.name.length > 12 ? `${selectedProject.name.substring(0, 12)}...` : selectedProject.name) : 'New Space'}
                 </h1>
                 {selectedFile && (
                   <p className="text-xs text-muted-foreground truncate">
@@ -1441,17 +1441,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </div>
             </div>
             
-            {/* Model Selector without label for mobile space optimization */}
-            <div className="flex-1 max-w-48 mx-2 flex items-center">
-              <ModelSelector
-                selectedModel={selectedModel}
-                onModelChange={setSelectedModel}
-                userPlan={userPlan}
-                subscriptionStatus={subscriptionStatus}
-                compact={true}
-                className="flex-1"
-              />
-            </div>
+            {/* Model Selector without label for mobile space optimization - only when project selected */}
+            {selectedProject && (
+              <div className="flex-1 max-w-48 mx-2 flex items-center">
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  userPlan={userPlan}
+                  subscriptionStatus={subscriptionStatus}
+                  compact={true}
+                  className="flex-1"
+                />
+              </div>
+            )}
             
             <div className="flex items-center space-x-1">
               <Button
