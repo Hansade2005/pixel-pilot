@@ -146,7 +146,7 @@ export function EmptyWorkspaceView({
 
         <div className="relative z-10 w-full max-w-4xl">
           {/* Title */}
-            <h1 className="text-2xl sm:text-3xl font-bold text-white text-center mb-4 sm:mb-5 tracking-tight leading-tight px-2 sm:px-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white text-center mt-6 mb-4 sm:mb-5 tracking-tight leading-tight px-2 sm:px-4">
               Ready to build something amazing?
               <span className="block text-xs sm:text-sm text-pink-300 mt-2 font-normal">Let PiPilot create your next web app in seconds.</span>
             </h1>

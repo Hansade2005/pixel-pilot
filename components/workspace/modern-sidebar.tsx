@@ -156,7 +156,7 @@ export function ModernSidebar({
       <div className="flex flex-col flex-1 w-full">
         {/* Header with Logo and Close Button */}
         <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
-          <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/workspace'}>
+          <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/'}>
             <div className="w-10 h-10 bg-gradient-to-br rounded-lg flex-shrink-0 flex items-center justify-center">
               <img src="https://pipilot.dev/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
             </div>
@@ -335,7 +335,7 @@ export function ModernSidebar({
           }`}
         >
           <Database size={18} />
-          {shouldExpand && <span className="ml-3 text-sm">Database</span>}
+          {shouldExpand && <span className="ml-3 text-sm">PiPilot DB</span>}
         </button>
 
         {/* AI Platform */}
@@ -346,7 +346,7 @@ export function ModernSidebar({
           }`}
         >
           <Sparkles size={18} />
-          {shouldExpand && <span className="ml-3 text-sm">AI</span>}
+          {shouldExpand && <span className="ml-3 text-sm">PiPilot AI</span>}
         </button>
 
         {/* Docs */}
