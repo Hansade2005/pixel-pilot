@@ -238,8 +238,8 @@ export function ProjectHeader({
         <div className="flex items-center space-x-4">
           <Logo variant="icon" size="sm" />
           <div>
-            <h1 className="text-lg font-semibold text-card-foreground">Welcome to PiPilot</h1>
-            <p className="text-sm text-muted-foreground">Create your first project to get started</p>
+            <h1 className="text-lg font-semibold text-card-foreground">Time to Ship</h1>
+            <p className="text-sm text-muted-foreground">Ask PiPilot</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
