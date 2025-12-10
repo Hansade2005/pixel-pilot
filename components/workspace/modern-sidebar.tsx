@@ -487,12 +487,7 @@ export function ModernSidebar({
         {/* Toggle button - always visible */}
         {onToggleExpanded && (
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('Toggle button clicked');
-              onToggleExpanded();
-            }}
+            onClick={onToggleExpanded}
             className="absolute top-5 -right-3 z-[100] p-1.5 bg-gray-800 border border-gray-700 rounded-full text-gray-300 hover:bg-gray-700 transition-all shadow-lg hover:scale-110"
             aria-label="Toggle sidebar width"
           >
