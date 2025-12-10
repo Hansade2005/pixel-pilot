@@ -156,7 +156,7 @@ export function ModernSidebar({
       <div className="flex flex-col flex-1 w-full">
         {/* Header with Logo and Close Button */}
         <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
-          <div className="flex items-center cursor-pointer" onClick={() => handleNavigation('/workspace')}>
+          <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/workspace'}>
             <div className="w-10 h-10 bg-gradient-to-br rounded-lg flex-shrink-0 flex items-center justify-center">
               <img src="https://pipilot.dev/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
             </div>
@@ -181,7 +181,7 @@ export function ModernSidebar({
         <nav className="flex flex-col space-y-1 px-2 py-3">
           {/* Home */}
           <button
-            onClick={() => handleNavigation('/workspace')}
+            onClick={() => window.location.href = '/workspace'}
             className={`flex items-center w-full h-10 px-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors ${
               shouldExpand ? 'justify-start' : 'justify-center'
             }`}
