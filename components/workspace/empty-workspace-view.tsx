@@ -5,6 +5,7 @@ import { ChatInput } from '@/components/chat-input'
 import { Button } from '@/components/ui/button'
 import { ArrowUp, Star, Sparkles, Filter, SortAsc, SortDesc } from 'lucide-react'
 import { ProjectGrid } from '@/components/project-grid'
+import { createClient } from '@/lib/supabase/client'
 import type { Workspace } from '@/lib/storage-manager'
 
 interface EmptyWorkspaceViewProps {
@@ -28,11 +29,50 @@ export function EmptyWorkspaceView({
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'activity'>('activity')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [filterBy, setFilterBy] = useState<'all' | 'recent' | 'week' | 'month'>('all')
+  const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoaded(true), 100)
     return () => clearTimeout(t)
   }, [])
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single()
+          
+          setUserProfile(profile)
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error)
+      }
+    }
+
+    fetchUserProfile()
+  }, [])
+
+  // Helper function to format user's name with possessive
+  const getUserProjectsTitle = () => {
+    if (userProfile?.full_name) {
+      const fullName = userProfile.full_name.trim()
+      // Get just the first word (first name)
+      const firstName = fullName.split(' ')[0]
+      // Handle names ending with s, x, z, etc. (add ' instead of 's)
+      if (firstName.toLowerCase().endsWith('s') || firstName.toLowerCase().endsWith('x') || firstName.toLowerCase().endsWith('z')) {
+        return `${firstName}' Projects`
+      }
+      return `${firstName}'s Projects`
+    }
+    return "My Projects"
+  }
 
   // Filter and sort projects
   const getFilteredAndSortedProjects = () => {
@@ -140,7 +180,7 @@ export function EmptyWorkspaceView({
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
               {/* Filter Dropdown */}
               <div className="relative">
                 <select
@@ -177,6 +217,10 @@ export function EmptyWorkspaceView({
                 {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
               </button>
 
+              <button className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm">
+                <span>Browse all</span>
+                <ArrowUp size={14} className="rotate-45 sm:w-4 sm:h-4" />
+              </button>
             </div>
           </div>
 
@@ -185,6 +229,7 @@ export function EmptyWorkspaceView({
             filterBy={filterBy}
             sortBy={sortBy}
             sortOrder={sortOrder}
+            userProfile={userProfile}
           />
         </div>
       </div>

@@ -31,6 +31,7 @@ interface ProjectGridProps {
   filterBy?: 'all' | 'recent' | 'week' | 'month'
   sortBy?: 'name' | 'date' | 'activity'
   sortOrder?: 'asc' | 'desc'
+  userProfile?: { full_name?: string } | null
 }
 
 // Helper function to generate thumbnail URLs
@@ -40,12 +41,27 @@ const generateThumbnailUrl = (projectName: string, description: string, seed: st
   return `https://api.a0.dev/assets/image?text=${encodeURIComponent(prompt)}&aspect=16:9&seed=${seed}`
 }
 
-export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder = 'desc' }: ProjectGridProps = {}) {
+export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder = 'desc', userProfile = null }: ProjectGridProps = {}) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
+
+  // Helper function to format user's name with possessive
+  const getUserProjectsTitle = () => {
+    if (userProfile?.full_name) {
+      const fullName = userProfile.full_name.trim()
+      // Get just the first word (first name)
+      const firstName = fullName.split(' ')[0]
+      // Handle names ending with s, x, z, etc. (add ' instead of 's)
+      if (firstName.toLowerCase().endsWith('s') || firstName.toLowerCase().endsWith('x') || firstName.toLowerCase().endsWith('z')) {
+        return `${firstName}' Projects`
+      }
+      return `${firstName}'s Projects`
+    }
+    return "Your Projects"
+  }
 
   const handleDeleteProject = async (projectId: string, event: React.MouseEvent) => {
     event.preventDefault() // Prevent navigation to project
@@ -231,7 +247,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       <section className="w-full max-w-7xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Your Projects
+            {getUserProjectsTitle()}
           </h2>
           <p className="text-white/70 text-lg mb-8">
             Sign in to view and manage your projects
@@ -252,7 +268,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       <section className="w-full max-w-7xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Your Projects
+            {getUserProjectsTitle()}
           </h2>
           <p className="text-white/70 text-lg">
             No projects yet. Start building something amazing!
@@ -276,7 +292,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
     <section className="w-full max-w-7xl mx-auto px-4 py-16">
       <div className="text-center mb-12">
         <h2 className="text-3xl font-bold text-white mb-4">
-          Your Projects
+          {getUserProjectsTitle()}
         </h2>
         <p className="text-white/70 text-lg">
           Continue working on your amazing projects

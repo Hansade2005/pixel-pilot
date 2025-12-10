@@ -52,6 +52,7 @@ import { storageManager } from "@/lib/storage-manager"
 export default function LandingPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<{ full_name?: string } | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [templates, setTemplates] = useState<any[]>([])
@@ -207,6 +208,19 @@ export default function LandingPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+
+      // Also fetch user profile for personalized titles
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+        
+        setUserProfile(profile)
+      } else {
+        setUserProfile(null)
+      }
     } catch (error) {
       console.error("Error checking user:", error)
     } finally {
@@ -373,7 +387,7 @@ export default function LandingPage() {
 
       {/* Projects Section */}
       <div className="relative z-10 w-full max-w-7xl mx-auto mb-16">
-        <ProjectGrid />
+        <ProjectGrid userProfile={userProfile} />
       </div>
 
       {/* From Pixel Community Section */}
