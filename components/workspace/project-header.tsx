@@ -243,8 +243,8 @@ export function ProjectHeader({
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Model selector even when no project */}
-          {selectedModel && onModelChange && (
+          {/* Model selector only when project is selected */}
+          {project && selectedModel && onModelChange && (
             <ModelSelector
               selectedModel={selectedModel}
               onModelChange={onModelChange}
@@ -257,7 +257,7 @@ export function ProjectHeader({
           }}>
             <Button variant="default" size="sm" onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Create Project
+              Create Manually
             </Button>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
