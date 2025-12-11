@@ -347,7 +347,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                 disabled={!selectedTemplate?.preview_url}
               >
                 {selectedTemplate?.preview_url ? (
-                  <a href={selectedTemplate.preview_url!} target="_blank" rel="noopener noreferrer">View Preview</a>
+                  <a href={selectedTemplate.preview_url!} target="_blank" rel="noopener noreferrer">Preview</a>
                 ) : (
                   'View Preview'
                 )}
