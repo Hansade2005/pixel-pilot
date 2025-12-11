@@ -67,6 +67,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [publishName, setPublishName] = useState('')
   const [publishDescription, setPublishDescription] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [publishPreviewUrl, setPublishPreviewUrl] = useState('')
 
   // Helper function to format user's name with possessive
   const getUserProjectsTitle = () => {
@@ -104,6 +105,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setProjectToPublish(project)
       setPublishName(project.name)
       setPublishDescription(project.description)
+      setPublishPreviewUrl('')
       setPublishDialogOpen(true)
     }
   }
@@ -140,7 +142,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
     try {
       const supabase = createClient()
-      
+
       // Get user's profile name
       const { data: profile } = await supabase
         .from('profiles')
@@ -170,7 +172,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           thumbnail_url: projectToPublish.thumbnail,
           author_name: profile?.full_name || null,
           files: filesData,
-          usage_count: 0
+          usage_count: 0,
+          preview_url: publishPreviewUrl || null
         })
 
       if (error) throw error
@@ -185,6 +188,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setProjectToPublish(null)
       setPublishName('')
       setPublishDescription('')
+      setPublishPreviewUrl('')
     }
   }
 
@@ -509,8 +513,10 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         project={projectToPublish}
         name={publishName}
         description={publishDescription}
+        previewUrl={publishPreviewUrl}
         onNameChange={setPublishName}
         onDescriptionChange={setPublishDescription}
+        onPreviewUrlChange={setPublishPreviewUrl}
         onConfirm={confirmPublishTemplate}
         isPublishing={isPublishing}
       />

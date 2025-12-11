@@ -36,6 +36,17 @@ interface TemplatesViewProps {
 }
 
 export function TemplatesView({ userId }: TemplatesViewProps) {
+    // State for editing template
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+    const [editPreviewUrl, setEditPreviewUrl] = useState('');
+    const [editTemplateId, setEditTemplateId] = useState<string | null>(null);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+    // State for delete confirmation
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
   const [templates, setTemplates] = useState<PublicTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTemplate, setSelectedTemplate] = useState<PublicTemplate | null>(null)
@@ -192,81 +203,232 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((template) => (
-              <Card key={template.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden group">
-                <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
-                  {template.thumbnail_url ? (
-                    <Image
-                      src={template.thumbnail_url}
-                      alt={template.name}
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/40 text-6xl">
-                      📄
+            {templates.map((template) => {
+              const isOwner = (template as any).user_id === userId;
+              return (
+                <Card key={template.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden group">
+                  <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
+                    {template.thumbnail_url ? (
+                      <Image
+                        src={template.thumbnail_url}
+                        alt={template.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/40 text-6xl">
+                        📄
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                    <div className="absolute top-3 right-3">
+                      <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 border-white/30 font-medium shadow-lg">
+                        {template.usage_count || 0} uses
+                      </Badge>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                  <div className="absolute top-3 right-3">
-                    <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 border-white/30 font-medium shadow-lg">
-                      {template.usage_count || 0} uses
-                    </Badge>
                   </div>
-                </div>
-                
-                <CardContent className="p-5 bg-gradient-to-b from-white/5 to-transparent">
-                  <h3 className="text-white font-bold text-lg mb-2 line-clamp-1">
-                    {template.name}
-                  </h3>
-                  <p className="text-white/60 text-sm line-clamp-2 mb-3">
-                    {template.description || 'No description provided'}
-                  </p>
-                  <div className="text-xs text-white/50 mb-4">
-                    by {template.author_name || 'Anonymous'}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleUseTemplate(template)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
-                      size="sm"
-                    >
-                      Use Template
-                    </Button>
-                    {template.preview_url ? (
+                  <CardContent className="p-5 bg-gradient-to-b from-white/5 to-transparent">
+                    <h3 className="text-white font-bold text-lg mb-2 line-clamp-1">
+                      {template.name}
+                    </h3>
+                    <p className="text-white/60 text-sm line-clamp-2 mb-3">
+                      {template.description || 'No description provided'}
+                    </p>
+                    <div className="text-xs text-white/50 mb-4">
+                      by {template.author_name || 'Anonymous'}
+                    </div>
+                    <div className="flex gap-2">
                       <Button
-                        asChild
-                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        onClick={() => handleUseTemplate(template)}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
                         size="sm"
                       >
-                        <a href={template.preview_url} target="_blank" rel="noopener noreferrer">
+                        Use Template
+                      </Button>
+                      {template.preview_url ? (
+                        <Button
+                          asChild
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          size="sm"
+                        >
+                          <a href={template.preview_url} target="_blank" rel="noopener noreferrer">
+                            <Eye className="h-4 w-4 mr-1" />
+                            Preview
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button
+                          className="flex-1 bg-green-600 hover:bg-green-700 opacity-50 cursor-not-allowed"
+                          size="sm"
+                          disabled
+                        >
                           <Eye className="h-4 w-4 mr-1" />
                           Preview
-                        </a>
-                      </Button>
-                    ) : (
+                        </Button>
+                      )}
                       <Button
-                        className="flex-1 bg-green-600 hover:bg-green-700 opacity-50 cursor-not-allowed"
+                        onClick={() => handleViewInfo(template)}
+                        variant="outline"
                         size="sm"
-                        disabled
+                        className="border-white/20 text-white hover:bg-white/10"
                       >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Preview
+                        <Info className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button
-                      onClick={() => handleViewInfo(template)}
-                      variant="outline"
-                      size="sm"
-                      className="border-white/20 text-white hover:bg-white/10"
-                    >
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      {isOwner && (
+                        <Button
+                          size="sm"
+                          className="bg-yellow-600 hover:bg-yellow-700"
+                          onClick={() => {
+                            setEditTemplateId(template.id);
+                            setEditName(template.name);
+                            setEditDescription(template.description || '');
+                            setEditPreviewUrl(template.preview_url || '');
+                            setIsEditModalOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {isOwner && (
+                        <Button
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700"
+                          onClick={() => {
+                            setDeleteTemplateId(template.id);
+                            setIsDeleteModalOpen(true);
+                          }}
+                        >
+                          🗑
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+                {/* Edit Template Modal */}
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                  <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Edit Template</DialogTitle>
+                      <DialogDescription>Edit your template details below.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm mb-1">Name</label>
+                        <input
+                          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white"
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          disabled={isSavingEdit}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Description</label>
+                        <textarea
+                          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white"
+                          value={editDescription}
+                          onChange={e => setEditDescription(e.target.value)}
+                          disabled={isSavingEdit}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Preview URL</label>
+                        <input
+                          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white"
+                          value={editPreviewUrl}
+                          onChange={e => setEditPreviewUrl(e.target.value)}
+                          disabled={isSavingEdit}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditModalOpen(false)}
+                        disabled={isSavingEdit}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          if (!editTemplateId) return;
+                          setIsSavingEdit(true);
+                          try {
+                            const supabase = createClient();
+                            const { error } = await supabase
+                              .from('public_templates')
+                              .update({
+                                name: editName,
+                                description: editDescription,
+                                preview_url: editPreviewUrl
+                              })
+                              .eq('id', editTemplateId)
+                              .eq('user_id', userId);
+                            if (error) throw error;
+                            toast({ title: 'Template updated', description: 'Your template was updated.' });
+                            setIsEditModalOpen(false);
+                            setEditTemplateId(null);
+                            fetchTemplates();
+                          } catch (error) {
+                            toast({ title: 'Error', description: 'Failed to update template', variant: 'destructive' });
+                          } finally {
+                            setIsSavingEdit(false);
+                          }
+                        }}
+                        disabled={isSavingEdit || !editName.trim()}
+                      >
+                        {isSavingEdit ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Delete Template Modal */}
+                <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+                  <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Delete Template</DialogTitle>
+                      <DialogDescription>Are you sure you want to delete this template? This action cannot be undone.</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsDeleteModalOpen(false)}
+                        disabled={isDeleting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={async () => {
+                          if (!deleteTemplateId) return;
+                          setIsDeleting(true);
+                          try {
+                            const supabase = createClient();
+                            const { error } = await supabase
+                              .from('public_templates')
+                              .delete()
+                              .eq('id', deleteTemplateId)
+                              .eq('user_id', userId);
+                            if (error) throw error;
+                            toast({ title: 'Template deleted', description: 'Your template was deleted.' });
+                            setIsDeleteModalOpen(false);
+                            setDeleteTemplateId(null);
+                            fetchTemplates();
+                          } catch (error) {
+                            toast({ title: 'Error', description: 'Failed to delete template', variant: 'destructive' });
+                          } finally {
+                            setIsDeleting(false);
+                          }
+                        }}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? 'Deleting...' : 'Delete'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
           </div>
         )}
       </div>
