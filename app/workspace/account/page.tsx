@@ -1664,32 +1664,7 @@ function AccountSettingsPageContent() {
                         </Badge>
                       </div>
 
-                      {/* Usage Limits */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                        
-                        </div>
-                        <Progress
-                          value={((subscription.deploymentsThisMonth || 0) / getLimits(subscription.plan).deploymentsPerMonth) * 100}
-                          className="h-2"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Resets monthly • {subscription.githubPushesThisMonth || 0} GitHub pushes used
-                        </p>
-                      </div>
-
-                      {/* Billing Information */}
-                      {subscription.subscriptionEndDate && (
-                        <div className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">Next billing date</span>
-                          </div>
-                          <span className="text-sm font-medium">
-                            {new Date(subscription.subscriptionEndDate).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
+                  
 
                      
                     </>
@@ -1717,123 +1692,80 @@ function AccountSettingsPageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  
-                  <Button variant="outline" className="w-full" onClick={handleViewDetailedUsage}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    View Detailed Usage
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Billing History Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
-                    Billing History
-                  </CardTitle>
-                  <CardDescription>
-                    View your past invoices and payments
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
                   <div className="space-y-3">
-                    {/* This would be populated with actual billing history */}
-                    <div className="text-center py-8">
-                      <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        No billing history available
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Invoices will appear here after your first payment
-                      </p>
+                    
+
+                    {/* Credits Section */}
+                    <div className="space-y-2 p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Coins className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Credits</span>
+                        </div>
+                        {loadingCredits ? (
+                          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        ) : (
+                          <span className="text-sm font-bold text-green-700 dark:text-green-300">
+                            {creditBalance !== null ? creditBalance.toFixed(2) : '0.00'}
+                          </span>
+                        )}
+                      </div>
+
+                      {!loadingCredits && creditBalance !== null && (
+                        <>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-green-700 dark:text-green-300">
+                              ~{estimatedMessages} messages remaining
+                            </span>
+                            <span className="text-green-600 dark:text-green-400 capitalize">
+                              {currentPlan} Plan
+                            </span>
+                          </div>
+
+                          {/* Credit Status Indicator */}
+                          <div className="flex items-center gap-2">
+                            {creditBalance > 10 ? (
+                              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                <TrendingUp className="h-3 w-3" />
+                                <span className="text-xs">Good balance</span>
+                              </div>
+                            ) : creditBalance > 2 ? (
+                              <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="text-xs">Low balance</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="text-xs">Very low</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Top Up Button */}
+                          {(creditBalance <= 2 || currentPlan === 'free') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
+                              onClick={() => setShowTopUpDialog(true)}
+                            >
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
+
+                    
                   </div>
 
-                  <Button variant="outline" className="w-full mt-4" onClick={handleDownloadAllInvoices}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download All Invoices
-                  </Button>
+                 
                 </CardContent>
               </Card>
 
-              {/* Billing Information Card */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Billing Information
-                  </CardTitle>
-                  <CardDescription>
-                    Manage your payment methods and billing details
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {subscription && subscription.plan !== 'free' && subscription.stripeCustomerId ? (
-                    <>
-                      {/* Payment Method - Only shown when Stripe customer exists */}
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium">Payment Method</h4>
-                        <div className="p-4 border rounded-lg bg-muted/30">
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Payment information is managed through Stripe
-                          </p>
-                          <Button variant="outline" size="sm" asChild>
-                            <a 
-                              href={`https://billing.stripe.com/p/login/test_${subscription.stripeCustomerId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Manage Payment Methods
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Billing Preferences */}
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium">Billing Preferences</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">Auto-renewal</span>
-                            <input
-                              type="checkbox"
-                              checked={!subscription.cancelAtPeriodEnd}
-                              disabled
-                              className="rounded"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Manage billing preferences in your{" "}
-                          <a 
-                            href="https://billing.stripe.com" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline"
-                          >
-                            Stripe customer portal
-                          </a>
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-4">
-                        {subscription && subscription.plan !== 'free' 
-                          ? "Billing information will be available once payment is processed"
-                          : "Billing information will be available once you subscribe to a paid plan"}
-                      </p>
-                      <Button asChild>
-                        <a href="/pricing">Choose a Plan</a>
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
+             
               {/* Connected Services Card */}
               <Card className="md:col-span-2">
                 <CardHeader>
