@@ -241,10 +241,11 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                       disabled={!template.preview_url}
                     >
                       {template.preview_url ? (
-                        <a href={template.preview_url} target="_blank" rel="noopener noreferrer">View Preview</a>
+                        <a href={template.preview_url} target="_blank" rel="noopener noreferrer">Preview  <Eye className="h-4 w-4" /></a>
                       ) : (
                         'View Preview'
                       )}
+                     
                     </Button>
                     <Button
                       onClick={() => handleViewInfo(template)}
