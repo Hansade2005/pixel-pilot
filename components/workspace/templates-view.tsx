@@ -28,6 +28,7 @@ interface PublicTemplate {
   usage_count: number
   files: any
   created_at: string
+  preview_url?: string | null
 }
 
 interface TemplatesViewProps {
@@ -234,6 +235,18 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                       Use Template
                     </Button>
                     <Button
+                      asChild
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      size="sm"
+                      disabled={!template.preview_url}
+                    >
+                      {template.preview_url ? (
+                        <a href={template.preview_url} target="_blank" rel="noopener noreferrer">View Preview</a>
+                      ) : (
+                        'View Preview'
+                      )}
+                    </Button>
+                    <Button
                       onClick={() => handleViewInfo(template)}
                       variant="outline"
                       size="sm"
@@ -277,6 +290,19 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   <h4 className="text-sm font-semibold text-gray-400 mb-1">Description</h4>
                   <p className="text-white">{selectedTemplate.description || 'No description provided'}</p>
                 </div>
+                {selectedTemplate.preview_url && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-400 mb-1">Preview URL</h4>
+                    <a
+                      href={selectedTemplate.preview_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 underline break-all"
+                    >
+                      {selectedTemplate.preview_url}
+                    </a>
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -298,7 +324,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             </div>
           )}
           
-          <DialogFooter className="flex-shrink-0">
+          <DialogFooter className="flex-shrink-0 gap-2">
             <Button
               variant="outline"
               onClick={() => setIsInfoModalOpen(false)}
@@ -306,13 +332,26 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             >
               Close
             </Button>
-            <Button
-              onClick={() => selectedTemplate && handleUseTemplate(selectedTemplate)}
-              disabled={isUsingTemplate}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isUsingTemplate ? 'Creating...' : 'Use Template'}
-            </Button>
+            <div className="flex w-full gap-2">
+              <Button
+                onClick={() => selectedTemplate && handleUseTemplate(selectedTemplate)}
+                disabled={isUsingTemplate}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                {isUsingTemplate ? 'Creating...' : 'Use Template'}
+              </Button>
+              <Button
+                asChild
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                disabled={!selectedTemplate?.preview_url}
+              >
+                {selectedTemplate?.preview_url ? (
+                  <a href={selectedTemplate.preview_url!} target="_blank" rel="noopener noreferrer">View Preview</a>
+                ) : (
+                  'View Preview'
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
