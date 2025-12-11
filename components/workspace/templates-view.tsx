@@ -183,11 +183,11 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60"></div>
         
         <div className="relative z-10 max-w-7xl mx-auto text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-            <Sparkles className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap">
+            <Sparkles className="h-6 w-6 sm:h-8 sm:w-8" />
             Community Templates
           </h1>
-          <p className="text-white/80 text-lg max-w-2xl mx-auto">
+          <p className="hidden sm:block text-white/80 text-lg max-w-2xl mx-auto">
             Start your next project with professionally crafted templates from our community
           </p>
         </div>
