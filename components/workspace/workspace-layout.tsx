@@ -1463,59 +1463,67 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
             
             <div className="flex items-center space-x-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={handleBackupToCloud}
-                disabled={!selectedProject || isBackingUp}
-                title={isBackingUp ? "Backing up..." : "Backup to Cloud"}
-              >
-                <DatabaseBackup className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setMobileTab("cloud")}
-                title="Cloud Services"
-              >
-                <Cloud className="h-4 w-4" />
-              </Button>
-             
-              
-             
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2"
-                onClick={() => setIsCreateDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-             
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
-                disabled={!selectedProject}
-                title="Deploy"
-              >
-                <Rocket className="h-4 w-4" />
-              </Button>
-              
-              {/* GitHub Push Button - only show when connected */}
-              {gitHubConnected && (
+              {selectedProject ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleBackupToCloud}
+                    disabled={!selectedProject || isBackingUp}
+                    title={isBackingUp ? "Backing up..." : "Backup to Cloud"}
+                  >
+                    <DatabaseBackup className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setMobileTab("cloud")}
+                    title="Cloud Services"
+                  >
+                    <Cloud className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => setIsCreateDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
+                    disabled={!selectedProject}
+                    title="Deploy"
+                  >
+                    <Rocket className="h-4 w-4" />
+                  </Button>
+                  {/* GitHub Push Button - only show when connected */}
+                  {gitHubConnected && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={handlePushToGitHub}
+                      disabled={!selectedProject || isPushing}
+                      title={isPushing ? "Pushing to GitHub..." : "Push to GitHub"}
+                    >
+                      <Github className={`h-4 w-4 ${isPushing ? 'animate-pulse' : ''}`} />
+                    </Button>
+                  )}
+                </>
+              ) : (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={handlePushToGitHub}
-                  disabled={!selectedProject || isPushing}
-                  title={isPushing ? "Pushing to GitHub..." : "Push to GitHub"}
+                  className="h-8 px-2"
+                  onClick={() => setIsCreateDialogOpen(true)}
                 >
-                  <Github className={`h-4 w-4 ${isPushing ? 'animate-pulse' : ''}`} />
+                  <Plus className="h-4 w-4" />
                 </Button>
               )}
             </div>
