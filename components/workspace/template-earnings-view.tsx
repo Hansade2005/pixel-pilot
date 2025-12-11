@@ -32,8 +32,8 @@ import {
 interface CreatorEarnings {
   total_earned: number
   total_paid_out: number
-  pending_payout: number
-  balance: number
+  pending_balance: number
+  available_balance: number
 }
 
 interface TemplateStats {
@@ -154,8 +154,8 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
       setEarnings({
         total_earned: creatorData.total_earned || 0,
         total_paid_out: creatorData.total_paid_out || 0,
-        pending_payout: creatorData.pending_payout || 0,
-        balance: creatorData.balance || 0
+        pending_balance: creatorData.pending_balance || 0,
+        available_balance: creatorData.available_balance || 0
       })
 
       // Fetch template stats
@@ -238,10 +238,10 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
         return
       }
 
-      if (!earnings || amount > earnings.pending_payout) {
+      if (!earnings || amount > earnings.pending_balance) {
         toast({
           title: 'Insufficient Balance',
-          description: `You only have $${earnings?.pending_payout.toFixed(2)} available for payout`,
+          description: `You only have $${earnings?.pending_balance.toFixed(2)} available for payout`,
           variant: 'destructive',
         })
         return
@@ -364,7 +364,7 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">${earnings.pending_payout.toFixed(2)}</div>
+                <div className="text-2xl font-bold">${earnings.pending_balance.toFixed(2)}</div>
                 <Clock className="h-4 w-4 text-blue-500" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">Ready to withdraw</p>
@@ -392,7 +392,7 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">${earnings.balance.toFixed(2)}</div>
+                <div className="text-2xl font-bold">${earnings.available_balance.toFixed(2)}</div>
                 <DollarSign className="h-4 w-4 text-purple-500" />
               </div>
               <p className="text-xs text-muted-foreground mt-2">Available to withdraw</p>
@@ -405,7 +405,7 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
       <div className="flex gap-3">
         <Button 
           onClick={() => setIsPayoutModalOpen(true)}
-          disabled={!earnings || earnings.pending_payout < 50}
+          disabled={!earnings || earnings.pending_balance < 50}
           className="gap-2"
         >
           <ArrowUp className="h-4 w-4" />
@@ -558,14 +558,14 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
               <>
                 <div className="bg-gray-100 p-3 rounded-lg">
                   <p className="text-sm text-muted-foreground">Available Balance</p>
-                  <p className="text-2xl font-bold">${earnings.pending_payout.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">${earnings.pending_balance.toFixed(2)}</p>
                 </div>
 
-                {earnings.pending_payout < 50 && (
+                {earnings.pending_balance < 50 && (
                   <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex gap-2">
                     <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-yellow-800">
-                      Minimum payout amount is $50.00. You need ${(50 - earnings.pending_payout).toFixed(2)} more.
+                      Minimum payout amount is $50.00. You need ${(50 - earnings.pending_balance).toFixed(2)} more.
                     </p>
                   </div>
                 )}
@@ -581,13 +581,13 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
                       placeholder="Enter amount"
                       value={payoutAmount}
                       onChange={(e) => setPayoutAmount(e.target.value)}
-                      max={earnings.pending_payout}
+                      max={earnings.pending_balance}
                       step="0.01"
                       min="50"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Minimum: $50.00 | Maximum: ${earnings.pending_payout.toFixed(2)}
+                    Minimum: $50.00 | Maximum: ${earnings.pending_balance.toFixed(2)}
                   </p>
                 </div>
 
@@ -612,7 +612,7 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
             </Button>
             <Button
               onClick={handleRequestPayout}
-              disabled={isRequestingPayout || !payoutAmount || !earnings || earnings.pending_payout < 50}
+              disabled={isRequestingPayout || !payoutAmount || !earnings || earnings.pending_balance < 50}
             >
               {isRequestingPayout ? 'Processing...' : 'Request Payout'}
             </Button>

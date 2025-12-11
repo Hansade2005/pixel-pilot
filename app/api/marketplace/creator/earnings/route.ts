@@ -198,9 +198,9 @@ async function handlePayoutRequest(supabase: any, userId: string, amount: number
     }
 
     // Check pending payout balance
-    if (wallet.pending_payout < amount) {
+    if (wallet.pending_balance < amount) {
       return NextResponse.json(
-        { error: `Insufficient pending balance. Available: $${wallet.pending_payout.toFixed(2)}` },
+        { error: `Insufficient pending balance. Available: $${wallet.pending_balance.toFixed(2)}` },
         { status: 400 }
       )
     }
@@ -235,11 +235,11 @@ async function handlePayoutRequest(supabase: any, userId: string, amount: number
       throw new Error(payoutError.message)
     }
 
-    // Update wallet - move from pending_payout to total_paid_out
+    // Update wallet - move from pending_balance to total_paid_out
     const { error: updateError } = await supabase
       .from('marketplace_wallet')
       .update({
-        pending_payout: wallet.pending_payout - amount,
+        pending_balance: wallet.pending_balance - amount,
         total_paid_out: wallet.total_paid_out + amount,
         balance: wallet.balance - amount,
         updated_at: new Date().toISOString()

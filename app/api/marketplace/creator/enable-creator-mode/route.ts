@@ -38,10 +38,10 @@ export async function POST(request: NextRequest) {
       .from('marketplace_wallet')
       .insert({
         creator_id: user.id,
-        balance: 0,
+        available_balance: 0,
+        pending_balance: 0,
         total_earned: 0,
-        total_paid_out: 0,
-        pending_payout: 0
+        total_paid_out: 0
       })
       .select()
       .single()

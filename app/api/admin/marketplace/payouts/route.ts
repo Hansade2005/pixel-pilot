@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
           .from('marketplace_wallet')
           .update({
             balance: wallet.balance + payout.amount,
-            pending_payout: wallet.pending_payout + payout.amount,
+            pending_balance: wallet.pending_balance + payout.amount,
             updated_at: new Date().toISOString()
           })
           .eq('creator_id', payout.creator_id)
