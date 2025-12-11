@@ -165,7 +165,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
     // Category filter
     const metadata = templateMetadata.get(template.id)
-    if (category && metadata?.category !== category) {
+    if (category && category !== 'all' && metadata?.category !== category) {
       return false
     }
 
@@ -419,7 +419,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent className="bg-gray-700 border-gray-600">
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="Dashboard">Dashboard</SelectItem>
                 <SelectItem value="E-Commerce">E-Commerce</SelectItem>
                 <SelectItem value="Portfolio">Portfolio</SelectItem>
