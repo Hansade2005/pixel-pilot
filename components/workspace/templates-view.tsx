@@ -251,8 +251,8 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
       {/* Template Info Modal */}
       <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[600px] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-2xl">{selectedTemplate?.name}</DialogTitle>
             <DialogDescription className="text-gray-400">
               Template Details
@@ -260,7 +260,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
           </DialogHeader>
           
           {selectedTemplate && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
               {selectedTemplate.thumbnail_url && (
                 <div className="relative aspect-video rounded-lg overflow-hidden">
                   <Image
@@ -298,7 +298,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             </div>
           )}
           
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => setIsInfoModalOpen(false)}
