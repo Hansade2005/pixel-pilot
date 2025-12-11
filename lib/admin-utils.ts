@@ -89,6 +89,20 @@ export const ADMIN_MENU_ITEMS = [
     permission: ADMIN_PERMISSIONS.MANAGE_BILLING
   },
   {
+    id: 'marketplace',
+    label: 'Marketplace',
+    icon: 'ShoppingCart',
+    href: '/admin/marketplace',
+    permission: ADMIN_PERMISSIONS.VIEW_ANALYTICS
+  },
+  {
+    id: 'payouts',
+    label: 'Payout Management',
+    icon: 'DollarSign',
+    href: '/admin/marketplace/payouts',
+    permission: ADMIN_PERMISSIONS.MANAGE_BILLING
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     icon: 'BarChart3',

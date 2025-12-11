@@ -13,6 +13,7 @@ import { Sidebar } from "./sidebar"
 import { ModernSidebar } from "./modern-sidebar"
 import { EmptyWorkspaceView } from "./empty-workspace-view"
 import { TemplatesView } from "./templates-view"
+import { TemplateEarningsView } from "./template-earnings-view"
 import { ChatPanel } from "./chat-panel"
 import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
@@ -1194,6 +1195,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {!isLoadingProjects && (clientProjects.length === 0 || !selectedProject) && (
               searchParams.get('view') === 'templates' ? (
                 <TemplatesView userId={user.id} />
+              ) : searchParams.get('view') === 'template-earnings' ? (
+                <TemplateEarningsView userId={user.id} />
               ) : (
                 <EmptyWorkspaceView
                   onAuthRequired={() => router.push('/auth/login')}
@@ -1534,6 +1537,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {clientProjects.length === 0 || !selectedProject ? (
               searchParams.get('view') === 'templates' ? (
                 <TemplatesView userId={user.id} />
+              ) : searchParams.get('view') === 'template-earnings' ? (
+                <TemplateEarningsView userId={user.id} />
               ) : (
                 <EmptyWorkspaceView
                   onAuthRequired={() => router.push('/auth/login')}

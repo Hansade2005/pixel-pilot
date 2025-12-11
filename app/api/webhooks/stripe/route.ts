@@ -231,11 +231,34 @@ export async function POST(request: NextRequest) {
       }
 
       case 'checkout.session.completed': {
-        // Handle one-time credit purchases
+        // Handle one-time credit purchases or marketplace purchases
         const session = event.data.object as Stripe.Checkout.Session
 
         if (session.mode === 'payment' && session.metadata?.user_id) {
           await handleCreditPurchase(session, supabase)
+        } else if (session.mode === 'payment' && session.metadata?.purchase_type) {
+          // Handle marketplace template/bundle purchases
+          await handleMarketplacePurchase(session, supabase)
+        }
+        break
+      }
+
+      case 'charge.succeeded': {
+        // Handle marketplace purchases via Stripe Payments (legacy)
+        const charge = event.data.object as Stripe.Charge
+
+        if (charge.metadata?.purchase_type === 'template' || charge.metadata?.purchase_type === 'bundle') {
+          await handleMarketplaceCharge(charge, supabase, 'sale')
+        }
+        break
+      }
+
+      case 'charge.refunded': {
+        // Handle marketplace purchase refunds
+        const charge = event.data.object as Stripe.Charge
+
+        if (charge.metadata?.purchase_type === 'template' || charge.metadata?.purchase_type === 'bundle') {
+          await handleMarketplaceCharge(charge, supabase, 'refund')
         }
         break
       }
@@ -400,4 +423,155 @@ function mapStripeStatus(stripeStatus: string): string {
   }
 
   return statusMap[stripeStatus] || 'inactive'
+}
+
+// Helper function to handle marketplace checkout sessions
+async function handleMarketplacePurchase(session: Stripe.Checkout.Session, supabase: any) {
+  const buyerId = session.metadata?.buyer_id
+  const creatorId = session.metadata?.creator_id
+  const templateIds = session.metadata?.template_ids?.split(',') || []
+  const bundleId = session.metadata?.bundle_id
+  const platformFee = parseFloat(session.metadata?.platform_fee || '0')
+  const creatorEarnings = parseFloat(session.metadata?.creator_earnings || '0')
+
+  if (!buyerId || !creatorId) return
+
+  // Update purchase status to completed
+  const { error: updateError } = await supabase
+    .from('template_purchases')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+    })
+    .eq('payment_intent_id', session.payment_intent as string)
+
+  if (updateError) {
+    console.error('Failed to update marketplace purchase:', updateError)
+    return
+  }
+
+  // Update creator marketplace wallet
+  const { data: wallet, error: walletError } = await supabase
+    .from('marketplace_wallet')
+    .select('*')
+    .eq('creator_id', creatorId)
+    .single()
+
+  if (walletError || !wallet) {
+    console.error('Failed to fetch creator marketplace wallet:', walletError)
+    return
+  }
+
+  // Update wallet balance
+  const newAvailableBalance = (wallet.available_balance || 0) + creatorEarnings
+  const newTotalEarned = (wallet.total_earned || 0) + creatorEarnings
+
+  await supabase
+    .from('marketplace_wallet')
+    .update({
+      available_balance: newAvailableBalance,
+      total_earned: newTotalEarned,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', wallet.id)
+
+  // Record transaction
+  await supabase
+    .from('marketplace_transactions')
+    .insert({
+      wallet_id: wallet.id,
+      transaction_type: 'sale',
+      amount: creatorEarnings,
+      reference_id: session.payment_intent,
+      description: bundleId ? 'Bundle sale' : 'Template sale',
+      created_at: new Date().toISOString(),
+    })
+
+  // Update creator profile earnings
+  await supabase
+    .from('profiles')
+    .update({
+      total_earnings: newTotalEarned,
+    })
+    .eq('id', creatorId)
+
+  // Update template metadata stats
+  if (templateIds.length > 0) {
+    for (const templateId of templateIds) {
+      const { data: metadata } = await supabase
+        .from('template_metadata')
+        .select('*')
+        .eq('template_id', templateId)
+        .single()
+
+      if (metadata) {
+        await supabase
+          .from('template_metadata')
+          .update({
+            total_sales: (metadata.total_sales || 0) + 1,
+            total_revenue: (metadata.total_revenue || 0) + creatorEarnings / templateIds.length,
+            total_downloads: (metadata.total_downloads || 0) + 1,
+          })
+          .eq('template_id', templateId)
+      }
+    }
+  }
+
+  console.log(`✅ Marketplace purchase completed: ${buyerId} → ${creatorId}, earnings: $${creatorEarnings}`)
+}
+
+// Helper function to handle marketplace charges (legacy Stripe Payments API)
+async function handleMarketplaceCharge(charge: Stripe.Charge, supabase: any, type: 'sale' | 'refund') {
+  const buyerId = charge.metadata?.buyer_id
+  const creatorId = charge.metadata?.creator_id
+  const templateIds = charge.metadata?.template_ids?.split(',') || []
+  const bundleId = charge.metadata?.bundle_id
+  const creatorEarnings = parseFloat(charge.metadata?.creator_earnings || '0')
+
+  if (!buyerId || !creatorId) return
+
+  // Update purchase status
+  const status = type === 'sale' ? 'completed' : 'refunded'
+  await supabase
+    .from('template_purchases')
+    .update({
+      status,
+      [type === 'sale' ? 'completed_at' : 'refunded_at']: new Date().toISOString(),
+    })
+    .eq('payment_intent_id', charge.payment_intent as string)
+
+  // Update marketplace wallet
+  const { data: wallet } = await supabase
+    .from('marketplace_wallet')
+    .select('*')
+    .eq('creator_id', creatorId)
+    .single()
+
+  if (!wallet) return
+
+  const walletAdjustment = type === 'sale' ? creatorEarnings : -creatorEarnings
+  const newAvailableBalance = (wallet.available_balance || 0) + walletAdjustment
+  const newTotalEarned = (wallet.total_earned || 0) + walletAdjustment
+
+  await supabase
+    .from('marketplace_wallet')
+    .update({
+      available_balance: Math.max(0, newAvailableBalance),
+      total_earned: Math.max(0, newTotalEarned),
+    })
+    .eq('id', wallet.id)
+
+  // Record transaction
+  await supabase
+    .from('marketplace_transactions')
+    .insert({
+      wallet_id: wallet.id,
+      transaction_type: type,
+      amount: walletAdjustment,
+      reference_id: charge.id,
+      description: type === 'sale' ? 'Sale' : 'Refund',
+      created_at: new Date().toISOString(),
+    })
+
+  console.log(`${type === 'sale' ? '✅' : '⚠️'} Marketplace ${type}: ${creatorId}, amount: $${Math.abs(walletAdjustment)}`)
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Info, Eye, Sparkles, Edit3, Trash2 } from 'lucide-react'
+import { Info, Eye, Sparkles, Edit3, Trash2, ShoppingCart, DollarSign, Star, MessageSquare, TrendingUp } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { storageManager } from '@/lib/storage-manager'
@@ -18,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface PublicTemplate {
   id: string
@@ -29,6 +36,28 @@ interface PublicTemplate {
   files: any
   created_at: string
   preview_url?: string | null
+  user_id?: string
+}
+
+interface TemplateMetadata {
+  template_id: string
+  category?: string
+  tags?: string[]
+  total_sales?: number
+  total_revenue?: number
+  total_downloads?: number
+  rating?: number
+  review_count?: number
+  featured?: boolean
+}
+
+interface TemplatePricing {
+  template_id: string
+  price: number
+  pricing_type: string
+  currency: string
+  discount_percent?: number
+  discount_active?: boolean
 }
 
 interface TemplatesViewProps {
@@ -55,6 +84,17 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
   const router = useRouter()
   const { toast } = useToast()
 
+  // Marketplace features state
+  const [templateMetadata, setTemplateMetadata] = useState<Map<string, TemplateMetadata>>(new Map())
+  const [templatePricing, setTemplatePricing] = useState<Map<string, TemplatePricing>>(new Map())
+  const [templateReviews, setTemplateReviews] = useState<Map<string, any[]>>(new Map())
+  const [category, setCategory] = useState<string>('')
+  const [sortBy, setSortBy] = useState<string>('trending')
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [showOnlyPaid, setShowOnlyPaid] = useState(false)
+  const [minPrice, setMinPrice] = useState<number>(0)
+  const [maxPrice, setMaxPrice] = useState<number>(999)
+
   useEffect(() => {
     fetchTemplates()
   }, [])
@@ -70,6 +110,35 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
       if (error) throw error
 
       setTemplates(data || [])
+
+      // Fetch marketplace metadata and pricing for all templates
+      if (data && data.length > 0) {
+        const templateIds = data.map((t: any) => t.id)
+        
+        // Fetch metadata
+        const { data: metadataList } = await supabase
+          .from('template_metadata')
+          .select('*')
+          .in('template_id', templateIds)
+        
+        if (metadataList) {
+          const metadataMap = new Map()
+          metadataList.forEach((m: any) => metadataMap.set(m.template_id, m))
+          setTemplateMetadata(metadataMap)
+        }
+
+        // Fetch pricing
+        const { data: pricingList } = await supabase
+          .from('template_pricing')
+          .select('*')
+          .in('template_id', templateIds)
+        
+        if (pricingList) {
+          const pricingMap = new Map()
+          pricingList.forEach((p: any) => pricingMap.set(p.template_id, p))
+          setTemplatePricing(pricingMap)
+        }
+      }
     } catch (error) {
       console.error('Error fetching templates:', error)
       toast({
@@ -82,9 +151,128 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
     }
   }
 
+  // Filter and sort templates
+  const filteredAndSortedTemplates = templates.filter(template => {
+    // Search filter
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase()
+      if (!template.name.toLowerCase().includes(lowerQuery) &&
+          !template.description?.toLowerCase().includes(lowerQuery) &&
+          !template.author_name?.toLowerCase().includes(lowerQuery)) {
+        return false
+      }
+    }
+
+    // Category filter
+    const metadata = templateMetadata.get(template.id)
+    if (category && metadata?.category !== category) {
+      return false
+    }
+
+    // Price filter
+    const pricing = templatePricing.get(template.id)
+    const price = pricing?.price || 0
+    if (showOnlyPaid && price === 0) {
+      return false
+    }
+    if (price < minPrice || price > maxPrice) {
+      return false
+    }
+
+    return true
+  }).sort((a, b) => {
+    const metaA = templateMetadata.get(a.id)
+    const metaB = templateMetadata.get(b.id)
+    const priceA = templatePricing.get(a.id)?.price || 0
+    const priceB = templatePricing.get(b.id)?.price || 0
+
+    switch (sortBy) {
+      case 'newest':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'price-low':
+        return priceA - priceB
+      case 'price-high':
+        return priceB - priceA
+      case 'top-rated':
+        return (metaB?.rating || 0) - (metaA?.rating || 0)
+      case 'trending':
+      default:
+        return (metaB?.total_downloads || 0) - (metaA?.total_downloads || 0)
+    }
+  })
+
   const handleViewInfo = (template: PublicTemplate) => {
     setSelectedTemplate(template)
+    fetchTemplateReviews(template.id)
     setIsInfoModalOpen(true)
+  }
+
+  const fetchTemplateReviews = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/marketplace/templates/${templateId}/reviews`)
+      if (response.ok) {
+        const data = await response.json()
+        setTemplateReviews(new Map(templateReviews).set(templateId, data.reviews || []))
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error)
+    }
+  }
+
+  const handlePurchaseTemplate = async (template: PublicTemplate) => {
+    if (!userId) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to purchase templates',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const pricing = templatePricing.get(template.id)
+    if (!pricing) {
+      toast({
+        title: 'Error',
+        description: 'Template pricing not found',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      const response = await fetch('/api/marketplace/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: template.id })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Purchase failed')
+      }
+
+      const result = await response.json()
+
+      if (result.access_granted) {
+        // Free template - access granted immediately
+        toast({
+          title: 'Success',
+          description: `You now have access to ${template.name}!`,
+        })
+        // Close modal and redirect to use template
+        setIsInfoModalOpen(false)
+        handleUseTemplate(template)
+      } else if (result.checkout_url) {
+        // Paid template - redirect to Stripe checkout
+        window.location.href = result.checkout_url
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to purchase template',
+        variant: 'destructive'
+      })
+    }
   }
 
   const handleUseTemplate = async (template: PublicTemplate) => {
@@ -182,29 +370,127 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
       <div className="relative bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 py-12 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60"></div>
         
-        <div className="relative z-10 max-w-7xl mx-auto text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap">
-            <Sparkles className="h-6 w-6 sm:h-8 sm:w-8" />
-            Community Templates
-          </h1>
-          <p className="hidden sm:block text-white/80 text-lg max-w-2xl mx-auto">
-            Start your next project with professionally crafted templates from our community
-          </p>
+        <div className="relative z-10 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="text-center flex-1">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap">
+                <Sparkles className="h-6 w-6 sm:h-8 sm:w-8" />
+                Template Marketplace
+              </h1>
+              <p className="hidden sm:block text-white/80 text-lg max-w-2xl mx-auto">
+                Browse, purchase, and explore premium templates from our creator community
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search)
+                params.set('view', 'template-earnings')
+                window.location.href = `/workspace?${params.toString()}`
+              }}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold gap-2 whitespace-nowrap"
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">My Earnings</span>
+              <span className="sm:hidden">Earnings</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters & Search Section */}
+      <div className="bg-gray-800/50 border-b border-gray-700 sticky top-0 z-20 py-4 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto space-y-4">
+          {/* Search Bar */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search templates by name, description, or creator..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Filter and Sort Controls */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Category Filter */}
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-700 border-gray-600">
+                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="Dashboard">Dashboard</SelectItem>
+                <SelectItem value="E-Commerce">E-Commerce</SelectItem>
+                <SelectItem value="Portfolio">Portfolio</SelectItem>
+                <SelectItem value="AI">AI Tools</SelectItem>
+                <SelectItem value="SaaS">SaaS</SelectItem>
+                <SelectItem value="Business">Business</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sort Filter */}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-700 border-gray-600">
+                <SelectItem value="trending">Trending</SelectItem>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="price-low">Price: Low to High</SelectItem>
+                <SelectItem value="price-high">Price: High to Low</SelectItem>
+                <SelectItem value="top-rated">Top Rated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Price Range Min */}
+            <input
+              type="number"
+              placeholder="Min price"
+              value={minPrice}
+              onChange={(e) => setMinPrice(Number(e.target.value))}
+              className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            {/* Price Range Max */}
+            <input
+              type="number"
+              placeholder="Max price"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(Number(e.target.value))}
+              className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Paid Only Checkbox */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="paidOnly"
+              checked={showOnlyPaid}
+              onChange={(e) => setShowOnlyPaid(e.target.checked)}
+              className="rounded border-gray-600"
+            />
+            <label htmlFor="paidOnly" className="text-sm text-white/80">Show only paid templates</label>
+          </div>
         </div>
       </div>
 
       {/* Templates Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {templates.length === 0 ? (
+        {filteredAndSortedTemplates.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">📦</div>
-            <h3 className="text-xl font-semibold text-white mb-2">No Templates Yet</h3>
-            <p className="text-white/60">Be the first to publish a template!</p>
+            <h3 className="text-xl font-semibold text-white mb-2">No Templates Found</h3>
+            <p className="text-white/60">Try adjusting your filters or search query</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((template) => {
-              const isOwner = (template as any).user_id === userId;
+            {filteredAndSortedTemplates.map((template) => {
+              const isOwner = template.user_id === userId;
+              const metadata = templateMetadata.get(template.id)
+              const pricing = templatePricing.get(template.id)
+              const reviews = templateReviews.get(template.id) || []
               return (
                 <Card key={template.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden group relative">
                   {/* Edit/Delete Icon Buttons (top left) */}
@@ -239,6 +525,16 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                       </button>
                     </div>
                   )}
+
+                  {/* Price Badge (top right) */}
+                  {pricing && (
+                    <div className="absolute top-3 right-3 z-10">
+                      <Badge className={pricing.price === 0 ? 'bg-green-500/90 text-white' : 'bg-blue-500/90 text-white'}>
+                        {pricing.price === 0 ? 'Free' : `$${pricing.price.toFixed(2)}`}
+                      </Badge>
+                    </div>
+                  )}
+
                   <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
                     {template.thumbnail_url ? (
                       <Image
@@ -253,34 +549,62 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                    <div className="absolute top-3 right-3">
-                      <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 border-white/30 font-medium shadow-lg">
-                        {template.usage_count || 0} uses
-                      </Badge>
+                    
+                    {/* Stats badges */}
+                    <div className="absolute bottom-3 left-3 flex gap-2 flex-wrap">
+                      {metadata?.total_downloads && (
+                        <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 text-xs">
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                          {metadata.total_downloads} downloads
+                        </Badge>
+                      )}
+                      {metadata?.rating && (
+                        <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 text-xs">
+                          <Star className="w-3 h-3 mr-1" />
+                          {metadata.rating.toFixed(1)}
+                        </Badge>
+                      )}
+                      {metadata?.featured && (
+                        <Badge className="bg-yellow-500/90 text-white text-xs">Featured</Badge>
+                      )}
                     </div>
                   </div>
+
                   <CardContent className="p-5 bg-gradient-to-b from-white/5 to-transparent">
-                    <h3 className="text-white font-bold text-lg mb-2 line-clamp-1">
+                    <h3 className="text-white font-bold text-lg mb-1 line-clamp-1">
                       {template.name}
                     </h3>
+                    {metadata?.category && (
+                      <Badge variant="outline" className="mb-2 text-xs">{metadata.category}</Badge>
+                    )}
                     <p className="text-white/60 text-sm line-clamp-2 mb-3">
                       {template.description || 'No description provided'}
                     </p>
                     <div className="text-xs text-white/50 mb-4">
                       by {template.author_name || 'Anonymous'}
                     </div>
-                    <div className="flex gap-2">
+
+                    {/* Review Count */}
+                    {metadata?.review_count && (
+                      <div className="flex items-center gap-1 text-xs text-white/60 mb-3">
+                        <MessageSquare className="w-3 h-3" />
+                        {metadata.review_count} review{metadata.review_count !== 1 ? 's' : ''}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-2">
                       <Button
-                        onClick={() => handleUseTemplate(template)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        onClick={() => handlePurchaseTemplate(template)}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
                         size="sm"
                       >
-                        Use Template
+                        <ShoppingCart className="h-4 w-4 mr-1" />
+                        {pricing?.price === 0 ? 'Get Access' : 'Purchase'}
                       </Button>
                       {template.preview_url ? (
                         <Button
                           asChild
-                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          className="w-full bg-green-600 hover:bg-green-700"
                           size="sm"
                         >
                           <a href={template.preview_url} target="_blank" rel="noopener noreferrer">
@@ -290,7 +614,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         </Button>
                       ) : (
                         <Button
-                          className="flex-1 bg-green-600 hover:bg-green-700 opacity-50 cursor-not-allowed"
+                          className="w-full bg-green-600 hover:bg-green-700 opacity-50 cursor-not-allowed"
                           size="sm"
                           disabled
                         >
@@ -302,16 +626,19 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         onClick={() => handleViewInfo(template)}
                         variant="outline"
                         size="sm"
-                        className="border-white/20 text-white hover:bg-white/10"
+                        className="w-full border-white/20 text-white hover:bg-white/10"
                       >
-                        <Info className="h-4 w-4" />
+                        <Info className="h-4 w-4 mr-1" />
+                        Details
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
               );
             })}
-                {/* Edit Template Modal */}
+          </div>
+        )}
+      </div>
                 <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                   <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-md">
                     <DialogHeader>
@@ -434,12 +761,9 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-          </div>
-        )}
-      </div>
 
-      {/* Template Info Modal */}
-      <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
+                {/* Edit Template Modal */}
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[600px] flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-2xl">{selectedTemplate?.name}</DialogTitle>
@@ -496,6 +820,33 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   <h4 className="text-sm font-semibold text-gray-400 mb-1">Created</h4>
                   <p className="text-white">{new Date(selectedTemplate.created_at).toLocaleDateString()}</p>
                 </div>
+
+                {/* Reviews Section */}
+                {selectedTemplate && templateReviews.get(selectedTemplate.id) && templateReviews.get(selectedTemplate.id)!.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-400 mb-2">Recent Reviews</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {templateReviews.get(selectedTemplate.id)!.slice(0, 3).map((review: any) => (
+                        <div key={review.id} className="bg-white/5 p-2 rounded text-xs">
+                          <div className="flex items-center gap-1 mb-1">
+                            <div className="flex">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-3 h-3 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-white/60 ml-auto">
+                              {review.profiles?.username || 'Anonymous'}
+                            </span>
+                          </div>
+                          <p className="text-white/80">{review.review_text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -510,11 +861,12 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             </Button>
             <div className="flex w-full gap-2">
               <Button
-                onClick={() => selectedTemplate && handleUseTemplate(selectedTemplate)}
+                onClick={() => selectedTemplate && handlePurchaseTemplate(selectedTemplate)}
                 disabled={isUsingTemplate}
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
-                {isUsingTemplate ? 'Creating...' : 'Use Template'}
+                <ShoppingCart className="h-4 w-4 mr-1" />
+                {isUsingTemplate ? 'Processing...' : (templatePricing.get(selectedTemplate?.id || '')?.price === 0 ? 'Get Access' : 'Purchase')}
               </Button>
               <Button
                 asChild
