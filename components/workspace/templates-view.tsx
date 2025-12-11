@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Info, Eye, Sparkles } from 'lucide-react'
+import { Info, Eye, Sparkles, Edit3, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { storageManager } from '@/lib/storage-manager'
@@ -206,7 +206,39 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             {templates.map((template) => {
               const isOwner = (template as any).user_id === userId;
               return (
-                <Card key={template.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden group">
+                <Card key={template.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden group relative">
+                  {/* Edit/Delete Icon Buttons (top left) */}
+                  {isOwner && (
+                    <div className="absolute top-3 left-3 flex gap-2 z-10">
+                      <button
+                        title="Edit Template"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setEditTemplateId(template.id);
+                          setEditName(template.name);
+                          setEditDescription(template.description || '');
+                          setEditPreviewUrl(template.preview_url || '');
+                          setIsEditModalOpen(true);
+                        }}
+                        className="p-2 bg-yellow-500/90 hover:bg-yellow-600 text-white rounded-full shadow-lg transition-all duration-200"
+                        style={{ lineHeight: 0 }}
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        title="Delete Template"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setDeleteTemplateId(template.id);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="p-2 bg-red-500/90 hover:bg-red-600 text-white rounded-full shadow-lg transition-all duration-200"
+                        style={{ lineHeight: 0 }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
                     {template.thumbnail_url ? (
                       <Image
@@ -274,33 +306,6 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                       >
                         <Info className="h-4 w-4" />
                       </Button>
-                      {isOwner && (
-                        <Button
-                          size="sm"
-                          className="bg-yellow-600 hover:bg-yellow-700"
-                          onClick={() => {
-                            setEditTemplateId(template.id);
-                            setEditName(template.name);
-                            setEditDescription(template.description || '');
-                            setEditPreviewUrl(template.preview_url || '');
-                            setIsEditModalOpen(true);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                      {isOwner && (
-                        <Button
-                          size="sm"
-                          className="bg-red-600 hover:bg-red-700"
-                          onClick={() => {
-                            setDeleteTemplateId(template.id);
-                            setIsDeleteModalOpen(true);
-                          }}
-                        >
-                          🗑
-                        </Button>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
