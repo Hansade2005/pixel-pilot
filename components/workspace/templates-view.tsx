@@ -234,19 +234,27 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                     >
                       Use Template
                     </Button>
-                    <Button
-                      asChild
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      size="sm"
-                      disabled={!template.preview_url}
-                    >
-                      {template.preview_url ? (
-                        <a href={template.preview_url} target="_blank" rel="noopener noreferrer">Preview  <Eye className="h-4 w-4" /></a>
-                      ) : (
-                        'View Preview'
-                      )}
-                     
-                    </Button>
+                    {template.preview_url ? (
+                      <Button
+                        asChild
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        size="sm"
+                      >
+                        <a href={template.preview_url} target="_blank" rel="noopener noreferrer">
+                          <Eye className="h-4 w-4 mr-1" />
+                          Preview
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        className="flex-1 bg-green-600 hover:bg-green-700 opacity-50 cursor-not-allowed"
+                        size="sm"
+                        disabled
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Preview
+                      </Button>
+                    )}
                     <Button
                       onClick={() => handleViewInfo(template)}
                       variant="outline"
