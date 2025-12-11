@@ -12,6 +12,7 @@ import type { Workspace, File } from "@/lib/storage-manager"
 import { Sidebar } from "./sidebar"
 import { ModernSidebar } from "./modern-sidebar"
 import { EmptyWorkspaceView } from "./empty-workspace-view"
+import { TemplatesView } from "./templates-view"
 import { ChatPanel } from "./chat-panel"
 import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
@@ -1191,9 +1192,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Empty State - No Projects OR No Project Selected */}
             {!isLoadingProjects && (clientProjects.length === 0 || !selectedProject) && (
-              <EmptyWorkspaceView
-                onAuthRequired={() => router.push('/auth/login')}
-                onProjectCreated={async (newProject) => {
+              searchParams.get('view') === 'templates' ? (
+                <TemplatesView userId={user.id} />
+              ) : (
+                <EmptyWorkspaceView
+                  onAuthRequired={() => router.push('/auth/login')}
+                  onProjectCreated={async (newProject) => {
                   // Refresh projects when a new one is created
                   try {
                     await storageManager.init()
@@ -1226,8 +1230,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     console.error('Error refreshing projects after creation:', error)
                   }
                 }}
-                recentProjects={[]}
-              />
+                  recentProjects={[]}
+                />
+              )
             )}
 
             {/* Status Bar */}
@@ -1519,9 +1524,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           {/* Mobile Content with top padding for fixed header and bottom padding for fixed tabs */}
           <div className="flex-1 min-h-0 pt-14 pb-12">
             {clientProjects.length === 0 || !selectedProject ? (
-              <EmptyWorkspaceView
-                onAuthRequired={() => router.push('/auth/login')}
-                onProjectCreated={async (newProject) => {
+              searchParams.get('view') === 'templates' ? (
+                <TemplatesView userId={user.id} />
+              ) : (
+                <EmptyWorkspaceView
+                  onAuthRequired={() => router.push('/auth/login')}
+                  onProjectCreated={async (newProject) => {
                   // Refresh projects when a new one is created
                   try {
                     await storageManager.init()
@@ -1555,6 +1563,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   lastActivity: p.lastActivity
                 }))}
               />
+              )
             ) : (
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">

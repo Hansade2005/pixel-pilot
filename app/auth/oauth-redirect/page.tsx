@@ -31,7 +31,7 @@ export default function OAuthRedirectPage() {
         if (session?.user) {
           toast({
             title: 'Success',
-            description: 'Successfully signed in with GitHub!',
+            description: 'Successfully signed in!',
           })
           router.push('/workspace')
         } else {

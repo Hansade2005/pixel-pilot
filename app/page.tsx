@@ -100,9 +100,47 @@ export default function LandingPage() {
     }
   }, [isDropdownOpen])
 
-  const loadTemplates = () => {
-    const templateData = TemplateManager.getAllTemplates()
-    setTemplates(templateData)
+  const loadTemplates = async () => {
+    try {
+      // Get static templates from TemplateManager
+      const staticTemplates = TemplateManager.getAllTemplates()
+      
+      // Get public templates from Supabase
+      const supabase = createClient()
+      const { data: publicTemplates, error } = await supabase
+        .from('public_templates')
+        .select('*')
+        .order('usage_count', { ascending: false })
+      
+      if (error) {
+        console.error('Error fetching public templates:', error)
+        setTemplates(staticTemplates)
+        return
+      }
+      
+      // Transform public templates to match the existing template format
+      const transformedPublicTemplates = (publicTemplates || []).map(template => ({
+        id: `public-${template.id}`,
+        title: template.name,
+        description: template.description || 'A community template',
+        thumbnailUrl: template.thumbnail_url || 'https://via.placeholder.com/400x300?text=Template',
+        category: 'Community',
+        remixes: template.usage_count || 0,
+        author: template.author_name || 'Anonymous',
+        files: template.files,
+        isPublicTemplate: true,
+        publicTemplateId: template.id
+      }))
+      
+      // Combine both template sources
+      const allTemplates = [...staticTemplates, ...transformedPublicTemplates]
+      setTemplates(allTemplates)
+    } catch (error) {
+      console.error('Error loading templates:', error)
+      // Fallback to static templates only
+      const templateData = TemplateManager.getAllTemplates()
+      setTemplates(templateData)
+    }
   }
 
   const handleDownloadTemplate = async (templateId: string) => {
@@ -166,9 +204,36 @@ export default function LandingPage() {
         slug
       })
 
-      // Apply template files to workspace
-      const { TemplateManager } = await import('@/lib/template-manager')
-      await TemplateManager.applyTemplate(template.id, workspace.id)
+      // Check if this is a public template or static template
+      if (template.isPublicTemplate && template.files) {
+        // Handle public template - copy files directly from JSONB
+        const files = Array.isArray(template.files) ? template.files : []
+        
+        for (const file of files) {
+          await storageManager.createFile({
+            workspaceId: workspace.id,
+            name: file.name,
+            content: file.content,
+            path: file.path || '/',
+            type: file.type || 'file',
+            fileType: file.fileType || 'text',
+            size: file.content?.length || 0,
+            isDirectory: false
+          })
+        }
+        
+        // Increment usage count for public template
+        if (template.publicTemplateId) {
+          const supabase = createClient()
+          await supabase.rpc('increment_template_usage', { 
+            template_id: template.publicTemplateId 
+          })
+        }
+      } else {
+        // Handle static template - use TemplateManager
+        const { TemplateManager } = await import('@/lib/template-manager')
+        await TemplateManager.applyTemplate(template.id, workspace.id)
+      }
 
       // Create initial checkpoint (same pattern as GitHub import)
       try {

@@ -39,7 +39,8 @@ import {
   CreditCard,
   TrendingUp,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  Layout
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -270,6 +271,17 @@ export function ModernSidebar({
           >
             <Search size={18} />
             {shouldExpand && <span className="ml-3 text-sm">Search</span>}
+          </button>
+
+          {/* Templates */}
+          <button
+            onClick={() => router.push('/workspace?view=templates')}
+            className={`flex items-center w-full h-10 px-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors ${
+              shouldExpand ? 'justify-start' : 'justify-center'
+            }`}
+          >
+            <Layout size={18} />
+            {shouldExpand && <span className="ml-3 text-sm">Templates</span>}
           </button>
 
           {/* All Works Accordion */}

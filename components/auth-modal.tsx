@@ -68,6 +68,26 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   }
 
   const handleGitHubAuth = async () => {
+      const handleGoogleAuth = async () => {
+        const supabase = createClient()
+        setIsLoading(true)
+        setError(null)
+
+        try {
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              scopes: 'openid email profile',
+              redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
+            },
+          })
+          if (error) throw error
+          // Google OAuth will redirect, so we don't need to handle success here
+        } catch (error: unknown) {
+          setError(error instanceof Error ? error.message : "An error occurred")
+          setIsLoading(false)
+        }
+      }
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
@@ -112,7 +132,8 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* GitHub OAuth Button */}
+
+          {/* OAuth Buttons */}
           <Button
             type="button"
             variant="outline"
@@ -122,6 +143,25 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           >
             <Github className="h-4 w-4 mr-2" />
             Continue with GitHub
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600 hover:border-gray-500"
+            onClick={handleGoogleAuth}
+            disabled={isLoading}
+          >
+            <img
+              src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/google.svg"
+              alt="Google"
+              className="h-4 w-4 mr-2"
+              style={{ filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)' }}
+            />
+            Continue with Google
+            <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded-full font-medium">
+              New
+            </span>
           </Button>
 
           <div className="relative">

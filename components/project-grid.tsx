@@ -2,13 +2,14 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Trash2 } from "lucide-react"
+import { ExternalLink, Trash2, Upload, Share2 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
 import { timeAgo } from "@/lib/utils"
+import { PublishTemplateDialog } from "./workspace/publish-template-dialog"
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Pagination,
   PaginationContent,
@@ -58,6 +62,11 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const itemsPerPage = 6
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [projectToPublish, setProjectToPublish] = useState<Project | null>(null)
+  const [publishName, setPublishName] = useState('')
+  const [publishDescription, setPublishDescription] = useState('')
+  const [isPublishing, setIsPublishing] = useState(false)
 
   // Helper function to format user's name with possessive
   const getUserProjectsTitle = () => {
@@ -86,6 +95,19 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
     }
   }
 
+  const handlePublishTemplate = async (projectId: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setProjectToPublish(project)
+      setPublishName(project.name)
+      setPublishDescription(project.description)
+      setPublishDialogOpen(true)
+    }
+  }
+
   const confirmDeleteProject = async () => {
     if (!projectToDelete || !user) return
 
@@ -108,6 +130,61 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
     } finally {
       setDeleteDialogOpen(false)
       setProjectToDelete(null)
+    }
+  }
+
+  const confirmPublishTemplate = async () => {
+    if (!projectToPublish || !user) return
+
+    setIsPublishing(true)
+
+    try {
+      const supabase = createClient()
+      
+      // Get user's profile name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+
+      // Get project files
+      await storageManager.init()
+      const files = await storageManager.getFiles(projectToPublish.id)
+
+      // Prepare files for JSONB storage
+      const filesData = files.map(file => ({
+        name: file.name,
+        content: file.content,
+        path: file.path,
+        type: file.type
+      }))
+
+      // Insert into public_templates table
+      const { error } = await supabase
+        .from('public_templates')
+        .insert({
+          user_id: user.id,
+          name: publishName,
+          description: publishDescription,
+          thumbnail_url: projectToPublish.thumbnail,
+          author_name: profile?.full_name || null,
+          files: filesData,
+          usage_count: 0
+        })
+
+      if (error) throw error
+
+      alert('Template published successfully!')
+    } catch (error) {
+      console.error('Error publishing template:', error)
+      alert('Failed to publish template. Please try again.')
+    } finally {
+      setIsPublishing(false)
+      setPublishDialogOpen(false)
+      setProjectToPublish(null)
+      setPublishName('')
+      setPublishDescription('')
     }
   }
 
@@ -374,6 +451,13 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
             >
               <Trash2 className="w-4 h-4" />
             </button>
+            <button
+              onClick={(e) => handlePublishTemplate(project.id, e)}
+              className="absolute top-3 left-14 p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              title="Publish as template"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
           </div>
         ))}
       </div>
@@ -416,6 +500,19 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         onOpenChange={setDeleteDialogOpen}
         project={projectToDelete}
         onConfirm={confirmDeleteProject}
+      />
+
+      {/* Publish Template Dialog */}
+      <PublishTemplateDialog
+        open={publishDialogOpen}
+        onOpenChange={setPublishDialogOpen}
+        project={projectToPublish}
+        name={publishName}
+        description={publishDescription}
+        onNameChange={setPublishName}
+        onDescriptionChange={setPublishDescription}
+        onConfirm={confirmPublishTemplate}
+        isPublishing={isPublishing}
       />
     </section>
   )

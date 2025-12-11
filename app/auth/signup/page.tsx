@@ -39,7 +39,7 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/workspace`,
           data: {
             full_name: fullName,
           },
@@ -64,7 +64,7 @@ export default function SignupPage() {
         provider: 'github',
         options: {
           scopes: 'read:user',
-          redirectTo: `${window.location.origin}/api/auth/callback?next=/`,
+          redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
         },
       })
       if (error) throw error
@@ -84,7 +84,7 @@ export default function SignupPage() {
         provider: 'google',
         options: {
           scopes: 'openid email profile',
-          redirectTo: `${window.location.origin}/api/auth/callback?next=/`,
+          redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
         },
       })
       if (error) throw error
