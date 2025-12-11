@@ -1667,10 +1667,7 @@ function AccountSettingsPageContent() {
                       {/* Usage Limits */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Deployments This Month</span>
-                          <span className="text-sm text-muted-foreground">
-                            {subscription.deploymentsThisMonth || 0} / {getLimits(subscription.plan).deploymentsPerMonth}
-                          </span>
+                        
                         </div>
                         <Progress
                           value={((subscription.deploymentsThisMonth || 0) / getLimits(subscription.plan).deploymentsPerMonth) * 100}
@@ -1694,29 +1691,7 @@ function AccountSettingsPageContent() {
                         </div>
                       )}
 
-                      {/* Action Buttons */}
-                      <div className="flex gap-2">
-                        {subscription.plan !== 'enterprise' && (
-                          <Button
-                            variant="outline"
-                            onClick={() => handleUpgradePlan('enterprise')}
-                            className="flex-1"
-                          >
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            Upgrade to Enterprise
-                          </Button>
-                        )}
-                        {subscription.plan !== 'free' && (
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelSubscription}
-                            className="flex-1 text-red-600 hover:text-red-700"
-                          >
-                            <AlertTriangle className="h-4 w-4 mr-2" />
-                            Cancel Subscription
-                          </Button>
-                        )}
-                      </div>
+                     
                     </>
                   ) : (
                     <div className="text-center py-8">
@@ -1742,91 +1717,7 @@ function AccountSettingsPageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Download className="h-4 w-4 text-blue-500" />
-                        <span className="text-sm">Deployments</span>
-                      </div>
-                      <span className="text-sm font-medium">
-                        {usageStats.deploymentsThisMonth} / {getLimits(subscription?.plan || 'free').deploymentsPerMonth}
-                      </span>
-                    </div>
-
-                    {/* Credits Section */}
-                    <div className="space-y-2 p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-lg border">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Coins className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-800 dark:text-green-200">Credits</span>
-                        </div>
-                        {loadingCredits ? (
-                          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                        ) : (
-                          <span className="text-sm font-bold text-green-700 dark:text-green-300">
-                            {creditBalance !== null ? creditBalance.toFixed(2) : '0.00'}
-                          </span>
-                        )}
-                      </div>
-
-                      {!loadingCredits && creditBalance !== null && (
-                        <>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-green-700 dark:text-green-300">
-                              ~{estimatedMessages} messages remaining
-                            </span>
-                            <span className="text-green-600 dark:text-green-400 capitalize">
-                              {currentPlan} Plan
-                            </span>
-                          </div>
-
-                          {/* Credit Status Indicator */}
-                          <div className="flex items-center gap-2">
-                            {creditBalance > 10 ? (
-                              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                                <TrendingUp className="h-3 w-3" />
-                                <span className="text-xs">Good balance</span>
-                              </div>
-                            ) : creditBalance > 2 ? (
-                              <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                                <AlertTriangle className="h-3 w-3" />
-                                <span className="text-xs">Low balance</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                                <AlertTriangle className="h-3 w-3" />
-                                <span className="text-xs">Very low</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Top Up Button */}
-                          {(creditBalance <= 2 || currentPlan === 'free') && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full h-7 text-xs mt-2 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-950"
-                              onClick={() => setShowTopUpDialog(true)}
-                            >
-                              <CreditCard className="h-3 w-3 mr-1" />
-                              {currentPlan === 'free' ? 'Upgrade & Buy Credits' : 'Buy Credits'}
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">Storage</span>
-                      </div>
-                      <span className="text-sm font-medium">
-                        {usageStats.storageUsed}GB / Unlimited
-                      </span>
-                    </div>
-                  </div>
-
+                  
                   <Button variant="outline" className="w-full" onClick={handleViewDetailedUsage}>
                     <Settings className="h-4 w-4 mr-2" />
                     View Detailed Usage
