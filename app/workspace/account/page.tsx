@@ -342,8 +342,8 @@ function AccountSettingsPageContent() {
       checkConnectionStatus(user.id)
       fetchSubscriptionStatus(user.id)
       // Fetch immediately then refresh every 5 seconds for near real-time updates
-      fetchCreditBalance(user.id)
-      const interval = setInterval(() => fetchCreditBalance(user.id), 5000)
+      fetchCreditBalance(user.id, true) // isInitial = true
+      const interval = setInterval(() => fetchCreditBalance(user.id, false), 5000) // isInitial = false
       return () => clearInterval(interval)
 
       // Auto-restore is disabled on account page - only available in workspace with project ID
@@ -1279,9 +1279,9 @@ function AccountSettingsPageContent() {
   }
 
 
-  const fetchCreditBalance = async (userId: string) => {
+  const fetchCreditBalance = async (userId: string, isInitial: boolean = false) => {
     try {
-      setLoadingCredits(true)
+      if (isInitial) setLoadingCredits(true)
       const supabase = createClient()
       const { data, error } = await supabase
         .from('wallet')
@@ -1302,7 +1302,7 @@ function AccountSettingsPageContent() {
     } catch (error) {
       console.error('Exception fetching credit balance:', error)
     } finally {
-      setLoadingCredits(false)
+      if (isInitial) setLoadingCredits(false)
     }
   }
 
