@@ -45,15 +45,15 @@ export function PublishTemplateDialog({
 }: PublishTemplateDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-800 text-white">
-        <DialogHeader>
+      <DialogContent className="bg-gray-900 border-gray-800 text-white max-h-[600px] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-green-400">Publish as Template</DialogTitle>
           <DialogDescription className="text-gray-300">
             Share your project as a community template. Others will be able to use it as a starting point for their projects.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-2">
           <div>
             <Label htmlFor="template-name" className="text-white">Template Name</Label>
             <Input
@@ -71,14 +71,13 @@ export function PublishTemplateDialog({
               id="template-description"
               value={description}
               onChange={(e) => onDescriptionChange(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="bg-gray-800 border-gray-700 text-white h-32 resize-none overflow-y-auto"
               placeholder="Describe what makes this template useful..."
-              rows={4}
             />
           </div>
         </div>
         
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-shrink-0">
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
