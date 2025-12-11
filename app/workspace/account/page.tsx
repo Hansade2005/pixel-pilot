@@ -1624,61 +1624,7 @@ function AccountSettingsPageContent() {
                 </CardContent>
               </Card>
 
-              {/* Current Subscription Card */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Crown className="h-5 w-5" />
-                    Current Subscription
-                  </CardTitle>
-                  <CardDescription>
-                    Manage your subscription plan and billing
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {subscriptionLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                      <span className="ml-2">Loading subscription...</span>
-                    </div>
-                  ) : subscription ? (
-                    <>
-                      {/* Plan Status */}
-                      <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${subscription.status === 'active' ? 'bg-green-500' :
-                              subscription.status === 'trialing' ? 'bg-blue-500' :
-                                subscription.status === 'past_due' ? 'bg-yellow-500' : 'bg-red-500'
-                            }`} />
-                          <div>
-                            <p className="font-medium capitalize">{subscription.plan} Plan</p>
-                            <p className="text-sm text-muted-foreground">
-                              Status: {subscription.status === 'active' ? 'Active' :
-                                subscription.status === 'trialing' ? 'Trial' :
-                                  subscription.status === 'past_due' ? 'Payment Due' : 'Inactive'}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
-                          {subscription.status}
-                        </Badge>
-                      </div>
 
-                  
-
-                     
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-4">No active subscription</p>
-                      <Button asChild>
-                        <a href="/pricing">Choose a Plan</a>
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Usage Statistics Card */}
               <Card>
@@ -1758,7 +1704,50 @@ function AccountSettingsPageContent() {
                       )}
                     </div>
 
-                    
+                    {/* Current Subscription Section */}
+                    <div className="space-y-2 p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-lg border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Crown className="h-4 w-4 text-purple-600" />
+                        <span className="text-sm font-medium text-purple-800 dark:text-purple-200">Subscription</span>
+                      </div>
+
+                      {subscriptionLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="ml-2 text-xs">Loading subscription...</span>
+                        </div>
+                      ) : subscription ? (
+                        <>
+                          {/* Plan Status */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${subscription.status === 'active' ? 'bg-green-500' :
+                                  subscription.status === 'trialing' ? 'bg-blue-500' :
+                                    subscription.status === 'past_due' ? 'bg-yellow-500' : 'bg-red-500'
+                                }`} />
+                              <div>
+                                <p className="text-sm font-medium capitalize">{subscription.plan} Plan</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {subscription.status === 'active' ? 'Active' :
+                                    subscription.status === 'trialing' ? 'Trial' :
+                                      subscription.status === 'past_due' ? 'Payment Due' : 'Inactive'}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                              {subscription.status}
+                            </Badge>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-4">
+                          <p className="text-xs text-muted-foreground mb-2">No active subscription</p>
+                          <Button asChild size="sm" variant="outline" className="w-full h-7 text-xs">
+                            <a href="/pricing">Choose a Plan</a>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                  
