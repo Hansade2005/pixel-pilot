@@ -438,55 +438,8 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
             <ul className="space-y-2">
               <li>✓ Minimum payout: $50.00</li>
               <li>✓ Processing time: 2-5 business days</li>
-              <li>✓ Payments sent to your registered bank account</li>
-              <li>✓ Stripe handles all transfers securely</li>
+              <li>✓ Payments sent to your registered bank account </li>
             </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Top Selling Templates */}
-      {templateStats.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Selling Templates</CardTitle>
-            <CardDescription>Your best performing templates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {templateStats.map(template => (
-                <div key={template.template_id} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold text-lg">{template.template_name}</h4>
-                      {template.featured && (
-                        <Badge className="mt-1">Featured</Badge>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-green-600">
-                        ${template.total_revenue.toFixed(2)}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Total revenue</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Sales</p>
-                      <p className="text-lg font-semibold">{template.total_sales}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Rating</p>
-                      <p className="text-lg font-semibold">⭐ {template.rating}/5</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Reviews</p>
-                      <p className="text-lg font-semibold">{template.review_count}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
       )}
