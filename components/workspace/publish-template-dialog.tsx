@@ -26,8 +26,10 @@ interface PublishTemplateDialogProps {
   project: Project | null
   name: string
   description: string
+  previewUrl: string
   onNameChange: (value: string) => void
   onDescriptionChange: (value: string) => void
+  onPreviewUrlChange: (value: string) => void
   onConfirm: () => void
   isPublishing: boolean
 }
@@ -38,8 +40,10 @@ export function PublishTemplateDialog({
   project,
   name,
   description,
+  previewUrl,
   onNameChange,
   onDescriptionChange,
+  onPreviewUrlChange,
   onConfirm,
   isPublishing
 }: PublishTemplateDialogProps) {
@@ -64,7 +68,6 @@ export function PublishTemplateDialog({
               placeholder="Enter template name"
             />
           </div>
-          
           <div>
             <Label htmlFor="template-description" className="text-white">Description</Label>
             <Textarea
@@ -73,6 +76,17 @@ export function PublishTemplateDialog({
               onChange={(e) => onDescriptionChange(e.target.value)}
               className="bg-gray-800 border-gray-700 text-white h-32 resize-none overflow-y-auto"
               placeholder="Describe what makes this template useful..."
+            />
+          </div>
+          <div>
+            <Label htmlFor="template-preview-url" className="text-white">Preview URL (optional)</Label>
+            <Input
+              id="template-preview-url"
+              value={previewUrl}
+              onChange={(e) => onPreviewUrlChange(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="https://your-demo-url.com (optional)"
+              type="url"
             />
           </div>
         </div>
