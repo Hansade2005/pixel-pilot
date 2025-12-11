@@ -61,17 +61,49 @@ export function useOneSignal(): OneSignalHook {
       }
 
       try {
-        setIsSupported(true);
+        setIsSupported(
+          typeof window.OneSignal?.isPushNotificationsSupported === 'function'
+            ? window.OneSignal.isPushNotificationsSupported()
+            : !!window.OneSignal
+        );
 
-        // Check if user is subscribed
-        const isSubscribed = await window.OneSignal.Notifications.getSubscription();
-        setIsSubscribed(isSubscribed);
+        // Determine subscription status using available OneSignal APIs
+        let isSubscribedResult = false;
 
-        // Listen for subscription changes using the correct API
-        if (window.OneSignal.Notifications) {
-          window.OneSignal.Notifications.addEventListener('subscriptionChange', (isSubscribed: boolean) => {
-            setIsSubscribed(isSubscribed);
-          });
+        if (typeof window.OneSignal?.isPushNotificationsEnabled === 'function') {
+          try {
+            isSubscribedResult = !!(await window.OneSignal.isPushNotificationsEnabled());
+          } catch (err) {
+            // If this call throws, fall back to other checks
+            console.warn('isPushNotificationsEnabled threw:', err);
+          }
+        }
+
+        if (!isSubscribedResult && typeof window.OneSignal?.getUserId === 'function') {
+          try {
+            const userId = await window.OneSignal.getUserId();
+            isSubscribedResult = !!userId;
+          } catch (err) {
+            console.warn('getUserId threw:', err);
+          }
+        }
+
+        // Legacy Notifications API fallback
+        if (!isSubscribedResult && window.OneSignal?.Notifications && typeof window.OneSignal.Notifications.getSubscription === 'function') {
+          try {
+            isSubscribedResult = !!(await window.OneSignal.Notifications.getSubscription());
+          } catch (err) {
+            console.warn('Notifications.getSubscription threw:', err);
+          }
+        }
+
+        setIsSubscribed(!!isSubscribedResult);
+
+        // Listen for subscription changes using modern API if available
+        if (typeof window.OneSignal?.on === 'function') {
+          window.OneSignal.on('subscriptionChange', (isSubscribed: boolean) => setIsSubscribed(!!isSubscribed));
+        } else if (window.OneSignal?.Notifications && typeof window.OneSignal.Notifications.addEventListener === 'function') {
+          window.OneSignal.Notifications.addEventListener('subscriptionChange', (isSubscribed: boolean) => setIsSubscribed(!!isSubscribed));
         }
       } catch (error) {
         console.error('Error checking OneSignal status:', error);
@@ -88,10 +120,31 @@ export function useOneSignal(): OneSignalHook {
 
     try {
       setIsLoading(true);
-      await window.OneSignal.Notifications.requestPermission();
-      const isSubscribed = await window.OneSignal.Notifications.getSubscription();
-      setIsSubscribed(isSubscribed);
-      return isSubscribed;
+
+      // Use modern registerForPushNotifications if available
+      if (typeof window.OneSignal.registerForPushNotifications === 'function') {
+        await window.OneSignal.registerForPushNotifications();
+      } else if (window.OneSignal?.Notifications && typeof window.OneSignal.Notifications.requestPermission === 'function') {
+        await window.OneSignal.Notifications.requestPermission();
+      } else if (typeof Notification !== 'undefined' && Notification.requestPermission) {
+        await Notification.requestPermission();
+      }
+
+      // Re-check subscription state using the same robust approach as above
+      let subscribed = false;
+      if (typeof window.OneSignal.isPushNotificationsEnabled === 'function') {
+        subscribed = !!(await window.OneSignal.isPushNotificationsEnabled());
+      }
+      if (!subscribed && typeof window.OneSignal.getUserId === 'function') {
+        const uid = await window.OneSignal.getUserId();
+        subscribed = !!uid;
+      }
+      if (!subscribed && window.OneSignal?.Notifications && typeof window.OneSignal.Notifications.getSubscription === 'function') {
+        subscribed = !!(await window.OneSignal.Notifications.getSubscription());
+      }
+
+      setIsSubscribed(!!subscribed);
+      return !!subscribed;
     } catch (error) {
       console.error('Error subscribing to OneSignal:', error);
       return false;
@@ -105,7 +158,11 @@ export function useOneSignal(): OneSignalHook {
 
     try {
       setIsLoading(true);
-      await window.OneSignal.Notifications.setSubscription(false);
+      if (typeof window.OneSignal.setSubscription === 'function') {
+        await window.OneSignal.setSubscription(false);
+      } else if (window.OneSignal?.Notifications && typeof window.OneSignal.Notifications.setSubscription === 'function') {
+        await window.OneSignal.Notifications.setSubscription(false);
+      }
       setIsSubscribed(false);
       return true;
     } catch (error) {

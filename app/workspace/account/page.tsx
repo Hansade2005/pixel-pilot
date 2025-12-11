@@ -180,6 +180,15 @@ function AccountSettingsPageContent() {
     storageUsed: 0
   })
 
+  // Credits/Balance states
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [currentPlan, setCurrentPlan] = useState<string>('free')
+  const [estimatedMessages, setEstimatedMessages] = useState<number>(0)
+  const [loadingCredits, setLoadingCredits] = useState(true)
+  const [showTopUpDialog, setShowTopUpDialog] = useState(false)
+  const [topUpAmount, setTopUpAmount] = useState('10')
+  const [processingTopUp, setProcessingTopUp] = useState(false)
+
   // Delete account state
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
 
@@ -332,7 +341,10 @@ function AccountSettingsPageContent() {
       checkCloudSyncStatus(user.id)
       checkConnectionStatus(user.id)
       fetchSubscriptionStatus(user.id)
+      // Fetch immediately then refresh every 5 seconds for near real-time updates
       fetchCreditBalance(user.id)
+      const interval = setInterval(() => fetchCreditBalance(user.id), 5000)
+      return () => clearInterval(interval)
 
       // Auto-restore is disabled on account page - only available in workspace with project ID
       console.log('Account page: Auto-restore is disabled on this page')
@@ -1269,6 +1281,7 @@ function AccountSettingsPageContent() {
 
   const fetchCreditBalance = async (userId: string) => {
     try {
+      setLoadingCredits(true)
       const supabase = createClient()
       const { data, error } = await supabase
         .from('wallet')
