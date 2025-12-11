@@ -69,23 +69,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user profile
-    const { error: profileError } = await supabase
+    const { data: updatedProfile, error: profileError } = await supabase
       .from('profiles')
       .update({
         is_creator: true,
         creator_mode_enabled_at: new Date().toISOString()
       })
       .eq('id', user.id)
+      .select()
+      .single()
 
     if (profileError) {
       console.error('Profile update error:', profileError)
+      // Don't fail - wallet was created successfully
     }
 
     return NextResponse.json({
       success: true,
       wallet,
+      profile: updatedProfile,
       message: 'Creator mode enabled successfully!'
-    })
+    }, { status: 201 })
   } catch (error) {
     console.error('Error enabling creator mode:', error)
     return NextResponse.json(

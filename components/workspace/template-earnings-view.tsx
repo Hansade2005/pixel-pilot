@@ -85,12 +85,49 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
   const [isSavingBankDetails, setIsSavingBankDetails] = useState(false)
   const [showAccountNumber, setShowAccountNumber] = useState(false)
   const [showRoutingNumber, setShowRoutingNumber] = useState(false)
+  const [isEnablingCreatorMode, setIsEnablingCreatorMode] = useState(false)
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchEarningsData()
   }, [userId])
+
+  const enableCreatorMode = async () => {
+    try {
+      setIsEnablingCreatorMode(true)
+
+      const response = await fetch('/api/marketplace/creator/enable-creator-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to enable creator mode')
+      }
+
+      const data = await response.json()
+
+      toast({
+        title: 'Success',
+        description: 'Creator mode enabled! You can now start selling templates.',
+      })
+
+      // Refresh the earnings data
+      setIsCreator(true)
+      fetchEarningsData()
+    } catch (error) {
+      console.error('Error enabling creator mode:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to enable creator mode',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsEnablingCreatorMode(false)
+    }
+  }
 
   const fetchEarningsData = async () => {
     try {
@@ -279,7 +316,13 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="mt-4">Enable Creator Mode</Button>
+            <Button 
+              onClick={enableCreatorMode}
+              disabled={isEnablingCreatorMode}
+              className="mt-4"
+            >
+              {isEnablingCreatorMode ? 'Enabling...' : 'Enable Creator Mode'}
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -21,15 +21,37 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is creator
-    const { data: profile } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('is_creator')
       .eq('id', user.id)
       .single()
 
+    // If profile doesn't exist, create it
+    if (profileError && profileError.code === 'PGRST116') {
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email: user.email,
+          is_creator: false
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Error creating profile:', createError)
+        return NextResponse.json(
+          { error: 'Failed to initialize user profile' },
+          { status: 500 }
+        )
+      }
+      profile = newProfile
+    }
+
     if (!profile?.is_creator) {
       return NextResponse.json(
-        { error: 'User is not a creator' },
+        { error: 'User is not a creator. Enable creator mode first.' },
         { status: 403 }
       )
     }
