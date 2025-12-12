@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
     console.log('Successfully fetched metadata:', metadata?.length)
 
     // Fetch purchases
+    console.log('Fetching purchases...')
     const { data: purchases, error: purchasesError } = await adminSupabase
       .from('template_purchases')
       .select(`
@@ -130,8 +131,10 @@ export async function GET(request: NextRequest) {
         details: purchasesError.message
       }, { status: 500 })
     }
+    console.log('Successfully fetched purchases:', purchases?.length)
 
     // Fetch reviews
+    console.log('Fetching reviews...')
     const { data: reviews, error: reviewsError } = await adminSupabase
       .from('template_reviews')
       .select(`
@@ -152,8 +155,10 @@ export async function GET(request: NextRequest) {
         details: reviewsError.message
       }, { status: 500 })
     }
+    console.log('Successfully fetched reviews:', reviews?.length)
 
     // Fetch bundles
+    console.log('Fetching bundles...')
     const { data: bundles, error: bundlesError } = await adminSupabase
       .from('template_bundles')
       .select(`
@@ -175,49 +180,116 @@ export async function GET(request: NextRequest) {
         details: bundlesError.message
       }, { status: 500 })
     }
+    console.log('Successfully fetched bundles:', bundles?.length)
 
     // Calculate aggregated statistics
+    console.log('Calculating statistics...')
     const totalCreators = creators?.length || 0
-    const totalEarned = creators?.reduce((sum, c) => sum + (c.total_earned || 0), 0) || 0
-    const totalPaidOut = creators?.reduce((sum, c) => sum + (c.total_paid_out || 0), 0) || 0
-    const totalPending = creators?.reduce((sum, c) => sum + (c.pending_balance || 0), 0) || 0
+    const totalEarned = (creators || []).reduce((sum, c) => {
+      const earned = typeof c.total_earned === 'number' ? c.total_earned : parseFloat(c.total_earned as any) || 0
+      return sum + earned
+    }, 0)
+    const totalPaidOut = (creators || []).reduce((sum, c) => {
+      const paidOut = typeof c.total_paid_out === 'number' ? c.total_paid_out : parseFloat(c.total_paid_out as any) || 0
+      return sum + paidOut
+    }, 0)
+    const totalPending = (creators || []).reduce((sum, c) => {
+      const pending = typeof c.pending_balance === 'number' ? c.pending_balance : parseFloat(c.pending_balance as any) || 0
+      return sum + pending
+    }, 0)
     const totalTemplates = metadata?.length || 0
-    const totalPaidTemplates = templates?.filter(t => t.is_paid)?.length || 0
-    const totalFreeTemplates = templates?.filter(t => !t.is_paid)?.length || 0
+    const totalPaidTemplates = (templates || []).filter(t => t.is_paid)?.length || 0
+    const totalFreeTemplates = (templates || []).filter(t => !t.is_paid)?.length || 0
     const totalSales = purchases?.length || 0
-    const totalRevenue = purchases?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0
+    const totalRevenue = (purchases || []).reduce((sum, p) => {
+      const amount = typeof p.amount === 'number' ? p.amount : parseFloat(p.amount as any) || 0
+      return sum + amount
+    }, 0)
     const totalReviews = reviews?.length || 0
-    const avgRating = metadata && metadata.length > 0
-      ? (metadata.reduce((sum, m) => sum + (m.rating || 0), 0) / metadata.length).toFixed(2)
-      : 0
+    const avgRating = (metadata || []).length > 0
+      ? ((metadata || []).reduce((sum, m) => {
+          const rating = typeof m.rating === 'number' ? m.rating : parseFloat(m.rating as any) || 0
+          return sum + rating
+        }, 0) / (metadata || []).length).toFixed(2)
+      : '0.00'
     const totalBundles = bundles?.length || 0
 
+    console.log('Statistics calculated successfully')
+
     // Get top creators
-    const topCreators = creators?.slice(0, 10) || []
+    console.log('Processing top creators...')
+    const topCreators = (creators || [])
+      .slice(0, 10)
+      .map(c => ({
+        id: c.id,
+        creator_id: c.creator_id,
+        available_balance: c.available_balance,
+        total_earned: c.total_earned,
+        total_paid_out: c.total_paid_out,
+        pending_balance: c.pending_balance
+      }))
 
     // Get top templates by revenue
-    const topTemplates = metadata?.slice(0, 10) || []
+    console.log('Processing top templates...')
+    const topTemplates = (metadata || [])
+      .slice(0, 10)
+      .map(m => ({
+        id: m.id,
+        template_id: m.template_id,
+        category: m.category,
+        total_sales: m.total_sales,
+        total_revenue: m.total_revenue,
+        rating: m.rating
+      }))
 
     // Get recent purchases
-    const recentPurchases = purchases?.slice(0, 20) || []
+    console.log('Processing recent purchases...')
+    const recentPurchases = (purchases || [])
+      .slice(0, 20)
+      .map(p => ({
+        id: p.id,
+        template_id: p.template_id,
+        buyer_id: p.buyer_id,
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status,
+        purchased_at: p.purchased_at
+      }))
 
     // Get featured templates
-    const featuredTemplates = metadata?.filter(m => m.is_featured) || []
+    console.log('Processing featured templates...')
+    const featuredTemplates = (metadata || [])
+      .filter(m => m.is_featured)
+      .map(m => ({
+        id: m.id,
+        template_id: m.template_id,
+        category: m.category,
+        rating: m.rating,
+        total_revenue: m.total_revenue
+      }))
 
     // Platform health metrics
+    console.log('Calculating platform metrics...')
     const avgPricePerTemplate = totalTemplates > 0
-      ? (templates?.reduce((sum, t) => sum + (t.price || 0), 0) / totalTemplates).toFixed(2)
-      : 0
+      ? ((templates || []).reduce((sum, t) => {
+          const price = typeof t.price === 'number' ? t.price : parseFloat(t.price as any) || 0
+          return sum + price
+        }, 0) / totalTemplates).toFixed(2)
+      : '0.00'
 
     const conversionRate = totalTemplates > 0
       ? ((totalSales / totalTemplates) * 100).toFixed(2)
-      : 0
+      : '0.00'
 
     const avgReviewRating = totalReviews > 0
-      ? (reviews?.reduce((sum, r) => sum + r.rating, 0) / totalReviews).toFixed(2)
-      : 0
+      ? ((reviews || []).reduce((sum, r) => {
+          const rating = typeof r.rating === 'number' ? r.rating : parseFloat(r.rating as any) || 0
+          return sum + rating
+        }, 0) / totalReviews).toFixed(2)
+      : '0.00'
 
-    return NextResponse.json({
+    console.log('All calculations complete, preparing response...')
+    const responseData = {
       summary: {
         totalCreators,
         totalTemplates,
@@ -230,16 +302,19 @@ export async function GET(request: NextRequest) {
         totalPending: totalPending.toFixed(2),
         totalReviews,
         totalBundles,
-        avgRating,
-        avgPricePerTemplate,
-        conversionRate,
-        avgReviewRating
+        avgRating: String(avgRating),
+        avgPricePerTemplate: String(avgPricePerTemplate),
+        conversionRate: String(conversionRate),
+        avgReviewRating: String(avgReviewRating)
       },
       topCreators,
       topTemplates,
       recentPurchases,
       featuredTemplates
-    })
+    }
+
+    console.log('Response data prepared, sending response...')
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Error fetching marketplace stats:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
