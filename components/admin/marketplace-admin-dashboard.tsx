@@ -39,12 +39,8 @@ interface MarketplaceStats {
     totalEarned: string
     totalPaidOut: string
     totalPending: string
-    totalReviews: number
-    totalBundles: number
-    avgRating: string
     avgPricePerTemplate: string
     conversionRate: string
-    avgReviewRating: string
   }
   topCreators: any[]
   topTemplates: any[]
@@ -235,20 +231,7 @@ export function MarketplaceAdminDashboard() {
       </div>
 
       {/* Quality Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Rating</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{summary.avgRating}/5</div>
-              <Star className="h-4 w-4 text-yellow-500" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{summary.totalReviews} reviews</p>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle>

@@ -90,7 +90,7 @@ export const ADMIN_MENU_ITEMS = [
   },
   {
     id: 'marketplace',
-    label: 'Marketplace',
+    label: 'Templates Marketplace',
     icon: 'ShoppingCart',
     href: '/admin/marketplace',
     permission: ADMIN_PERMISSIONS.VIEW_ANALYTICS
