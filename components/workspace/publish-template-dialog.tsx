@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface Project {
   id: string
@@ -27,9 +28,13 @@ interface PublishTemplateDialogProps {
   name: string
   description: string
   previewUrl: string
+  templateType: 'free' | 'paid'
+  templatePrice: string
   onNameChange: (value: string) => void
   onDescriptionChange: (value: string) => void
   onPreviewUrlChange: (value: string) => void
+  onTemplateTypeChange: (type: 'free' | 'paid') => void
+  onTemplatePriceChange: (price: string) => void
   onConfirm: () => void
   isPublishing: boolean
 }
@@ -41,9 +46,13 @@ export function PublishTemplateDialog({
   name,
   description,
   previewUrl,
+  templateType,
+  templatePrice,
   onNameChange,
   onDescriptionChange,
   onPreviewUrlChange,
+  onTemplateTypeChange,
+  onTemplatePriceChange,
   onConfirm,
   isPublishing
 }: PublishTemplateDialogProps) {
@@ -88,6 +97,48 @@ export function PublishTemplateDialog({
               placeholder="https://your-demo-url.com (optional)"
               type="url"
             />
+          </div>
+
+          {/* Pricing Section */}
+          <div className="border-t border-gray-700 pt-4">
+            <Label className="text-white font-semibold mb-3 block">Template Pricing</Label>
+            <RadioGroup value={templateType} onValueChange={(value) => onTemplateTypeChange(value as 'free' | 'paid')}>
+              <div className="flex items-center space-x-2 mb-3">
+                <RadioGroupItem value="free" id="free-option" />
+                <Label htmlFor="free-option" className="text-gray-300 cursor-pointer font-normal">
+                  Free Template - Anyone can download
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="paid" id="paid-option" />
+                <Label htmlFor="paid-option" className="text-gray-300 cursor-pointer font-normal">
+                  Paid Template
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {templateType === 'paid' && (
+              <div className="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                <Label htmlFor="template-price" className="text-white text-sm">Price (USD)</Label>
+                <div className="flex items-center mt-2">
+                  <span className="text-gray-400 mr-2">$</span>
+                  <Input
+                    id="template-price"
+                    type="number"
+                    step="0.99"
+                    min="0.99"
+                    max="999.99"
+                    value={templatePrice}
+                    onChange={(e) => onTemplatePriceChange(e.target.value)}
+                    className="bg-gray-700 border-gray-600 text-white flex-1"
+                    placeholder="9.99"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Minimum: $0.99 | Maximum: $999.99
+                </p>
+              </div>
+            )}
           </div>
         </div>
         

@@ -68,6 +68,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [publishDescription, setPublishDescription] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishPreviewUrl, setPublishPreviewUrl] = useState('')
+  const [templateType, setTemplateType] = useState<'free' | 'paid'>('free')
+  const [templatePrice, setTemplatePrice] = useState('')
 
   // Helper function to format user's name with possessive
   const getUserProjectsTitle = () => {
@@ -106,6 +108,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setPublishName(project.name)
       setPublishDescription(project.description)
       setPublishPreviewUrl('')
+      setTemplateType('free')
+      setTemplatePrice('')
       setPublishDialogOpen(true)
     }
   }
@@ -137,6 +141,15 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
   const confirmPublishTemplate = async () => {
     if (!projectToPublish || !user) return
+    
+    // Validate price for paid templates
+    if (templateType === 'paid') {
+      const price = parseFloat(templatePrice)
+      if (isNaN(price) || price < 0.99 || price > 999.99) {
+        alert('Please enter a valid price between $0.99 and $999.99')
+        return
+      }
+    }
 
     setIsPublishing(true)
 
@@ -163,7 +176,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       }))
 
       // Insert into public_templates table
-      const { error } = await supabase
+      const { data: templateData, error: templateError } = await supabase
         .from('public_templates')
         .insert({
           user_id: user.id,
@@ -175,10 +188,25 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           usage_count: 0,
           preview_url: publishPreviewUrl || null
         })
+        .select('id')
+        .single()
 
-      if (error) throw error
+      if (templateError) throw templateError
 
-      alert('Template published successfully!')
+      // Create pricing entry
+      const price = templateType === 'paid' ? parseFloat(templatePrice) : 0
+      const { error: pricingError } = await supabase
+        .from('template_pricing')
+        .insert({
+          template_id: templateData.id,
+          price: price,
+          currency: 'USD',
+          is_free: templateType === 'free'
+        })
+
+      if (pricingError) throw pricingError
+
+      alert(`Template published successfully${templateType === 'paid' ? ` - Price: $${price.toFixed(2)}` : ' (Free)'}!`)
     } catch (error) {
       console.error('Error publishing template:', error)
       alert('Failed to publish template. Please try again.')
@@ -189,6 +217,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setPublishName('')
       setPublishDescription('')
       setPublishPreviewUrl('')
+      setTemplateType('free')
+      setTemplatePrice('')
     }
   }
 
@@ -514,9 +544,13 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         name={publishName}
         description={publishDescription}
         previewUrl={publishPreviewUrl}
+        templateType={templateType}
+        templatePrice={templatePrice}
         onNameChange={setPublishName}
         onDescriptionChange={setPublishDescription}
         onPreviewUrlChange={setPublishPreviewUrl}
+        onTemplateTypeChange={setTemplateType}
+        onTemplatePriceChange={setTemplatePrice}
         onConfirm={confirmPublishTemplate}
         isPublishing={isPublishing}
       />

@@ -21,34 +21,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
 
+    console.log('Admin user:', user.email, 'accessing marketplace stats')
+
     const adminSupabase = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
     // Fetch all creators with wallet info
+    console.log('Fetching creators from marketplace_wallet...')
     const { data: creators, error: creatorsError } = await adminSupabase
       .from('marketplace_wallet')
       .select(`
         id,
         creator_id,
-        balance,
+        available_balance,
         total_earned,
         total_paid_out,
-        pending_payout,
+        pending_balance,
         created_at,
         updated_at
       `)
       .order('total_earned', { ascending: false })
 
     if (creatorsError) {
+      console.error('Error fetching creators:', creatorsError)
       return NextResponse.json({
         error: "Failed to fetch creators",
         details: creatorsError.message
       }, { status: 500 })
     }
+    console.log('Successfully fetched creators:', creators?.length)
 
     // Fetch all template pricing and sales
+    console.log('Fetching template pricing...')
     const { data: templates, error: templatesError } = await adminSupabase
       .from('template_pricing')
       .select(`
@@ -66,15 +72,18 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (templatesError) {
+      console.error('Error fetching templates:', templatesError)
       return NextResponse.json({
         error: "Failed to fetch template pricing",
         details: templatesError.message
       }, { status: 500 })
     }
+    console.log('Successfully fetched templates:', templates?.length)
 
     // Fetch marketplace metadata
+    console.log('Fetching template metadata...')
     const { data: metadata, error: metadataError } = await adminSupabase
-      .from('marketplace_metadata')
+      .from('template_metadata')
       .select(`
         id,
         template_id,
@@ -85,19 +94,20 @@ export async function GET(request: NextRequest) {
         total_downloads,
         rating,
         review_count,
-        featured,
-        featured_at,
+        is_featured,
         created_at,
         updated_at
       `)
       .order('total_revenue', { ascending: false })
 
     if (metadataError) {
+      console.error('Error fetching metadata:', metadataError)
       return NextResponse.json({
         error: "Failed to fetch marketplace metadata",
         details: metadataError.message
       }, { status: 500 })
     }
+    console.log('Successfully fetched metadata:', metadata?.length)
 
     // Fetch purchases
     const { data: purchases, error: purchasesError } = await adminSupabase
@@ -106,13 +116,12 @@ export async function GET(request: NextRequest) {
         id,
         template_id,
         buyer_id,
-        price_paid,
+        amount,
         currency,
-        payment_status,
-        access_granted_at,
-        created_at
+        status,
+        purchased_at
       `)
-      .order('created_at', { ascending: false })
+      .order('purchased_at', { ascending: false })
       .limit(1000)
 
     if (purchasesError) {
@@ -130,7 +139,7 @@ export async function GET(request: NextRequest) {
         template_id,
         reviewer_id,
         rating,
-        comment,
+        review_text,
         helpful_count,
         created_at
       `)
@@ -150,9 +159,9 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         creator_id,
-        name,
+        bundle_name,
         description,
-        price,
+        bundle_price,
         currency,
         discount_percent,
         created_at,
@@ -171,12 +180,12 @@ export async function GET(request: NextRequest) {
     const totalCreators = creators?.length || 0
     const totalEarned = creators?.reduce((sum, c) => sum + (c.total_earned || 0), 0) || 0
     const totalPaidOut = creators?.reduce((sum, c) => sum + (c.total_paid_out || 0), 0) || 0
-    const totalPending = creators?.reduce((sum, c) => sum + (c.pending_payout || 0), 0) || 0
+    const totalPending = creators?.reduce((sum, c) => sum + (c.pending_balance || 0), 0) || 0
     const totalTemplates = metadata?.length || 0
     const totalPaidTemplates = templates?.filter(t => t.is_paid)?.length || 0
     const totalFreeTemplates = templates?.filter(t => !t.is_paid)?.length || 0
     const totalSales = purchases?.length || 0
-    const totalRevenue = purchases?.reduce((sum, p) => sum + (p.price_paid || 0), 0) || 0
+    const totalRevenue = purchases?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0
     const totalReviews = reviews?.length || 0
     const avgRating = metadata && metadata.length > 0
       ? (metadata.reduce((sum, m) => sum + (m.rating || 0), 0) / metadata.length).toFixed(2)
@@ -193,7 +202,7 @@ export async function GET(request: NextRequest) {
     const recentPurchases = purchases?.slice(0, 20) || []
 
     // Get featured templates
-    const featuredTemplates = metadata?.filter(m => m.featured) || []
+    const featuredTemplates = metadata?.filter(m => m.is_featured) || []
 
     // Platform health metrics
     const avgPricePerTemplate = totalTemplates > 0
@@ -239,8 +248,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching marketplace stats:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Detailed error:', errorMessage)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: errorMessage },
       { status: 500 }
     )
   }

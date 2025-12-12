@@ -1,6 +1,6 @@
 // Admin utilities and role management
 const ADMIN_EMAILS = ['hanscadx8@gmail.com','hansade2005@gmail.com']
-const SUPER_ADMIN_EMAILS = ['hansade2005@gmail.com'] // Only specific super admins
+const SUPER_ADMIN_EMAILS = ['hanscadx8@gmail.com','hansade2005@gmail.com'] // Only specific super admins
 
 export function isAdmin(email: string | undefined): boolean {
   return email ? ADMIN_EMAILS.includes(email.toLowerCase()) : false

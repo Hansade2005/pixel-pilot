@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { checkAdminAccess } from '@/lib/admin-utils'
 import { AdminMarketplacePayoutManager } from '@/components/admin/marketplace-payout-manager'
 
 export const metadata = {
@@ -18,14 +19,8 @@ export default async function AdminPayoutsPage() {
     redirect('/login')
   }
 
-  // Check if user is admin
-  const { data: adminData } = await supabase
-    .from('admin_users')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!adminData) {
+  // Check if user is admin using email-based admin check
+  if (!checkAdminAccess(user)) {
     redirect('/workspace')
   }
 

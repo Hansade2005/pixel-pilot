@@ -247,8 +247,7 @@ export async function POST(request: NextRequest) {
         await adminSupabase
           .from('marketplace_wallet')
           .update({
-            balance: wallet.balance + payout.amount,
-            pending_balance: wallet.pending_balance + payout.amount,
+            available_balance: wallet.available_balance + payout.amount,
             updated_at: new Date().toISOString()
           })
           .eq('creator_id', payout.creator_id)
