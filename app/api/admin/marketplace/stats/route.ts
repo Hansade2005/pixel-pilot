@@ -238,13 +238,7 @@ export async function GET(request: NextRequest) {
       topCreators,
       topTemplates,
       recentPurchases,
-      featuredTemplates,
-      creators,
-      templates,
-      metadata,
-      purchases,
-      reviews,
-      bundles
+      featuredTemplates
     })
   } catch (error) {
     console.error('Error fetching marketplace stats:', error)
