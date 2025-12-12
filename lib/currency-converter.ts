@@ -62,7 +62,7 @@ export function convertUsdToCad(usdPrice: number, exchangeRate: number): number 
  * Format price for display
  * @param price Price amount
  * @param currency Currency code (USD or CAD)
- * @returns Formatted price string
+ * @returns Formatted price string with currency label
  */
 export function formatPrice(price: number, currency: 'USD' | 'CAD' = 'CAD'): string {
   const formatter = new Intl.NumberFormat('en-CA', {
@@ -72,7 +72,8 @@ export function formatPrice(price: number, currency: 'USD' | 'CAD' = 'CAD'): str
     maximumFractionDigits: 2,
   })
   
-  return formatter.format(price)
+  const formatted = formatter.format(price)
+  return currency === 'CAD' ? `${formatted} CAD` : formatted
 }
 
 /**

@@ -251,7 +251,7 @@ export default function PricingPage() {
     return {
       name: config.name,
       description: config.description,
-      price: config.id === 'enterprise' ? "Coming Soon" : (currentPrice === 0 ? "$0 CAD" : cadPriceFormatted),
+      price: config.id === 'enterprise' ? "Coming Soon" : (currentPrice === 0 ? "$0.00 CAD" : cadPriceFormatted),
       priceAmount: config.id === 'enterprise' ? undefined : (config.id === 'enterprise' ? cadPriceFormatted : undefined),
       originalPrice: originalPrice,
       period: config.id === 'enterprise' ? undefined : (isAnnual ? "per user / year" : "per user / month"),
