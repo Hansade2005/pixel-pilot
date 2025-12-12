@@ -203,7 +203,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           template_id: templateData.id,
           price: price,
           currency: 'USD',
-          is_free: templateType === 'free',
+          pricing_type: templateType === 'paid' ? 'one-time' : 'freemium',
           is_paid: templateType === 'paid'
         })
 

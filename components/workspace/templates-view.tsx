@@ -61,7 +61,7 @@ interface TemplatePricing {
 }
 
 interface TemplatesViewProps {
-  userId: string
+  userId?: string
 }
 
 export function TemplatesView({ userId }: TemplatesViewProps) {
@@ -76,6 +76,8 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    // State for auth required modal
+    const [showAuthRequired, setShowAuthRequired] = useState(false);
   const [templates, setTemplates] = useState<PublicTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTemplate, setSelectedTemplate] = useState<PublicTemplate | null>(null)
@@ -202,6 +204,10 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
   })
 
   const handleViewInfo = (template: PublicTemplate) => {
+    if (!userId) {
+      setShowAuthRequired(true)
+      return
+    }
     setSelectedTemplate(template)
     fetchTemplateReviews(template.id)
     setIsInfoModalOpen(true)
@@ -219,13 +225,9 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
     }
   }
 
-  const handlePurchaseTemplate = async (template: PublicTemplate) => {
+  const handlePurchase = async (template: PublicTemplate) => {
     if (!userId) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to purchase templates',
-        variant: 'destructive'
-      })
+      setShowAuthRequired(true)
       return
     }
 
@@ -277,11 +279,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
   const handleUseTemplate = async (template: PublicTemplate) => {
     if (!userId) {
-      toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to use templates',
-        variant: 'destructive'
-      })
+      setShowAuthRequired(true)
       return
     }
 
@@ -594,7 +592,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
                     <div className="flex flex-col gap-2">
                       <Button
-                        onClick={() => handlePurchaseTemplate(template)}
+                        onClick={() => handlePurchase(template)}
                         className="w-full bg-blue-600 hover:bg-blue-700"
                         size="sm"
                       >
@@ -919,7 +917,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             </Button>
             <div className="flex w-full gap-2">
               <Button
-                onClick={() => selectedTemplate && handlePurchaseTemplate(selectedTemplate)}
+                onClick={() => selectedTemplate && handlePurchase(selectedTemplate)}
                 disabled={isUsingTemplate}
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
@@ -938,6 +936,36 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                 )}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auth Required Modal */}
+      <Dialog open={showAuthRequired} onOpenChange={setShowAuthRequired}>
+        <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sign In Required</DialogTitle>
+            <DialogDescription>You need to sign in to access this feature</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-white/80 mb-6">
+              To purchase, view details, or start a new project from a template, please sign in to your account.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAuthRequired(false)}
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            >
+              Continue Browsing
+            </Button>
+            <Button
+              onClick={() => router.push('/auth')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Sign In / Sign Up
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
