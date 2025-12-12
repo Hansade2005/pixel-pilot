@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const { template_id, bundle_id } = body
 
     let checkoutData: any = {
+      mode: 'payment',
       customer_email: user.email,
       client_reference_id: user.id,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/workspace?purchase_success=true&redirect=/workspace?view=templates`,
