@@ -68,6 +68,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [publishDescription, setPublishDescription] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishPreviewUrl, setPublishPreviewUrl] = useState('')
+  const [publishCategory, setPublishCategory] = useState('')
   const [templateType, setTemplateType] = useState<'free' | 'paid'>('free')
   const [templatePrice, setTemplatePrice] = useState('')
 
@@ -108,6 +109,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setPublishName(project.name)
       setPublishDescription(project.description)
       setPublishPreviewUrl('')
+      setPublishCategory(project.category || 'other')
       setTemplateType('free')
       setTemplatePrice('')
       setPublishDialogOpen(true)
@@ -201,10 +203,30 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           template_id: templateData.id,
           price: price,
           currency: 'USD',
-          is_free: templateType === 'free'
+          is_free: templateType === 'free',
+          is_paid: templateType === 'paid'
         })
 
       if (pricingError) throw pricingError
+
+      // Create metadata entry with category
+      const { error: metadataError } = await supabase
+        .from('template_metadata')
+        .insert({
+          template_id: templateData.id,
+          category: publishCategory || 'other',
+          tags: [],
+          total_sales: 0,
+          total_revenue: 0,
+          total_downloads: 0,
+          rating: 0,
+          review_count: 0,
+          is_featured: false,
+          is_verified: false,
+          marketplace_visible: true
+        })
+
+      if (metadataError) throw metadataError
 
       alert(`Template published successfully${templateType === 'paid' ? ` - Price: $${price.toFixed(2)}` : ' (Free)'}!`)
     } catch (error) {
@@ -217,6 +239,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setPublishName('')
       setPublishDescription('')
       setPublishPreviewUrl('')
+      setPublishCategory('')
       setTemplateType('free')
       setTemplatePrice('')
     }
@@ -544,11 +567,13 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         name={publishName}
         description={publishDescription}
         previewUrl={publishPreviewUrl}
+        category={publishCategory}
         templateType={templateType}
         templatePrice={templatePrice}
         onNameChange={setPublishName}
         onDescriptionChange={setPublishDescription}
         onPreviewUrlChange={setPublishPreviewUrl}
+        onCategoryChange={setPublishCategory}
         onTemplateTypeChange={setTemplateType}
         onTemplatePriceChange={setTemplatePrice}
         onConfirm={confirmPublishTemplate}

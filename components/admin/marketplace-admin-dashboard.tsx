@@ -114,7 +114,7 @@ export function MarketplaceAdminDashboard() {
 
   // Prepare data for charts
   const revenueChartData = topTemplates.slice(0, 10).map(t => ({
-    name: t.tags?.[0] || 'Unknown',
+    name: t.category || 'Uncategorized',
     revenue: parseFloat(t.total_revenue || '0')
   }))
 
@@ -431,10 +431,10 @@ export function MarketplaceAdminDashboard() {
                     <TableCell className="font-mono text-xs">{creator.creator_id.substring(0, 8)}...</TableCell>
                     <TableCell className="font-semibold">${parseFloat(creator.total_earned || '0').toFixed(2)}</TableCell>
                     <TableCell>${parseFloat(creator.total_paid_out || '0').toFixed(2)}</TableCell>
-                    <TableCell>${parseFloat(creator.pending_payout || '0').toFixed(2)}</TableCell>
-                    <TableCell>${parseFloat(creator.balance || '0').toFixed(2)}</TableCell>
+                    <TableCell>${parseFloat(creator.pending_balance || '0').toFixed(2)}</TableCell>
+                    <TableCell>${parseFloat(creator.available_balance || '0').toFixed(2)}</TableCell>
                     <TableCell className="text-sm">
-                      {new Date(creator.updated_at).toLocaleDateString()}
+                      {creator.updated_at ? new Date(creator.updated_at).toLocaleDateString() : 'N/A'}
                     </TableCell>
                   </TableRow>
                 ))}

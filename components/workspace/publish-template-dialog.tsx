@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface Project {
   id: string
@@ -28,11 +35,13 @@ interface PublishTemplateDialogProps {
   name: string
   description: string
   previewUrl: string
+  category: string
   templateType: 'free' | 'paid'
   templatePrice: string
   onNameChange: (value: string) => void
   onDescriptionChange: (value: string) => void
   onPreviewUrlChange: (value: string) => void
+  onCategoryChange: (value: string) => void
   onTemplateTypeChange: (type: 'free' | 'paid') => void
   onTemplatePriceChange: (price: string) => void
   onConfirm: () => void
@@ -46,11 +55,13 @@ export function PublishTemplateDialog({
   name,
   description,
   previewUrl,
+  category,
   templateType,
   templatePrice,
   onNameChange,
   onDescriptionChange,
   onPreviewUrlChange,
+  onCategoryChange,
   onTemplateTypeChange,
   onTemplatePriceChange,
   onConfirm,
@@ -97,6 +108,27 @@ export function PublishTemplateDialog({
               placeholder="https://your-demo-url.com (optional)"
               type="url"
             />
+          </div>
+
+          <div>
+            <Label htmlFor="template-category" className="text-white">Category</Label>
+            <Select value={category} onValueChange={onCategoryChange}>
+              <SelectTrigger id="template-category" className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectItem value="landing-page">Landing Page</SelectItem>
+                <SelectItem value="dashboard">Dashboard</SelectItem>
+                <SelectItem value="ecommerce">E-commerce</SelectItem>
+                <SelectItem value="blog">Blog</SelectItem>
+                <SelectItem value="portfolio">Portfolio</SelectItem>
+                <SelectItem value="saas">SaaS</SelectItem>
+                <SelectItem value="mobile">Mobile App UI</SelectItem>
+                <SelectItem value="admin">Admin Panel</SelectItem>
+                <SelectItem value="social">Social Network</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Pricing Section */}

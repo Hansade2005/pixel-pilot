@@ -172,7 +172,8 @@ export async function GET(request: NextRequest) {
         available_balance: c.available_balance,
         total_earned: c.total_earned,
         total_paid_out: c.total_paid_out,
-        pending_balance: c.pending_balance
+        pending_balance: c.pending_balance,
+        updated_at: c.updated_at
       }))
 
     // Get top templates by revenue
