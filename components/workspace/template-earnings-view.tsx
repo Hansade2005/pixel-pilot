@@ -430,11 +430,11 @@ export function TemplateEarningsView({ userId }: { userId: string }) {
 
       {/* Bank Details Info Card */}
       {earnings && (
-        <Card className="bg-blue-50 border-blue-200">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-blue-900">Payout Information</CardTitle>
+            <CardTitle className="text-sm">Payout Information</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-blue-800">
+          <CardContent className="text-sm">
             <ul className="space-y-2">
               <li>✓ Minimum payout: $50.00</li>
               <li>✓ Processing time: 2-5 business days</li>
