@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { storageManager } from '@/lib/storage-manager'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { getExchangeRates, convertUsdToCad, formatPrice } from '@/lib/currency-converter'
 import {
   Dialog,
   DialogContent,
@@ -96,6 +97,21 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
   const [showOnlyPaid, setShowOnlyPaid] = useState(false)
   const [minPrice, setMinPrice] = useState<number>(0)
   const [maxPrice, setMaxPrice] = useState<number>(999)
+  const [exchangeRate, setExchangeRate] = useState<number>(1.35) // Default CAD to USD rate
+
+  useEffect(() => {
+    // Fetch exchange rates on component mount
+    const loadExchangeRates = async () => {
+      try {
+        const rates = await getExchangeRates()
+        setExchangeRate(rates.CAD)
+      } catch (error) {
+        console.error('Failed to load exchange rates:', error)
+        setExchangeRate(1.35) // Fallback rate
+      }
+    }
+    loadExchangeRates()
+  }, [])
 
   useEffect(() => {
     fetchTemplates()
@@ -398,6 +414,13 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
       {/* Filters & Search Section */}
       <div className="bg-gray-800/50 border-b border-gray-700 sticky top-0 z-20 py-4 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto space-y-4">
+          {/* Currency Indicator */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-700/50 rounded-lg text-xs text-white/80 w-fit">
+            <span>
+              💵 Prices in <strong>CAD</strong> • 1 USD = ${exchangeRate.toFixed(2)} CAD
+            </span>
+          </div>
+
           {/* Search Bar */}
           <div className="flex gap-2">
             <input
@@ -527,9 +550,13 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   {/* Price Badge (top right) */}
                   {pricing && (
                     <div className="absolute top-3 right-3 z-10">
-                      <Badge className={pricing.price === 0 ? 'bg-green-500/90 text-white' : 'bg-blue-500/90 text-white'}>
-                        {pricing.price === 0 ? 'Free' : `$${pricing.price.toFixed(2)}`}
-                      </Badge>
+                      {pricing.price === 0 ? (
+                        <Badge className='bg-green-500/90 text-white'>Free</Badge>
+                      ) : (
+                        <Badge className='bg-blue-500/90 text-white'>
+                          {formatPrice(convertUsdToCad(pricing.price, exchangeRate), 'CAD')}
+                        </Badge>
+                      )}
                     </div>
                   )}
 
@@ -597,7 +624,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         size="sm"
                       >
                         <ShoppingCart className="h-4 w-4 mr-1" />
-                        {pricing?.price === 0 ? 'Get Access' : 'Purchase'}
+                        {pricing?.price === 0 ? 'Get Access' : `Purchase - ${formatPrice(convertUsdToCad(pricing?.price || 0, exchangeRate), 'CAD')}`}
                       </Button>
                       {template.preview_url ? (
                         <Button
@@ -922,7 +949,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
                 <ShoppingCart className="h-4 w-4 mr-1" />
-                {isUsingTemplate ? 'Processing...' : (templatePricing.get(selectedTemplate?.id || '')?.price === 0 ? 'Get Access' : 'Purchase')}
+                {isUsingTemplate ? 'Processing...' : (templatePricing.get(selectedTemplate?.id || '')?.price === 0 ? 'Get Access' : `Purchase - ${formatPrice(convertUsdToCad(templatePricing.get(selectedTemplate?.id || '')?.price || 0, exchangeRate), 'CAD')}`)}
               </Button>
               <Button
                 asChild

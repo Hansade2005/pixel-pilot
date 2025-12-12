@@ -2,6 +2,7 @@
 // This file defines all our products, prices, and features
 
 import { chatModels } from '@/lib/ai-models'
+import { getExchangeRates, convertUsdToCad, formatPrice } from '@/lib/currency-converter'
 
 // Get all available model IDs for premium plans
 const ALL_MODEL_IDS = chatModels.map(model => model.id)
@@ -268,4 +269,34 @@ export const STRIPE_PRODUCT_IDS = {
   COLLABORATE: 'prod_TWBVEKvyCu0hYP',
   SCALE: 'prod_TWBVHmYvmfFQMA',
   EXTRA_CREDITS: 'prod_TWBWlx7GadNZK1'
+}
+
+// Currency conversion helpers for CAD display
+export async function getPriceInCAD(usdPrice: number): Promise<number> {
+  try {
+    const rates = await getExchangeRates()
+    return convertUsdToCad(usdPrice, rates.CAD)
+  } catch (error) {
+    console.error('Failed to get CAD price:', error)
+    // Fallback to approximate conversion
+    return parseFloat((usdPrice * 1.35).toFixed(2))
+  }
+}
+
+export async function formatPriceForDisplay(usdPrice: number, currency: 'USD' | 'CAD' = 'CAD'): Promise<string> {
+  if (currency === 'USD') {
+    return formatPrice(usdPrice, 'USD')
+  }
+  
+  const cadPrice = await getPriceInCAD(usdPrice)
+  return formatPrice(cadPrice, 'CAD')
+}
+
+export async function getExchangeRateForDisplay(): Promise<number> {
+  try {
+    const rates = await getExchangeRates()
+    return rates.CAD
+  } catch (error) {
+    return 1.35
+  }
 }

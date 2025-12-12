@@ -10,7 +10,8 @@ import { Heart, Check, Info, ChevronDown, Star, Users, Loader2 } from "lucide-re
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
-import { PRODUCT_CONFIGS, getPrice, getSavings } from "@/lib/stripe-config"
+import { PRODUCT_CONFIGS, getPrice, getSavings, getExchangeRateForDisplay } from "@/lib/stripe-config"
+import { convertUsdToCad, formatPrice } from "@/lib/currency-converter"
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
@@ -20,6 +21,7 @@ export default function PricingPage() {
   const [currentPlan, setCurrentPlan] = useState<string>('free')
   const [creditBalance, setCreditBalance] = useState<number>(0)
   const [canPurchaseCredits, setCanPurchaseCredits] = useState<boolean>(false)
+  const [exchangeRate, setExchangeRate] = useState<number>(1.35)
 
   const supabase = createClient()
 
@@ -55,7 +57,18 @@ export default function PricingPage() {
       }
     }
 
+    const fetchExchangeRate = async () => {
+      try {
+        const rate = await getExchangeRateForDisplay()
+        setExchangeRate(rate)
+      } catch (error) {
+        console.error('Error fetching exchange rate:', error)
+        setExchangeRate(1.35)
+      }
+    }
+
     checkUser()
+    fetchExchangeRate()
 
     // Check for success/cancel parameters
     const urlParams = new URLSearchParams(window.location.search)
@@ -230,14 +243,16 @@ export default function PricingPage() {
     const monthlyPrice = config.prices.monthly.amount
     const yearlyPrice = config.prices.yearly.amount
     const currentPrice = isAnnual ? yearlyPrice : monthlyPrice
-    const originalPrice = isAnnual ? null : (yearlyPrice > 0 ? `$${yearlyPrice}` : null)
+    const cadPrice = convertUsdToCad(currentPrice, exchangeRate)
+    const cadPriceFormatted = formatPrice(cadPrice, 'CAD')
+    const originalPrice = isAnnual ? null : (yearlyPrice > 0 ? formatPrice(convertUsdToCad(yearlyPrice, exchangeRate), 'CAD') : null)
     const savings = getSavings(config.id, isAnnual)
 
     return {
       name: config.name,
       description: config.description,
-      price: config.id === 'enterprise' ? "Coming Soon" : (currentPrice === 0 ? "$0" : `$${currentPrice}`),
-      priceAmount: config.id === 'enterprise' ? undefined : (config.id === 'enterprise' ? `$${currentPrice}` : undefined),
+      price: config.id === 'enterprise' ? "Coming Soon" : (currentPrice === 0 ? "$0 CAD" : cadPriceFormatted),
+      priceAmount: config.id === 'enterprise' ? undefined : (config.id === 'enterprise' ? cadPriceFormatted : undefined),
       originalPrice: originalPrice,
       period: config.id === 'enterprise' ? undefined : (isAnnual ? "per user / year" : "per user / month"),
       savings: savings,
@@ -285,6 +300,11 @@ export default function PricingPage() {
             <p className="text-xl text-white/80 max-w-3xl mx-auto">
               Transform ideas into production apps with AI. From concept to deployment in minutes.
             </p>
+            
+            {/* Currency Indicator */}
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-white/60">
+              <span>💵 Prices in CAD • 1 USD = ${exchangeRate.toFixed(2)} CAD</span>
+            </div>
           </div>
 
           {/* Pricing Toggle */}
