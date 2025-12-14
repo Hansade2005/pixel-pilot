@@ -78,7 +78,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const audioChunksRef = useRef<Blob[]>([])
 
   // Template selection state
-  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo'>('vite-react')
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
@@ -1190,7 +1190,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 {/* Template Selector */}
                 <Select
                   value={selectedTemplate}
-                  onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}
+                  onValueChange={(value: 'vite-react' | 'nextjs' | 'expo') => setSelectedTemplate(value)}
                   disabled={isGenerating}
                 >
                   <SelectTrigger className="w-[100px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
@@ -1207,6 +1207,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                       <div className="flex items-center gap-2">
                         <span className="text-lg">▲</span>
                         <span>Next.js</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="expo" className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📱</span>
+                        <span>Expo</span>
                       </div>
                     </SelectItem>
                   </SelectContent>

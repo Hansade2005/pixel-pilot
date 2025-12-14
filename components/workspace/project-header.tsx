@@ -67,7 +67,7 @@ export function ProjectHeader({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
-  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo'>('vite-react')
   const [isCreating, setIsCreating] = useState(false)
   const [gitHubConnected, setGitHubConnected] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
@@ -287,13 +287,14 @@ export function ProjectHeader({
                 </div>
                 <div>
                   <Label htmlFor="template">Template</Label>
-                  <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
+                  <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo') => setSelectedTemplate(value)}>
                     <SelectTrigger id="template">
                       <SelectValue placeholder="Select a template..." />
                     </SelectTrigger>
                     <SelectContent className="z-[110]">
                       <SelectItem value="vite-react">Vite</SelectItem>
                       <SelectItem value="nextjs">Next.js</SelectItem>
+                      <SelectItem value="expo">Expo (Mobile)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -405,13 +406,14 @@ export function ProjectHeader({
               </div>
               <div>
                 <Label htmlFor="template">Template</Label>
-                <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
+                <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo') => setSelectedTemplate(value)}>
                   <SelectTrigger id="template">
                     <SelectValue placeholder="Select a template..." />
                   </SelectTrigger>
                   <SelectContent className="z-[110]">
                     <SelectItem value="vite-react">Vite</SelectItem>
                     <SelectItem value="nextjs">Next.js</SelectItem>
+                    <SelectItem value="expo">Expo (Mobile)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

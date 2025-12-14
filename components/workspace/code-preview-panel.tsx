@@ -148,6 +148,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [isResizing, setIsResizing] = useState(false)
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
+  const [isExpoProject, setIsExpoProject] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
   const [backgroundProcess, setBackgroundProcess] = useState<{
@@ -208,6 +209,39 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       setCurrentLog(message)
     }
   }
+
+  // Detect if project is Expo
+  useEffect(() => {
+    if (!project) {
+      setIsExpoProject(false)
+      return
+    }
+
+    const checkExpoProject = async () => {
+      try {
+        const files = await window.storageManager.getAllFiles(project.id)
+        // Check for app.json or app.config.js
+        const hasExpoConfig = files.some(f => f.path === 'app.json' || f.path === 'app.config.js')
+        if (hasExpoConfig) {
+          setIsExpoProject(true)
+          return
+        }
+        // Check package.json for expo dependency
+        const packageJsonFile = files.find(f => f.path === 'package.json')
+        if (packageJsonFile) {
+          const packageJson = JSON.parse(packageJsonFile.content)
+          setIsExpoProject(!!(packageJson.dependencies?.expo || packageJson.devDependencies?.expo))
+        } else {
+          setIsExpoProject(false)
+        }
+      } catch (error) {
+        console.error('Error checking for Expo project:', error)
+        setIsExpoProject(false)
+      }
+    }
+
+    checkExpoProject()
+  }, [project])
 
   useEffect(() => {
     if (preview.url) {
@@ -1627,16 +1661,51 @@ export default function TodoApp() {
                   </div>
                 </div>
               ) : preview.url ? (
-                <WebPreviewBody
-                  className="h-full"
-                  src={preview.url}
-                  ref={previewIframeRef}
-                  onIframeRef={(iframe) => {
-                    if (iframe) {
-                      injectConsoleInterceptor(iframe)
-                    }
-                  }}
-                />
+                isExpoProject ? (
+                  <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      {/* Phone Frame - responsive with max dimensions */}
+                      <div className="relative" style={{ 
+                        width: '100%',
+                        maxWidth: '375px',
+                        aspectRatio: '375/812',
+                        maxHeight: '100%'
+                      }}>
+                        <div className="absolute inset-0 rounded-[3rem] bg-black shadow-2xl" style={{
+                          boxShadow: '0 0 0 12px #1a1a1a, 0 0 0 13px #333, 0 20px 60px rgba(0,0,0,0.5)'
+                        }}>
+                          {/* Notch */}
+                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[40%] h-[3%] bg-black rounded-b-3xl z-10" />
+                          
+                          {/* Screen */}
+                          <div className="absolute inset-[4%] rounded-[2.5rem] overflow-hidden bg-white">
+                            <WebPreviewBody
+                              className="h-full w-full"
+                              src={preview.url}
+                              ref={previewIframeRef}
+                              onIframeRef={(iframe) => {
+                                if (iframe) {
+                                  injectConsoleInterceptor(iframe)
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <WebPreviewBody
+                    className="h-full"
+                    src={preview.url}
+                    ref={previewIframeRef}
+                    onIframeRef={(iframe) => {
+                      if (iframe) {
+                        injectConsoleInterceptor(iframe)
+                      }
+                    }}
+                  />
+                )
               ) : (
                 <div className="h-full flex items-center justify-center p-8">
                   <div className="text-center">

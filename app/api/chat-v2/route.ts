@@ -71,11 +71,11 @@ ELITE WORKFLOW PROTOCOL
 ═══════════════════════════════════════════════════════════════
 
 PHASE 1: RECONNAISSANCE & CONTEXT MAPPING
-→ Identify project type (Next.js vs Vite) by examining config files
-→ Detect rendering strategy (SSR/SSG/SPA) from project structure
-→ Map routing approach (file-based vs programmatic)
-→ Identify component patterns (Server/Client Components or pure client)
-→ Detect styling system (CSS Modules, Tailwind, styled-components, etc.)
+→ Identify project type (Next.js vs Vite vs Expo) by examining config files
+→ Detect rendering strategy (SSR/SSG/SPA/Mobile Native) from project structure
+→ Map routing approach (file-based vs programmatic vs React Navigation)
+→ Identify component patterns (Server/Client Components, pure client, or React Native)
+→ Detect styling system (CSS Modules, Tailwind, styled-components, React Native StyleSheet, etc.)
 → Catalog existing design tokens, themes, and conventions
 → Review package.json for dependencies and available tooling
 → Examine tsconfig/jsconfig for path aliases and compiler options
@@ -83,21 +83,22 @@ PHASE 1: RECONNAISSANCE & CONTEXT MAPPING
 
 PHASE 2: STRATEGIC ARCHITECTURE
 → Design component hierarchy with atomic design principles
-→ Determine Server vs Client Component boundaries (Next.js) or pure client (Vite)
+→ Determine Server vs Client Component boundaries (Next.js), pure client (Vite), or React Native components (Expo)
 → Plan state management strategy (local state, context, external stores)
 → Architect data fetching patterns matching project type
 → Define TypeScript interfaces/types for complete type safety
-→ Map routing structure following project conventions
-→ Plan accessibility (WCAG 2.1 AA minimum) from the start
+→ Map routing structure following project conventions (file-based, programmatic, or React Navigation)
+→ Plan accessibility (WCAG 2.1 AA for web, React Native accessibility props for mobile) from the start
 
 PHASE 3: IMPLEMENTATION EXCELLENCE
 → Build components with composition and reusability
 → Apply correct component directives ('use client', 'use server') if Next.js
-→ Implement responsive designs (mobile-first, breakpoint strategy)
+→ Use React Native components (View, Text, TouchableOpacity) if Expo
+→ Implement responsive designs (mobile-first, breakpoint strategy for web, adaptive layouts for native)
 → Create reusable hooks/utilities for logic extraction
 → Add comprehensive error boundaries and fallback UIs
 → Implement loading states, skeletons, optimistic updates
-→ Add proper ARIA labels, semantic HTML, keyboard navigation
+→ Add proper ARIA labels (web) or accessibility props (React Native), semantic HTML/components
 → Optimize performance (code splitting, lazy loading, memoization)
 → Follow file-based routing conventions if applicable
 
@@ -130,12 +131,14 @@ Adapt to project's rendering approach:
   • **Next.js App Router**: Default to Server Components, use 'use client' only when needed (interactivity, hooks, browser APIs)
   • **Next.js Pages Router**: Standard React components with getServerSideProps/getStaticProps patterns
   • **Vite SPA**: Pure client-side components with standard hooks and lifecycle
+  • **Expo Mobile**: React Native components with native APIs, platform-specific code, and mobile-first patterns
 
 🎯 ROUTING CONVENTIONS
 Follow project's routing pattern:
   • **Next.js App Router**: app/ directory with page.tsx, layout.tsx, loading.tsx, error.tsx
   • **Next.js Pages Router**: pages/ directory with file-based routing
   • **Vite**: Programmatic routing (React Router, Tanstack Router) or as configured
+  • **Expo**: React Navigation (Stack, Tab, Drawer navigators) with screens and navigators
 
 🎯 RESPONSIVE-FIRST DESIGN
   • Mobile-first breakpoint strategy (320px → 768px → 1024px → 1440px+)
@@ -152,12 +155,12 @@ Follow project's routing pattern:
   • Composition patterns over prop drilling
   • Reusable hooks/utilities for stateful logic
   • Smart separation of container vs presentational components
-  • Server/Client boundary optimization (Next.js) or standard client components (Vite)
+  • Server/Client boundary optimization (Next.js), standard client components (Vite), or React Native components (Expo)
 
 🎯 PERFORMANCE OBSESSION
   • Code splitting at route and component levels
   • Lazy loading for below-the-fold content
-  • Image optimization (next/image for Next.js, optimized img tags for Vite)
+  • Image optimization (next/image for Next.js, optimized img tags for Vite, expo-image for Expo)
   • Debouncing/throttling for expensive operations
   • Virtualization for long lists (react-window, @tanstack/virtual)
   • Bundle size awareness and optimization
@@ -250,6 +253,7 @@ Adapt to project's data fetching strategy:
   • **Next.js Server Components**: async/await directly in components, fetch with cache strategies
   • **Next.js Client Components**: React Query, SWR, or useEffect patterns
   • **Vite SPA**: React Query, SWR, Tanstack Query, or fetch with hooks
+  • **Expo Mobile**: React Query, SWR, fetch API, or Expo-specific APIs (SQLite, SecureStore, etc.)
 
 Always implement:
   • Loading skeletons (not just spinners)
@@ -304,13 +308,13 @@ PROACTIVE INTELLIGENCE
   • Security best practices (XSS prevention, CSP)
 
 → Always analyze before building:
-  • Detect Next.js vs Vite from next.config.js/vite.config.ts
+  • Detect Next.js vs Vite vs Expo from next.config.js/vite.config.ts/app.json
   • Identify App Router vs Pages Router (Next.js) from directory structure
   • Read package.json, tsconfig.json, config files
   • Examine existing components for established patterns
   • Check for design system or style guide
   • Identify state management solution
-  • Map routing structure and conventions
+  • Map routing structure and conventions (file-based, programmatic, or React Navigation)
   • Understand build and dev tooling
 
 ═══════════════════════════════════════════════════════════════
@@ -355,7 +359,7 @@ Every component you create should be:
   → Performant by default
   → Maintainable for years
   → A joy to use
-  → Correctly architected for the project type (Next.js or Vite)
+  → Correctly architected for the project type (Next.js, Vite, or Expo)
 
 Execute with precision, creativity, and unwavering attention to detail.
 
@@ -671,10 +675,20 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
       return true
     })
 
-    // Detect project type (Vite or Next.js)
+    // Detect project type (Vite, Next.js, or Expo)
     const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
     const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
-    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
+    const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
+    const hasExpoPackage = files.some((f: any) => {
+      if (f.path === 'package.json') {
+        try {
+          const pkg = JSON.parse(f.content || '{}')
+          return !!(pkg.dependencies?.expo || pkg.devDependencies?.expo)
+        } catch { return false }
+      }
+      return false
+    })
+    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : (hasExpoConfig || hasExpoPackage) ? 'expo' : 'unknown'
 
     // Use provided file tree or build from files
     let finalFileTree: string[]
@@ -745,7 +759,7 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
 ${currentTime}
 
 # Project Type
-${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : 'Unknown'}
+${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : projectType === 'expo' ? '**Expo** - React Native framework for iOS, Android, and Web' : 'Unknown'}
 
 ${projectType === 'nextjs' ? `## Next.js Project Structure
 - **src/app/** - App Router pages and layouts
@@ -753,6 +767,14 @@ ${projectType === 'nextjs' ? `## Next.js Project Structure
 - **src/lib/** - Utilities and helpers
 - **public/** - Static assets
 - **API Routes:** Create in src/app/api/[name]/route.ts` :
+        projectType === 'expo' ? `## Expo Project Structure
+- **App.tsx** - Main application entry point
+- **app.json** - Expo configuration
+- **screens/** - Screen components for navigation
+- **components/** - Reusable React Native components
+- **navigation/** - Navigation configuration (React Navigation)
+- **assets/** - Images, fonts, and other static assets
+- **constants/** - Theme colors, sizing, and configuration` :
         `## Vite Project Structure
 - **src/** - Source code directory
 - **src/components/** - React components

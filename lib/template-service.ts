@@ -6353,6 +6353,931 @@ This setup provides a complete, production-ready authentication system for your 
     },
   ]
 
+  // Default Expo React Native + TypeScript template files
+  private static readonly EXPO_TEMPLATE_FILES: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[] = [
+    {
+      name: 'package.json',
+      path: 'package.json',
+      content: `{
+  "name": "expo-mobile-app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~54.0.29",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "~0.19.10",
+    "@react-navigation/native": "^7.0.25",
+    "@react-navigation/bottom-tabs": "^7.2.1",
+    "@react-navigation/native-stack": "^7.2.2",
+    "react-native-safe-area-context": "4.15.0",
+    "react-native-screens": "~4.4.0",
+    "expo-linear-gradient": "~14.0.1",
+    "expo-blur": "~14.0.1",
+    "expo-font": "~13.0.1",
+    "expo-haptics": "~14.0.0",
+    "expo-asset": "~11.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}`,
+      fileType: 'json',
+      type: 'json',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'app.json',
+      path: 'app.json',
+      content: `{
+  "expo": {
+    "name": "expo-mobile-app",
+    "slug": "expo-mobile-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "https://pipilot.dev/assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "https://pipilot.dev/assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pipilot.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "https://pipilot.dev/assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.pipilot.app",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "https://pipilot.dev/assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": []
+  }
+}`,
+      fileType: 'json',
+      type: 'json',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'index.ts',
+      path: 'index.ts',
+      content: `import { registerRootComponent } from 'expo';
+
+import App from './App';
+
+// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+// It also ensures that whether you load the app in Expo Go or in a native build,
+// the environment is set up appropriately
+registerRootComponent(App);
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'App.tsx',
+      path: 'App.tsx',
+      content: `import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
+// Import screens
+import HomeScreen from './screens/HomeScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
+
+// Tab Icons (using simple text for now, can be replaced with icon library)
+const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => (
+  <Text style={{ fontSize: 20, color: focused ? '#007AFF' : '#999' }}>
+    {name === 'Home' ? '🏠' : name === 'Profile' ? '👤' : '⚙️'}
+  </Text>
+);
+
+const Tab = createBottomTabNavigator();
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar style="auto" />
+        <Tab.Navigator
+          screenOptions={({ route }) => ({
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name={route.name} focused={focused} />
+            ),
+            tabBarActiveTintColor: '#007AFF',
+            tabBarInactiveTintColor: '#999',
+            headerStyle: {
+              backgroundColor: '#007AFF',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+          })}
+        >
+          <Tab.Screen name="Home" component={HomeScreen} />
+          <Tab.Screen name="Profile" component={ProfileScreen} />
+          <Tab.Screen name="Settings" component={SettingsScreen} />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'HomeScreen.tsx',
+      path: 'screens/HomeScreen.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FeatureCard } from '../components/FeatureCard';
+import { WelcomeBanner } from '../components/WelcomeBanner';
+
+const { width } = Dimensions.get('window');
+
+export default function HomeScreen() {
+  const features = [
+    { id: 1, title: 'Quick Start', description: 'Get started in seconds', icon: '🚀' },
+    { id: 2, title: 'Beautiful UI', description: 'Modern design components', icon: '🎨' },
+    { id: 3, title: 'Cross Platform', description: 'iOS, Android & Web', icon: '📱' },
+    { id: 4, title: 'TypeScript', description: 'Type-safe development', icon: '💪' },
+  ];
+
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <WelcomeBanner />
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Features</Text>
+          <View style={styles.featureGrid}>
+            {features.map((feature) => (
+              <FeatureCard key={feature.id} {...feature} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Get Started</Text>
+          <TouchableOpacity style={styles.button}>
+            <LinearGradient
+              colors={['#007AFF', '#0051D5']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buttonGradient}
+            >
+              <Text style={styles.buttonText}>Start Building</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F7',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  section: {
+    marginTop: 30,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1D1D1F',
+    marginBottom: 16,
+  },
+  featureGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  button: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  buttonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ProfileScreen.tsx',
+      path: 'screens/ProfileScreen.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ProfileCard } from '../components/ProfileCard';
+import { StatCard } from '../components/StatCard';
+
+export default function ProfileScreen() {
+  const stats = [
+    { label: 'Projects', value: '12', icon: '📂' },
+    { label: 'Followers', value: '1.2K', icon: '👥' },
+    { label: 'Following', value: '456', icon: '❤️' },
+  ];
+
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <LinearGradient
+          colors={['#007AFF', '#0051D5']}
+          style={styles.header}
+        >
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>👤</Text>
+            </View>
+          </View>
+          <Text style={styles.name}>John Doe</Text>
+          <Text style={styles.bio}>Mobile Developer • Creator</Text>
+        </LinearGradient>
+
+        <View style={styles.statsContainer}>
+          {stats.map((stat, index) => (
+            <StatCard key={index} {...stat} />
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <ProfileCard
+            title="Completed Project"
+            description="Built a new mobile app"
+            time="2 hours ago"
+          />
+          <ProfileCard
+            title="New Achievement"
+            description="Reached 1K followers"
+            time="1 day ago"
+          />
+          <ProfileCard
+            title="Collaboration"
+            description="Joined a new team"
+            time="3 days ago"
+          />
+        </View>
+
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Edit Profile</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F7',
+  },
+  scrollContent: {
+    paddingBottom: 30,
+  },
+  header: {
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 50,
+  },
+  name: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  bio: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    marginTop: -30,
+    marginBottom: 20,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1D1D1F',
+    marginBottom: 16,
+  },
+  button: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'SettingsScreen.tsx',
+      path: 'screens/SettingsScreen.tsx',
+      content: `import React, { useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { SettingsRow } from '../components/SettingsRow';
+
+export default function SettingsScreen() {
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>PREFERENCES</Text>
+          <View style={styles.settingsGroup}>
+            <SettingsRow
+              icon="🔔"
+              title="Notifications"
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
+            />
+            <SettingsRow
+              icon="🌙"
+              title="Dark Mode"
+              value={darkModeEnabled}
+              onValueChange={setDarkModeEnabled}
+            />
+            <SettingsRow
+              icon="💾"
+              title="Auto Save"
+              value={autoSaveEnabled}
+              onValueChange={setAutoSaveEnabled}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>ACCOUNT</Text>
+          <View style={styles.settingsGroup}>
+            <SettingsRow icon="👤" title="Profile" isLink />
+            <SettingsRow icon="🔒" title="Privacy" isLink />
+            <SettingsRow icon="🔐" title="Security" isLink />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>SUPPORT</Text>
+          <View style={styles.settingsGroup}>
+            <SettingsRow icon="❓" title="Help Center" isLink />
+            <SettingsRow icon="📧" title="Contact Us" isLink />
+            <SettingsRow icon="ℹ️" title="About" isLink />
+          </View>
+        </View>
+
+        <View style={styles.version}>
+          <Text style={styles.versionText}>Version 1.0.0</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F7',
+  },
+  scrollContent: {
+    paddingBottom: 30,
+  },
+  section: {
+    marginTop: 30,
+    paddingHorizontal: 20,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginBottom: 10,
+    marginLeft: 16,
+  },
+  settingsGroup: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  version: {
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  versionText: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'FeatureCard.tsx',
+      path: 'components/FeatureCard.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
+const cardWidth = (width - 60) / 2;
+
+interface FeatureCardProps {
+  title: string;
+  description: string;
+  icon: string;
+}
+
+export const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, icon }) => {
+  return (
+    <TouchableOpacity style={styles.card}>
+      <Text style={styles.icon}>{icon}</Text>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.description}>{description}</Text>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    width: cardWidth,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  icon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1D1D1F',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'WelcomeBanner.tsx',
+      path: 'components/WelcomeBanner.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+
+export const WelcomeBanner: React.FC = () => {
+  return (
+    <LinearGradient
+      colors={['#007AFF', '#0051D5']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.banner}
+    >
+      <Text style={styles.greeting}>Welcome Back! 👋</Text>
+      <Text style={styles.subtitle}>Build amazing mobile apps with Expo</Text>
+    </LinearGradient>
+  );
+};
+
+const styles = StyleSheet.create({
+  banner: {
+    borderRadius: 20,
+    padding: 30,
+    marginTop: 20,
+  },
+  greeting: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ProfileCard.tsx',
+      path: 'components/ProfileCard.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+
+interface ProfileCardProps {
+  title: string;
+  description: string;
+  time: string;
+}
+
+export const ProfileCard: React.FC<ProfileCardProps> = ({ title, description, time }) => {
+  return (
+    <TouchableOpacity style={styles.card}>
+      <View style={styles.content}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.description}>{description}</Text>
+      </View>
+      <Text style={styles.time}>{time}</Text>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  content: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1D1D1F',
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  time: {
+    fontSize: 12,
+    color: '#C7C7CC',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'StatCard.tsx',
+      path: 'components/StatCard.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
+interface StatCardProps {
+  label: string;
+  value: string;
+  icon: string;
+}
+
+export const StatCard: React.FC<StatCardProps> = ({ label, value, icon }) => {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.icon}>{icon}</Text>
+      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.label}>{label}</Text>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    minWidth: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  icon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  value: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1D1D1F',
+    marginBottom: 4,
+  },
+  label: {
+    fontSize: 13,
+    color: '#8E8E93',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'SettingsRow.tsx',
+      path: 'components/SettingsRow.tsx',
+      content: `import React from 'react';
+import { StyleSheet, Text, View, Switch, TouchableOpacity } from 'react-native';
+
+interface SettingsRowProps {
+  icon: string;
+  title: string;
+  value?: boolean;
+  onValueChange?: (value: boolean) => void;
+  isLink?: boolean;
+}
+
+export const SettingsRow: React.FC<SettingsRowProps> = ({
+  icon,
+  title,
+  value,
+  onValueChange,
+  isLink,
+}) => {
+  const content = (
+    <View style={styles.row}>
+      <View style={styles.left}>
+        <Text style={styles.icon}>{icon}</Text>
+        <Text style={styles.title}>{title}</Text>
+      </View>
+      {isLink ? (
+        <Text style={styles.chevron}>›</Text>
+      ) : (
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+          thumbColor="#fff"
+        />
+      )}
+    </View>
+  );
+
+  return isLink ? (
+    <TouchableOpacity style={styles.container}>
+      {content}
+    </TouchableOpacity>
+  ) : (
+    <View style={styles.container}>{content}</View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  left: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  icon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  title: {
+    fontSize: 16,
+    color: '#1D1D1F',
+  },
+  chevron: {
+    fontSize: 24,
+    color: '#C7C7CC',
+  },
+});
+`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'tsconfig.json',
+      path: 'tsconfig.json',
+      content: `{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  }
+}`,
+      fileType: 'json',
+      type: 'json',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: '.gitignore',
+      path: '.gitignore',
+      content: `# Expo
+.expo/
+dist/
+web-build/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env.local
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+`,
+      fileType: 'text',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'README.md',
+      path: 'README.md',
+      content: `# Expo Mobile App
+
+A modern mobile application built with Expo and React Native.
+
+## Features
+
+- 🚀 Cross-platform (iOS, Android, Web)
+- 📱 Beautiful UI components
+- 🎨 Gradient effects with expo-linear-gradient
+- 🧭 Tab navigation with React Navigation
+- 💪 TypeScript for type safety
+- ⚡ Fast refresh for instant feedback
+
+## Getting Started
+
+1. Install dependencies:
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+2. Start the development server:
+   \`\`\`bash
+   npm start
+   \`\`\`
+
+3. Run on your device:
+   - Press \`a\` for Android
+   - Press \`i\` for iOS
+   - Press \`w\` for Web
+
+## Project Structure
+
+\`\`\`
+├── App.tsx              # Main app component with navigation
+├── screens/             # Screen components
+│   ├── HomeScreen.tsx
+│   ├── ProfileScreen.tsx
+│   └── SettingsScreen.tsx
+├── components/          # Reusable components
+│   ├── FeatureCard.tsx
+│   ├── WelcomeBanner.tsx
+│   ├── ProfileCard.tsx
+│   ├── StatCard.tsx
+│   └── SettingsRow.tsx
+└── index.ts            # App entry point
+\`\`\`
+
+## Built With Pipilot
+
+This template was created with [Pipilot](https://pipilot.dev) - the fastest way to build mobile apps.
+`,
+      fileType: 'markdown',
+      type: 'markdown',
+      size: 0,
+      isDirectory: false
+    },
+  ]
+
   // Default Next.js + TypeScript + Tailwind CSS template files
   private static readonly NEXTJS_TEMPLATE_FILES: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[] = [
     {
@@ -12343,6 +13268,41 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
   }
 
   /**
+   * Apply the default Expo React Native template to a new workspace
+   */
+  static async applyExpoTemplate(workspaceId: string): Promise<void> {
+    try {
+      console.log(`🎯 Applying Expo template to workspace: ${workspaceId}`)
+      console.log(`📁 Template files to create: ${this.EXPO_TEMPLATE_FILES.length}`)
+
+      // Create all template files
+      for (const templateFile of this.EXPO_TEMPLATE_FILES) {
+        console.log(`📝 Creating file: ${templateFile.path}`)
+        const createdFile = await storageManager.createFile({
+          workspaceId,
+          name: templateFile.name,
+          path: templateFile.path,
+          content: templateFile.content,
+          fileType: templateFile.fileType,
+          type: templateFile.type,
+          size: templateFile.content.length,
+          isDirectory: false
+        })
+        console.log(`✅ Created file: ${createdFile.name} with ID: ${createdFile.id}`)
+      }
+
+      // Verify files were created
+      const createdFiles = await storageManager.getFiles(workspaceId)
+      console.log(`🔍 Verification: Found ${createdFiles.length} files in workspace ${workspaceId}`)
+
+      console.log(`🎉 Expo template applied successfully to workspace: ${workspaceId}`)
+    } catch (error) {
+      console.error(`❌ Error applying Expo template to workspace ${workspaceId}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Create a new workspace with the specified template
    */
   static async createWorkspaceWithTemplate(
@@ -12368,6 +13328,9 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
       switch (templateId) {
         case 'nextjs':
           await this.applyNextJSTemplate(workspace.id)
+          break
+        case 'expo':
+          await this.applyExpoTemplate(workspace.id)
           break
         case 'vite-react':
         default:
@@ -12408,6 +13371,14 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
         category: 'Next.js',
         tags: ['nextjs', 'react', 'typescript', 'tailwind', 'ssr'],
         files: this.NEXTJS_TEMPLATE_FILES.length
+      },
+      {
+        id: 'expo',
+        name: 'Expo React Native + TypeScript',
+        description: 'A cross-platform mobile app with Expo, React Native, and TypeScript',
+        category: 'Mobile',
+        tags: ['expo', 'react-native', 'mobile', 'typescript', 'ios', 'android'],
+        files: this.EXPO_TEMPLATE_FILES.length
       }
     ]
   }

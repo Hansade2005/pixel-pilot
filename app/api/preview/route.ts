@@ -742,9 +742,22 @@ async function handleStreamingPreview(req: Request) {
             envVars = { ...envVars, ...parseEnvFile(envFile.content) }
           }
 
+          // Detect project type for template selection
+          const packageJsonFile = files.find((f: any) => f.path === 'package.json')
+          let packageJson: any = null
+          if (packageJsonFile) {
+            try {
+              packageJson = JSON.parse(packageJsonFile.content)
+            } catch (error) {
+              console.warn('[Preview] Failed to parse package.json, using default commands')
+            }
+          }
+          const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
+          const template = isExpoProject ? "pipilot-expo" : "pipilot"
+
           // 🔹 Create sandbox
           const sandbox = await createEnhancedSandbox({
-            template: "pipilot",
+            template,
             timeoutMs: 600000,
             env: envVars
           })
@@ -826,18 +839,6 @@ async function handleStreamingPreview(req: Request) {
           const hasYarnLock = files.some(f => f.path === 'yarn.lock')
           const packageManager = hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm'
           
-          const packageJsonFile = files.find((f: any) => f.path === 'package.json')
-          let packageJson: any = null
-          if (packageJsonFile) {
-            try {
-              packageJson = JSON.parse(packageJsonFile.content)
-            } catch (error) {
-              console.warn('[Preview] Failed to parse package.json, using default commands')
-            }
-          }
-
-          const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
-
           if (hasViteConfig || packageJson?.scripts?.preview) {
             // Vite project - build and host on Supabase storage
             send({ type: "log", message: "Detected Vite project, will build and host on Supabase" })
@@ -1157,11 +1158,24 @@ async function handleRegularPreview(req: Request) {
       envVars = { ...envVars, ...parseEnvFile(envFile.content) }
     }
 
+    // Detect project type for template selection
+    const packageJsonFile = files.find((f: any) => f.path === 'package.json')
+    let packageJson: any = null
+    if (packageJsonFile) {
+      try {
+        packageJson = JSON.parse(packageJsonFile.content)
+      } catch (error) {
+        console.warn('[Preview] Failed to parse package.json, using default commands')
+      }
+    }
+    const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
+    const template = isExpoProject ? "pipilot-expo" : "pipilot"
+
     // Create enhanced E2B sandbox with environment variables
     let sandbox
     try {
       sandbox = await createEnhancedSandbox({
-        template: 'pipilot',
+        template,
         timeoutMs: 600000, // 10 minutes for sandbox creation and operations
         env: envVars // Pass environment variables to sandbox
       })
@@ -1329,16 +1343,6 @@ devDependencies:
       const hasYarnLock = files.some(f => f.path === 'yarn.lock')
       const packageManager = hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm'
       
-      const packageJsonFile = files.find((f: any) => f.path === 'package.json')
-      let packageJson: any = null
-      if (packageJsonFile) {
-        try {
-          packageJson = JSON.parse(packageJsonFile.content)
-        } catch (error) {
-          console.warn('[Preview] Failed to parse package.json, using default commands')
-        }
-      }
-
       if (hasViteConfig || packageJson?.scripts?.preview) {
         // Vite project - build and host on Supabase storage
         console.log('[Preview] Detected Vite project, will build and host')
