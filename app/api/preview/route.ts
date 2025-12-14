@@ -962,10 +962,10 @@ async function handleStreamingPreview(req: Request) {
             // Expo project - run web dev server
             send({ type: "log", message: "Detected Expo project, starting web dev server" })
             
-            const devCommand = `expo start --web --port 3000`
+            const devCommand = `npx expo start --web --port 3000`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
-              workingDirectory: '/project',
+              workingDirectory: '/home/developer',
               port: 3000,
               timeoutMs: 300000, // 5 minutes timeout
               envVars,

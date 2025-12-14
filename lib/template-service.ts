@@ -6377,7 +6377,7 @@ This setup provides a complete, production-ready authentication system for your 
     "@react-navigation/native": "^7.0.25",
     "@react-navigation/bottom-tabs": "^7.2.1",
     "@react-navigation/native-stack": "^7.2.2",
-    "react-native-safe-area-context": "4.15.0",
+    "react-native-safe-area-context": "5.6.2",
     "react-native-screens": "~4.4.0",
     "expo-linear-gradient": "~14.0.1",
     "expo-blur": "~14.0.1",
