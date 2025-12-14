@@ -38,8 +38,7 @@ RUN useradd -m -s /bin/bash developer
 USER developer
 
 # Create project directory
-RUN mkdir -p /project
-WORKDIR /project
+WORKDIR /home/developer
 
 # Copy package files for dependency installation
 COPY --chown=developer:developer e2b-template/package.json ./
