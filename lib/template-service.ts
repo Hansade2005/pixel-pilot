@@ -6372,7 +6372,8 @@ This setup provides a complete, production-ready authentication system for your 
   "dependencies": {
     "expo": "~54.0.29",
     "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-native": "0.81.5",
     "react-native-web": "~0.19.10",
     "@react-navigation/native": "^7.0.25",
@@ -6387,7 +6388,7 @@ This setup provides a complete, production-ready authentication system for your 
     "expo-asset": "~11.0.1"
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
+    "@types/react": "~18.3.0",
     "typescript": "~5.9.2"
   },
   "private": true
