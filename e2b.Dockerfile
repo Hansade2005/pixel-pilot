@@ -18,7 +18,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js dependencies
-RUN npm install -g pnpm
+RUN npm install -g pnpm@latest
+RUN npm install -g npm@latest
+RUN npm install -g @expo/cli@latest
+RUN npm install -g eas-cli@latest
 
 # Set up Python environment
 RUN python3 -m pip install --upgrade pip --break-system-packages
