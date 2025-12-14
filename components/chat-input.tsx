@@ -880,6 +880,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           const { TemplateService } = await import('@/lib/template-service')
           if (selectedTemplate === 'nextjs') {
             await TemplateService.applyNextJSTemplate(workspace.id)
+          } else if (selectedTemplate === 'expo') {
+            await TemplateService.applyExpoTemplate(workspace.id)
           } else {
             await TemplateService.applyViteReactTemplate(workspace.id)
           }
