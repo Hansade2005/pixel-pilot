@@ -836,6 +836,8 @@ async function handleStreamingPreview(req: Request) {
             }
           }
 
+          const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
+
           if (hasViteConfig || packageJson?.scripts?.preview) {
             // Vite project - build and host on Supabase storage
             send({ type: "log", message: "Detected Vite project, will build and host on Supabase" })
@@ -844,7 +846,7 @@ async function handleStreamingPreview(req: Request) {
             const buildCommand = `${packageManager} run build`
             send({ type: "log", message: `Building Vite project with: ${buildCommand}` })
             const buildResult = await sandbox.executeCommand(buildCommand, {
-              workingDirectory: '/project',
+              workingDirectory: '/home/developer',
               timeoutMs: 300000, // 5 minutes for build
               envVars,
               onStdout: (data) => send({ type: "log", message: data.trim() }),
@@ -955,6 +957,40 @@ async function handleStreamingPreview(req: Request) {
             // Exit the function early for hosted projects
             controller.close()
             return
+          } else if (isExpoProject) {
+            // Expo project - run web dev server
+            send({ type: "log", message: "Detected Expo project, starting web dev server" })
+            
+            const devCommand = `expo start --web --port 3000`
+            const devServer = await sandbox.startDevServer({
+              command: devCommand,
+              workingDirectory: '/project',
+              port: 3000,
+              timeoutMs: 300000, // 5 minutes timeout
+              envVars,
+              onStdout: (data) => send({ type: "log", message: data.trim() }),
+              onStderr: (data) => send({ type: "error", message: data.trim() })
+            })
+            
+            send({
+              type: "ready",
+              message: "Expo web dev server running",
+              sandboxId: sandbox.id,
+              url: devServer.url,
+              processId: devServer.processId,
+            })
+            
+            // Keep-alive heartbeat
+            const heartbeat = setInterval(() => {
+              send({ type: "heartbeat", message: "alive" })
+            }, 30000)
+            
+            const originalClose = controller.close.bind(controller)
+            controller.close = () => {
+              isClosed = true
+              clearInterval(heartbeat)
+              originalClose()
+            }
           } else {
             // 🔹 Assume Next.js or other framework, run dev server
             send({ type: "log", message: "Starting dev server..." })

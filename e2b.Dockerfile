@@ -36,7 +36,10 @@ RUN apt-get update && apt-get install -y \
 # Create a user
 RUN useradd -m -s /bin/bash developer
 USER developer
-WORKDIR /home/developer
+
+# Create project directory
+RUN mkdir -p /project
+WORKDIR /project
 
 # Copy package files for dependency installation
 COPY --chown=developer:developer e2b-template/package.json ./
