@@ -6364,9 +6364,10 @@ This setup provides a complete, production-ready authentication system for your 
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
+    "dev": "expo start --web --port 3000",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web --port 3000"
   },
   "dependencies": {
     "expo": "~54.0.29",

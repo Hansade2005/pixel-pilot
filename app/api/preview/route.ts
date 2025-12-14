@@ -962,13 +962,20 @@ async function handleStreamingPreview(req: Request) {
             // Expo project - run web dev server
             send({ type: "log", message: "Detected Expo project, starting web dev server" })
             
-            const devCommand = `npx expo start --web --port 3000`
+            // Use pnpm run dev which executes: expo start --web --port 3000
+            const devCommand = `${packageManager} run dev`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
               workingDirectory: '/home/developer',
               port: 3000,
               timeoutMs: 300000, // 5 minutes timeout
-              envVars,
+              envVars: {
+                ...envVars,
+                EXPO_NO_METRO_LAZY: '1',
+                CI: '1',
+                EXPO_NO_TELEMETRY: '1',
+                EXPO_NO_DOTENV: '1'
+              },
               onStdout: (data) => send({ type: "log", message: data.trim() }),
               onStderr: (data) => send({ type: "error", message: data.trim() })
             })
