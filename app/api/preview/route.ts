@@ -959,22 +959,20 @@ async function handleStreamingPreview(req: Request) {
             controller.close()
             return
           } else if (isExpoProject) {
-            // Expo project - run web dev server
-            send({ type: "log", message: "Detected Expo project, starting web dev server" })
+            // Expo project - run dev server on port 8081 as per E2B docs
+            send({ type: "log", message: "Detected Expo project, starting Expo dev server" })
             
-            // Use npx expo directly to ensure it works regardless of package.json scripts
-            const devCommand = `npx expo start --web --port 3000 --non-interactive --no-dev-client`
+            // Use npx expo start as recommended by E2B documentation
+            const devCommand = `npx expo start --non-interactive`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
               workingDirectory: '/home/developer',
-              port: 3000,
+              port: 8081,
               timeoutMs: 300000, // 5 minutes timeout
               envVars: {
                 ...envVars,
-                EXPO_NO_METRO_LAZY: '1',
                 CI: '1',
-                EXPO_NO_TELEMETRY: '1',
-                EXPO_NO_DOTENV: '1'
+                EXPO_NO_TELEMETRY: '1'
               },
               onStdout: (data) => send({ type: "log", message: data.trim() }),
               onStderr: (data) => send({ type: "error", message: data.trim() })

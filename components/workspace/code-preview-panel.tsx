@@ -725,6 +725,8 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         setCurrentLog("🚀 Starting Next.js development server...")
                       } else if (msg.message.includes("compiled successfully") || msg.message.includes("ready")) {
                         setCurrentLog("✅ Next.js dev server ready...")
+                      } else if (msg.message.toLowerCase().includes("expo") || msg.message.toLowerCase().includes("metro")) {
+                        setCurrentLog("📱 Starting Expo Metro bundler...")
                       }
                       
                       // Vite detection - very specific
@@ -736,10 +738,19 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         msg.message.includes("- Network:") && msg.message.includes("http://")
                       )
                       
+                      // Expo detection - Metro bundler ready messages
+                      const isExpoReady = (
+                        msg.message.includes("Metro waiting on") ||
+                        msg.message.includes("Bundler is ready") ||
+                        msg.message.includes("exp://") ||
+                        msg.message.includes("http://localhost:8081") ||
+                        msg.message.toLowerCase().includes("metro") && msg.message.toLowerCase().includes("ready")
+                      )
+                      
                       // Generic detection for custom servers
                       const isGenericReady = msg.message.includes("Production server running")
                       
-                      if (isViteReady || isNextReady || isGenericReady) {
+                      if (isViteReady || isNextReady || isExpoReady || isGenericReady) {
                         // Now the server is actually ready to serve content
                         setCurrentLog("✅ Preview ready!")
                         setPreview(prev => ({ ...prev, isLoading: false }))

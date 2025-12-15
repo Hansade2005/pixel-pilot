@@ -12279,15 +12279,14 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
       name: 'package.json',
       path: 'package.json',
       content: `{
-  "name": "expo-mobile-app",
+  "name": "expo-app",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "dev": "expo start --web --port 3000",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web --port 3000"
+    "web": "expo start --web"
   },
   "dependencies": {
     "expo": "~52.0.0",
@@ -12298,8 +12297,9 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
     "react-native-web": "~0.19.13"
   },
   "devDependencies": {
+    "@babel/core": "^7.25.0",
     "@types/react": "~18.3.0",
-    "typescript": "~5.7.0"
+    "typescript": "~5.3.0"
   },
   "private": true
 }`,
