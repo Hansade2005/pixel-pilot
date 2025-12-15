@@ -44,6 +44,8 @@ function getSubdomain(hostname: string): string | null {
 }
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
   // Handle CORS preflight requests
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, {
@@ -65,7 +67,7 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
 
     // For root requests to subdomains, explicitly serve index.html
-    const originalPath = request.nextUrl.pathname;
+    const originalPath = pathname;
     const targetPath = originalPath === '/' ? `/sites/${subdomain}/index.html` : `/sites/${subdomain}${originalPath}`;
 
     url.pathname = targetPath;
@@ -81,8 +83,26 @@ export async function middleware(request: NextRequest) {
   }
 
   // Skip Supabase auth for public API routes
-  if (request.nextUrl.pathname.startsWith('/api/v1')) {
+  if (pathname.startsWith('/api/v1')) {
     const response = NextResponse.next();
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return response;
+  }
+
+  // Only check auth for protected routes
+  const needsAuth = pathname.startsWith('/admin') || 
+                    pathname.startsWith('/workspace') || 
+                    pathname.startsWith('/database');
+
+  if (!needsAuth) {
+    // Skip auth check for public routes - just add CORS headers
+    const response = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -123,11 +143,11 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
+  // Refresh session if expired - only for protected routes
   const { data: { user } } = await supabase.auth.getUser()
 
   // Protect admin routes
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/admin')) {
     if (!user) {
       // Redirect to login if not authenticated
       return NextResponse.redirect(new URL('/auth/login', request.url))
@@ -140,14 +160,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protect workspace routes (require authentication)
-  if (request.nextUrl.pathname.startsWith('/workspace')) {
+  if (pathname.startsWith('/workspace')) {
     if (!user) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
   }
 
   // Protect database routes (require authentication)
-  if (request.nextUrl.pathname.startsWith('/database')) {
+  if (pathname.startsWith('/database')) {
     if (!user) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
@@ -163,13 +183,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/admin/:path*',
+    '/workspace/:path*',
+    '/database/:path*',
+    '/sites/:path*',
   ],
 }
