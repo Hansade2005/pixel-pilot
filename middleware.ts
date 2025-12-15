@@ -83,7 +83,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Skip Supabase auth for public API routes
-  if (pathname.startsWith('/api/v1')) {
+  if (pathname.startsWith('/api/v1') || pathname.startsWith('/api/')) {
     const response = NextResponse.next();
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -183,9 +183,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/workspace/:path*',
-    '/database/:path*',
-    '/sites/:path*',
+    /*
+     * Match all request paths except static files
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|woff|woff2|ttf|eot)$).*)',
   ],
 }
