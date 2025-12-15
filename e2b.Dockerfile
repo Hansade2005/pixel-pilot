@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 # Install Node.js dependencies with versions compatible with Node.js 25
 RUN npm install -g npm@11.0.0
 RUN npm install -g pnpm@9.15.0
-RUN npm install -g yarn@1.22.22
+# Yarn is already included in Node.js 25 Docker image
 RUN npm install -g @expo/cli@latest
 RUN npm install -g eas-cli@latest
 
