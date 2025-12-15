@@ -620,6 +620,58 @@ export class EnhancedE2BSandbox {
     }
 
     // All strategies failed
+    console.error(`[${this.id}] All dependency installation strategies failed`)
+    
+    // Try to read npm debug log if available
+    try {
+      console.log(`[${this.id}] Attempting to read npm debug log...`)
+      const debugLogPath = '/home/user/.npm/_logs/'
+      
+      // List log files
+      const listResult = await this.executeCommand(`ls -la ${debugLogPath}`, {
+        workingDirectory,
+        timeoutMs: 5000,
+        onStdout: (data) => console.log(`[Log List] ${data}`),
+        onStderr: (data) => console.warn(`[Log List Error] ${data}`),
+        envVars
+      })
+      
+      if (listResult.exitCode === 0) {
+        // Find the most recent debug log
+        const logFiles = listResult.stdout.split('\n')
+          .filter(line => line.includes('debug-0.log'))
+          .map(line => line.split(/\s+/).pop())
+          .filter(Boolean)
+          .sort()
+          .reverse()
+        
+        if (logFiles.length > 0) {
+          const latestLog = logFiles[0]
+          const fullLogPath = `${debugLogPath}${latestLog}`
+          console.log(`[${this.id}] Reading latest npm debug log: ${fullLogPath}`)
+          
+          // Read the log file content using the same method as preview/generate_report
+          const logContent = await this.container.files.read(fullLogPath)
+          
+          // Stream log content to console in chunks
+          const lines = logContent.split('\n')
+          console.log(`[${this.id}] === NPM DEBUG LOG CONTENT (Last 50 lines) ===`)
+          const lastLines = lines.slice(-50)
+          for (let i = 0; i < lastLines.length; i++) {
+            console.log(`[${this.id}] LOG[${i + lines.length - 50}]: ${lastLines[i]}`)
+          }
+          console.log(`[${this.id}] === END NPM DEBUG LOG ===`)
+          
+          // Also send to onStderr callback if provided
+          if (options?.onStderr) {
+            options.onStderr(`NPM DEBUG LOG:\n${lastLines.join('\n')}`)
+          }
+        }
+      }
+    } catch (logError) {
+      console.warn(`[${this.id}] Failed to read npm debug log:`, logError)
+    }
+    
     throw new Error('All dependency installation strategies failed')
   }
 
