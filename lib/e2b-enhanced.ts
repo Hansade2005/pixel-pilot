@@ -541,7 +541,8 @@ export class EnhancedE2BSandbox {
     // Strategy 1: Try packageManager install with no timeout
     try {
       console.log(`[${this.id}] Strategy 1: Attempting ${packageManager} install...`)
-      const result = await this.executeCommand(`${packageManager} install`, {
+      const installCommand = packageManager === 'npm' ? `${packageManager} install --legacy-peer-deps` : `${packageManager} install`
+      const result = await this.executeCommand(installCommand, {
         workingDirectory,
         timeoutMs: 0, // Disable timeout for dependency installation
         onStdout,
@@ -559,8 +560,10 @@ export class EnhancedE2BSandbox {
 
     // Strategy 2: Try packageManager install with production flag (faster)
     try {
-      console.log(`[${this.id}] Strategy 2: Attempting ${packageManager} install --production...`)
-      const result = await this.executeCommand(`${packageManager} install --production`, {
+      console.log(`[${this.id}] Strategy 2: Attempting ${packageManager} install without dev dependencies...`)
+      const productionFlag = packageManager === 'npm' ? '--omit=dev' : '--production'
+      const installCommand = `${packageManager} install ${productionFlag} --legacy-peer-deps`
+      const result = await this.executeCommand(installCommand, {
         workingDirectory,
         timeoutMs: 0, // Disable timeout for production install
         onStdout,
@@ -569,17 +572,19 @@ export class EnhancedE2BSandbox {
       })
       
       if (result.exitCode === 0) {
-        console.log(`[${this.id}] Strategy 2 successful: ${packageManager} install --production completed`)
+        console.log(`[${this.id}] Strategy 2 successful: ${packageManager} install without dev dependencies completed`)
         return result
       }
     } catch (error) {
       console.warn(`[${this.id}] Strategy 2 failed:`, error)
     }
 
-    // Strategy 3: Try packageManager install --frozen-lockfile (clean install, faster)
+    // Strategy 3: Try packageManager install with frozen lockfile (clean install, faster)
     try {
-      console.log(`[${this.id}] Strategy 3: Attempting ${packageManager} install --frozen-lockfile...`)
-      const result = await this.executeCommand(`${packageManager} install --frozen-lockfile`, {
+      console.log(`[${this.id}] Strategy 3: Attempting ${packageManager} install with lockfile...`)
+      const lockfileFlag = packageManager === 'pnpm' ? '--frozen-lockfile' : packageManager === 'yarn' ? '--frozen-lockfile' : '--package-lock-only'
+      const installCommand = `${packageManager} install ${lockfileFlag}`
+      const result = await this.executeCommand(installCommand, {
         workingDirectory,
         timeoutMs: 0, // Disable timeout for frozen lockfile install
         onStdout,
@@ -588,7 +593,7 @@ export class EnhancedE2BSandbox {
       })
       
       if (result.exitCode === 0) {
-        console.log(`[${this.id}] Strategy 3 successful: ${packageManager} install --frozen-lockfile completed`)
+        console.log(`[${this.id}] Strategy 3 successful: ${packageManager} install with lockfile completed`)
         return result
       }
     } catch (error) {
