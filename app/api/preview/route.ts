@@ -770,43 +770,6 @@ async function handleStreamingPreview(req: Request) {
             content: f.content || "",
           }))
 
-          // Create package.json if it doesn't exist
-          const hasPackageJson = files.some((f: any) => f.path === 'package.json')
-          if (!hasPackageJson) {
-            const packageJson = {
-              name: 'preview-app',
-              version: '0.1.0',
-              private: true,
-              packageManager: isExpoProject ? 'yarn' : 'pnpm@8.15.0',
-              scripts: {
-                dev: 'vite',
-                build: 'tsc && vite build',
-                preview: 'vite preview --port 3000',
-                lint: 'eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0'
-              },
-              dependencies: {
-                'react': '^18.2.0',
-                'react-dom': '^18.2.0'
-              },
-              devDependencies: {
-                '@types/react': '^18.2.43',
-                '@types/react-dom': '^18.2.17',
-                '@typescript-eslint/eslint-plugin': '^6.14.0',
-                '@typescript-eslint/parser': '^6.14.0',
-                '@vitejs/plugin-react': '^4.2.1',
-                'eslint': '^8.55.0',
-                'eslint-plugin-react-hooks': '^4.6.0',
-                'eslint-plugin-react-refresh': '^0.4.5',
-                'typescript': '^5.2.2',
-                'vite': '^5.0.8'
-              }
-            }
-            sandboxFiles.push({
-              path: '/project/package.json',
-              content: JSON.stringify(packageJson, null, 2)
-            })
-          }
-
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
@@ -968,8 +931,8 @@ async function handleStreamingPreview(req: Request) {
             let waitingOnPort = false
             let readySent = false
             
-            // Use the detected package manager run dev (which runs expo start --web --port 8081) for proper web development
-            const devCommand = `${packageManager} run dev`
+            // Use the detected package manager run start --web (Expo web development)
+            const devCommand = `${packageManager} start --web`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
               workingDirectory: '/home/developer',
@@ -1226,43 +1189,6 @@ async function handleRegularPreview(req: Request) {
         path: `/project/${file.path}`,
         content: file.content || ''
       }))
-
-      // Create package.json if it doesn't exist
-      const hasPackageJson = files.some(f => f.path === 'package.json')
-      if (!hasPackageJson) {
-        const packageJson = {
-          name: 'preview-app',
-          version: '0.1.0',
-          private: true,
-          packageManager: isExpoProject ? 'yarn' : 'pnpm@8.15.0',
-          scripts: {
-            dev: 'vite',
-            build: 'tsc && vite build',
-            preview: 'vite preview',
-            lint: 'eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0'
-          },
-          dependencies: {
-            'react': '^18.2.0',
-            'react-dom': '^18.2.0'
-          },
-          devDependencies: {
-            '@types/react': '^18.2.43',
-            '@types/react-dom': '^18.2.17',
-            '@typescript-eslint/eslint-plugin': '^6.14.0',
-            '@typescript-eslint/parser': '^6.14.0',
-            '@vitejs/plugin-react': '^4.2.1',
-            'eslint': '^8.55.0',
-            'eslint-plugin-react-hooks': '^4.6.0',
-            'eslint-plugin-react-refresh': '^0.4.5',
-            'typescript': '^5.2.2',
-            'vite': '^5.0.8'
-          }
-        }
-        sandboxFiles.push({
-          path: '/project/package.json',
-          content: JSON.stringify(packageJson, null, 2)
-        })
-      }
 
       // Add .npmrc for package manager optimization
       const hasNpmrc = files.some(f => f.path === '.npmrc')
