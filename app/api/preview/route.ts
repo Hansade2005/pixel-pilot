@@ -812,9 +812,14 @@ async function handleStreamingPreview(req: Request) {
 
           // 🔹 Install dependencies (simple and reliable like the old version)
           send({ type: "log", message: "Installing dependencies..." })
+          
+          // For Expo projects, force npm to avoid pnpm postinstall script blocking
+          const packageManagerForInstall = isExpoProject ? 'npm' : 'pnpm'
+          
           const installResult = await sandbox.installDependenciesRobust("/project", {
             timeoutMs: 0,
             envVars,
+            packageManager: packageManagerForInstall,
             onStdout: (data) => send({ type: "log", message: data.trim() }),
             onStderr: (data) => send({ type: "error", message: data.trim() }),
           })
@@ -1325,7 +1330,13 @@ devDependencies:
       }
 
       // Install dependencies with no timeout (simple and reliable like old version)
-      const installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
+      // For Expo projects, force npm to avoid pnpm postinstall script blocking
+      const packageManagerForInstall2 = isExpoProject ? 'npm' : 'pnpm'
+      const installResult = await sandbox.installDependenciesRobust('/project', { 
+        timeoutMs: 0, 
+        envVars,
+        packageManager: packageManagerForInstall2
+      })
       
       if (installResult.exitCode !== 0) {
         console.error('npm install failed:', installResult.stderr)
