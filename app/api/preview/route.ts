@@ -810,28 +810,20 @@ async function handleStreamingPreview(req: Request) {
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
-          // 🔹 Install dependencies (use npm for Expo projects, robust method for others)
-          send({ type: "log", message: "Installing dependencies..." })
-          let installResult: any
+          // Detect package manager early - use npm for Expo projects due to postinstall script requirements
+          const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml')
+          const hasYarnLock = files.some(f => f.path === 'yarn.lock')
+          const packageManager = isExpoProject ? 'npm' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
 
-          if (isExpoProject) {
-            // Use npm for Expo projects due to postinstall script requirements
-            installResult = await sandbox.executeCommand("npm install", {
-              workingDirectory: '/home/developer',
-              timeoutMs: 300000, // 5 minutes for installation
-              envVars,
-              onStdout: (data) => send({ type: "log", message: data.trim() }),
-              onStderr: (data) => send({ type: "error", message: data.trim() })
-            })
-          } else {
-            // Use robust installation method for other projects
-            installResult = await sandbox.installDependenciesRobust("/project", {
-              timeoutMs: 0,
-              envVars,
-              onStdout: (data) => send({ type: "log", message: data.trim() }),
-              onStderr: (data) => send({ type: "error", message: data.trim() }),
-            })
-          }
+          // 🔹 Install dependencies (simple and reliable like the old version)
+          send({ type: "log", message: "Installing dependencies..." })
+          const installResult = await sandbox.installDependenciesRobust("/project", {
+            timeoutMs: 0,
+            envVars,
+            packageManager,
+            onStdout: (data) => send({ type: "log", message: data.trim() }),
+            onStderr: (data) => send({ type: "error", message: data.trim() }),
+          })
 
           if (installResult.exitCode !== 0) {
             send({ type: "error", message: "Dependency installation failed" })
@@ -847,11 +839,6 @@ async function handleStreamingPreview(req: Request) {
             f.path === 'vite.config.ts' || 
             f.path === 'vite.config.mjs'
           )
-          
-          // Detect package manager - use npm for Expo projects due to postinstall script requirements
-          const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml')
-          const hasYarnLock = files.some(f => f.path === 'yarn.lock')
-          const packageManager = isExpoProject ? 'npm' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
           
           if (hasViteConfig || packageJson?.scripts?.preview) {
             // Vite project - build and host on Supabase storage
@@ -1349,26 +1336,13 @@ devDependencies:
         console.log(`Successfully wrote ${fileResult.successCount} files to sandbox`)
       }
 
-      // Install dependencies (use npm for Expo projects, robust method for others)
-      let installResult: any
-      if (isExpoProject) {
-        // Use npm for Expo projects due to postinstall script requirements
-        installResult = await sandbox.executeCommand("npm install", {
-          workingDirectory: '/project',
-          timeoutMs: 300000, // 5 minutes for installation
-          envVars,
-          onStdout: (data) => console.log(`[npm Install] ${data}`),
-          onStderr: (data) => console.warn(`[npm Install Error] ${data}`)
-        })
-      } else {
-        // Use robust installation method for other projects
-        installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
-      }
+      // Install dependencies with no timeout (simple and reliable like old version)
+      const installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
       
       if (installResult.exitCode !== 0) {
-        console.error('Dependency installation failed:', installResult.stderr)
-        console.error('Installation stdout:', installResult.stdout)
-        throw new Error(`Dependency installation failed with exit code ${installResult.exitCode}`)
+        console.error('npm install failed:', installResult.stderr)
+        console.error('npm install stdout:', installResult.stdout)
+        throw new Error(`npm dependency installation failed with exit code ${installResult.exitCode}`)
       }
       
       console.log('Dependencies installed successfully with npm')
