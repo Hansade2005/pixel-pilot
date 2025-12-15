@@ -12292,12 +12292,19 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
   "dependencies": {
     "expo": "~54.0.29",
     "expo-status-bar": "~3.0.9",
+    "expo-constants": "~17.0.5",
+    "expo-linking": "~7.0.5",
+    "expo-router": "~4.0.17",
+    "expo-splash-screen": "~0.29.21",
+    "expo-updates": "~0.27.3",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "@types/react-native": "~0.73.0",
     "typescript": "~5.9.2"
   },
   "private": true
