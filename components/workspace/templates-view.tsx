@@ -119,22 +119,19 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
   const fetchTemplates = async () => {
     try {
-      // Use API route to bypass CORS issues
-      const response = await fetch('/api/templates/public?orderBy=created_at&ascending=false')
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch templates')
-      }
-      
-      const data = await response.json()
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('public_templates')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
       setTemplates(data || [])
 
       // Fetch marketplace metadata and pricing for all templates
       if (data && data.length > 0) {
         const templateIds = data.map((t: any) => t.id)
-        
-        // Use createClient for metadata/pricing (these are authenticated calls)
-        const supabase = createClient()
         
         // Fetch metadata
         const { data: metadataList } = await supabase

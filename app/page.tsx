@@ -106,19 +106,21 @@ export default function LandingPage() {
       // Get static templates from TemplateManager
       const staticTemplates = TemplateManager.getAllTemplates()
       
-      // Get public templates from API route (bypasses CORS)
-      const response = await fetch('/api/templates/public?orderBy=usage_count&ascending=false')
+      // Get public templates from Supabase
+      const supabase = createClient()
+      const { data: publicTemplates, error } = await supabase
+        .from('public_templates')
+        .select('*')
+        .order('usage_count', { ascending: false })
       
-      if (!response.ok) {
-        console.error('Error fetching public templates:', await response.text())
+      if (error) {
+        console.error('Error fetching public templates:', error)
         setTemplates(staticTemplates)
         return
       }
       
-      const publicTemplates = await response.json()
-      
       // Transform public templates to match the existing template format
-      const transformedPublicTemplates = (publicTemplates || []).map((template: any) => ({
+      const transformedPublicTemplates = (publicTemplates || []).map(template => ({
         id: `public-${template.id}`,
         title: template.name,
         description: template.description || 'A community template',
