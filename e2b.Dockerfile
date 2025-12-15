@@ -39,6 +39,11 @@ RUN apt-get update && apt-get install -y \
 
 # Create a user
 RUN useradd -m -s /bin/bash developer
+
+# Create necessary directories with correct ownership before switching user
+RUN mkdir -p /home/developer/.expo /home/developer/.npm /home/developer/.cache \
+    && chown -R developer:developer /home/developer
+
 USER developer
 
 # Create project directory
