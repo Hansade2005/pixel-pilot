@@ -6372,23 +6372,18 @@ This setup provides a complete, production-ready authentication system for your 
   "dependencies": {
     "expo": "~54.0.29",
     "expo-status-bar": "~3.0.9",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-web": "~0.19.10",
-    "@react-navigation/native": "^7.0.25",
-    "@react-navigation/bottom-tabs": "^7.2.1",
-    "@react-navigation/native-stack": "^7.2.2",
-    "react-native-safe-area-context": "5.6.2",
-    "react-native-screens": "~4.4.0",
-    "expo-linear-gradient": "~14.0.1",
-    "expo-blur": "~14.0.1",
-    "expo-font": "~13.0.1",
-    "expo-haptics": "~14.0.0",
-    "expo-asset": "~11.0.1"
+    "react-native-web": "~0.21.2",
+    "@react-navigation/native": "^7.1.25",
+    "@react-navigation/bottom-tabs": "^7.8.12",
+    "@react-navigation/native-stack": "^7.8.6",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.4.0"
   },
   "devDependencies": {
-    "@types/react": "~18.3.0",
+    "@types/react": "~19.1.0",
     "typescript": "~5.9.2"
   },
   "private": true
@@ -6522,7 +6517,6 @@ export default function App() {
       path: 'screens/HomeScreen.tsx',
       content: `import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeatureCard } from '../components/FeatureCard';
 import { WelcomeBanner } from '../components/WelcomeBanner';
@@ -6554,14 +6548,9 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Get Started</Text>
           <TouchableOpacity style={styles.button}>
-            <LinearGradient
-              colors={['#007AFF', '#0051D5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
+            <View style={styles.buttonGradient}>
               <Text style={styles.buttonText}>Start Building</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -7230,7 +7219,7 @@ A modern mobile application built with Expo and React Native.
 
 - 🚀 Cross-platform (iOS, Android, Web)
 - 📱 Beautiful UI components
-- 🎨 Gradient effects with expo-linear-gradient
+- 🎨 Modern UI with clean styling
 - 🧭 Tab navigation with React Navigation
 - 💪 TypeScript for type safety
 - ⚡ Fast refresh for instant feedback
