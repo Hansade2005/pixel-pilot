@@ -37,21 +37,21 @@ RUN apt-get update && apt-get install -y \
     tightvncserver \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a user
-RUN useradd -m -s /bin/bash developer
+# Create a user with proper setup like E2B Expo template
+RUN useradd -m -s /bin/bash user
 
 # Create necessary directories with correct ownership before switching user
-RUN mkdir -p /home/developer/.expo /home/developer/.npm /home/developer/.cache \
-    && chown -R developer:developer /home/developer
+RUN mkdir -p /home/user/.expo /home/user/.npm /home/user/.cache \
+    && chown -R user:user /home/user
 
-USER developer
+USER user
 
-# Create project directory
-WORKDIR /home/developer
+# Set working directory to user home like E2B Expo template
+WORKDIR /home/user
 
 # Copy package files for dependency installation
-COPY --chown=developer:developer e2b-template/package.json ./
-COPY --chown=developer:developer e2b-template/pnpm-lock.yaml* ./
+COPY --chown=user:user e2b-template/package.json ./
+COPY --chown=user:user e2b-template/pnpm-lock.yaml* ./
 
 # Install Node.js dependencies
 RUN pnpm install

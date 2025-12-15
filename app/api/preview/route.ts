@@ -766,7 +766,7 @@ async function handleStreamingPreview(req: Request) {
           // 🔹 Write project files
           send({ type: "log", message: "Writing files..." })
           const sandboxFiles: SandboxFile[] = files.map((f: any) => ({
-            path: `/project/${f.path}`,
+            path: isExpoProject ? `/home/user/${f.path}` : `/project/${f.path}`,
             content: f.content || "",
           }))
 
@@ -780,13 +780,16 @@ async function handleStreamingPreview(req: Request) {
 
           // 🔹 Install dependencies (simple and reliable like the old version)
           send({ type: "log", message: "Installing dependencies..." })
-          const installResult = await sandbox.installDependenciesRobust("/project", {
-            timeoutMs: 0,
-            envVars,
-            packageManager,
-            onStdout: (data) => send({ type: "log", message: data.trim() }),
-            onStderr: (data) => send({ type: "error", message: data.trim() }),
-          })
+          const installResult = await sandbox.installDependenciesRobust(
+            isExpoProject ? "/home/user" : "/project", 
+            {
+              timeoutMs: 0,
+              envVars,
+              packageManager,
+              onStdout: (data) => send({ type: "log", message: data.trim() }),
+              onStderr: (data) => send({ type: "error", message: data.trim() }),
+            }
+          )
 
           if (installResult.exitCode !== 0) {
             send({ type: "error", message: "Dependency installation failed" })
@@ -811,7 +814,7 @@ async function handleStreamingPreview(req: Request) {
             const buildCommand = `${packageManager} run build`
             send({ type: "log", message: `Building Vite project with: ${buildCommand}` })
             const buildResult = await sandbox.executeCommand(buildCommand, {
-              workingDirectory: '/home/developer',
+              workingDirectory: '/project', // Vite projects use /project directory
               timeoutMs: 300000, // 5 minutes for build
               envVars,
               onStdout: (data) => send({ type: "log", message: data.trim() }),
@@ -935,7 +938,7 @@ async function handleStreamingPreview(req: Request) {
             const devCommand = `npx expo start --web`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
-              workingDirectory: '/home/developer',
+              workingDirectory: '/home/user', // Use user home directory like E2B Expo template
               port: 8081,
               timeoutMs: 300000, // 5 minutes timeout
               envVars: {
@@ -1186,7 +1189,7 @@ async function handleRegularPreview(req: Request) {
     try {
       // Prepare files for batch operation
       const sandboxFiles: SandboxFile[] = files.map(file => ({
-        path: `/project/${file.path}`,
+        path: isExpoProject ? `/home/user/${file.path}` : `/project/${file.path}`,
         content: file.content || ''
       }))
 
@@ -1286,7 +1289,10 @@ devDependencies:
       }
 
       // Install dependencies with no timeout (simple and reliable like old version)
-      const installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
+      const installResult = await sandbox.installDependenciesRobust(
+        isExpoProject ? '/home/user' : '/project', 
+        { timeoutMs: 0, envVars }
+      )
       
       if (installResult.exitCode !== 0) {
         console.error('npm install failed:', installResult.stderr)
