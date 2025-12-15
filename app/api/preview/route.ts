@@ -798,7 +798,33 @@ async function handleStreamingPreview(req: Request) {
 
           send({ type: "log", message: "Dependencies installed successfully" })
 
-          // 🔹 Determine the build and start command based on framework
+          // 🔹 For Expo projects with TypeScript files, ensure TypeScript is installed
+          if (isExpoProject) {
+            const hasTypeScriptFiles = files.some((f: any) => 
+              f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path === 'tsconfig.json'
+            )
+            
+            if (hasTypeScriptFiles) {
+              send({ type: "log", message: "Installing TypeScript for Expo project..." })
+              try {
+                const tsInstallResult = await sandbox.executeCommand('npx expo install typescript', {
+                  workingDirectory: '/home/user',
+                  timeoutMs: 60000,
+                  envVars,
+                  onStdout: (data) => send({ type: "log", message: data.trim() }),
+                  onStderr: (data) => send({ type: "error", message: data.trim() })
+                })
+                
+                if (tsInstallResult.exitCode !== 0) {
+                  send({ type: "error", message: "TypeScript installation failed, but continuing..." })
+                } else {
+                  send({ type: "log", message: "TypeScript installed successfully" })
+                }
+              } catch (error) {
+                send({ type: "error", message: "TypeScript installation failed, but continuing..." })
+              }
+            }
+          }
           let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
           const hasViteConfig = files.some((f: any) => 
             f.path === 'vite.config.js' || 
@@ -1302,7 +1328,31 @@ devDependencies:
       
       console.log('Dependencies installed successfully with npm')
 
-      // Determine the build and start command based on framework
+      // For Expo projects with TypeScript files, ensure TypeScript is installed
+      if (isExpoProject) {
+        const hasTypeScriptFiles = files.some((f: any) => 
+          f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path === 'tsconfig.json'
+        )
+        
+        if (hasTypeScriptFiles) {
+          console.log('Installing TypeScript for Expo project...')
+          try {
+            const tsInstallResult = await sandbox.executeCommand('npx expo install typescript', {
+              workingDirectory: '/home/user',
+              timeoutMs: 60000,
+              envVars
+            })
+            
+            if (tsInstallResult.exitCode !== 0) {
+              console.warn('TypeScript installation failed, but continuing...')
+            } else {
+              console.log('TypeScript installed successfully')
+            }
+          } catch (error) {
+            console.warn('TypeScript installation failed, but continuing...')
+          }
+        }
+      }
       let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
       const hasViteConfig = files.some((f: any) => 
         f.path === 'vite.config.js' || 
