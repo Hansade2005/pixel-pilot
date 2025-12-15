@@ -923,7 +923,7 @@ async function handleStreamingPreview(req: Request) {
             controller.close()
             return
           } else if (isExpoProject) {
-            // Expo project - run dev server on port 8081 as per E2B docs
+            // Expo project - run dev server directly with npx (no dependency on package.json scripts)
             send({ type: "log", message: "Detected Expo project, starting Expo dev server" })
             
             // Track Metro bundler readiness
@@ -931,8 +931,8 @@ async function handleStreamingPreview(req: Request) {
             let waitingOnPort = false
             let readySent = false
             
-            // Use the detected package manager run start --web (Expo web development)
-            const devCommand = `${packageManager} start --web`
+            // Use npx expo start --web directly (Expo CLI is globally installed)
+            const devCommand = `npx expo start --web`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
               workingDirectory: '/home/developer',
