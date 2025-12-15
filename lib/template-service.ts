@@ -12284,10 +12284,10 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "dev": "expo start --web --port 3000",
+    "dev": "expo start --web --port 8081",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web --port 3000"
+    "web": "expo start --web --port 8081"
   },
   "dependencies": {
     "expo": "~54.0.29",
