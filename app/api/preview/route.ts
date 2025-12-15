@@ -777,7 +777,7 @@ async function handleStreamingPreview(req: Request) {
               name: 'preview-app',
               version: '0.1.0',
               private: true,
-              packageManager: isExpoProject ? 'npm' : 'pnpm@8.15.0',
+              packageManager: isExpoProject ? 'yarn' : 'pnpm@8.15.0',
               scripts: {
                 dev: 'vite',
                 build: 'tsc && vite build',
@@ -810,10 +810,10 @@ async function handleStreamingPreview(req: Request) {
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
-          // Detect package manager early - use npm for Expo projects due to postinstall script requirements
+          // Detect package manager early - use yarn for Expo projects due to postinstall script requirements
           const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml')
           const hasYarnLock = files.some(f => f.path === 'yarn.lock')
-          const packageManager = isExpoProject ? 'npm' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
+          const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
 
           // 🔹 Install dependencies (simple and reliable like the old version)
           send({ type: "log", message: "Installing dependencies..." })
@@ -1211,7 +1211,7 @@ async function handleRegularPreview(req: Request) {
           name: 'preview-app',
           version: '0.1.0',
           private: true,
-          packageManager: isExpoProject ? 'npm' : 'pnpm@8.15.0',
+          packageManager: isExpoProject ? 'yarn' : 'pnpm@8.15.0',
           scripts: {
             dev: 'vite',
             build: 'tsc && vite build',
@@ -1246,9 +1246,9 @@ async function handleRegularPreview(req: Request) {
       if (!hasNpmrc) {
         let npmrcContent: string
         if (isExpoProject) {
-          // npm configuration for Expo projects
+          // yarn configuration for Expo projects
           npmrcContent = [
-            '# npm configuration for Expo/React Native compatibility',
+            '# yarn configuration for Expo/React Native compatibility',
             'fund=false',
             'audit=false'
           ].join('\n')

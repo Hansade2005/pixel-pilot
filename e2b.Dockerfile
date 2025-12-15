@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:25-slim
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -17,11 +17,15 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js dependencies
-RUN npm install -g pnpm@latest
-RUN npm install -g npm@latest
+# Install Node.js dependencies with versions compatible with Node.js 25
+RUN npm install -g npm@11.0.0
+RUN npm install -g pnpm@9.15.0
+RUN npm install -g yarn@1.22.22
 RUN npm install -g @expo/cli@latest
 RUN npm install -g eas-cli@latest
+
+# Clean npm cache to prevent corruption
+RUN npm cache clean --force
 
 # Set up Python environment
 RUN python3 -m pip install --upgrade pip --break-system-packages

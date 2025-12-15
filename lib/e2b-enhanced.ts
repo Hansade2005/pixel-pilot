@@ -619,8 +619,71 @@ export class EnhancedE2BSandbox {
       console.warn(`[${this.id}] Strategy 4 failed:`, error)
     }
 
+    // Strategy 5: Fallback to yarn install (if original packageManager failed)
+    if (packageManager !== 'yarn') {
+      try {
+        console.log(`[${this.id}] Strategy 5: Fallback to yarn install...`)
+        const result = await this.executeCommand('yarn install', {
+          workingDirectory,
+          timeoutMs: 0, // Disable timeout for yarn install
+          onStdout,
+          onStderr,
+          envVars // Pass environment variables
+        })
+        
+        if (result.exitCode === 0) {
+          console.log(`[${this.id}] Strategy 5 successful: yarn install completed`)
+          return result
+        }
+      } catch (error) {
+        console.warn(`[${this.id}] Strategy 5 failed:`, error)
+      }
+    }
+
+    // Strategy 6: Fallback to yarn install with frozen lockfile
+    if (packageManager !== 'yarn') {
+      try {
+        console.log(`[${this.id}] Strategy 6: Fallback to yarn install with frozen lockfile...`)
+        const result = await this.executeCommand('yarn install --frozen-lockfile', {
+          workingDirectory,
+          timeoutMs: 0, // Disable timeout for yarn frozen install
+          onStdout,
+          onStderr,
+          envVars // Pass environment variables
+        })
+        
+        if (result.exitCode === 0) {
+          console.log(`[${this.id}] Strategy 6 successful: yarn install with frozen lockfile completed`)
+          return result
+        }
+      } catch (error) {
+        console.warn(`[${this.id}] Strategy 6 failed:`, error)
+      }
+    }
+
+    // Strategy 7: Fallback to yarn add essential dependencies
+    if (packageManager !== 'yarn') {
+      try {
+        console.log(`[${this.id}] Strategy 7: Fallback to yarn add essential dependencies...`)
+        const result = await this.executeCommand('yarn add react react-dom vite @vitejs/plugin-react typescript', {
+          workingDirectory,
+          timeoutMs: 0, // Disable timeout for yarn add
+          onStdout,
+          onStderr,
+          envVars // Pass environment variables
+        })
+        
+        if (result.exitCode === 0) {
+          console.log(`[${this.id}] Strategy 7 successful: yarn add essential dependencies completed`)
+          return result
+        }
+      } catch (error) {
+        console.warn(`[${this.id}] Strategy 7 failed:`, error)
+      }
+    }
+
     // All strategies failed
-    console.error(`[${this.id}] All dependency installation strategies failed`)
+    console.error(`[${this.id}] All dependency installation strategies failed (including yarn fallback)`)
     
     // Try to read npm debug log if available
     try {

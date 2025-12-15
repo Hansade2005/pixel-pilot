@@ -6437,7 +6437,7 @@ This setup provides a complete, production-ready authentication system for your 
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@types/node": "^20.10.5",
+    "@types/node": "^25.0.0",
     "typescript": "^5.2.2",
     "tailwindcss": "^3.3.6",
     "autoprefixer": "^10.4.16",
