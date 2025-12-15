@@ -1,10 +1,5 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import type { CookieOptions } from '@supabase/ssr'
-
-// Admin email for role-based access
-const ADMIN_EMAIL = 'hanscadx8@gmail.com'
 
 // Reserved subdomains that should NOT be treated as site subdomains
 const RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'admin', 'auth', 'dashboard']
@@ -89,97 +84,23 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Define protected routes that require authentication
-  const isProtectedRoute = 
-    request.nextUrl.pathname.startsWith('/admin') ||
-    request.nextUrl.pathname.startsWith('/workspace') ||
-    request.nextUrl.pathname.startsWith('/database');
-
-  // Create a response object to mutate
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
-
-  // Only check auth for protected routes to avoid timeout on public pages
-  if (isProtectedRoute) {
-    // Create a Supabase client configured to use cookies
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            })
-          },
-          remove(name: string, options: CookieOptions) {
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            })
-          },
-        },
-      }
-    )
-
-    // Check authentication for protected routes only
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Protect admin routes
-    if (request.nextUrl.pathname.startsWith('/admin')) {
-      if (!user) {
-        // Redirect to login if not authenticated
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
-
-      if (user.email !== ADMIN_EMAIL) {
-        // Redirect to workspace if not admin
-        return NextResponse.redirect(new URL('/workspace', request.url))
-      }
-    }
-
-    // Protect workspace routes (require authentication)
-    if (request.nextUrl.pathname.startsWith('/workspace')) {
-      if (!user) {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
-    }
-
-    // Protect database routes (require authentication)
-    if (request.nextUrl.pathname.startsWith('/database')) {
-      if (!user) {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
-    }
-  }
-
   // Add CORS headers to all responses
-  response.headers.set('Access-Control-Allow-Origin', '*')
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  const response = NextResponse.next();
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  return response
+  return response;
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     * - api routes (handled directly)
+     * Only run middleware on:
+     * - Multi-tenant subdomain routes (for pipilot.dev)
+     * - API v1 routes (for CORS)
+     * Exclude all static assets and Next.js internal routes
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)$).*)',
   ],
 }
