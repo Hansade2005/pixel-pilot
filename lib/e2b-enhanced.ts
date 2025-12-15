@@ -526,22 +526,20 @@ export class EnhancedE2BSandbox {
       timeoutMs?: number, 
       envVars?: Record<string, string>,
       onStdout?: (data: string) => void,
-      onStderr?: (data: string) => void,
-      packageManager?: 'pnpm' | 'npm' | 'yarn'
+      onStderr?: (data: string) => void
     }
   ): Promise<CommandResult> {
     const timeoutMs = options?.timeoutMs || 0 // Default to 0 (no timeout) for dependency installation
     const envVars = options?.envVars || {} // Get environment variables
-    const packageManager = options?.packageManager || 'pnpm' // Default to pnpm for backward compatibility
-    const onStdout = options?.onStdout || ((data: string) => console.log(`[${packageManager} Install] ${data}`))
-    const onStderr = options?.onStderr || ((data: string) => console.warn(`[${packageManager} Install Error] ${data}`))
+    const onStdout = options?.onStdout || ((data: string) => console.log(`[pnpm Install] ${data}`))
+    const onStderr = options?.onStderr || ((data: string) => console.warn(`[pnpm Install Error] ${data}`))
     
-    console.log(`[${this.id}] Starting robust dependency installation with ${packageManager}, timeout: ${timeoutMs === 0 ? 'disabled' : timeoutMs + 'ms'}...`)
+    console.log(`[${this.id}] Starting robust dependency installation with timeout: ${timeoutMs === 0 ? 'disabled' : timeoutMs + 'ms'}...`)
     
-    // Strategy 1: Try packageManager install with no timeout
+    // Strategy 1: Try pnpm install with no timeout
     try {
-      console.log(`[${this.id}] Strategy 1: Attempting ${packageManager} install...`)
-      const result = await this.executeCommand(`${packageManager} install`, {
+      console.log(`[${this.id}] Strategy 1: Attempting pnpm install...`)
+      const result = await this.executeCommand('pnpm install', {
         workingDirectory,
         timeoutMs: 0, // Disable timeout for dependency installation
         onStdout,
@@ -550,17 +548,17 @@ export class EnhancedE2BSandbox {
       })
       
       if (result.exitCode === 0) {
-        console.log(`[${this.id}] Strategy 1 successful: ${packageManager} install completed`)
+        console.log(`[${this.id}] Strategy 1 successful: pnpm install completed`)
         return result
       }
     } catch (error) {
       console.warn(`[${this.id}] Strategy 1 failed:`, error)
     }
 
-    // Strategy 2: Try packageManager install with production flag (faster)
+    // Strategy 2: Try pnpm install with production flag (faster)
     try {
-      console.log(`[${this.id}] Strategy 2: Attempting ${packageManager} install --production...`)
-      const result = await this.executeCommand(`${packageManager} install --production`, {
+      console.log(`[${this.id}] Strategy 2: Attempting pnpm install --production...`)
+      const result = await this.executeCommand('pnpm install --production', {
         workingDirectory,
         timeoutMs: 0, // Disable timeout for production install
         onStdout,
@@ -569,38 +567,36 @@ export class EnhancedE2BSandbox {
       })
       
       if (result.exitCode === 0) {
-        console.log(`[${this.id}] Strategy 2 successful: ${packageManager} install --production completed`)
+        console.log(`[${this.id}] Strategy 2 successful: pnpm install --production completed`)
         return result
       }
     } catch (error) {
       console.warn(`[${this.id}] Strategy 2 failed:`, error)
     }
 
-    // Strategy 3: Try packageManager install --frozen-lockfile (clean install, faster) - only for pnpm
-    if (packageManager === 'pnpm') {
-      try {
-        console.log(`[${this.id}] Strategy 3: Attempting pnpm install --frozen-lockfile...`)
-        const result = await this.executeCommand('pnpm install --frozen-lockfile', {
-          workingDirectory,
-          timeoutMs: 0, // Disable timeout for frozen lockfile install
-          onStdout,
-          onStderr,
-          envVars // Pass environment variables
-        })
-        
-        if (result.exitCode === 0) {
-          console.log(`[${this.id}] Strategy 3 successful: pnpm install --frozen-lockfile completed`)
-          return result
-        }
-      } catch (error) {
-        console.warn(`[${this.id}] Strategy 3 failed:`, error)
+    // Strategy 3: Try pnpm install --frozen-lockfile (clean install, faster)
+    try {
+      console.log(`[${this.id}] Strategy 3: Attempting pnpm install --frozen-lockfile...`)
+      const result = await this.executeCommand('pnpm install --frozen-lockfile', {
+        workingDirectory,
+        timeoutMs: 0, // Disable timeout for frozen lockfile install
+        onStdout,
+        onStderr,
+        envVars // Pass environment variables
+      })
+      
+      if (result.exitCode === 0) {
+        console.log(`[${this.id}] Strategy 3 successful: pnpm install --frozen-lockfile completed`)
+        return result
       }
+    } catch (error) {
+      console.warn(`[${this.id}] Strategy 3 failed:`, error)
     }
 
     // Strategy 4: Try installing only essential dependencies
     try {
       console.log(`[${this.id}] Strategy 4: Attempting minimal dependency installation...`)
-      const result = await this.executeCommand(`${packageManager} add react react-dom vite @vitejs/plugin-react typescript`, {
+      const result = await this.executeCommand('pnpm add react react-dom vite @vitejs/plugin-react typescript', {
         workingDirectory,
         timeoutMs: 0, // Disable timeout for minimal install
         onStdout,
@@ -631,17 +627,15 @@ export class EnhancedE2BSandbox {
       timeoutMs?: number,
       envVars?: Record<string, string>,
       onStdout?: (data: string) => void,
-      onStderr?: (data: string) => void,
-      packageManager?: 'pnpm' | 'npm' | 'yarn'
+      onStderr?: (data: string) => void
     }
   ): Promise<CommandResult | null> {
     const timeoutMs = options?.timeoutMs || 0
     const envVars = options?.envVars || {}
-    const packageManager = options?.packageManager || 'pnpm'
-    const onStdout = options?.onStdout || ((data: string) => console.log(`[${packageManager} Add] ${data}`))
-    const onStderr = options?.onStderr || ((data: string) => console.warn(`[${packageManager} Add Error] ${data}`))
+    const onStdout = options?.onStdout || ((data: string) => console.log(`[pnpm Add] ${data}`))
+    const onStderr = options?.onStderr || ((data: string) => console.warn(`[pnpm Add Error] ${data}`))
 
-    console.log(`[${this.id}] Installing ALL project dependencies (fresh install) with ${packageManager}...`)
+    console.log(`[${this.id}] Installing ALL project dependencies (fresh install)...`)
 
     try {
       // Get ALL dependencies from project package.json
@@ -680,7 +674,7 @@ export class EnhancedE2BSandbox {
 
         console.log(`[${this.id}] Installing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allDepsToInstall.length / batchSize)}: ${batch.join(', ')}`)
 
-        const installCommand = isDev ? `${packageManager} add -D ${batch.join(' ')}` : `${packageManager} add ${batch.join(' ')}`
+        const installCommand = isDev ? `pnpm add -D ${batch.join(' ')}` : `pnpm add ${batch.join(' ')}`
 
         const result = await this.executeCommand(installCommand, {
           workingDirectory,
