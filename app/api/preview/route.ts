@@ -963,8 +963,13 @@ async function handleStreamingPreview(req: Request) {
             // Expo project - run dev server on port 8081 as per E2B docs
             send({ type: "log", message: "Detected Expo project, starting Expo dev server" })
             
-            // Use npx expo start as recommended by E2B documentation
-            const devCommand = `npx expo start --non-interactive`
+            // Track Metro bundler readiness
+            let metroStarted = false
+            let waitingOnPort = false
+            let readySent = false
+            
+            // Use npm run dev (which runs expo start --web --port 8081) for proper web development
+            const devCommand = `npm run dev`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
               workingDirectory: '/home/developer',
@@ -975,16 +980,34 @@ async function handleStreamingPreview(req: Request) {
                 CI: '1',
                 EXPO_NO_TELEMETRY: '1'
               },
-              onStdout: (data) => send({ type: "log", message: data.trim() }),
+              onStdout: (data) => {
+                const message = data.trim()
+                send({ type: "log", message })
+                
+                // Check for Metro bundler readiness indicators
+                if (message.includes("Starting Metro Bundler")) {
+                  metroStarted = true
+                  send({ type: "log", message: "Metro Bundler started" })
+                }
+                if (message.includes("Waiting on http://localhost:8081")) {
+                  waitingOnPort = true
+                  send({ type: "log", message: "Expo dev server ready on port 8081" })
+                }
+                
+                // Send ready event only when both conditions are met and not already sent
+                if (metroStarted && waitingOnPort && !readySent) {
+                  readySent = true
+                  send({
+                    type: "ready",
+                    message: "Expo web dev server running",
+                    sandboxId: sandbox.id,
+                    url: devServer.url,
+                    processId: devServer.processId,
+                  })
+                  send({ type: "log", message: `Expo web server URL: ${devServer.url}` })
+                }
+              },
               onStderr: (data) => send({ type: "error", message: data.trim() })
-            })
-            
-            send({
-              type: "ready",
-              message: "Expo web dev server running",
-              sandboxId: sandbox.id,
-              url: devServer.url,
-              processId: devServer.processId,
             })
             
             // Keep-alive heartbeat
