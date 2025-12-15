@@ -968,8 +968,8 @@ async function handleStreamingPreview(req: Request) {
             let waitingOnPort = false
             let readySent = false
             
-            // Use npm run dev (which runs expo start --web --port 8081) for proper web development
-            const devCommand = `npm run dev`
+            // Use the detected package manager run dev (which runs expo start --web --port 8081) for proper web development
+            const devCommand = `${packageManager} run dev`
             const devServer = await sandbox.startDevServer({
               command: devCommand,
               workingDirectory: '/home/developer',
