@@ -1590,7 +1590,7 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className={isExpoProject ? "fixed top-0 left-0 right-0 z-50 bg-card border-b border-border" : ""}>
-              {/* Tab switching buttons - only shown in preview tab */}
+              {/* Tab switching buttons */}
               <WebPreviewNavigationButton
                 onClick={() => onTabChange("code")}
                 tooltip="Switch to Code View"
@@ -1613,13 +1613,17 @@ export default function TodoApp() {
 
               <div className="flex-1" />
               
-              {/* Visual Editor Toggle */}
-              <VisualEditorToggle
-                isEnabled={isVisualEditorEnabled}
-                onToggle={setIsVisualEditorEnabled}
-              />
+              {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
+              {!isExpoProject && (
+                <>
+                  <VisualEditorToggle
+                    isEnabled={isVisualEditorEnabled}
+                    onToggle={setIsVisualEditorEnabled}
+                  />
+                  <WebPreviewDeviceSelector />
+                </>
+              )}
               
-              <WebPreviewDeviceSelector />
               <WebPreviewUrl
                 onRefresh={refreshPreview}
                 onOpenExternal={() => {
@@ -1674,7 +1678,8 @@ export default function TodoApp() {
                       zIndex: 2000,
                       marginTop: '0px',
                       marginLeft: '0px',
-                      height: '100%',
+                      height: '90%',
+                      maxHeight: '750px',
                       width: '330px',
                       maxWidth: '280px',
                       minHeight: 'unset',
@@ -1701,12 +1706,9 @@ export default function TodoApp() {
                         justifyContent: 'center',
                         alignItems: 'center',
                         width: '100%',
-                        height: '500px',
+                        height: '100%',
                         margin: '0px',
-                        position: 'relative',
-                        maxWidth: '600px',
-                        maxHeight: 'none',
-                        minHeight: '550px'
+                        position: 'relative'
                       }}>
                         <WebPreviewBody
                           className="rounded-[25px]"
