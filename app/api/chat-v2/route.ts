@@ -4577,10 +4577,10 @@ ${conversationSummaryContext || ''}`
             await sandbox.writeFiles(sandboxFiles)
             logs.push('Project files written to sandbox')
 
-            // Detect package manager - use yarn for Expo projects
+            // Detect package manager - use yarn for Expo projects, pnpm for non-Expo
             const hasPnpmLock = allFiles.some(f => f.path === 'pnpm-lock.yaml')
             const hasYarnLock = allFiles.some(f => f.path === 'yarn.lock')
-            const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
+            const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
             
             logs.push(`Using package manager: ${packageManager}`)
 

@@ -773,10 +773,10 @@ async function handleStreamingPreview(req: Request) {
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
-          // Detect package manager early - use yarn for Expo projects due to postinstall script requirements
+          // Detect package manager early - use yarn for Expo projects due to postinstall script requirements, pnpm for non-Expo
           const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml')
           const hasYarnLock = files.some(f => f.path === 'yarn.lock')
-          const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
+          const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'pnpm')
 
           // 🔹 Install dependencies (simple and reliable like the old version)
           send({ type: "log", message: "Installing dependencies..." })
