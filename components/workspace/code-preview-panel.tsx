@@ -1682,8 +1682,7 @@ export default function TodoApp() {
                       zIndex: 2000,
                       marginTop: '0px',
                       marginLeft: '0px',
-                      height: '90%',
-                      maxHeight: '750px',
+                      height: '100%',
                       width: '330px',
                       maxWidth: '280px',
                       minHeight: 'unset',
@@ -1712,7 +1711,8 @@ export default function TodoApp() {
                         width: '100%',
                         height: '100%',
                         margin: '0px',
-                        position: 'relative'
+                        position: 'relative',
+                        padding: '8px'
                       }}>
                         <WebPreviewBody
                           className="rounded-[25px]"
@@ -1724,9 +1724,9 @@ export default function TodoApp() {
                             }
                           }}
                           style={{
-                            width: '95%',
-                            height: '93%',
-                            borderRadius: '25px 25px 25px 25px',
+                            width: '100%',
+                            height: '100%',
+                            borderRadius: '20px 20px 20px 20px',
                             border: 'none'
                           }}
                         />
