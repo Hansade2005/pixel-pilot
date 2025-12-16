@@ -1589,7 +1589,7 @@ export default function TodoApp() {
               setPreview(prev => ({ ...prev, url }))
             }}
           >
-            <WebPreviewNavigation>
+            <WebPreviewNavigation className={isExpoProject ? "fixed top-0 left-0 right-0 z-50 bg-card border-b border-border" : ""}>
               {/* Tab switching buttons - only shown in preview tab */}
               <WebPreviewNavigationButton
                 onClick={() => onTabChange("code")}
@@ -1648,7 +1648,7 @@ export default function TodoApp() {
               )}
             </WebPreviewNavigation>
 
-            <div className="flex-1 min-h-0">
+            <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
               {preview.isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center p-8">
@@ -1668,35 +1668,62 @@ export default function TodoApp() {
                 </div>
               ) : preview.url ? (
                 isExpoProject ? (
-                  <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      {/* Phone Frame - responsive with max dimensions */}
-                      <div className="relative" style={{ 
+                  <div className="h-full w-full flex items-center justify-center p-4">
+                    <div className="flex items-center justify-center" style={{
+                      display: 'flex',
+                      zIndex: 2000,
+                      marginTop: '0px',
+                      marginLeft: '0px',
+                      height: '100%',
+                      width: '330px',
+                      maxWidth: '280px',
+                      minHeight: 'unset',
+                      marginBottom: '0px',
+                      position: 'relative',
+                      padding: '0px 15px 0px 15px',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      columnGap: '0px',
+                      rowGap: '0px',
+                      backgroundImage: 'url(https://assets-v2.codedesign.ai/storage/v1/object/public/codedesign-templates-assets/template-asset-015194df)',
+                      backgroundPosition: '50% 50%',
+                      backgroundSize: 'cover',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundAttachment: 'scroll',
+                      backgroundClip: 'border-box',
+                      backgroundOrigin: 'padding-box',
+                      borderRadius: '30px 30px 30px 30px'
+                    }}>
+                      {/* Phone Screen */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
                         width: '100%',
-                        maxWidth: '375px',
-                        aspectRatio: '375/812',
-                        maxHeight: '100%'
+                        height: '500px',
+                        margin: '0px',
+                        position: 'relative',
+                        maxWidth: '600px',
+                        maxHeight: 'none',
+                        minHeight: '550px'
                       }}>
-                        <div className="absolute inset-0 rounded-[3rem] bg-black shadow-2xl" style={{
-                          boxShadow: '0 0 0 12px #1a1a1a, 0 0 0 13px #333, 0 20px 60px rgba(0,0,0,0.5)'
-                        }}>
-                          {/* Notch */}
-                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[40%] h-[3%] bg-black rounded-b-3xl z-10" />
-                          
-                          {/* Screen */}
-                          <div className="absolute inset-[4%] rounded-[2.5rem] overflow-hidden bg-white">
-                            <WebPreviewBody
-                              className="h-full w-full"
-                              src={preview.url}
-                              ref={previewIframeRef}
-                              onIframeRef={(iframe) => {
-                                if (iframe) {
-                                  injectConsoleInterceptor(iframe)
-                                }
-                              }}
-                            />
-                          </div>
-                        </div>
+                        <WebPreviewBody
+                          className="rounded-[25px]"
+                          src={preview.url}
+                          ref={previewIframeRef}
+                          onIframeRef={(iframe) => {
+                            if (iframe) {
+                              injectConsoleInterceptor(iframe)
+                            }
+                          }}
+                          style={{
+                            width: '95%',
+                            height: '93%',
+                            borderRadius: '25px 25px 25px 25px',
+                            border: 'none'
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
