@@ -1611,17 +1611,18 @@ export default function TodoApp() {
                 <Database className="h-4 w-4" />
               </WebPreviewNavigationButton>
 
-              <div className="flex-1" />
-              
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
-              {!isExpoProject && (
+              {!isExpoProject ? (
                 <>
+                  <div className="flex-1" />
                   <VisualEditorToggle
                     isEnabled={isVisualEditorEnabled}
                     onToggle={setIsVisualEditorEnabled}
                   />
                   <WebPreviewDeviceSelector />
                 </>
+              ) : (
+                <div className="w-4" />
               )}
               
               <WebPreviewUrl
