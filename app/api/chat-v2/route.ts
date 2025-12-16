@@ -4514,7 +4514,7 @@ ${conversationSummaryContext || ''}`
               f.path === 'app.config.js' || 
               (packageJson && packageJson.dependencies && packageJson.dependencies['expo'])
             )
-            const template = isExpoProject ? "pipilot-expo" : "pipilot"
+            const template = "pipilot-expo"
             const workingDir = isExpoProject ? "/home/user" : "/project"
 
             logs.push(`Detected project type: ${isExpoProject ? 'Expo React Native' : 'Vite/Next.js'}`)
@@ -5166,7 +5166,7 @@ ${conversationSummaryContext || ''}`
             const errors: string[] = []
 
             const sandbox = await createEnhancedSandbox({
-              template: "pipilot",
+              template: "pipilot-expo",
               timeoutMs: timeoutSeconds * 1000,
               env: envVars
             })

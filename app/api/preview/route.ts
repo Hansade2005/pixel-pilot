@@ -753,7 +753,7 @@ async function handleStreamingPreview(req: Request) {
             }
           }
           const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
-          const template = isExpoProject ? "pipilot-expo" : "pipilot"
+          const template = "pipilot-expo"
 
           // 🔹 Create sandbox
           const sandbox = await createEnhancedSandbox({
@@ -1282,7 +1282,7 @@ async function handleRegularPreview(req: Request) {
       }
     }
     const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
-    const template = isExpoProject ? "pipilot-expo" : "pipilot"
+    const template = "pipilot-expo"
 
     // Create enhanced E2B sandbox with environment variables
     let sandbox
