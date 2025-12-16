@@ -1676,17 +1676,14 @@ export default function TodoApp() {
                 </div>
               ) : preview.url ? (
                 isExpoProject ? (
-                  <div className="h-full w-full flex items-center justify-center p-4">
-                    <div className="flex items-center justify-center" style={{
+                  <div className="h-full w-full flex flex-col items-center justify-center p-4">
+                    <div className="flex items-center justify-center w-full h-full" style={{
                       display: 'flex',
                       zIndex: 2000,
                       marginTop: '0px',
                       marginLeft: '0px',
-                      height: '100%',
                       width: '330px',
                       maxWidth: '280px',
-                      minHeight: 'unset',
-                      marginBottom: '0px',
                       position: 'relative',
                       padding: '0px 15px 0px 15px',
                       flexDirection: 'column',
