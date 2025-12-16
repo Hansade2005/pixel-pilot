@@ -12301,11 +12301,16 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-web": "^0.21.2",
-    "@expo/vector-icons": "^14.0.3",
+    "@expo/vector-icons": "^15.0.3",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "react-native-screens": "~4.4.0",
-    "react-native-safe-area-context": "^4.10.8"
+    "react-native-safe-area-context": "^4.10.8",
+    "@react-native-async-storage/async-storage": "~1.23.1",
+    "react-native-chart-kit": "^6.12.0",
+    "react-native-svg": "13.9.0",
+    "date-fns": "^4.1.0",
+    "expo-notifications": "~0.28.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

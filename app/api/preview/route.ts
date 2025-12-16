@@ -798,30 +798,57 @@ async function handleStreamingPreview(req: Request) {
 
           send({ type: "log", message: "Dependencies installed successfully" })
 
-          // 🔹 For Expo projects with TypeScript files, ensure TypeScript is installed
+          // 🔹 For Expo projects, fix dependency versions and install TypeScript if needed
           if (isExpoProject) {
+            // Fix any dependency version mismatches automatically
+            send({ type: "log", message: "Fixing Expo dependency versions..." })
+            try {
+              const fixResult = await sandbox.executeCommand('npx expo install --fix', {
+                workingDirectory: '/home/user',
+                timeoutMs: 120000, // 2 minutes for fixing dependencies
+                envVars,
+                onStdout: (data) => send({ type: "log", message: data.trim() }),
+                onStderr: (data) => {
+                  const msg = data.trim()
+                  // Only send as error if it's a real error, not just warnings
+                  if (msg.includes('error') || msg.includes('failed')) {
+                    send({ type: "error", message: msg })
+                  } else {
+                    send({ type: "log", message: msg })
+                  }
+                }
+              })
+              
+              if (fixResult.exitCode === 0) {
+                send({ type: "log", message: "Expo dependencies fixed successfully" })
+              } else {
+                send({ type: "log", message: "Dependency fix completed with warnings, continuing..." })
+              }
+            } catch (error) {
+              send({ type: "log", message: "Dependency fix step skipped, continuing..." })
+            }
+            
+            // Install TypeScript if project uses it
             const hasTypeScriptFiles = files.some((f: any) => 
               f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path === 'tsconfig.json'
             )
             
             if (hasTypeScriptFiles) {
-              send({ type: "log", message: "Installing TypeScript for Expo project..." })
+              send({ type: "log", message: "Ensuring TypeScript is installed..." })
               try {
-                const tsInstallResult = await sandbox.executeCommand('npx expo install typescript', {
+                const tsInstallResult = await sandbox.executeCommand('npx expo install typescript @types/react', {
                   workingDirectory: '/home/user',
                   timeoutMs: 60000,
                   envVars,
                   onStdout: (data) => send({ type: "log", message: data.trim() }),
-                  onStderr: (data) => send({ type: "error", message: data.trim() })
+                  onStderr: (data) => send({ type: "log", message: data.trim() })
                 })
                 
-                if (tsInstallResult.exitCode !== 0) {
-                  send({ type: "error", message: "TypeScript installation failed, but continuing..." })
-                } else {
+                if (tsInstallResult.exitCode === 0) {
                   send({ type: "log", message: "TypeScript installed successfully" })
                 }
               } catch (error) {
-                send({ type: "error", message: "TypeScript installation failed, but continuing..." })
+                send({ type: "log", message: "TypeScript installation skipped, continuing..." })
               }
             }
           }
@@ -969,8 +996,8 @@ async function handleStreamingPreview(req: Request) {
               timeoutMs: 300000, // 5 minutes timeout
               envVars: {
                 ...envVars,
-                CI: '1',
-                EXPO_NO_TELEMETRY: '1'
+                EXPO_NO_TELEMETRY: '1',
+                EXPO_NO_REDIRECT: '1'
               },
               onStdout: (data) => {
                 const message = data.trim()
@@ -1328,28 +1355,45 @@ devDependencies:
       
       console.log('Dependencies installed successfully with npm')
 
-      // For Expo projects with TypeScript files, ensure TypeScript is installed
+      // For Expo projects, fix dependency versions and install TypeScript if needed
       if (isExpoProject) {
+        // Fix any dependency version mismatches automatically
+        console.log('Fixing Expo dependency versions...')
+        try {
+          const fixResult = await sandbox.executeCommand('npx expo install --fix', {
+            workingDirectory: '/home/user',
+            timeoutMs: 120000, // 2 minutes for fixing dependencies
+            envVars
+          })
+          
+          if (fixResult.exitCode === 0) {
+            console.log('Expo dependencies fixed successfully')
+          } else {
+            console.log('Dependency fix completed with warnings, continuing...')
+          }
+        } catch (error) {
+          console.log('Dependency fix step skipped, continuing...')
+        }
+        
+        // Install TypeScript if project uses it
         const hasTypeScriptFiles = files.some((f: any) => 
           f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path === 'tsconfig.json'
         )
         
         if (hasTypeScriptFiles) {
-          console.log('Installing TypeScript for Expo project...')
+          console.log('Ensuring TypeScript is installed...')
           try {
-            const tsInstallResult = await sandbox.executeCommand('npx expo install typescript', {
+            const tsInstallResult = await sandbox.executeCommand('npx expo install typescript @types/react', {
               workingDirectory: '/home/user',
               timeoutMs: 60000,
               envVars
             })
             
-            if (tsInstallResult.exitCode !== 0) {
-              console.warn('TypeScript installation failed, but continuing...')
-            } else {
+            if (tsInstallResult.exitCode === 0) {
               console.log('TypeScript installed successfully')
             }
           } catch (error) {
-            console.warn('TypeScript installation failed, but continuing...')
+            console.log('TypeScript installation skipped, continuing...')
           }
         }
       }

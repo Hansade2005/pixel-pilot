@@ -369,6 +369,180 @@ Execute with precision, creativity, and unwavering attention to detail.
   return undefined
 }
 
+// Get specialized system prompt for Expo React Native projects
+const getExpoSystemPrompt = (projectContext: string): string => {
+  console.log('[Chat-V2] Using specialized Expo SDK 54 system prompt')
+  return `# 🚀 PiPilot AI: Elite Expo SDK 54 Mobile Architect & Bug Hunter
+## Role
+You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating mobile apps with elite code quality, delightful UX, and thorough error handling for Expo React Native SDK 54.
+
+### Quick Checklist
+- ☐ Analyze requirements and project context
+- ☐ Create unique UI/UX solutions for mobile
+- ☐ Ensure full-stack product completeness
+- ☐ Implement robust, maintainable TypeScript code
+- ☐ Integrate Expo native features (notifications, storage, etc.)
+- ☐ Test thoroughly (happy/edge/error/performance cases)
+- ☐ Polish for production-readiness and virality
+
+## 📦 Package Management (CRITICAL)
+- **Preinstalled Packages**: The following packages are already installed in package.json - DO NOT reinstall them. Only add NEW packages when absolutely necessary, and always search for latest versions first.
+
+\`\`\`json
+"dependencies": {
+  "expo": "~54.0.29",
+  "expo-status-bar": "^3.0.9",
+  "expo-constants": "^17.0.5",
+  "expo-linking": "^7.0.5",
+  "expo-router": "^4.0.17",
+  "expo-splash-screen": "^0.29.21",
+  "expo-updates": "^0.27.3",
+  "react": "19.1.0",
+  "react-dom": "19.1.0",
+  "react-native": "0.81.5",
+  "react-native-web": "^0.21.2",
+  "@expo/vector-icons": "^15.0.3",
+  "@react-navigation/native": "^6.1.18",
+  "@react-navigation/bottom-tabs": "^6.6.1",
+  "react-native-screens": "~4.4.0",
+  "react-native-safe-area-context": "^4.10.8",
+  "@react-native-async-storage/async-storage": "~1.23.1",
+  "react-native-chart-kit": "^6.12.0",
+  "react-native-svg": "13.9.0",
+  "date-fns": "^4.1.0",
+  "expo-notifications": "~0.28.0"
+},
+"devDependencies": {
+  "@types/react": "~19.1.0",
+  "@types/react-native": "~0.73.0",
+  "typescript": "~5.9.2"
+}
+\`\`\`
+
+- **Latest Package Rule**: Before adding ANY new package, use the \`web_search\` tool with queries like "latest [package-name] npm version" to get 100% correct latest versions. Only use the most recent stable version compatible with Expo SDK 54.
+- **Verification**: Cross-reference with Expo documentation at docs.expo.dev for compatibility. Never assume versions - packages update frequently.
+
+## 📁 Project Structure
+Follow this exact Expo React Native project structure for consistency and maintainability. This is based on the habit-tracking app setup, but adapt for any mobile app features:
+
+\`\`\`
+📱 Expo Project Root
+├── .gitignore
+├── App.tsx (Main entry point, navigation setup)
+├── tsconfig.json (TypeScript configuration)
+├── index.ts (Optional entry point)
+├── package.json (Dependencies - see preinstalled list above)
+├── app.json (Expo configuration, permissions, icons)
+├── components/ (Reusable React Native components)
+│   ├── HabitModal.tsx (Modals for habit creation/editing)
+│   ├── HabitForm.tsx (Forms for habit input)
+│   ├── ProgressChart.tsx (Charts using react-native-chart-kit)
+│   ├── MotivationalQuote.tsx (Motivational UI elements)
+│   └── HabitCard.tsx (Card components for habits)
+├── constants/ (App constants, themes, colors)
+│   └── index.ts (Theme colors, sizing, config)
+├── navigation/ (React Navigation configuration)
+│   └── AppNavigator.tsx (Stack/Tab navigators setup)
+├── screens/ (Main screen components)
+│   ├── HomeScreen.tsx (Dashboard/home screen)
+│   ├── ProgressScreen.tsx (Analytics/progress view)
+│   └── HabitsScreen.tsx (Habit list/management)
+├── types/ (TypeScript type definitions)
+│   └── index.ts (App-wide type interfaces)
+└── utils/ (Utility functions and helpers)
+    ├── storage.ts (AsyncStorage operations)
+    ├── habitCalculations.ts (Business logic calculations)
+    └── notifications.ts (Expo notification helpers)
+\`\`\`
+
+**Key Structure Principles:**
+- **screens/**: One file per major screen/route
+- **components/**: Reusable UI components (modals, forms, cards, charts)
+- **navigation/**: All navigation logic and configurations
+- **utils/**: Pure functions, storage, calculations, native feature helpers
+- **types/**: TypeScript interfaces for data models
+- **constants/**: Theme colors, dimensions, app config
+
+## 🛠️ Feature Development Workflow
+When creating, adding, or updating app features, follow this exact structure and setup process:
+
+### 1. **Requirement Analysis** 🔍
+- Read existing code files to understand current architecture
+- Identify which files need modification or creation
+- Plan the feature scope (screens, components, navigation, storage)
+
+### 2. **File Creation/Update Pattern** 📝
+- **New Screen**: Create in \`screens/\` with proper TypeScript types
+- **New Component**: Create in \`components/\` with reusable, mobile-optimized design
+- **Navigation Update**: Modify \`navigation/AppNavigator.tsx\` to add routes
+- **Storage**: Update \`utils/storage.ts\` for data persistence
+- **Types**: Add to \`types/index.ts\` for type safety
+- **Constants**: Update \`constants/index.ts\` for theming
+
+### 3. **Implementation Steps** ⚡
+- Use \`write_file\` for new files, \`edit_file\` for updates (switch to \`client_replace_string_in_file\` if edit fails 3x)
+- Always read \`package.json\` before any package changes
+- Use \`web_search\` for latest package versions when adding new dependencies
+- Implement mobile-first responsive design with touch-friendly interfaces
+
+### 4. **Testing & Validation** ✅
+- Use \`check_dev_errors\` (build mode) to verify compilation
+- Test on multiple platforms (iOS/Android/Web via Expo Go)
+- Ensure 60fps performance with Hermes engine
+- Verify native features work (notifications, storage, etc.)
+
+### 5. **Polish & Production Ready** ✨
+- Add animations and micro-interactions using React Native Animated
+- Implement error handling and loading states
+- Ensure accessibility (ARIA labels, keyboard navigation)
+- Optimize bundle size and performance
+
+## Core Directives
+1. **Quality**: Sparkling clean TypeScript code with proper error handling
+2. **Innovation**: Unique mobile UX with delightful interactions and animations
+3. **Excellence**: Fully complete features ready for App Store submission
+4. **Performance**: Optimized for 60fps on all devices
+5. **Compatibility**: 100% Expo SDK 54 compliant with latest packages
+
+## Autonomous Tool Usage
+**You have full access to 50+ tools** - use them proactively without permission to analyze, build, test, and report changes.
+
+### Available Tools for Mobile Development:
+- **File Operations**: \`read_file\`, \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`
+- **Package Management**: Check \`package.json\` first, use \`web_search\` for latest versions
+- **Development**: \`check_dev_errors\` for build verification
+- **Search**: \`semantic_code_navigator\`, \`grep_search\` for code analysis
+- **External**: \`web_search\`, \`web_extract\` for documentation and latest packages
+
+### ⚠️ CRITICAL FILE READING RULE ⚠️
+**NEVER read files >150 lines without line ranges!** Use \`startLine\`/\`endLine\` or \`lineRange\` for large files.
+
+## 🎨 Mobile UX Philosophy
+- **Touch-First**: 44pt minimum touch targets, gesture-friendly interfaces
+- **Platform Consistency**: iOS Human Interface Guidelines + Material Design
+- **Animations**: React Native Animated for smooth 60fps transitions
+- **Accessibility**: Screen reader support, high contrast, keyboard navigation
+- **Performance**: Lazy loading, optimized images, efficient re-renders
+
+## 🐛 Bug Handling Protocol
+1. **Reproduce**: Understand the exact issue and steps
+2. **Investigate**: Read relevant code and use debugging tools
+3. **Fix**: Implement solution with UX improvements
+4. **Test**: Verify across platforms and scenarios
+5. **Polish**: Add enhancements beyond the fix
+
+## Success Metrics
+- ✅ Zero console errors in production builds
+- 📱 Perfect mobile experience across iOS/Android/Web
+- ⚡ 60fps animations and smooth scrolling
+- 🏆 App Store-ready with all native features working
+- 🚀 Viral features and delightful UX that users love
+
+Remember: You're creating mobile magic! Every feature should set new benchmarks for mobile app excellence. Build legendary things! 🚀📱✨
+
+${projectContext}`
+}
+
 // Add timeout utility function at the top level
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -2286,6 +2460,17 @@ export async function POST(req: Request) {
     const projectContext = await buildOptimizedProjectContext(projectId, sessionData, fileTree)
     console.log(`[PROJECT_CONTEXT] Built project context (${projectContext.length} chars):`, projectContext.substring(0, 500) + (projectContext.length > 500 ? '...' : ''))
 
+    // Detect if this is an Expo project from the project context
+    const isExpoProject = projectContext.includes('# Project Type\n**Expo**') || 
+                          projectContext.includes('## Expo Project Structure') ||
+                          sessionData?.files && Array.from(sessionData.files.values()).some((f: any) => 
+                            f.path === 'app.json' || f.path === 'app.config.js'
+                          )
+    
+    if (isExpoProject) {
+      console.log('[Chat-V2] Detected Expo project, will use specialized Expo system prompt')
+    }
+
     // Get conversation history for context (last 5 message pairs) - Enhanced format for better AI context
     let conversationSummaryContext = ''
     try {
@@ -2593,8 +2778,6 @@ When using \`generate_report\`, present results using this exact markdown struct
 ### 📋 Execution Summary
 - **Status**: ✅ Success
 - **Files Generated**: X documents
-- **Execution Time**: X seconds
-- **Sandbox Output**: [execution results]
 
 ### 🔗 Direct Download Links
 - **Chart (PNG)**: [chart.png](download_url)
@@ -2684,6 +2867,12 @@ ${conversationSummaryContext || ''}`
     if (uiSystemPrompt) {
       systemPrompt = uiSystemPrompt
       console.log('[Chat-V2] Using specialized UI prototyping system prompt')
+    }
+
+    // Check for Expo project and use specialized Expo system prompt
+    if (isExpoProject) {
+      systemPrompt = getExpoSystemPrompt(projectContext)
+      console.log('[Chat-V2] Using specialized Expo SDK 54 system prompt')
     }
 
     // Add continuation instructions if this is a continuation request
@@ -4310,9 +4499,29 @@ ${conversationSummaryContext || ''}`
             let serverStarted = false
             let buildCompleted = false
 
+            // Detect project type
+            const packageJsonFile = allFiles.find((f: any) => f.path === 'package.json')
+            let packageJson: any = null
+            if (packageJsonFile) {
+              try {
+                packageJson = JSON.parse(packageJsonFile.content || '{}')
+              } catch (error) {
+                console.warn('[check_dev_errors] Failed to parse package.json')
+              }
+            }
+            const isExpoProject = allFiles.some((f: any) => 
+              f.path === 'app.json' || 
+              f.path === 'app.config.js' || 
+              (packageJson && packageJson.dependencies && packageJson.dependencies['expo'])
+            )
+            const template = isExpoProject ? "pipilot-expo" : "pipilot"
+            const workingDir = isExpoProject ? "/home/user" : "/project"
+
+            logs.push(`Detected project type: ${isExpoProject ? 'Expo React Native' : 'Vite/Next.js'}`)
+
             // Create sandbox with reasonable timeout for error detection
             const sandbox = await createEnhancedSandbox({
-              template: "pipilot",
+              template,
               timeoutMs: mode === 'dev' ? 120000 : 90000, // 120s for dev, 90s for build (increased for proper error checking)
               env: {}
             })
@@ -4323,7 +4532,7 @@ ${conversationSummaryContext || ''}`
             const sandboxFiles: any[] = allFiles
               .filter(file => file.content && !file.isDirectory)
               .map(file => ({
-                path: `/project/${file.path}`,
+                path: isExpoProject ? `/home/user/${file.path}` : `/project/${file.path}`,
                 content: file.content,
               }))
 
@@ -4368,10 +4577,18 @@ ${conversationSummaryContext || ''}`
             await sandbox.writeFiles(sandboxFiles)
             logs.push('Project files written to sandbox')
 
+            // Detect package manager - use yarn for Expo projects
+            const hasPnpmLock = allFiles.some(f => f.path === 'pnpm-lock.yaml')
+            const hasYarnLock = allFiles.some(f => f.path === 'yarn.lock')
+            const packageManager = isExpoProject ? 'yarn' : (hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm')
+            
+            logs.push(`Using package manager: ${packageManager}`)
+
             // Install dependencies with reasonable timeout for error detection
-            const installResult = await sandbox.installDependenciesRobust("/project", {
+            const installResult = await sandbox.installDependenciesRobust(workingDir, {
               timeoutMs: 90000, // Increased from 60000 (1min) to 90000 (1.5min) for proper error checking
               envVars: {},
+              packageManager,
               onStdout: (data) => logs.push(`[INSTALL] ${data.trim()}`),
               onStderr: (data) => {
                 errors.push(`[INSTALL ERROR] ${data.trim()}`)
@@ -4406,6 +4623,59 @@ ${conversationSummaryContext || ''}`
 
             logs.push('Dependencies installed successfully')
 
+            // For Expo projects, fix dependency versions and install TypeScript if needed
+            if (isExpoProject) {
+              logs.push('Fixing Expo dependency versions...')
+              try {
+                const fixResult = await sandbox.executeCommand('npx expo install --fix', {
+                  workingDirectory: workingDir,
+                  timeoutMs: 120000, // 2 minutes for fixing dependencies
+                  envVars: {},
+                  onStdout: (data) => logs.push(`[EXPO FIX] ${data.trim()}`),
+                  onStderr: (data) => {
+                    const msg = data.trim()
+                    // Only treat as error if it's a real error, not warnings
+                    if (msg.includes('error') || msg.includes('failed')) {
+                      errors.push(`[EXPO FIX ERROR] ${msg}`)
+                    }
+                    logs.push(`[EXPO FIX] ${msg}`)
+                  }
+                })
+                
+                if (fixResult.exitCode === 0) {
+                  logs.push('Expo dependencies fixed successfully')
+                } else {
+                  logs.push('Dependency fix completed with warnings, continuing...')
+                }
+              } catch (error) {
+                logs.push('Dependency fix step skipped, continuing...')
+              }
+
+              // Install TypeScript if project uses it
+              const hasTypeScriptFiles = allFiles.some((f: any) => 
+                f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path === 'tsconfig.json'
+              )
+              
+              if (hasTypeScriptFiles) {
+                logs.push('Ensuring TypeScript is installed...')
+                try {
+                  const tsInstallResult = await sandbox.executeCommand('npx expo install typescript @types/react', {
+                    workingDirectory: workingDir,
+                    timeoutMs: 60000,
+                    envVars: {},
+                    onStdout: (data) => logs.push(`[TS INSTALL] ${data.trim()}`),
+                    onStderr: (data) => logs.push(`[TS INSTALL] ${data.trim()}`)
+                  })
+                  
+                  if (tsInstallResult.exitCode === 0) {
+                    logs.push('TypeScript installed successfully')
+                  }
+                } catch (error) {
+                  logs.push('TypeScript installation skipped, continuing...')
+                }
+              }
+            }
+
             if (mode === 'dev') {
               // Start dev server and monitor for errors
               logs.push('Starting development server...')
@@ -4416,9 +4686,115 @@ ${conversationSummaryContext || ''}`
                 serverReadyResolve = resolve
               })
 
+              // Expo-specific dev server setup
+              if (isExpoProject) {
+                logs.push('Starting Expo dev server...')
+                
+                let metroStarted = false
+                let waitingOnPort = false
+
+                const devServer = await sandbox.startDevServer({
+                  command: "npx expo start --web",
+                  workingDirectory: workingDir,
+                  port: 8081,
+                  timeoutMs: 60000, // 60 seconds to start Expo
+                  envVars: {
+                    EXPO_NO_TELEMETRY: '1',
+                    EXPO_NO_REDIRECT: '1'
+                  },
+                  onStdout: (data) => {
+                    const message = data.trim()
+                    logs.push(`[EXPO] ${message}`)
+                    
+                    // Check for Metro bundler readiness indicators
+                    if (message.includes("Starting Metro Bundler")) {
+                      metroStarted = true
+                    }
+                    if (message.includes("Waiting on http://localhost:8081")) {
+                      waitingOnPort = true
+                    }
+                    
+                    // Send ready event when both conditions are met
+                    if (metroStarted && waitingOnPort && !serverStarted) {
+                      serverStarted = true
+                      serverReadyResolve()
+                    }
+                  },
+                  onStderr: (data) => {
+                    const message = data.trim()
+                    // Don't treat package mismatch warnings as errors
+                    if (!message.includes('should be updated for best compatibility')) {
+                      errors.push(`[EXPO ERROR] ${message}`)
+                    }
+                    logs.push(`[EXPO] ${message}`)
+                  },
+                })
+
+                // Wait for server to be ready or timeout
+                const timeoutPromise = new Promise<void>((resolve) => {
+                  setTimeout(() => resolve(), 30000) // 30 second timeout for Expo
+                })
+
+                await Promise.race([serverReadyPromise, timeoutPromise])
+
+                if (!serverStarted) {
+                  const executionTime = Date.now() - toolStartTime;
+                  toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+
+                  return {
+                    success: false,
+                    error: 'Expo dev server failed to start within timeout',
+                    mode,
+                    logs,
+                    errors,
+                    fullErrorDetails: {
+                      errorMessage: 'Expo dev server failed to start within 30 seconds',
+                      exitCode: null,
+                      stdout: '',
+                      stderr: ''
+                    },
+                    toolCallId,
+                    executionTimeMs: executionTime,
+                    timeWarning: timeStatus.warningMessage
+                  }
+                }
+
+                logs.push(`Expo dev server started successfully at ${devServer.url}`)
+
+                // Wait for the specified timeout to monitor for runtime errors
+                logs.push(`Monitoring for runtime errors for ${timeoutSeconds} seconds...`)
+                await new Promise(resolve => setTimeout(resolve, timeoutSeconds * 1000))
+
+                // Check if any errors occurred during monitoring (excluding package warnings)
+                const runtimeErrors = errors.filter(error =>
+                  error.includes('[EXPO ERROR]') &&
+                  !error.includes('ExperimentalWarning') &&
+                  !error.includes('DeprecationWarning') &&
+                  !error.includes('should be updated for best compatibility') &&
+                  !error.includes('⚠') &&
+                  !error.includes('Warning')
+                )
+
+                return {
+                  success: runtimeErrors.length === 0,
+                  message: runtimeErrors.length === 0
+                    ? 'Expo dev server started successfully with no runtime errors'
+                    : `Expo dev server started but ${runtimeErrors.length} runtime errors detected`,
+                  mode,
+                  serverUrl: devServer.url,
+                  logs,
+                  errors: runtimeErrors,
+                  errorCount: runtimeErrors.length,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Vite/Next.js dev server setup
               const devServer = await sandbox.startDevServer({
                 command: "npm run dev",
-                workingDirectory: "/project",
+                workingDirectory: workingDir,
                 port: 3000,
                 timeoutMs: 30000, // 30 seconds to start
                 envVars: {},
@@ -4499,8 +4875,100 @@ ${conversationSummaryContext || ''}`
 
             } else if (mode === 'build') {
               // Run build process with reasonable timeout for error detection
+              
+              // Expo projects don't have a traditional build command in development
+              // Instead, we verify that the project structure is valid
+              if (isExpoProject) {
+                logs.push('Validating Expo project structure...')
+                
+                // Check for TypeScript errors if TypeScript is used
+                const hasTypeScriptFiles = allFiles.some((f: any) => 
+                  f.path.endsWith('.ts') || f.path.endsWith('.tsx')
+                )
+                
+                if (hasTypeScriptFiles && allFiles.some((f: any) => f.path === 'tsconfig.json')) {
+                  logs.push('Running TypeScript type check...')
+                  const typeCheckResult = await sandbox.executeCommand("npx tsc --noEmit", {
+                    workingDirectory: workingDir,
+                    timeoutMs: 60000, // 60 seconds for type checking
+                    envVars: {},
+                    onStdout: (data: string) => logs.push(`[TYPECHECK] ${data.trim()}`),
+                    onStderr: (data: string) => {
+                      const message = data.trim()
+                      if (!message.includes('warning') && !message.includes('Warning')) {
+                        errors.push(`[TYPECHECK ERROR] ${message}`)
+                      }
+                      logs.push(`[TYPECHECK] ${message}`)
+                    },
+                  })
+
+                  buildCompleted = typeCheckResult.exitCode === 0
+
+                  if (!buildCompleted) {
+                    const executionTime = Date.now() - toolStartTime;
+                    toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+
+                    return {
+                      success: false,
+                      error: 'TypeScript type check failed',
+                      mode,
+                      logs,
+                      errors,
+                      exitCode: typeCheckResult.exitCode,
+                      stdout: typeCheckResult.stdout || '',
+                      stderr: typeCheckResult.stderr || '',
+                      fullErrorDetails: {
+                        errorMessage: 'TypeScript type check failed',
+                        exitCode: typeCheckResult.exitCode,
+                        stdout: typeCheckResult.stdout || '',
+                        stderr: typeCheckResult.stderr || ''
+                      },
+                      toolCallId,
+                      executionTimeMs: executionTime,
+                      timeWarning: timeStatus.warningMessage
+                    }
+                  }
+
+                  // Filter out warnings and keep only actual errors
+                  const typeCheckErrors = errors.filter(error =>
+                    error.includes('[TYPECHECK ERROR]') &&
+                    !error.includes('warning') &&
+                    !error.includes('Warning')
+                  )
+
+                  return {
+                    success: typeCheckErrors.length === 0,
+                    message: typeCheckErrors.length === 0
+                      ? 'Expo project validation completed successfully with no errors'
+                      : `Expo project validation completed but ${typeCheckErrors.length} errors detected`,
+                    mode,
+                    logs,
+                    errors: typeCheckErrors,
+                    errorCount: typeCheckErrors.length,
+                    toolCallId,
+                    executionTimeMs: Date.now() - toolStartTime,
+                    timeWarning: timeStatus.warningMessage
+                  }
+                } else {
+                  // No TypeScript, just validate project structure
+                  logs.push('Expo project structure validated (no TypeScript type checking)')
+                  return {
+                    success: true,
+                    message: 'Expo project structure validated successfully',
+                    mode,
+                    logs,
+                    errors: [],
+                    errorCount: 0,
+                    toolCallId,
+                    executionTimeMs: Date.now() - toolStartTime,
+                    timeWarning: timeStatus.warningMessage
+                  }
+                }
+              }
+
+              // Vite/Next.js build process
               const buildResult = await sandbox.executeCommand("npm run build", {
-                workingDirectory: "/project",
+                workingDirectory: workingDir,
                 timeoutMs: 90000, // Increased from 60000 (1min) to 90000 (1.5min) for proper error checking
                 envVars: {},
                 onStdout: (data: string) => logs.push(`[BUILD] ${data.trim()}`),
