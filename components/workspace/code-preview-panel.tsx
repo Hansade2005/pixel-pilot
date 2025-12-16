@@ -1590,6 +1590,8 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className={isExpoProject ? "fixed top-0 left-0 right-0 z-50 bg-card border-b border-border" : ""}>
+              <div className="flex-1" />
+              
               {/* Tab switching buttons */}
               <WebPreviewNavigationButton
                 onClick={() => onTabChange("code")}
@@ -1611,19 +1613,20 @@ export default function TodoApp() {
                 <Database className="h-4 w-4" />
               </WebPreviewNavigationButton>
 
+              <div className="w-4" />
+
               {/* For Expo: No Visual Editor/Responsive. For others: show icons only */}
-              {!isExpoProject ? (
+              {!isExpoProject && (
                 <>
-                  <div className="flex-1" />
                   <VisualEditorToggle
                     isEnabled={isVisualEditorEnabled}
                     onToggle={setIsVisualEditorEnabled}
                   />
                   <WebPreviewDeviceSelector />
                 </>
-              ) : (
-                <div className="w-4" />
               )}
+
+              <div className="w-4" />
               
               <WebPreviewUrl
                 onRefresh={refreshPreview}
