@@ -1676,14 +1676,17 @@ export default function TodoApp() {
                 </div>
               ) : preview.url ? (
                 isExpoProject ? (
-                  <div className="h-full w-full flex flex-col items-center justify-center p-4">
-                    <div className="flex items-center justify-center w-full h-full" style={{
+                  <div className="h-full w-full flex items-center justify-center p-4">
+                    <div className="flex items-center justify-center" style={{
                       display: 'flex',
                       zIndex: 2000,
                       marginTop: '0px',
                       marginLeft: '0px',
+                      height: 'auto',
                       width: '330px',
-                      maxWidth: '280px',
+                      maxWidth: '250px',
+                      minHeight: '550px',
+                      marginBottom: '0px',
                       position: 'relative',
                       padding: '0px 15px 0px 15px',
                       flexDirection: 'column',
@@ -1706,10 +1709,12 @@ export default function TodoApp() {
                         justifyContent: 'center',
                         alignItems: 'center',
                         width: '100%',
-                        height: '100%',
+                        height: '500px',
                         margin: '0px',
                         position: 'relative',
-                        padding: '8px'
+                        maxWidth: '600px',
+                        maxHeight: 'none',
+                        minHeight: '550px'
                       }}>
                         <WebPreviewBody
                           className="rounded-[25px]"
@@ -1721,9 +1726,9 @@ export default function TodoApp() {
                             }
                           }}
                           style={{
-                            width: '100%',
-                            height: '100%',
-                            borderRadius: '20px 20px 20px 20px',
+                            width: '95%',
+                            height: '93%',
+                            borderRadius: '25px 25px 25px 25px',
                             border: 'none'
                           }}
                         />
