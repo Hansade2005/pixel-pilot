@@ -16,7 +16,8 @@ import {
   Link as LinkIcon,
   X,CornerDownLeftIcon,
   Github,
-  Gitlab
+  Gitlab,
+  RefreshCw
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -1365,6 +1366,14 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 {suggestion.display}
               </Suggestion>
             ))}
+            <Suggestion
+              suggestion="Refresh Suggestions"
+              onClick={() => fetchPromptSuggestions()}
+              disabled={isGenerating}
+              title="Generate new prompt suggestions"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Suggestion>
           </Suggestions>
         </div>
       )}

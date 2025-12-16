@@ -1589,7 +1589,7 @@ export default function TodoApp() {
               setPreview(prev => ({ ...prev, url }))
             }}
           >
-            <WebPreviewNavigation className={isExpoProject ? "fixed top-0 left-0 right-0 z-50 bg-card border-b border-border" : ""}>
+            <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
               <div className="flex-1" />
               
               {/* Tab switching buttons */}
@@ -1656,7 +1656,7 @@ export default function TodoApp() {
               )}
             </WebPreviewNavigation>
 
-            <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
+            <div className="flex-1 min-h-0 pt-16">
               {preview.isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center p-8">

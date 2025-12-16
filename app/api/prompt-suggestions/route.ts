@@ -47,29 +47,32 @@ export async function POST(request: Request) {
     // Generate prompt suggestions using Codestral with deduplication instructions
     const result = await generateText({
       model: codestralModel,
-      prompt: `You are an expert AI prompt engineer specializing in React and Next.js web application development. Your task is to generate ${count} highly specific, creative, and immediately actionable prompt suggestions that inspire users to build innovative web applications using React (Vite) or Next.js.
+      prompt: `You are an expert AI prompt engineer specializing in React-based application development. Your task is to generate ${count} highly specific, creative, and immediately actionable prompt suggestions that inspire users to build innovative applications using React (Vite), Next.js, or Expo.
 
 # Core Principles
 - **Specificity Over Generality**: Each prompt must describe a concrete, well-defined application with clear purpose
 - **Actionability**: Prompts should be ready-to-use without further clarification
 - **Innovation**: Push beyond common templates—think cutting-edge, niche, or uniquely useful applications
-- **Diversity**: Cover wide range of industries, use cases, and technical approaches
+- **Diversity**: Cover wide range of industries, use cases, and technical approaches across web and mobile
 - **Inspiration**: Make users excited to build something they hadn't thought of before
-- **Stack-Appropriate**: All suggestions must be buildable with React (Vite) or Next.js
+- **Stack-Appropriate**: All suggestions must be buildable with React (Vite), Next.js, or Expo 
 
 # Supported Technology Stack
-- **Frontend Framework**: React with Vite OR Next.js
+- **Web Frontend Framework**: React with Vite OR Next.js
+- **Mobile Framework**: Expo (for iOS/Android apps)
 - **When to Use React (Vite)**: SPAs, client-heavy apps, interactive tools, dashboards, games
-- **When to Use Next.js**: Full-stack apps, SSR/SSG needs, API routes, SEO-critical apps, multi-page apps
-- **Styling**: Tailwind CSS (primary), CSS Modules, styled-components
-- **State Management**: React hooks (useState, useContext, useReducer), Zustand, or similar
-- **UI Libraries**: shadcn/ui, Radix UI, Headless UI, Lucide icons
-- **Data Fetching**: Fetch API, React Query, SWR
+- **When to Use Next.js**: Full-stack web apps, SSR/SSG needs, API routes, SEO-critical apps, multi-page apps
+- **When to Use Expo**: Native mobile apps, device features, offline-first apps, platform-specific integrations
+- **Styling**: Tailwind CSS (web), NativeWind (mobile), CSS Modules, styled-components
+- **State Management**: React hooks (useState, useContext, useReducer), Zustand, Redux Toolkit
+- **UI Libraries**: shadcn/ui (web), Radix UI (web), React Native Elements, React Native Paper
+- **Data Fetching**: Fetch API, React Query, SWR, Axios
 - **Backend (Next.js only)**: API routes, server actions, middleware
-- **Database Integration**: Supabase, Firebase, Vercel Postgres, MongoDB Atlas (via API)
+- **Database Integration**: Supabase, Firebase, AsyncStorage (mobile), SQLite (mobile)
 - **Real-time**: WebSockets, Supabase real-time, Pusher, Socket.io
-- **Authentication**: NextAuth, Supabase Auth, Clerk, Auth0
+- **Authentication**: NextAuth (web), Supabase Auth, Clerk, Auth0, Firebase Auth
 - **AI Integration**: OpenAI API, Anthropic API, Hugging Face, Replicate
+- **Mobile-Specific**: Camera, GPS, notifications, biometric auth, offline storage, device sensors
 
 # Categories to Cover (distribute evenly across ${count} prompts)
 - **Business**: CRM, project management, invoicing, HR, inventory, analytics
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
 - **Creative**: Design tools, content generators, media editors, portfolio builders
 - **Social**: Community platforms, networking apps, social feeds, collaboration spaces
 - **Utility**: Calculators, converters, generators, validators, scrapers, API tools
-- **Gaming**: Browser games, game mechanics, score trackers, gaming communities
+- **Gaming**: Browser games, mobile games, game mechanics, score trackers, gaming communities
 - **Education**: Learning platforms, quiz builders, course creators, study tools
 - **Health**: Fitness trackers, meal planners, mental health tools, wellness dashboards
 - **Finance**: Budget trackers, expense splitters, investment calculators, payment processors
@@ -87,6 +90,7 @@ export async function POST(request: Request) {
 - **Data & Analytics**: Visualization dashboards, reporting tools, data explorers, BI platforms
 - **Communication**: Chat apps, messaging systems, collaboration tools, comment systems
 - **Entertainment**: Media players, content aggregators, streaming interfaces, discovery platforms
+- **Mobile-Specific**: Location-based apps, camera apps, health trackers, social networking, utility tools
 
 # Prompt Construction Formula
 
@@ -103,28 +107,31 @@ Each prompt should include:
 - **Avoid**: Overly complex multi-clause sentences
 - **Include**: Specific industries, real-world use cases, modern React/Next.js features
 
-# Feature Variety to Include (React/Next.js Specific)
+# Feature Variety to Include (React/Next.js/Expo Specific)
 - **Client-side interactivity**: Drag-and-drop, animations, real-time updates, canvas manipulation
 - **Server-side features** (Next.js): SSR, SSG, ISR, API routes, server actions, middleware
-- **AI integration**: OpenAI/Anthropic API, chatbots, content generation, image analysis
+- **Mobile features** (Expo): Camera access, GPS/location, push notifications, biometric auth, offline storage, device sensors
+- **AI integration**: OpenAI/Anthropic API, chatbots, content generation, image analysis, speech recognition
 - **Real-time collaboration**: WebSockets, Supabase real-time, shared state
 - **Data visualization**: Charts (Recharts, Chart.js), dashboards, interactive graphs
-- **File handling**: Upload, processing, preview, download
+- **File handling**: Upload, processing, preview, download, media capture (mobile)
 - **Authentication & Authorization**: User management, protected routes, role-based access
-- **Payment integration**: Stripe, PayPal, subscription management
+- **Payment integration**: Stripe, PayPal, subscription management, in-app purchases (mobile)
 - **Search & filtering**: Full-text search, faceted filters, autocomplete
 - **Markdown/Rich text**: Editors, renderers, note-taking
 - **Progressive Web App**: Offline support, push notifications, installable
 - **Internationalization**: Multi-language support
-- **Accessibility**: WCAG compliance, keyboard navigation, screen reader support
-- **Performance**: Code splitting, lazy loading, image optimization
+- **Accessibility**: WCAG compliance (web), mobile accessibility guidelines
+- **Performance**: Code splitting, lazy loading, image optimization, native performance (mobile)
 - **API integration**: Third-party APIs, webhooks, data aggregation
 
 # Examples of GOOD Prompts (for reference, don't copy):
 - "Build a Next.js markdown-based documentation site with AI-powered search and dark mode theming"
 - "Create a React Vite kanban board with drag-and-drop, real-time collaboration, and custom workflows"
 - "Design a Next.js meal planning app with recipe recommendations, shopping lists, and nutritional tracking"
-- "Develop a React dashboard for cryptocurrency portfolio tracking with live price updates and profit/loss charts"
+- "Develop an Expo fitness tracker with GPS route mapping, workout logging, and social sharing"
+- "Build an Expo language learning app with speech recognition, flashcards, and progress tracking"
+- "Create a React Vite cryptocurrency portfolio tracker with live price updates and profit/loss charts"
 
 # Examples of BAD Prompts (avoid these):
 - "Create a landing page for a business" (too generic)
@@ -133,7 +140,7 @@ Each prompt should include:
 - "Design a todo app" (overdone, not inspiring)
 - "Build a website with Vue" (wrong tech stack)
 
-# React (Vite) vs Next.js Guidance
+# React (Vite) vs Next.js vs Expo Guidance
 
 **Use React (Vite) for prompts involving:**
 - Single-page applications (SPAs)
@@ -156,6 +163,16 @@ Each prompt should include:
 - SEO-critical applications
 - Database-driven apps
 
+**Use Expo for prompts involving:**
+- Native mobile applications (iOS/Android)
+- Device hardware access (camera, GPS, sensors)
+- Offline-first functionality
+- Push notifications
+- Biometric authentication
+- Platform-specific features
+- Mobile-optimized user experiences
+- Apps needing native performance
+
 # Uniqueness Requirements
 - **NO duplicates** within the ${count} prompts generated
 - **NO clichés**: Avoid the most common tutorial apps
@@ -165,7 +182,8 @@ Each prompt should include:
 - **NO mentions of other frameworks**: Don't mention Vue, Svelte, Angular, or any non-React frameworks
 
 # Diversity Checklist (ensure variety across all ${count} prompts)
-- Mix of React (Vite) and Next.js suggestions
+- Mix of React (Vite), Next.js, and Expo suggestions
+- Mix of web and mobile applications
 - Mix of B2B and B2C applications
 - Mix of consumer and enterprise tools
 - Mix of single-user and multi-user apps
@@ -207,9 +225,9 @@ Format:
 5. Output MUST be valid JSON only (no markdown, no explanations)
 6. Each "display" should be catchy and descriptive
 7. Think: "Would I be excited to build this?"
-8. **ONLY use React (Vite) or Next.js** - no other frameworks
-9. Consider which stack (React vs Next.js) is most appropriate for each prompt
-10. Focus on modern, practical applications that showcase React/Next.js strengths
+8. **ONLY use React (Vite), Next.js, or Expo** - no other frameworks
+9. Consider which stack (React vs Next.js vs Expo) is most appropriate for each prompt
+10. Focus on modern, practical applications that showcase React ecosystem strengths
 
 Generate ${count} unique, inspiring, and actionable web app prompts now:`,
     })
