@@ -9445,13 +9445,7 @@ Result must be Markdown formatted for proper display:
 ### 📋 Execution Summary
 - **Status:** ✅ Success
 - **Files Generated:** 3
-- **Files Uploaded:** 3/3 to Supabase
-- **Storage:** documents bucket
-- **Auto-Cleanup:** Files deleted after 5 minutes
-- **Execution Time:** X sec
-- **Sandbox Output:** [results]
-
-**Note:** All files are stored in Supabase 'documents' bucket with permanent public URLs. Files are automatically deleted after 5 minutes via scheduled cleanup.`
+`
 ,
         inputSchema: z.object({
           code: z.string().describe('Python code to execute in E2B sandbox. ⚠️ CRITICAL: All file outputs MUST use absolute paths starting with /pipilot/ - Charts: plt.savefig(\'/pipilot/filename.png\'); CSVs: df.to_csv(\'/pipilot/filename.csv\'); PDFs: plt.savefig(\'/pipilot/filename.pdf\'); DOCX: doc.save(\'/pipilot/filename.docx\'). Always call plt.close() after charts.')
