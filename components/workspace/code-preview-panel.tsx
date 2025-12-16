@@ -1656,7 +1656,7 @@ export default function TodoApp() {
               )}
             </WebPreviewNavigation>
 
-            <div className="flex-1 min-h-0 pt-16">
+            <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
               {preview.isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center p-8">
