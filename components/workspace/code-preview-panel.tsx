@@ -662,9 +662,13 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     if (msg.type === "error") {
                       console.error('Preview error:', msg.message)
                       setCurrentLog(`Error: ${msg.message}`)
-                      addConsoleLog(`[ERR] ${msg.message}`, 'server')
-                      setPreview(prev => ({ ...prev, isLoading: false }))
-                      break
+                      addConsoleLog(`❌ ${msg.message}`, 'server')
+                      // Don't break the stream - continue receiving logs
+                      // Only stop loading if it's a fatal error (contains specific keywords)
+                      if (msg.message.includes('failed') || msg.message.includes('ERR!') || msg.message.includes('ENOENT')) {
+                        setPreview(prev => ({ ...prev, isLoading: false }))
+                      }
+                      // Continue processing other messages
                     }
 
                     if (msg.type === "ready") {
