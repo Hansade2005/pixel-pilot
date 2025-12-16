@@ -1728,7 +1728,7 @@ export default function TodoApp() {
                           style={{
                             width: '95%',
                             height: '93%',
-                            borderRadius: '25px 25px 25px 25px',
+                            borderRadius: '20px 20px 20px 20px',
                             border: 'none'
                           }}
                         />
