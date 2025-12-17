@@ -1447,7 +1447,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 </h1>
                 {selectedFile && (
                   <p className="text-xs text-muted-foreground truncate">
-                    {selectedFile.name}
+                    {selectedFile.name.length > 12 ? `${selectedFile.name.substring(0, 12)}...` : selectedFile.name}
                   </p>
                 )}
               </div>

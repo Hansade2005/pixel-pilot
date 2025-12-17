@@ -340,7 +340,6 @@ export function ProjectHeader({
               {project.name}
             </h1>
           )}
-          {project.description && <p className="text-sm text-muted-foreground">{project.description.length > 12 ? `${project.description.substring(0, 12)}...` : project.description}</p>}
         </div>
        
         {/* Model label and selector */}
