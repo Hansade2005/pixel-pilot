@@ -39,7 +39,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Sparkles,
-  Layout
+  Layout,
+  Github
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -281,6 +282,17 @@ export function ModernSidebar({
           >
             <Layout size={18} />
             {shouldExpand && <span className="ml-3 text-sm">Templates</span>}
+          </button>
+
+          {/* Repo Agent */}
+          <button
+            onClick={() => router.push('/workspace?view=repo-agent')}
+            className={`flex items-center w-full h-10 px-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors ${
+              shouldExpand ? 'justify-start' : 'justify-center'
+            }`}
+          >
+            <Github size={18} />
+            {shouldExpand && <span className="ml-3 text-sm">Repo Agent</span>}
           </button>
 
           {/* All Works Accordion */}
