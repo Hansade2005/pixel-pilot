@@ -204,6 +204,17 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         }
       } catch (error) {
         console.error('[RepoAgent] Error loading conversation history:', error)
+        // If IndexedDB store doesn't exist yet, user needs to refresh browser to trigger upgrade
+        if (error instanceof Error && error.message.includes('object stores was not found')) {
+          console.warn('[RepoAgent] ⚠️ IndexedDB schema outdated. Please refresh the browser to upgrade.')
+          toast({
+            title: "Database Upgrade Required",
+            description: "Please refresh your browser to enable conversation history.",
+            variant: "default"
+          })
+        }
+        // Continue without conversation history
+        setConversationId(null)
       } finally {
         setIsLoadingConversation(false)
       }

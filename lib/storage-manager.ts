@@ -1260,7 +1260,7 @@ class InMemoryStorage implements StorageInterface {
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 16 // Updated version to add Supabase project connection fields
+  private version = 17 // Updated version to add repoConversations store for GitHub repo agent
 
   async init(): Promise<void> {
     if (this.db) return

@@ -1420,7 +1420,33 @@ export async function POST(req: Request) {
       }
     })
 
-    return result.toTextStreamResponse()
+    // Stream the response using newline-delimited JSON format (matching chat-v2 pattern)
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder()
+
+          try {
+            // Stream the text and tool calls
+            for await (const part of result.fullStream) {
+              // Send each part as newline-delimited JSON (no SSE "data:" prefix)
+              controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+            }
+          } catch (error) {
+            console.error('[RepoAgent] Stream error:', error)
+          } finally {
+            controller.close()
+          }
+        }
+      }),
+      {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        }
+      }
+    )
 
   } catch (error: any) {
     console.error('[RepoAgent] Error:', error)
