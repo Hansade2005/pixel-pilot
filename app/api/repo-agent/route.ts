@@ -54,6 +54,10 @@ CORE CAPABILITIES
 - **github_search_code** - Search for code patterns across the repository
 - **github_get_commits** - View commit history and changes
 - **github_create_pull_request** - Create PRs for your changes
+- **github_semantic_search** - Advanced semantic code search and analysis
+- **github_replace_string** - Powerful string replacement with regex support
+- **github_grep_search** - Elite multi-strategy search engine
+- **github_edit_file** - Precise file editing with Git diff-style search/replace blocks
 
 ## 🎯 WORKFLOW PRINCIPLES
 1. **Repository Context**: Always maintain awareness of the current repository and branch
@@ -61,6 +65,12 @@ CORE CAPABILITIES
 3. **Clear Communication**: Explain every action you're taking
 4. **Version Control**: Create branches for significant changes
 5. **Code Quality**: Follow repository conventions and patterns
+
+## 📋 EDITING TOOLS GUIDE
+- **github_write_file**: For creating new files or completely replacing existing ones
+- **github_edit_file**: For precise edits using Git diff-style search/replace blocks (recommended for most edits)
+- **github_replace_string**: For simple string replacements with regex support
+- **github_delete_file**: For removing files entirely
 
 ## 📋 RESPONSE FORMAT
 When performing operations:
@@ -109,6 +119,123 @@ const createOctokitClient = (token: string) => {
 const parseRepoString = (repoString: string) => {
   const [owner, repo] = repoString.split('/')
   return { owner, repo }
+}
+
+// Advanced tool helper functions
+const buildSemanticSearchTerms = (query: string): string => {
+  const lowerQuery = query.toLowerCase()
+
+  // Map natural language to code patterns
+  const semanticMappings: Record<string, string[]> = {
+    'react component': ['function.*Component', 'const.*=.*\\(', 'export.*function', 'export.*const'],
+    'api endpoint': ['router\\.', 'app\\.', 'Route', '@app\\.route', 'def.*api', 'func.*handler'],
+    'error handling': ['try.*catch', 'except', 'rescue', 'catch.*Error', 'throw', 'raise'],
+    'database model': ['class.*Model', 'interface.*Model', 'type.*Model', 'Schema', 'model\\('],
+    'test file': ['describe\\(', 'it\\(', 'test\\(', 'spec', '\\.test\\.', '\\.spec\\.'],
+    'configuration': ['config', 'settings', 'env', 'Config', 'Settings'],
+    'utility function': ['export.*function', 'export.*const', 'util', 'helper', 'Utils'],
+    'hook': ['use[A-Z]', 'useState', 'useEffect', 'useCallback', 'useMemo'],
+    'middleware': ['middleware', 'Middleware', 'next\\(', 'req.*res'],
+    'validation': ['validate', 'schema', 'zod', 'yup', 'joi', 'Validate']
+  }
+
+  const terms = []
+  for (const [key, patterns] of Object.entries(semanticMappings)) {
+    if (lowerQuery.includes(key)) {
+      terms.push(...patterns)
+    }
+  }
+
+  // Add the original query if no semantic matches
+  if (terms.length === 0) {
+    terms.push(query)
+  }
+
+  return terms.join(' OR ')
+}
+
+const detectLanguage = (filePath: string, content: string): string => {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+
+  const languageMap: Record<string, string> = {
+    'js': 'JavaScript',
+    'jsx': 'JavaScript React',
+    'ts': 'TypeScript',
+    'tsx': 'TypeScript React',
+    'py': 'Python',
+    'java': 'Java',
+    'cpp': 'C++',
+    'c': 'C',
+    'cs': 'C#',
+    'php': 'PHP',
+    'rb': 'Ruby',
+    'go': 'Go',
+    'rs': 'Rust',
+    'swift': 'Swift',
+    'kt': 'Kotlin',
+    'scala': 'Scala',
+    'html': 'HTML',
+    'css': 'CSS',
+    'scss': 'SCSS',
+    'sass': 'Sass',
+    'less': 'Less',
+    'json': 'JSON',
+    'xml': 'XML',
+    'yaml': 'YAML',
+    'yml': 'YAML',
+    'md': 'Markdown',
+    'sh': 'Shell',
+    'bash': 'Bash',
+    'sql': 'SQL'
+  }
+
+  return languageMap[ext || ''] || 'Unknown'
+}
+
+const getRelevantExcerpt = (content: string, query: string, lines: number): string => {
+  const contentLines = content.split('\n')
+  const lowerQuery = query.toLowerCase()
+
+  // Find lines containing the query
+  const matchingLines = contentLines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => line.toLowerCase().includes(lowerQuery))
+    .slice(0, lines)
+
+  if (matchingLines.length === 0) {
+    // Return first few lines if no matches
+    return contentLines.slice(0, lines).join('\n')
+  }
+
+  // Get context around first match
+  const matchIndex = matchingLines[0].index
+  const start = Math.max(0, matchIndex - Math.floor(lines / 2))
+  const end = Math.min(contentLines.length, start + lines)
+
+  return contentLines.slice(start, end).join('\n')
+}
+
+const findSemanticMatches = (content: string, query: string): any[] => {
+  const lines = content.split('\n')
+  const matches = []
+  const lowerQuery = query.toLowerCase()
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.toLowerCase().includes(lowerQuery)) {
+      matches.push({
+        lineNumber: i + 1,
+        content: line.trim(),
+        type: 'text_match'
+      })
+    }
+  }
+
+  return matches
+}
+
+const escapeRegExp = (string: string): string => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export async function POST(req: Request) {
@@ -664,6 +791,593 @@ export async function POST(req: Request) {
             return {
               success: false,
               error: `Failed to create pull request: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      // Advanced Code Analysis Tools
+      github_semantic_search: tool({
+        description: 'Advanced semantic code search and analysis tool for GitHub repositories. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries and detailed code analysis.',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          query: z.string().describe('Natural language description of what to search for (e.g., "find React components", "show API endpoints", "locate error handling")'),
+          path: z.string().optional().describe('Optional: Specific path to search within'),
+          fileType: z.string().optional().describe('Optional: Filter by file type (e.g., "tsx", "ts", "js", "py", "md")'),
+          maxResults: z.number().optional().describe('Maximum number of results to return (default: 20)'),
+          branch: z.string().optional().describe('Branch name, defaults to repository default')
+        }),
+        execute: async ({ repo, query, path, fileType, maxResults = 20, branch }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+
+            // First, get repository structure to understand what we're working with
+            const repoInfo = await octokit.rest.repos.get({ owner, repo: repoName })
+            const defaultBranch = branch || repoInfo.data.default_branch
+
+            // Use GitHub's code search API with enhanced query building
+            let searchQuery = `repo:${repo}`
+
+            // Add path filter if specified
+            if (path) {
+              searchQuery += ` path:${path}`
+            }
+
+            // Add file extension filter if specified
+            if (fileType) {
+              const extensions = fileType.split(',').map(ext => ext.trim())
+              searchQuery += ` extension:${extensions.join(' extension:')}`
+            }
+
+            // Build semantic search terms based on query
+            const semanticTerms = buildSemanticSearchTerms(query)
+            searchQuery += ` ${semanticTerms}`
+
+            const searchResponse = await octokit.rest.search.code({
+              q: searchQuery,
+              per_page: Math.min(maxResults, 100)
+            })
+
+            // Enhance results with file content analysis
+            const enhancedResults = await Promise.all(
+              searchResponse.data.items.slice(0, maxResults).map(async (item) => {
+                try {
+                  // Get file content for deeper analysis
+                  const contentResponse = await octokit.rest.repos.getContent({
+                    owner,
+                    repo: repoName,
+                    path: item.path,
+                    ref: defaultBranch
+                  })
+
+                  if (!Array.isArray(contentResponse.data) && 'content' in contentResponse.data) {
+                    const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8')
+
+                    return {
+                      name: item.name,
+                      path: item.path,
+                      sha: item.sha,
+                      html_url: item.html_url,
+                      repository: {
+                        full_name: repo,
+                        html_url: repoInfo.data.html_url
+                      },
+                      content: {
+                        lines: content.split('\n').length,
+                        size: content.length,
+                        language: detectLanguage(item.path, content),
+                        excerpt: getRelevantExcerpt(content, query, 3)
+                      },
+                      matches: findSemanticMatches(content, query)
+                    }
+                  }
+                } catch (error) {
+                  // If we can't get content, return basic info
+                  console.warn(`Could not get content for ${item.path}:`, error)
+                }
+
+                return {
+                  name: item.name,
+                  path: item.path,
+                  sha: item.sha,
+                  html_url: item.html_url,
+                  repository: {
+                    full_name: repo,
+                    html_url: repoInfo.data.html_url
+                  },
+                  content: null,
+                  matches: []
+                }
+              })
+            )
+
+            return {
+              success: true,
+              query,
+              total_count: searchResponse.data.total_count,
+              returned_count: enhancedResults.length,
+              repository: {
+                full_name: repo,
+                default_branch: defaultBranch,
+                language: repoInfo.data.language
+              },
+              results: enhancedResults
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to perform semantic search: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              query
+            }
+          }
+        }
+      }),
+
+      github_replace_string: tool({
+        description: 'Advanced string replacement tool for editing files in GitHub repositories. Supports regex patterns, multiple replacements, and exact string matching. More powerful than basic file write operations.',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          path: z.string().describe('File path in repository'),
+          oldString: z.string().describe('The exact string to replace (must match exactly including whitespace and indentation)'),
+          newString: z.string().describe('The new string to replace with'),
+          message: z.string().describe('Commit message for the change'),
+          useRegex: z.boolean().optional().describe('Whether to treat oldString as regex pattern (default: false)'),
+          replaceAll: z.boolean().optional().describe('Whether to replace all occurrences (default: false, replaces first occurrence only)'),
+          caseInsensitive: z.boolean().optional().describe('Whether regex matching should be case insensitive (default: false)'),
+          branch: z.string().optional().describe('Branch name, defaults to repository default')
+        }),
+        execute: async ({ repo, path, oldString, newString, message, useRegex = false, replaceAll = false, caseInsensitive = false, branch }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+
+            // Get current file content
+            const fileResponse = await octokit.rest.repos.getContent({
+              owner,
+              repo: repoName,
+              path,
+              ref: branch
+            })
+
+            if (Array.isArray(fileResponse.data)) {
+              return {
+                success: false,
+                error: 'Cannot replace strings in directories'
+              }
+            }
+
+            const fileData = fileResponse.data as any
+            const currentContent = Buffer.from(fileData.content, 'base64').toString('utf-8')
+
+            // Perform the replacement
+            let updatedContent: string
+            let replacementCount = 0
+
+            if (useRegex) {
+              const flags = caseInsensitive ? 'gi' : 'g'
+              const regex = new RegExp(oldString, flags)
+
+              if (replaceAll) {
+                updatedContent = currentContent.replace(regex, newString)
+                const matches = currentContent.match(regex)
+                replacementCount = matches ? matches.length : 0
+              } else {
+                updatedContent = currentContent.replace(regex, newString)
+                replacementCount = currentContent.match(regex) ? 1 : 0
+              }
+            } else {
+              if (replaceAll) {
+                let count = 0
+                updatedContent = currentContent
+                let index = updatedContent.indexOf(oldString)
+                while (index !== -1) {
+                  updatedContent = updatedContent.substring(0, index) + newString + updatedContent.substring(index + oldString.length)
+                  count++
+                  index = updatedContent.indexOf(oldString, index + newString.length)
+                }
+                replacementCount = count
+              } else {
+                const index = currentContent.indexOf(oldString)
+                if (index === -1) {
+                  return {
+                    success: false,
+                    error: 'String to replace not found in file'
+                  }
+                }
+                updatedContent = currentContent.substring(0, index) + newString + currentContent.substring(index + oldString.length)
+                replacementCount = 1
+              }
+            }
+
+            // Check if content actually changed
+            if (updatedContent === currentContent) {
+              return {
+                success: false,
+                error: 'No replacements were made - string not found or no changes needed'
+              }
+            }
+
+            // Commit the changes
+            const updateResponse = await octokit.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo: repoName,
+              path,
+              message,
+              content: Buffer.from(updatedContent).toString('base64'),
+              sha: fileData.sha,
+              branch
+            })
+
+            return {
+              success: true,
+              replacements_made: replacementCount,
+              commit: {
+                sha: updateResponse.data.commit.sha,
+                message: updateResponse.data.commit.message,
+                author: updateResponse.data.commit.author,
+                url: updateResponse.data.commit.html_url
+              },
+              file: {
+                path: updateResponse.data.content?.path,
+                sha: updateResponse.data.content?.sha,
+                previous_sha: fileData.sha
+              },
+              changes: {
+                old_length: currentContent.length,
+                new_length: updatedContent.length,
+                diff: updatedContent.length - currentContent.length
+              }
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to replace string: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_grep_search: tool({
+        description: 'Elite multi-strategy search engine for GitHub repositories. Combines literal text search, regex patterns, intelligent code pattern detection, and semantic analysis.',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          query: z.string().describe('Search pattern - can be literal text, regex, or natural language'),
+          path: z.string().optional().describe('Limit search to specific path or file pattern'),
+          fileType: z.string().optional().describe('Filter by file type/extension'),
+          useRegex: z.boolean().optional().describe('Treat query as regex pattern (default: false)'),
+          caseInsensitive: z.boolean().optional().describe('Case insensitive search (default: false)'),
+          maxResults: z.number().optional().describe('Maximum results to return (default: 50)'),
+          branch: z.string().optional().describe('Branch name, defaults to repository default'),
+          contextLines: z.number().optional().describe('Lines of context around matches (default: 2)')
+        }),
+        execute: async ({ repo, query, path, fileType, useRegex = false, caseInsensitive = false, maxResults = 50, branch, contextLines = 2 }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+
+            // Get repository info for default branch
+            const repoInfo = await octokit.rest.repos.get({ owner, repo: repoName })
+            const defaultBranch = branch || repoInfo.data.default_branch
+
+            // Strategy 1: Use GitHub's code search API for initial results
+            let searchQuery = `repo:${repo}`
+
+            if (path) {
+              searchQuery += ` path:${path}`
+            }
+
+            if (fileType) {
+              const extensions = fileType.split(',').map(ext => ext.trim())
+              searchQuery += ` extension:${extensions.join(' extension:')}`
+            }
+
+            // Add the search query
+            searchQuery += ` ${query}`
+
+            const searchResponse = await octokit.rest.search.code({
+              q: searchQuery,
+              per_page: Math.min(maxResults * 2, 100) // Get more for processing
+            })
+
+            // Strategy 2: Enhanced analysis of results
+            const enhancedResults = []
+            const processedFiles = new Set()
+
+            for (const item of searchResponse.data.items.slice(0, maxResults)) {
+              if (processedFiles.has(item.path)) continue
+              processedFiles.add(item.path)
+
+              try {
+                // Get full file content for detailed analysis
+                const contentResponse = await octokit.rest.repos.getContent({
+                  owner,
+                  repo: repoName,
+                  path: item.path,
+                  ref: defaultBranch
+                })
+
+                if (!Array.isArray(contentResponse.data) && 'content' in contentResponse.data) {
+                  const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8')
+                  const lines = content.split('\n')
+
+                  // Perform grep-style search
+                  const matches = []
+                  const regexFlags = caseInsensitive ? 'gi' : 'g'
+                  const searchRegex = useRegex ? new RegExp(query, regexFlags) : new RegExp(escapeRegExp(query), regexFlags)
+
+                  for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i]
+                    const lineMatches = []
+
+                    let match
+                    while ((match = searchRegex.exec(line)) !== null) {
+                      lineMatches.push({
+                        match: match[0],
+                        start: match.index,
+                        end: match.index + match[0].length,
+                        groups: match.groups || {}
+                      })
+
+                      if (!useRegex) break // For literal searches, only find first match per line
+                    }
+
+                    if (lineMatches.length > 0) {
+                      // Get context lines
+                      const startLine = Math.max(0, i - contextLines)
+                      const endLine = Math.min(lines.length - 1, i + contextLines)
+                      const context = lines.slice(startLine, endLine + 1)
+
+                      matches.push({
+                        lineNumber: i + 1,
+                        line: line,
+                        matches: lineMatches,
+                        context: {
+                          startLine: startLine + 1,
+                          endLine: endLine + 1,
+                          lines: context
+                        }
+                      })
+                    }
+                  }
+
+                  if (matches.length > 0) {
+                    enhancedResults.push({
+                      file: {
+                        name: item.name,
+                        path: item.path,
+                        sha: item.sha,
+                        html_url: item.html_url,
+                        language: detectLanguage(item.path, content),
+                        size: content.length,
+                        lines: lines.length
+                      },
+                      matches: matches,
+                      total_matches: matches.length
+                    })
+                  }
+                }
+              } catch (error) {
+                console.warn(`Could not analyze ${item.path}:`, error)
+              }
+            }
+
+            return {
+              success: true,
+              query,
+              strategy: 'multi-strategy',
+              total_files_searched: searchResponse.data.total_count,
+              files_with_matches: enhancedResults.length,
+              repository: {
+                full_name: repo,
+                default_branch: defaultBranch
+              },
+              results: enhancedResults
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to perform grep search: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              query
+            }
+          }
+        }
+      }),
+
+      // Advanced File Editing Tool
+      github_edit_file: tool({
+        description: 'Edit an existing file in GitHub repository using search/replace blocks with advanced options. Supports regex patterns, multiple replacements, and detailed diff reporting. Uses Git diff-style format for precise edits. IMPORTANT: If this tool fails more than 3 times consecutively on the same file, automatically switch to using the github_write_file tool instead.',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          path: z.string().describe('File path in repository'),
+          searchReplaceBlock: z.string().describe(`Search/replace block in Git diff format:
+<<<<<<< SEARCH
+[exact code to find - include sufficient context]
+=======
+[new code to replace with]
+>>>>>>> REPLACE`),
+          message: z.string().describe('Commit message for the change'),
+          useRegex: z.boolean().optional().describe('Whether to treat search as regex pattern (default: false)'),
+          replaceAll: z.boolean().optional().describe('Whether to replace all occurrences (default: false, replaces first occurrence only)'),
+          branch: z.string().optional().describe('Branch name, defaults to repository default')
+        }),
+        execute: async ({ repo, path, searchReplaceBlock, message, useRegex = false, replaceAll = false, branch }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+
+            // Parse the search/replace block
+            const searchMarker = '<<<<<<< SEARCH'
+            const replaceMarker = '======='
+            const endMarker = '>>>>>>> REPLACE'
+
+            const searchStart = searchReplaceBlock.indexOf(searchMarker)
+            const replaceStart = searchReplaceBlock.indexOf(replaceMarker, searchStart)
+            const endPos = searchReplaceBlock.indexOf(endMarker, replaceStart)
+
+            if (searchStart === -1 || replaceStart === -1 || endPos === -1) {
+              return {
+                success: false,
+                error: 'Invalid search/replace block format. Must contain <<<<<<< SEARCH, =======, and >>>>>>> REPLACE markers.'
+              }
+            }
+
+            const oldString = searchReplaceBlock.substring(
+              searchStart + searchMarker.length,
+              replaceStart
+            ).trim()
+
+            const newString = searchReplaceBlock.substring(
+              replaceStart + replaceMarker.length,
+              endPos
+            ).trim()
+
+            if (!oldString) {
+              return {
+                success: false,
+                error: 'Search content cannot be empty'
+              }
+            }
+
+            // Get current file content
+            const fileResponse = await octokit.rest.repos.getContent({
+              owner,
+              repo: repoName,
+              path,
+              ref: branch
+            })
+
+            if (Array.isArray(fileResponse.data)) {
+              return {
+                success: false,
+                error: 'Cannot edit directories'
+              }
+            }
+
+            const fileData = fileResponse.data as any
+            const currentContent = Buffer.from(fileData.content, 'base64').toString('utf-8')
+
+            // Perform the replacement
+            let updatedContent: string
+            let replacementCount = 0
+
+            if (useRegex) {
+              const regex = new RegExp(oldString, 'g')
+              if (replaceAll) {
+                updatedContent = currentContent.replace(regex, newString)
+                const matches = currentContent.match(regex)
+                replacementCount = matches ? matches.length : 0
+              } else {
+                updatedContent = currentContent.replace(regex, newString)
+                replacementCount = currentContent.match(regex) ? 1 : 0
+              }
+            } else {
+              if (replaceAll) {
+                let count = 0
+                updatedContent = currentContent
+                let index = updatedContent.indexOf(oldString)
+                while (index !== -1) {
+                  updatedContent = updatedContent.substring(0, index) + newString + updatedContent.substring(index + oldString.length)
+                  count++
+                  index = updatedContent.indexOf(oldString, index + newString.length)
+                }
+                replacementCount = count
+              } else {
+                const index = currentContent.indexOf(oldString)
+                if (index === -1) {
+                  return {
+                    success: false,
+                    error: `Search string not found in file. Content length: ${currentContent.length} chars. Make sure the search string matches exactly including whitespace and indentation.`
+                  }
+                }
+                updatedContent = currentContent.substring(0, index) + newString + currentContent.substring(index + oldString.length)
+                replacementCount = 1
+              }
+            }
+
+            // Check if content actually changed
+            if (updatedContent === currentContent) {
+              return {
+                success: false,
+                error: 'No changes were made - content is identical or search string not found'
+              }
+            }
+
+            // Commit the changes
+            const updateResponse = await octokit.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo: repoName,
+              path,
+              message,
+              content: Buffer.from(updatedContent).toString('base64'),
+              sha: fileData.sha,
+              branch
+            })
+
+            // Generate diff for reporting
+            const generateDiff = (oldContent: string, newContent: string): string => {
+              const oldLines = oldContent.split('\n')
+              const newLines = newContent.split('\n')
+              const diff = []
+
+              let i = 0, j = 0
+              while (i < oldLines.length || j < newLines.length) {
+                if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
+                  diff.push(` ${oldLines[i]}`)
+                  i++
+                  j++
+                } else {
+                  // Find the actual change
+                  let oldEnd = i
+                  let newEnd = j
+
+                  // Look for matching lines after the change
+                  while (oldEnd < oldLines.length && newEnd < newLines.length) {
+                    if (oldLines[oldEnd] === newLines[newEnd]) break
+                    oldEnd++
+                    newEnd++
+                  }
+
+                  // Add removed lines
+                  while (i < oldEnd && i < oldLines.length) {
+                    diff.push(`-${oldLines[i]}`)
+                    i++
+                  }
+
+                  // Add added lines
+                  while (j < newEnd && j < newLines.length) {
+                    diff.push(`+${newLines[j]}`)
+                    j++
+                  }
+                }
+              }
+
+              return diff.join('\n')
+            }
+
+            const diff = generateDiff(currentContent, updatedContent)
+
+            return {
+              success: true,
+              replacements_made: replacementCount,
+              commit: {
+                sha: updateResponse.data.commit.sha,
+                message: updateResponse.data.commit.message,
+                author: updateResponse.data.commit.author,
+                url: updateResponse.data.commit.html_url
+              },
+              file: {
+                path: updateResponse.data.content?.path,
+                sha: updateResponse.data.content?.sha,
+                previous_sha: fileData.sha
+              },
+              changes: {
+                old_length: currentContent.length,
+                new_length: updatedContent.length,
+                diff_length: updatedContent.length - currentContent.length
+              },
+              diff: diff
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to edit file: ${error instanceof Error ? error.message : 'Unknown error'}`
             }
           }
         }
