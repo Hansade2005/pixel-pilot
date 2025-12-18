@@ -147,6 +147,28 @@ export interface ConversationSummary {
   updatedAt: string
 }
 
+// Repo agent conversation interface for managing GitHub repository chat history
+export interface RepoConversation {
+  id: string
+  userId: string
+  repo: string // GitHub repository full name (owner/repo)
+  branch: string // Branch name
+  messages: Array<{
+    id: string
+    role: 'user' | 'assistant'
+    content: string
+    timestamp: string
+    toolCalls?: any[]
+    fileChanges?: Array<{
+      path: string
+      status: 'created' | 'modified' | 'deleted'
+    }>
+  }>
+  lastActivity: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Deployment {
   id: string
   workspaceId: string
@@ -377,6 +399,13 @@ export interface StorageInterface {
   getVercelLogs(deploymentId: string): Promise<VercelLog[]>;
   deleteVercelLogs(deploymentId: string): Promise<boolean>;
   
+  // Repo conversation methods for GitHub repo agent chat persistence
+  getRepoConversation(repo: string, branch: string, userId: string): Promise<RepoConversation | null>;
+  createRepoConversation(conversation: Omit<RepoConversation, 'id' | 'createdAt' | 'updatedAt' | 'lastActivity'>): Promise<RepoConversation>;
+  updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null>;
+  deleteRepoConversation(id: string): Promise<boolean>;
+  getAllRepoConversations(userId: string): Promise<RepoConversation[]>;
+  
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
   
@@ -397,6 +426,7 @@ class InMemoryStorage implements StorageInterface {
   private checkpoints: Map<string, Checkpoint> = new Map() // Add checkpoints map
   private conversationMemories: Map<string, ConversationMemory> = new Map() // Add conversation memories map
   private conversationSummaries: Map<string, ConversationSummary> = new Map() // Add conversation summaries map
+  private repoConversations: Map<string, RepoConversation> = new Map() // Add repo conversations map
   private toolExecutions: Map<string, ToolExecution> = new Map() // Add tool executions map
 
   private constructor() {}
@@ -1125,6 +1155,61 @@ class InMemoryStorage implements StorageInterface {
     return this.conversationSummaries.delete(id)
   }
 
+  // Repo conversation methods for GitHub repository chat history
+  async createRepoConversation(conversation: Omit<RepoConversation, 'id' | 'createdAt' | 'updatedAt' | 'lastActivity'>): Promise<RepoConversation> {
+    const id = `repo_conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const now = new Date().toISOString()
+    const newConversation: RepoConversation = {
+      ...conversation,
+      id,
+      lastActivity: now,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.repoConversations.set(id, newConversation)
+    return newConversation
+  }
+
+  async getRepoConversation(repo: string, branch: string, userId: string): Promise<RepoConversation | null> {
+    // Find conversation by repo, branch, and userId combination
+    for (const conversation of this.repoConversations.values()) {
+      if (conversation.repo === repo && conversation.branch === branch && conversation.userId === userId) {
+        return conversation
+      }
+    }
+    return null
+  }
+
+  async updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null> {
+    const conversation = this.repoConversations.get(id)
+    if (!conversation) return null
+    
+    const updatedConversation: RepoConversation = {
+      ...conversation,
+      ...updates,
+      lastActivity: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+    this.repoConversations.set(id, updatedConversation)
+    return updatedConversation
+  }
+
+  async deleteRepoConversation(id: string): Promise<boolean> {
+    return this.repoConversations.delete(id)
+  }
+
+  async getAllRepoConversations(userId: string): Promise<RepoConversation[]> {
+    const conversations: RepoConversation[] = []
+    for (const conversation of this.repoConversations.values()) {
+      if (conversation.userId === userId) {
+        conversations.push(conversation)
+      }
+    }
+    return conversations.sort((a, b) => 
+      new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+    )
+  }
+
   // Tool execution tracking methods
   async createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution> {
     const id = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -1255,6 +1340,16 @@ class IndexedDBStorage implements StorageInterface {
           summaryStore.createIndex('projectId', 'projectId', { unique: false })
           summaryStore.createIndex('userId', 'userId', { unique: false })
           summaryStore.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+
+        // Create repo conversations store for GitHub repository chat history
+        if (!db.objectStoreNames.contains('repoConversations')) {
+          const repoConvStore = db.createObjectStore('repoConversations', { keyPath: 'id' })
+          repoConvStore.createIndex('userId', 'userId', { unique: false })
+          repoConvStore.createIndex('repo', 'repo', { unique: false })
+          repoConvStore.createIndex('branch', 'branch', { unique: false })
+          repoConvStore.createIndex('repo_branch', ['repo', 'branch'], { unique: false })
+          repoConvStore.createIndex('lastActivity', 'lastActivity', { unique: false })
         }
 
         // Create tool executions store for tracking XML command executions
@@ -2918,6 +3013,111 @@ class IndexedDBStorage implements StorageInterface {
     })
   }
 
+  // Repo conversation methods for GitHub repository chat history
+  async createRepoConversation(conversation: Omit<RepoConversation, 'id' | 'createdAt' | 'updatedAt' | 'lastActivity'>): Promise<RepoConversation> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    const id = `repo_conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const now = new Date().toISOString()
+    const newConversation: RepoConversation = {
+      ...conversation,
+      id,
+      lastActivity: now,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['repoConversations'], 'readwrite')
+      const store = transaction.objectStore('repoConversations')
+      const request = store.add(newConversation)
+
+      request.onsuccess = () => resolve(newConversation)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getRepoConversation(repo: string, branch: string, userId: string): Promise<RepoConversation | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['repoConversations'], 'readonly')
+      const store = transaction.objectStore('repoConversations')
+      const index = store.index('repo_branch')
+      const request = index.getAll([repo, branch])
+
+      request.onsuccess = () => {
+        const conversations = request.result || []
+        // Find conversation that matches repo, branch, and userId
+        const conversation = conversations.find(c => c.userId === userId)
+        resolve(conversation || null)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['repoConversations'], 'readwrite')
+      const store = transaction.objectStore('repoConversations')
+      const getRequest = store.get(id)
+      
+      getRequest.onsuccess = () => {
+        const conversation = getRequest.result
+        if (conversation) {
+          const updatedConversation = {
+            ...conversation,
+            ...updates,
+            lastActivity: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+          const putRequest = store.put(updatedConversation)
+          putRequest.onsuccess = () => resolve(updatedConversation)
+          putRequest.onerror = () => reject(putRequest.error)
+        } else {
+          resolve(null)
+        }
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteRepoConversation(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['repoConversations'], 'readwrite')
+      const store = transaction.objectStore('repoConversations')
+      const request = store.delete(id)
+      
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getAllRepoConversations(userId: string): Promise<RepoConversation[]> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['repoConversations'], 'readonly')
+      const store = transaction.objectStore('repoConversations')
+      const index = store.index('userId')
+      const request = index.getAll(userId)
+
+      request.onsuccess = () => {
+        const conversations = request.result || []
+        // Sort by last activity (most recent first)
+        conversations.sort((a, b) => 
+          new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+        )
+        resolve(conversations)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
   // Tool execution tracking methods
   async createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution> {
     if (!this.db) throw new Error('Database not initialized')
@@ -3505,6 +3705,32 @@ class StorageManager {
   async deleteVercelPromotion(id: string): Promise<boolean> {
     await this.init()
     return this.storage!.deleteVercelPromotion(id)
+  }
+
+  // Repo conversation methods for GitHub repo agent chat persistence
+  async getRepoConversation(repo: string, branch: string, userId: string): Promise<RepoConversation | null> {
+    await this.init()
+    return this.storage!.getRepoConversation(repo, branch, userId)
+  }
+
+  async createRepoConversation(conversation: Omit<RepoConversation, 'id' | 'createdAt' | 'updatedAt' | 'lastActivity'>): Promise<RepoConversation> {
+    await this.init()
+    return this.storage!.createRepoConversation(conversation)
+  }
+
+  async updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null> {
+    await this.init()
+    return this.storage!.updateRepoConversation(id, updates)
+  }
+
+  async deleteRepoConversation(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteRepoConversation(id)
+  }
+
+  async getAllRepoConversations(userId: string): Promise<RepoConversation[]> {
+    await this.init()
+    return this.storage!.getAllRepoConversations(userId)
   }
 
   /**

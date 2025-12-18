@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getDeploymentTokens } from '@/lib/cloud-sync'
 import { useToast } from '@/hooks/use-toast'
 import { useRepoAgent } from "@/hooks/use-repo-agent"
+import { storageManager } from '@/lib/storage-manager'
 import {
   Send,
   Paperclip,
@@ -115,6 +116,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   // UI state
   const [chatWidth, setChatWidth] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatBodyRef = useRef<HTMLDivElement>(null)
 
@@ -173,6 +176,41 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       setSelectedBranch(branches[0])
     }
   }, [branches, selectedBranch])
+
+  // Load conversation history when repo and branch are selected
+  useEffect(() => {
+    const loadConversationHistory = async () => {
+      if (!selectedRepo || !selectedBranch || !userId || currentView !== 'workspace') return
+
+      setIsLoadingConversation(true)
+      try {
+        await storageManager.init()
+        const conversation = await storageManager.getRepoConversation(selectedRepo, selectedBranch, userId)
+        
+        if (conversation) {
+          console.log('[RepoAgent] Loaded conversation history:', conversation.messages.length, 'messages')
+          setConversationId(conversation.id)
+          // Convert stored messages to component Message format
+          const loadedMessages: Message[] = conversation.messages.map((msg: any) => ({
+            id: msg.id,
+            content: msg.content,
+            isUser: msg.role === 'user',
+            timestamp: new Date(msg.timestamp)
+          }))
+          setMessages(loadedMessages)
+        } else {
+          console.log('[RepoAgent] No conversation history found for', selectedRepo, selectedBranch)
+          setConversationId(null)
+        }
+      } catch (error) {
+        console.error('[RepoAgent] Error loading conversation history:', error)
+      } finally {
+        setIsLoadingConversation(false)
+      }
+    }
+
+    loadConversationHistory()
+  }, [selectedRepo, selectedBranch, userId, currentView])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -478,6 +516,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         }
       }
 
+      // Save initial conversation after first stream completes
+      await saveConversationToStorage()
       setIsLandingLoading(false)
     } catch (error) {
       console.error('Error starting repo agent:', error)
@@ -517,11 +557,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       }
       setMessages(prev => [...prev, assistantMessage])
 
-      // Continue the conversation with the repo agent
+      // Continue the conversation with the repo agent (send full history as context)
       const conversationHistory = messages.concat(userMessage).map(msg => ({
         role: msg.isUser ? 'user' : 'assistant',
         content: msg.content
       }))
+
+      console.log('[RepoAgent] Sending conversation history:', conversationHistory.length, 'messages')
 
       const response = await fetch('/api/repo-agent', {
         method: 'POST',
@@ -617,6 +659,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         }
       }
 
+      // Save conversation after stream completes
+      await saveConversationToStorage()
       setIsLoading(false)
     } catch (error) {
       console.error('Error sending message:', error)
@@ -626,6 +670,45 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         variant: "destructive"
       })
       setIsLoading(false)
+    }
+  }
+
+  // Save conversation to IndexedDB
+  const saveConversationToStorage = async () => {
+    if (!selectedRepo || !selectedBranch || !userId || messages.length === 0) return
+
+    try {
+      await storageManager.init()
+      
+      // Convert messages to storage format
+      const storageMessages = messages.map(msg => ({
+        id: msg.id,
+        role: msg.isUser ? 'user' as const : 'assistant' as const,
+        content: msg.content,
+        timestamp: msg.timestamp.toISOString(),
+        fileChanges: fileChanges.length > 0 ? fileChanges : undefined
+      }))
+
+      if (conversationId) {
+        // Update existing conversation
+        await storageManager.updateRepoConversation(conversationId, {
+          messages: storageMessages,
+          lastActivity: new Date().toISOString()
+        })
+        console.log('[RepoAgent] Updated conversation:', conversationId)
+      } else {
+        // Create new conversation
+        const newConversation = await storageManager.createRepoConversation({
+          userId,
+          repo: selectedRepo,
+          branch: selectedBranch,
+          messages: storageMessages
+        })
+        setConversationId(newConversation.id)
+        console.log('[RepoAgent] Created new conversation:', newConversation.id)
+      }
+    } catch (error) {
+      console.error('[RepoAgent] Error saving conversation:', error)
     }
   }
 
