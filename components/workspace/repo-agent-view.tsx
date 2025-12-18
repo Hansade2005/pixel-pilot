@@ -385,84 +385,95 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         throw new Error('Failed to start repo agent session')
       }
 
-      // Handle streaming response
+      // Handle streaming response (following chat-panel-v2 pattern)
       const reader = response.body?.getReader()
       if (!reader) {
         throw new Error('No response stream available')
       }
 
       const decoder = new TextDecoder()
-      let buffer = ''
+      let lineBuffer = ''
+      let accumulatedContent = ''
+      const agentMessageId = (Date.now() + 1).toString()
+      
+      // Create placeholder assistant message
+      const assistantMessage: Message = {
+        id: agentMessageId,
+        content: '',
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, assistantMessage])
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          console.log('[RepoAgent] Stream complete')
+          break
+        }
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
+        const chunk = decoder.decode(value, { stream: true })
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop() || ''
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
+        const completeLines = lines.filter(line => line.trim())
 
-            try {
-              const parsed = JSON.parse(data)
-              if (parsed.content) {
-                // Add agent response
-                const agentMessage: Message = {
-                  id: (Date.now() + Math.random()).toString(),
-                  content: parsed.content,
-                  isUser: false,
-                  timestamp: new Date()
-                }
-                setMessages(prev => [...prev, agentMessage])
-              }
+        for (const line of completeLines) {
+          try {
+            const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+            if (!jsonString || jsonString.startsWith(':')) continue
 
-              // Handle tool calls and file changes
-              if (parsed.toolCalls) {
-                parsed.toolCalls.forEach((toolCall: any) => {
-                  if (toolCall.toolName?.startsWith('github_')) {
-                    // Add action log
-                    const actionLog: ActionLog = {
-                      id: Date.now().toString() + Math.random(),
-                      type: toolCall.toolName.includes('file') ? 'file_operation' : 'api_call',
-                      description: `${toolCall.toolName.replace('github_', '').replace('_', ' ')} operation`,
-                      timestamp: new Date(),
-                      success: toolCall.result?.success !== false
-                    }
-                    setActionLogs(prev => [actionLog, ...prev])
+            const parsed = JSON.parse(jsonString)
+            console.log('[RepoAgent] Parsed:', parsed)
 
-                    // Handle file changes
-                    if (toolCall.toolName === 'github_write_file' && toolCall.result?.success) {
-                      const fileChange: FileChange = {
-                        path: toolCall.args?.path || 'unknown',
-                        status: 'created',
-                        additions: toolCall.result?.file?.size || 0
-                      }
-                      setFileChanges(prev => [fileChange, ...prev])
-                    } else if (toolCall.toolName === 'github_edit_file' && toolCall.result?.success) {
-                      const fileChange: FileChange = {
-                        path: toolCall.args?.path || 'unknown',
-                        status: 'modified',
-                        additions: toolCall.result?.changes?.diff_length || 0,
-                        diff: toolCall.result?.diff ? toolCall.result.diff.split('\n') : undefined
-                      }
-                      setFileChanges(prev => [fileChange, ...prev])
-                    } else if (toolCall.toolName === 'github_delete_file' && toolCall.result?.success) {
-                      const fileChange: FileChange = {
-                        path: toolCall.args?.path || 'unknown',
-                        status: 'deleted'
-                      }
-                      setFileChanges(prev => [fileChange, ...prev])
-                    }
-                  }
-                })
-              }
-            } catch (parseError) {
-              console.warn('Failed to parse streaming data:', parseError)
+            // Handle text deltas (following chat-panel-v2 pattern)
+            if (parsed.type === 'text-delta' && parsed.text) {
+              accumulatedContent += parsed.text
+              setMessages(prev => prev.map(msg =>
+                msg.id === agentMessageId
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              ))
             }
+            // Handle tool calls
+            else if (parsed.type === 'tool-call') {
+              const actionLog: ActionLog = {
+                id: Date.now().toString() + Math.random(),
+                type: parsed.toolName?.includes('file') ? 'file_operation' : 'api_call',
+                description: `${parsed.toolName}`,
+                timestamp: new Date(),
+                success: false
+              }
+              setActionLogs(prev => [...prev, actionLog])
+            }
+            // Handle tool results
+            else if (parsed.type === 'tool-result') {
+              // Update action log status
+              setActionLogs(prev => prev.map(log => {
+                if (log.description.includes(parsed.toolName)) {
+                  return { ...log, success: true }
+                }
+                return log
+              }))
+
+              // Track file changes
+              if (parsed.toolName === 'github_write_file' && parsed.result?.success) {
+                const fileChange: FileChange = {
+                  path: parsed.args?.path || 'unknown',
+                  status: parsed.result?.created ? 'created' : 'modified'
+                }
+                setFileChanges(prev => [fileChange, ...prev])
+              } else if (parsed.toolName === 'github_delete_file' && parsed.result?.success) {
+                const fileChange: FileChange = {
+                  path: parsed.args?.path || 'unknown',
+                  status: 'deleted'
+                }
+                setFileChanges(prev => [fileChange, ...prev])
+              }
+            }
+          } catch (parseError) {
+            console.warn('[RepoAgent] Parse error:', parseError)
           }
         }
       }
@@ -496,6 +507,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     setIsLoading(true)
 
     try {
+      // Create placeholder assistant message
+      const assistantMessageId = (Date.now() + 1).toString()
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        content: '',
+        isUser: false,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, assistantMessage])
+
       // Continue the conversation with the repo agent
       const conversationHistory = messages.concat(userMessage).map(msg => ({
         role: msg.isUser ? 'user' : 'assistant',
@@ -519,84 +540,79 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         throw new Error('Failed to send message')
       }
 
-      // Handle streaming response
+      // Handle streaming response (following chat-panel-v2 pattern)
       const reader = response.body?.getReader()
       if (!reader) {
         throw new Error('No response stream available')
       }
 
       const decoder = new TextDecoder()
-      let buffer = ''
+      let lineBuffer = ''
+      let accumulatedContent = ''
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          console.log('[RepoAgent] Stream complete')
+          break
+        }
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
+        const chunk = decoder.decode(value, { stream: true })
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop() || ''
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
+        const completeLines = lines.filter(line => line.trim())
 
-            try {
-              const parsed = JSON.parse(data)
-              if (parsed.content) {
-                // Add agent response
-                const agentMessage: Message = {
-                  id: (Date.now() + Math.random()).toString(),
-                  content: parsed.content,
-                  isUser: false,
-                  timestamp: new Date()
-                }
-                setMessages(prev => [...prev, agentMessage])
-              }
+        for (const line of completeLines) {
+          try {
+            const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+            if (!jsonString || jsonString.startsWith(':')) continue
 
-              // Handle tool calls and file changes
-              if (parsed.toolCalls) {
-                parsed.toolCalls.forEach((toolCall: any) => {
-                  if (toolCall.toolName?.startsWith('github_')) {
-                    // Add action log
-                    const actionLog: ActionLog = {
-                      id: Date.now().toString() + Math.random(),
-                      type: toolCall.toolName.includes('file') ? 'file_operation' : 'api_call',
-                      description: `${toolCall.toolName.replace('github_', '').replace('_', ' ')} operation`,
-                      timestamp: new Date(),
-                      success: toolCall.result?.success !== false
-                    }
-                    setActionLogs(prev => [actionLog, ...prev])
+            const parsed = JSON.parse(jsonString)
 
-                    // Handle file changes
-                    if (toolCall.toolName === 'github_write_file' && toolCall.result?.success) {
-                      const fileChange: FileChange = {
-                        path: toolCall.args?.path || 'unknown',
-                        status: 'created',
-                        additions: toolCall.result?.file?.size || 0
-                      }
-                      setFileChanges(prev => [fileChange, ...prev])
-                    } else if (toolCall.toolName === 'github_edit_file' && toolCall.result?.success) {
-                      const fileChange: FileChange = {
-                        path: toolCall.args?.path || 'unknown',
-                        status: 'modified',
-                        additions: toolCall.result?.changes?.diff_length || 0,
-                        diff: toolCall.result?.diff ? toolCall.result.diff.split('\n') : undefined
-                      }
-                      setFileChanges(prev => [fileChange, ...prev])
-                    } else if (toolCall.toolName === 'github_delete_file' && toolCall.result?.success) {
-                      const fileChange: FileChange = {
-                        path: toolCall.args?.path || 'unknown',
-                        status: 'deleted'
-                      }
-                      setFileChanges(prev => [fileChange, ...prev])
-                    }
-                  }
-                })
-              }
-            } catch (parseError) {
-              console.warn('Failed to parse streaming data:', parseError)
+            if (parsed.type === 'text-delta' && parsed.text) {
+              accumulatedContent += parsed.text
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              ))
             }
+            else if (parsed.type === 'tool-call') {
+              const actionLog: ActionLog = {
+                id: Date.now().toString() + Math.random(),
+                type: parsed.toolName?.includes('file') ? 'file_operation' : 'api_call',
+                description: `${parsed.toolName}`,
+                timestamp: new Date(),
+                success: false
+              }
+              setActionLogs(prev => [...prev, actionLog])
+            }
+            else if (parsed.type === 'tool-result') {
+              setActionLogs(prev => prev.map(log => {
+                if (log.description.includes(parsed.toolName)) {
+                  return { ...log, success: true }
+                }
+                return log
+              }))
+
+              if (parsed.toolName === 'github_write_file' && parsed.result?.success) {
+                const fileChange: FileChange = {
+                  path: parsed.args?.path || 'unknown',
+                  status: parsed.result?.created ? 'created' : 'modified'
+                }
+                setFileChanges(prev => [fileChange, ...prev])
+              } else if (parsed.toolName === 'github_delete_file' && parsed.result?.success) {
+                const fileChange: FileChange = {
+                  path: parsed.args?.path || 'unknown',
+                  status: 'deleted'
+                }
+                setFileChanges(prev => [fileChange, ...prev])
+              }
+            }
+          } catch (parseError) {
+            console.warn('[RepoAgent] Parse error:', parseError)
           }
         }
       }
@@ -672,259 +688,146 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     return (
       <TooltipProvider>
         <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
-          <ScrollArea className="flex-1">
-          <div className="container mx-auto px-6 py-8">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent mb-4">
-                PiPilot Repo Agent
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            {/* Hero Section */}
+            <div className="text-center mb-12 max-w-3xl">
+              <h1 className="text-5xl sm:text-6xl font-bold mb-4">
+                <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                  PiPilot Repo Agent
+                </span>
               </h1>
-              <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-                Connect to your GitHub repositories and let AI work directly on your code.
-                Read, edit, create files, and manage your projects with intelligent automation.
+              <p className="text-xl text-gray-400">
+                AI-powered GitHub repository management
               </p>
             </div>
 
-            {/* GitHub Connection Status */}
-            <Card className="mb-6 bg-gray-800 border-gray-700">
-              <CardContent className="p-6">
-                <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Github className="h-5 w-5 text-gray-400" />
-                      <span className="text-gray-300 font-medium">GitHub Connection</span>
-                    </div>
+            {/* Integrated Input Box */}
+            <div className="w-full max-w-4xl">
+              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-2xl p-2">
+                {/* Top Bar with Selectors */}
+                <div className="flex flex-wrap gap-2 items-center mb-3 pb-3 border-b border-gray-700/50">
+                  {/* GitHub Connection Indicator */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-700/50">
+                    <Github className="h-4 w-4 text-gray-400" />
                     {storedTokens.github ? (
-                      <div className="flex items-center space-x-2 text-green-400">
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span className="text-sm">Connected</span>
-                      </div>
+                      <span className="text-xs text-green-400 flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                        Connected
+                      </span>
                     ) : (
-                      <div className="flex items-center space-x-2 text-yellow-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm">Not Connected</span>
-                      </div>
+                      <a href="/workspace/account" className="text-xs text-yellow-400 hover:text-yellow-300">
+                        Connect GitHub
+                      </a>
                     )}
                   </div>
-                  {!storedTokens.github && (
-                    <div className="mt-2 text-sm text-gray-400">
-                      <a href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
-                        Set up your GitHub token in Account Settings →
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Repository Selection */}
-            {storedTokens.github && (
-              <Card className="mb-6 bg-gray-800 border-gray-700">
-                <CardContent className="p-6">
-                  <div>
-                    <Label htmlFor="existing-repo" className="flex items-center space-x-2 text-gray-300">
-                      <span>Select Repository</span>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <HelpCircle className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-gray-700 border-gray-600 text-white">
-                          <p>Choose a repository to work with</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </Label>
-                    <div className="flex space-x-2 mt-1">
-                      <Select
-                        value={selectedRepo}
-                        onValueChange={setSelectedRepo}
-                        disabled={!storedTokens.github || isLoadingRepos}
-                      >
-                        <SelectTrigger className="flex-1 bg-gray-700 border-gray-600 text-white">
-                          <SelectValue placeholder="Select a repository" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-700 border-gray-600">
-                          {repositories.map((repo) => (
-                            <SelectItem
-                              key={repo.full_name}
-                              value={repo.full_name}
-                              className="text-white hover:bg-gray-600"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <span>{repo.full_name}</span>
-                                {repo.private && (
-                                  <Badge variant="secondary" className="text-xs">Private</Badge>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={fetchUserGitHubRepos}
-                        disabled={isLoadingRepos || !storedTokens.github}
-                        className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                      >
-                        {isLoadingRepos ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Refresh to load your latest repositories
-                    </p>
-                  </div>
+                  {/* Repository Selector */}
+                  <Select
+                    value={selectedRepo}
+                    onValueChange={setSelectedRepo}
+                    disabled={!storedTokens.github || isLoadingRepos}
+                  >
+                    <SelectTrigger className="h-9 bg-gray-700/50 border-gray-600/50 text-white text-sm w-[280px]">
+                      <SelectValue placeholder="Select repository" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      {repositories.map((repo) => (
+                        <SelectItem
+                          key={repo.full_name}
+                          value={repo.full_name}
+                          className="text-white hover:bg-gray-700"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="truncate">{repo.full_name}</span>
+                            {repo.private && <Lock className="h-3 w-3 text-gray-400" />}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                  {/* Branch Selection */}
+                  {/* Branch Selector */}
                   {selectedRepo && (
-                    <div className="mt-4">
-                      <Label htmlFor="branch-select" className="flex items-center space-x-2 text-gray-300">
-                        <span>Select Branch</span>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <HelpCircle className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-gray-700 border-gray-600 text-white">
-                            <p>Choose the branch to work with</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </Label>
-                      <div className="flex space-x-2 mt-1">
-                        <Select
-                          value={selectedBranch}
-                          onValueChange={setSelectedBranch}
-                          disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
-                        >
-                          <SelectTrigger className="flex-1 bg-gray-700 border-gray-600 text-white">
-                            <SelectValue placeholder="Select a branch" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-gray-700 border-gray-600">
-                            {branches.map((branch) => (
-                              <SelectItem
-                                key={branch}
-                                value={branch}
-                                className="text-white hover:bg-gray-600"
-                              >
-                                {branch}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => selectedRepo && fetchRepoGitHubBranches(selectedRepo)}
-                          disabled={isLoadingBranches || !selectedRepo || !storedTokens.github}
-                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                        >
-                          {isLoadingBranches ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Task Input */}
-            {storedTokens.github && selectedRepo && (
-              <Card className="bg-gray-800 border-gray-700">
-                <CardContent className="p-6">
-                  <div>
-                    <Label htmlFor="task-input" className="flex items-center space-x-2 text-gray-300">
-                      <span>Task Description</span>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <HelpCircle className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-gray-700 border-gray-600 text-white">
-                          <p>Describe what you want the AI to do with your repository</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </Label>
-                    <Textarea
-                      id="task-input"
-                      value={landingInput}
-                      onChange={(e) => setLandingInput(e.target.value)}
-                      placeholder="e.g., 'Fix the bug in the login component', 'Add a new feature to handle user authentication', 'Refactor the API routes for better performance'..."
-                      rows={4}
-                      className="mt-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="text-sm text-gray-400">
-                      Selected: <span className="font-medium text-gray-200">{selectedRepo}</span>
-                      {selectedBranch && <span className="ml-2">({selectedBranch})</span>}
-                    </div>
-                    <Button
-                      onClick={handleLandingSubmit}
-                      disabled={!landingInput.trim() || isLandingLoading}
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                    <Select
+                      value={selectedBranch}
+                      onValueChange={setSelectedBranch}
+                      disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
                     >
-                      {isLandingLoading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Starting Task...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="h-4 w-4 mr-2" />
-                          Start Repo Agent Task
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      <SelectTrigger className="h-9 bg-gray-700/50 border-gray-600/50 text-white text-sm w-[160px]">
+                        <div className="flex items-center gap-2">
+                          <GitBranch className="h-3.5 w-3.5" />
+                          <SelectValue placeholder="Branch" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {branches.map((branch) => (
+                          <SelectItem key={branch} value={branch} className="text-white hover:bg-gray-700">
+                            {branch}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
-            {/* Features Overview */}
-            <Card className="mt-8 bg-gray-800 border-gray-700">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-semibold text-gray-200 mb-4 text-center">What Can PiPilot Repo Agent Do?</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div className="text-center space-y-2">
-                    <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full w-fit mx-auto">
-                      <Code className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <h4 className="font-semibold text-gray-200">File Operations</h4>
-                    <p className="text-sm text-gray-400">
-                      Read, create, edit, and delete files directly in your repository
-                    </p>
-                  </div>
-
-                  <div className="text-center space-y-2">
-                    <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full w-fit mx-auto">
-                      <GitBranch className="h-6 w-6 text-green-600 dark:text-green-400" />
-                    </div>
-                    <h4 className="font-semibold text-gray-200">Branch Management</h4>
-                    <p className="text-sm text-gray-400">
-                      Create branches, switch contexts, and manage repository structure
-                    </p>
-                  </div>
-
-                  <div className="text-center space-y-2">
-                    <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full w-fit mx-auto">
-                      <Star className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <h4 className="font-semibold text-gray-200">Code Analysis</h4>
-                    <p className="text-sm text-gray-400">
-                      Search code patterns, analyze dependencies, and review changes
-                    </p>
-                  </div>
+                  {/* Refresh Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchUserGitHubRepos}
+                    disabled={isLoadingRepos || !storedTokens.github}
+                    className="h-9 px-2 text-gray-400 hover:text-white hover:bg-gray-700/50"
+                  >
+                    {isLoadingRepos ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-          </ScrollArea>
+
+                {/* Main Input Area */}
+                <div className="relative">
+                  <Textarea
+                    ref={textareaRef}
+                    value={landingInput}
+                    onChange={(e) => setLandingInput(e.target.value)}
+                    placeholder="Describe your task... e.g., 'Fix the authentication bug' or 'Add a new API endpoint'"
+                    className="min-h-[120px] bg-gray-900/50 border-0 text-white placeholder-gray-500 resize-none pr-14 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault()
+                        handleLandingSubmit()
+                      }
+                    }}
+                  />
+                  
+                  {/* Send Button */}
+                  <Button
+                    onClick={handleLandingSubmit}
+                    disabled={!landingInput.trim() || !selectedRepo || isLandingLoading || !storedTokens.github}
+                    className="absolute bottom-3 right-3 h-10 w-10 p-0 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLandingLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
+
+                {/* Hint */}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-700/50">
+                  <span className="text-xs text-gray-500">
+                    Press <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">⌘</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">↵</kbd> to send
+                  </span>
+                  {selectedRepo && (
+                    <span className="text-xs text-gray-500">
+                      {selectedRepo} · {selectedBranch}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
         </div>
       </TooltipProvider>
     )
