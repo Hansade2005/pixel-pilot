@@ -166,7 +166,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   // Set default branch when branches are loaded
   useEffect(() => {
-    if (branches.length > 0 && !selectedBranch) {
+    if (branches.length > 0 && selectedBranch === 'main' && !branches.includes('main')) {
+      setSelectedBranch(branches[0])
+    } else if (branches.length > 0 && !selectedBranch) {
       setSelectedBranch(branches[0])
     }
   }, [branches, selectedBranch])
