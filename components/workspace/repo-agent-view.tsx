@@ -516,9 +516,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         }
       }
 
+      // Final update: ensure the complete accumulated content is in the message
+      console.log('[RepoAgent] Landing stream complete, final content length:', accumulatedContent.length)
+      setMessages(prev => prev.map(msg =>
+        msg.id === agentMessageId
+          ? { ...msg, content: accumulatedContent }
+          : msg
+      ))
+
       // Save initial conversation after first stream completes
       await saveConversationToStorage()
-      setIsLandingLoading(false)
     } catch (error) {
       console.error('Error starting repo agent:', error)
       toast({
@@ -528,6 +535,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       })
       setCurrentView('landing')
       setMessages([])
+    } finally {
       setIsLandingLoading(false)
     }
   }
@@ -659,9 +667,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         }
       }
 
+      // Final update: ensure the complete accumulated content is in the message
+      console.log('[RepoAgent] Stream complete, final content length:', accumulatedContent.length)
+      setMessages(prev => prev.map(msg =>
+        msg.id === assistantMessageId
+          ? { ...msg, content: accumulatedContent }
+          : msg
+      ))
+
       // Save conversation after stream completes
       await saveConversationToStorage()
-      setIsLoading(false)
     } catch (error) {
       console.error('Error sending message:', error)
       toast({
@@ -669,6 +684,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         description: "Failed to send message. Please try again.",
         variant: "destructive"
       })
+    } finally {
       setIsLoading(false)
     }
   }
