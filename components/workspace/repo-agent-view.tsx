@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { createClient } from '@/lib/supabase/client'
 import { getDeploymentTokens } from '@/lib/cloud-sync'
@@ -131,38 +132,38 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const { toast } = useToast()
   const supabase = createClient()
 
-  // Use the repo agent hook for GitHub integration
+  // State for loading and repos/branches
+  const [repositories, setRepositories] = useState<RepoInfo[]>([])
+  const [branches, setBranches] = useState<string[]>([])
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false)
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false)
+
+  // Use the repo agent hook for GitHub connection check only
   const {
     connectionStatus,
-    repositories,
-    branches,
     isLoadingConnection,
-    isLoadingRepos,
-    isLoadingBranches,
     isConnected,
-    checkConnection,
-    fetchRepositories,
-    fetchBranches
+    checkConnection
   } = useRepoAgent()
 
-  // Check connection and load repos on mount
+  // Check connection on mount
   useEffect(() => {
     checkConnection()
   }, [checkConnection])
 
-  // Fetch repositories when connection is established and we have a token
+  // Fetch repositories when we have a stored GitHub token
   useEffect(() => {
-    if (isConnected && storedTokens.github && repositories.length === 0) {
-      fetchRepositories()
+    if (storedTokens.github && repositories.length === 0 && currentView === 'landing') {
+      fetchUserGitHubRepos()
     }
-  }, [isConnected, storedTokens.github, repositories.length, fetchRepositories])
+  }, [storedTokens.github, currentView])
 
   // Fetch branches when repository is selected
   useEffect(() => {
-    if (selectedRepo) {
-      fetchBranches(selectedRepo)
+    if (selectedRepo && storedTokens.github) {
+      fetchRepoGitHubBranches(selectedRepo)
     }
-  }, [selectedRepo, fetchBranches])
+  }, [selectedRepo, storedTokens.github])
 
   // Set default branch when branches are loaded
   useEffect(() => {
@@ -221,10 +222,107 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     }
   }
 
+  // Fetch user's GitHub repositories (following deployment-client pattern)
+  const fetchUserGitHubRepos = async () => {
+    if (!storedTokens.github) {
+      toast({
+        title: "GitHub Not Connected",
+        description: "Please connect your GitHub account in Account Settings first.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsLoadingRepos(true)
+    try {
+      const response = await fetch(`https://api.github.com/user/repos?sort=updated&per_page=100`, {
+        headers: {
+          'Authorization': `Bearer ${storedTokens.github}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch repositories')
+      }
+
+      const repos = await response.json()
+      const formattedRepos: RepoInfo[] = repos.map((repo: any) => ({
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        owner: repo.owner.login,
+        private: repo.private,
+        html_url: repo.html_url,
+        description: repo.description,
+        language: repo.language,
+        updated_at: repo.updated_at,
+        default_branch: repo.default_branch,
+        permissions: {
+          admin: repo.permissions?.admin || false,
+          push: repo.permissions?.push || false,
+          pull: repo.permissions?.pull || false
+        },
+        archived: repo.archived,
+        disabled: repo.disabled
+      }))
+
+      setRepositories(formattedRepos)
+    } catch (error) {
+      console.error('Error fetching GitHub repositories:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch repositories. Please check your connection.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingRepos(false)
+    }
+  }
+
+  // Fetch branches for a repository (following deployment-client pattern)
+  const fetchRepoGitHubBranches = async (repoFullName: string) => {
+    if (!storedTokens.github) return
+
+    setIsLoadingBranches(true)
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repoFullName}/branches?per_page=100`, {
+        headers: {
+          'Authorization': `Bearer ${storedTokens.github}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch branches')
+      }
+
+      const branchesData = await response.json()
+      const branchNames = branchesData.map((branch: any) => branch.name)
+      setBranches(branchNames)
+      
+      // Set default branch if not set
+      if (branchNames.length > 0 && !selectedBranch) {
+        setSelectedBranch(branchNames[0])
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch branches.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingBranches(false)
+    }
+  }
+
   // Load tokens on mount
   useEffect(() => {
     loadStoredTokens()
   }, [])
+
+  // Auto-scroll to bottom of chat
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -278,7 +376,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             content: landingInput
           }],
           repo: selectedRepo,
-          branch: selectedBranch
+          branch: selectedBranch,
+          githubToken: storedTokens.github
         })
       })
 
@@ -411,7 +510,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         body: JSON.stringify({
           messages: conversationHistory,
           repo: selectedRepo,
-          branch: selectedBranch
+          branch: selectedBranch,
+          githubToken: storedTokens.github
         })
       })
 
@@ -571,7 +671,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   if (currentView === 'landing') {
     return (
       <TooltipProvider>
-        <div className="min-h-screen bg-gray-900 text-white">
+        <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
+          <ScrollArea className="flex-1">
           <div className="container mx-auto px-6 py-8">
             {/* Header */}
             <div className="text-center mb-8">
@@ -636,6 +737,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       <Select
                         value={selectedRepo}
                         onValueChange={setSelectedRepo}
+                        disabled={!storedTokens.github || isLoadingRepos}
                       >
                         <SelectTrigger className="flex-1 bg-gray-700 border-gray-600 text-white">
                           <SelectValue placeholder="Select a repository" />
@@ -660,8 +762,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => fetchRepositories()}
-                        disabled={isLoadingRepos}
+                        onClick={fetchUserGitHubRepos}
+                        disabled={isLoadingRepos || !storedTokens.github}
                         className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                       >
                         {isLoadingRepos ? (
@@ -694,6 +796,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         <Select
                           value={selectedBranch}
                           onValueChange={setSelectedBranch}
+                          disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
                         >
                           <SelectTrigger className="flex-1 bg-gray-700 border-gray-600 text-white">
                             <SelectValue placeholder="Select a branch" />
@@ -713,8 +816,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => selectedRepo && fetchBranches(selectedRepo)}
-                          disabled={isLoadingBranches}
+                          onClick={() => selectedRepo && fetchRepoGitHubBranches(selectedRepo)}
+                          disabled={isLoadingBranches || !selectedRepo || !storedTokens.github}
                           className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                         >
                           {isLoadingBranches ? (
@@ -821,6 +924,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               </CardContent>
             </Card>
           </div>
+          </ScrollArea>
         </div>
       </TooltipProvider>
     )
