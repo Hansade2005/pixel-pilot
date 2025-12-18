@@ -690,44 +690,52 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
           <div className="flex-1 flex flex-col items-center justify-center px-6">
             {/* Hero Section */}
-            <div className="text-center mb-12 max-w-3xl">
-              <h1 className="text-5xl sm:text-6xl font-bold mb-4">
+            <div className="text-center mb-8 max-w-3xl">
+              <h1 className="text-5xl sm:text-6xl font-bold mb-3">
                 <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
                   PiPilot Repo Agent
                 </span>
               </h1>
-              <p className="text-xl text-gray-400">
+              <p className="text-lg text-gray-400">
                 AI-powered GitHub repository management
               </p>
             </div>
 
-            {/* Integrated Input Box */}
+            {/* Clean Input Box - Matching Image Design */}
             <div className="w-full max-w-4xl">
-              <div className="bg-gray-800/50 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-2xl p-2">
-                {/* Top Bar with Selectors */}
-                <div className="flex flex-wrap gap-2 items-center mb-3 pb-3 border-b border-gray-700/50">
-                  {/* GitHub Connection Indicator */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-700/50">
-                    <Github className="h-4 w-4 text-gray-400" />
+              <div className="bg-gray-800/60 backdrop-blur-xl rounded-xl border border-gray-700/50 shadow-2xl overflow-hidden">
+                {/* Header Bar with Repo/Branch Info */}
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-900/50 border-b border-gray-700/50">
+                  {/* GitHub Icon + Connection */}
+                  <div className="flex items-center gap-2">
                     {storedTokens.github ? (
-                      <span className="text-xs text-green-400 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                        Connected
-                      </span>
+                      <>
+                        <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                          <Github className="h-4 w-4" />
+                          <span className="text-xs">@</span>
+                          <span className="font-medium text-white">github</span>
+                        </div>
+                      </>
                     ) : (
-                      <a href="/workspace/account" className="text-xs text-yellow-400 hover:text-yellow-300">
-                        Connect GitHub
+                      <a 
+                        href="/workspace/account" 
+                        className="flex items-center gap-2 text-sm text-yellow-400 hover:text-yellow-300"
+                      >
+                        <Github className="h-4 w-4" />
+                        <span>Connect GitHub</span>
                       </a>
                     )}
                   </div>
 
-                  {/* Repository Selector */}
+                  <div className="h-4 w-px bg-gray-700" />
+
+                  {/* Repository Dropdown */}
                   <Select
                     value={selectedRepo}
                     onValueChange={setSelectedRepo}
                     disabled={!storedTokens.github || isLoadingRepos}
                   >
-                    <SelectTrigger className="h-9 bg-gray-700/50 border-gray-600/50 text-white text-sm w-[280px]">
+                    <SelectTrigger className="h-7 bg-transparent border-0 text-white text-sm font-medium hover:bg-gray-700/30 focus:ring-0 w-auto min-w-[200px]">
                       <SelectValue placeholder="Select repository" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
@@ -738,7 +746,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                           className="text-white hover:bg-gray-700"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="truncate">{repo.full_name}</span>
+                            <span>{repo.full_name}</span>
                             {repo.private && <Lock className="h-3 w-3 text-gray-400" />}
                           </div>
                         </SelectItem>
@@ -746,53 +754,60 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     </SelectContent>
                   </Select>
 
-                  {/* Branch Selector */}
+                  {/* Branch Icon */}
                   {selectedRepo && (
-                    <Select
-                      value={selectedBranch}
-                      onValueChange={setSelectedBranch}
-                      disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
-                    >
-                      <SelectTrigger className="h-9 bg-gray-700/50 border-gray-600/50 text-white text-sm w-[160px]">
-                        <div className="flex items-center gap-2">
-                          <GitBranch className="h-3.5 w-3.5" />
+                    <>
+                      <GitBranch className="h-3.5 w-3.5 text-gray-500" />
+                      
+                      {/* Branch Dropdown */}
+                      <Select
+                        value={selectedBranch}
+                        onValueChange={setSelectedBranch}
+                        disabled={!selectedRepo || isLoadingBranches || !storedTokens.github}
+                      >
+                        <SelectTrigger className="h-7 bg-transparent border-0 text-white text-sm hover:bg-gray-700/30 focus:ring-0 w-auto min-w-[100px]">
                           <SelectValue placeholder="Branch" />
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
-                        {branches.map((branch) => (
-                          <SelectItem key={branch} value={branch} className="text-white hover:bg-gray-700">
-                            {branch}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700">
+                          {branches.map((branch) => (
+                            <SelectItem key={branch} value={branch} className="text-white hover:bg-gray-700">
+                              {branch}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
                   )}
 
-                  {/* Refresh Button */}
+                  <div className="flex-1" />
+
+                  {/* Refresh Icon */}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={fetchUserGitHubRepos}
                     disabled={isLoadingRepos || !storedTokens.github}
-                    className="h-9 px-2 text-gray-400 hover:text-white hover:bg-gray-700/50"
+                    className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700/30"
                   >
                     {isLoadingRepos ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw className="h-3.5 w-3.5" />
                     )}
                   </Button>
+
+                  {/* Dollar Sign Icon (decorative) */}
+                  <div className="text-gray-500 text-sm font-mono">$</div>
                 </div>
 
-                {/* Main Input Area */}
-                <div className="relative">
+                {/* Input Area */}
+                <div className="relative p-4">
                   <Textarea
                     ref={textareaRef}
                     value={landingInput}
                     onChange={(e) => setLandingInput(e.target.value)}
-                    placeholder="Describe your task... e.g., 'Fix the authentication bug' or 'Add a new API endpoint'"
-                    className="min-h-[120px] bg-gray-900/50 border-0 text-white placeholder-gray-500 resize-none pr-14 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    placeholder="Describe your coding task or ask a question..."
+                    className="min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault()
@@ -800,34 +815,60 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       }
                     }}
                   />
-                  
-                  {/* Send Button */}
-                  <Button
-                    onClick={handleLandingSubmit}
-                    disabled={!landingInput.trim() || !selectedRepo || isLandingLoading || !storedTokens.github}
-                    className="absolute bottom-3 right-3 h-10 w-10 p-0 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLandingLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </Button>
                 </div>
 
-                {/* Hint */}
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-700/50">
-                  <span className="text-xs text-gray-500">
-                    Press <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">⌘</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">↵</kbd> to send
-                  </span>
-                  {selectedRepo && (
+                {/* Bottom Bar */}
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-900/30 border-t border-gray-700/50">
+                  <div className="flex items-center gap-3">
+                    {/* Action Icons */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-700/30"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-700/30"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-700/30"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-4">
                     <span className="text-xs text-gray-500">
-                      {selectedRepo} · {selectedBranch}
+                      Press <kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Cmd</kbd>+<kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Enter</kbd> to send
                     </span>
-                  )}
+
+                    {/* Send Button */}
+                    <Button
+                      onClick={handleLandingSubmit}
+                      disabled={!landingInput.trim() || !selectedRepo || isLandingLoading || !storedTokens.github}
+                      className="h-9 px-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
+                    >
+                      {isLandingLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>Send</span>
+                          <Send className="h-4 w-4" />
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
         </div>
       </TooltipProvider>
     )
