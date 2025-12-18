@@ -16,6 +16,7 @@ import { getDeploymentTokens } from '@/lib/cloud-sync'
 import { useToast } from '@/hooks/use-toast'
 import { useRepoAgent } from "@/hooks/use-repo-agent"
 import { storageManager } from '@/lib/storage-manager'
+import { Response } from '@/components/ai-elements/response'
 import {
   Send,
   Paperclip,
@@ -44,7 +45,8 @@ import {
   User,
   MessageSquare,
   Zap,
-  HelpCircle
+  HelpCircle,
+  History
 } from 'lucide-react'
 
 interface RepoAgentViewProps {
@@ -118,6 +120,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const [isResizing, setIsResizing] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [isLoadingConversation, setIsLoadingConversation] = useState(false)
+  const [conversationHistory, setConversationHistory] = useState<any[]>([])
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatBodyRef = useRef<HTMLDivElement>(null)
 
@@ -177,6 +181,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     }
   }, [branches, selectedBranch])
 
+  // Load all conversations for current user
+  const loadConversationsList = async () => {
+    if (!userId) return
+    
+    try {
+      await storageManager.init()
+      const allConversations = await storageManager.getAllRepoConversations(userId)
+      // Sort by lastActivity descending
+      const sorted = allConversations.sort((a, b) => 
+        new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+      )
+      setConversationHistory(sorted)
+    } catch (error) {
+      console.error('[RepoAgent] Error loading conversations list:', error)
+    }
+  }
+
   // Load conversation history when repo and branch are selected
   useEffect(() => {
     const loadConversationHistory = async () => {
@@ -222,6 +243,18 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
     loadConversationHistory()
   }, [selectedRepo, selectedBranch, userId, currentView])
+
+  // Load conversations list on mount
+  useEffect(() => {
+    loadConversationsList()
+  }, [userId])
+
+  // Load conversations list on mount
+  useEffect(() => {
+    if (userId) {
+      loadConversationsList()
+    }
+  }, [userId])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -906,12 +939,83 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     )}
                   </Button>
 
-                  {/* Dollar Sign Icon (decorative) */}
-                  <div className="text-gray-500 text-sm font-mono">$</div>
+                  {/* History Dropdown */}
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowHistoryDropdown(!showHistoryDropdown)
+                        if (!showHistoryDropdown) loadConversationsList()
+                      }}
+                      className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700/30"
+                    >
+                      <History className="h-3.5 w-3.5" />
+                    </Button>
+                    
+                    {showHistoryDropdown && (
+                      <div
+                        className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50"
+                        style={{
+                          background: 'rgba(17, 24, 39, 0.95)',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
+                          backdropFilter: 'blur(20px)',
+                          maxHeight: '300px'
+                        }}
+                      >
+                        <div className="p-3 border-b border-blue-500/20">
+                          <p className="text-xs text-gray-400 font-medium">Conversation History</p>
+                        </div>
+                        <div className="overflow-y-auto max-h-64">
+                          {conversationHistory.length === 0 ? (
+                            <div className="p-4 text-center text-gray-500 text-sm">
+                              No conversation history
+                            </div>
+                          ) : (
+                            conversationHistory.map((conv) => {
+                              const firstUserMsg = conv.messages?.find((m: any) => m.role === 'user')
+                              const title = firstUserMsg?.content?.substring(0, 15) + (firstUserMsg?.content?.length > 15 ? '...' : '') || 'Untitled'
+                              const isCurrent = conv.id === conversationId
+                              
+                              return (
+                                <button
+                                  key={conv.id}
+                                  onClick={() => {
+                                    setSelectedRepo(conv.repo)
+                                    setSelectedBranch(conv.branch)
+                                    setShowHistoryDropdown(false)
+                                  }}
+                                  className="w-full text-left p-3 transition-all border-none cursor-pointer hover:bg-blue-500/10"
+                                  style={{
+                                    background: isCurrent ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                                    borderBottom: '1px solid rgba(59, 130, 246, 0.1)'
+                                  }}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <Github className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-white font-medium truncate">{title}</p>
+                                      <p className="text-xs text-gray-400 truncate">{conv.repo} • {conv.branch}</p>
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        {new Date(conv.lastActivity).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Input Area */}
-                <div className="relative p-4">
+                <div className="relative p-4 flex items-center gap-2">
+                  {/* Dollar Sign before input */}
+                  <div className="text-blue-400 text-lg font-mono font-semibold">$</div>
                   <Textarea
                     ref={textareaRef}
                     value={landingInput}
@@ -1080,7 +1184,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           {messages.map(message => (
             <div
               key={message.id}
-              className={`message max-w-[80%] p-4 rounded-2xl leading-relaxed whitespace-pre-wrap text-sm transition-all relative`}
+              className={`message max-w-[80%] p-4 rounded-2xl leading-relaxed text-sm transition-all relative`}
               style={{
                 alignSelf: message.isUser ? 'flex-end' : 'flex-start',
                 background: message.isUser 
@@ -1093,7 +1197,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 animation: 'messageSlide 0.4s ease-out'
               }}
             >
-              {message.content}
+              {message.isUser ? (
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              ) : (
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
+                  <Response>{message.content}</Response>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1112,6 +1222,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
               transition: 'all 0.3s ease'
             }}>
+              <div className="dollar-sign px-3 text-gray-400 text-lg font-semibold">$</div>
               <div className="textarea-wrapper flex-1">
                 <Textarea
                   ref={textareaRef}
