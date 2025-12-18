@@ -19,7 +19,10 @@ import { useToast } from '@/hooks/use-toast'
 import { useRepoAgent } from "@/hooks/use-repo-agent"
 import { storageManager } from '@/lib/storage-manager'
 import { Response } from '@/components/ai-elements/response'
+import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent, ChainOfThoughtStep } from '@/components/ai-elements/chain-of-thought'
+import { Actions, Action } from '@/components/ai-elements/actions'
 import { FileAttachmentDropdown } from '@/components/ui/file-attachment-dropdown'
+import { cn } from '@/lib/utils'
 import {
   Send,
   Paperclip,
@@ -55,7 +58,13 @@ import {
   X,
   StopCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  BrainIcon,
+  Timer,
+  ArrowUp,
+  Trash2,
+  Copy,
+  RotateCcw
 } from 'lucide-react'
 
 interface RepoAgentViewProps {
@@ -87,6 +96,9 @@ interface Message {
   content: string
   isUser: boolean
   timestamp: Date
+  reasoning?: string
+  toolInvocations?: any[]
+  role?: 'user' | 'assistant'
 }
 
 interface FileChange {
@@ -522,6 +534,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       }
       setMessages(prev => [...prev, assistantMessage])
 
+      let accumulatedReasoning = ''
+      let accumulatedToolInvocations: any[] = []
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
@@ -544,29 +559,65 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             const parsed = JSON.parse(jsonString)
             console.log('[RepoAgent] Parsed:', parsed)
 
-            // Handle text deltas (following chat-panel-v2 pattern)
+            // Handle text deltas
             if (parsed.type === 'text-delta' && parsed.text) {
               accumulatedContent += parsed.text
               setMessages(prev => prev.map(msg =>
                 msg.id === agentMessageId
-                  ? { ...msg, content: accumulatedContent }
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
+                  : msg
+              ))
+            }
+            else if (parsed.type === 'reasoning-delta' && parsed.text) {
+              accumulatedReasoning += parsed.text
+              setMessages(prev => prev.map(msg =>
+                msg.id === agentMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
                   : msg
               ))
             }
             // Handle tool calls
             else if (parsed.type === 'tool-call') {
+              accumulatedToolInvocations.push({
+                toolCallId: parsed.toolCallId || Date.now().toString(),
+                toolName: parsed.toolName,
+                args: parsed.args || parsed.input,
+                state: 'call'
+              })
+
               const actionLog: ActionLog = {
-                id: Date.now().toString() + Math.random(),
+                id: parsed.toolCallId || Date.now().toString(),
                 type: parsed.toolName?.includes('file') ? 'file_operation' : 'api_call',
                 description: `${parsed.toolName}`,
                 timestamp: new Date(),
                 success: false
               }
               setActionLogs(prev => [...prev, actionLog])
+
+              setMessages(prev => prev.map(msg =>
+                msg.id === agentMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
+                  : msg
+              ))
             }
             // Handle tool results
             else if (parsed.type === 'tool-result') {
               console.log('[RepoAgent] Tool result:', parsed.toolName, parsed.result)
+
+              const toolIndex = accumulatedToolInvocations.findIndex(t => t.toolCallId === parsed.toolCallId)
+              if (toolIndex !== -1) {
+                accumulatedToolInvocations[toolIndex] = {
+                  ...accumulatedToolInvocations[toolIndex],
+                  state: 'result',
+                  result: parsed.result
+                }
+              }
+
+              setMessages(prev => prev.map(msg =>
+                msg.id === agentMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
+                  : msg
+              ))
 
               // Update action log status
               setActionLogs(prev => prev.map(log => {
@@ -653,7 +704,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       console.log('[RepoAgent] Landing stream complete, final content length:', accumulatedContent.length)
       setMessages(prev => prev.map(msg =>
         msg.id === agentMessageId
-          ? { ...msg, content: accumulatedContent }
+          ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
       ))
 
@@ -754,6 +805,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       const decoder = new TextDecoder()
       let lineBuffer = ''
       let accumulatedContent = ''
+      let accumulatedReasoning = ''
+      let accumulatedToolInvocations: any[] = []
 
       while (true) {
         const { done, value } = await reader.read()
@@ -780,36 +833,78 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               accumulatedContent += parsed.text
               setMessages(prev => prev.map(msg =>
                 msg.id === assistantMessageId
-                  ? { ...msg, content: accumulatedContent }
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
+                  : msg
+              ))
+            }
+            else if (parsed.type === 'reasoning-delta' && parsed.text) {
+              accumulatedReasoning += parsed.text
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
                   : msg
               ))
             }
             else if (parsed.type === 'tool-call') {
+              // Add to tool invocations for the message (AI SDK format)
+              accumulatedToolInvocations.push({
+                toolCallId: parsed.toolCallId || Date.now().toString(),
+                toolName: parsed.toolName,
+                args: parsed.args || parsed.input,
+                state: 'call'
+              })
+
+              // Update sidebar log
               const actionLog: ActionLog = {
-                id: Date.now().toString() + Math.random(),
-                type: parsed.toolName?.includes('file') ? 'file_operation' : 'api_call',
-                description: `${parsed.toolName}`,
+                id: parsed.toolCallId || Date.now().toString(),
+                type: parsed.toolName?.includes('file') || parsed.toolName?.includes('folder') ? 'file_operation' : 'api_call',
+                description: `${parsed.toolName} ${parsed.args?.path ? `(${parsed.args.path})` : ''}`,
                 timestamp: new Date(),
                 success: false
               }
               setActionLogs(prev => [...prev, actionLog])
+
+              // Update message with new tool invocation
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
+                  : msg
+              ))
             }
             else if (parsed.type === 'tool-result') {
               console.log('[RepoAgent] Tool result:', parsed.toolName, parsed.result)
 
+              // Update tool invocation state
+              const toolIndex = accumulatedToolInvocations.findIndex(t => t.toolCallId === parsed.toolCallId)
+              if (toolIndex !== -1) {
+                accumulatedToolInvocations[toolIndex] = {
+                  ...accumulatedToolInvocations[toolIndex],
+                  state: 'result',
+                  result: parsed.result
+                }
+              }
+
+              // Update sidebar log
               setActionLogs(prev => prev.map(log => {
-                if (log.description.includes(parsed.toolName)) {
+                if (log.id === parsed.toolCallId || log.description.includes(parsed.toolName)) {
                   return { ...log, success: parsed.result?.success || false }
                 }
                 return log
               }))
 
+              // Update message
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
+                  : msg
+              ))
+
               // Track file changes for ALL file operation tools
               if (parsed.result?.success) {
                 let fileChange: FileChange | null = null
 
-                // github_write_file - creates or updates files
-                if (parsed.toolName === 'github_write_file') {
+                // github_write_file
+                if (parsed.toolName === 'github_write_file' || parsed.toolName === 'write_file') {
                   fileChange = {
                     path: parsed.result.file?.path || parsed.args?.path || 'unknown',
                     status: parsed.result.action === 'created' ? 'created' : 'modified',
@@ -818,10 +913,10 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
                   }
                 }
-                // github_edit_file - edits existing files with search/replace
-                else if (parsed.toolName === 'github_edit_file') {
+                // github_edit_file
+                else if (parsed.toolName === 'github_edit_file' || parsed.toolName === 'edit_file') {
                   fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    path: parsed.result.file?.path || parsed.args?.path || parsed.args?.filePath || 'unknown',
                     status: 'modified',
                     additions: parsed.result.changes?.new_length || 0,
                     deletions: parsed.result.changes?.old_length || 0,
@@ -832,10 +927,10 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     ]
                   }
                 }
-                // github_replace_string - replaces strings in files
-                else if (parsed.toolName === 'github_replace_string') {
+                // github_replace_string
+                else if (parsed.toolName === 'github_replace_string' || parsed.toolName === 'client_replace_string_in_file') {
                   fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    path: parsed.result.file?.path || parsed.args?.path || parsed.args?.filePath || 'unknown',
                     status: 'modified',
                     additions: parsed.result.changes?.new_length || 0,
                     deletions: parsed.result.changes?.old_length || 0,
@@ -846,8 +941,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     ]
                   }
                 }
-                // github_delete_file - deletes files
-                else if (parsed.toolName === 'github_delete_file') {
+                // github_delete_file
+                else if (parsed.toolName === 'github_delete_file' || parsed.toolName === 'delete_file') {
                   fileChange = {
                     path: parsed.args?.path || 'unknown',
                     status: 'deleted',
@@ -859,7 +954,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 if (fileChange) {
                   console.log('[RepoAgent] Adding file change:', fileChange)
                   setFileChanges(prev => {
-                    // Check if this file is already tracked, update it instead of duplicating
                     const existingIndex = prev.findIndex(fc => fc.path === fileChange!.path)
                     if (existingIndex >= 0) {
                       const updated = [...prev]
@@ -877,11 +971,11 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         }
       }
 
-      // Final update: ensure the complete accumulated content is in the message
+      // Final update
       console.log('[RepoAgent] Stream complete, final content length:', accumulatedContent.length)
       setMessages(prev => prev.map(msg =>
         msg.id === assistantMessageId
-          ? { ...msg, content: accumulatedContent }
+          ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
       ))
 
@@ -1125,6 +1219,36 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isResizing])
+
+  // Message Action Handlers
+  const handleCopyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      toast({ title: 'Copied', description: 'Message copied to clipboard' })
+    } catch (err) {
+      toast({ title: 'Copy failed', variant: 'destructive' })
+    }
+  }
+
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages(prev => prev.filter(msg => msg.id !== messageId))
+  }
+
+  const handleRetryMessage = (messageId: string, content: string) => {
+    // Delete this message and all subsequent ones
+    const messageIndex = messages.findIndex(msg => msg.id === messageId)
+    if (messageIndex !== -1) {
+      setMessages(prev => prev.slice(0, messageIndex)) // Remove the user message too
+    }
+    // Set input and focus
+    if (currentView === 'landing') {
+      setLandingInput(content)
+    } else {
+      setCurrentInput(content)
+    }
+    // Focus happens automatically via autofocus or effect if we set input?
+  }
+
 
   if (currentView === 'landing') {
     return (
@@ -1375,7 +1499,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         style={{
           flex: `0 0 ${chatWidth}%`,
           background: 'linear-gradient(180deg, #0a0e14 0%, #0d1117 100%)',
-          borderRight: '1px solid rgba(59, 130, 246, 0.1)',
+          borderRight: '1px solid rgba(59, 131, 246, 0)',
           boxShadow: '4px 0 40px rgba(0, 0, 0, 0.5)',
           position: 'relative',
           minWidth: '320px',
@@ -1457,7 +1581,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             paddingBottom: '160px'
           }}
         >
-          {messages.map(message => {
+          {messages.map((message, index) => {
             const isLongMessage = message.isUser && message.content.length > 200
             const isExpanded = expandedMessages[message.id]
             const displayContent = isLongMessage && !isExpanded
@@ -1481,7 +1605,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 }}
               >
                 {message.isUser ? (
-                  <div>
+                  <div className="group">
                     <div className="whitespace-pre-wrap">{displayContent}</div>
                     {isLongMessage && (
                       <button
@@ -1501,10 +1625,63 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         )}
                       </button>
                     )}
+
+                    {/* User Action Buttons */}
+                    <div className="flex justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Actions>
+                        <Action tooltip="Retry message" onClick={() => handleRetryMessage(message.id, message.content)}>
+                          <ArrowUp className="w-4 h-4" />
+                        </Action>
+                        <Action tooltip="Copy message" onClick={() => handleCopyMessage(message.content)}>
+                          <Copy className="w-4 h-4" />
+                        </Action>
+                        <Action tooltip="Delete message" onClick={() => handleDeleteMessage(message.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Action>
+                      </Actions>
+                    </div>
                   </div>
                 ) : (
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
-                    <Response>{message.content}</Response>
+                  <div className="group w-full max-w-full overflow-hidden">
+                    <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
+                      {message.reasoning && (
+                        <div className="mb-4 not-prose">
+                          <ChainOfThought defaultOpen={false}>
+                            <ChainOfThoughtHeader>
+                              {isStreaming && index === messages.length - 1
+                                ? "PiPilot is working"
+                                : "PiPilot worked for a moment"
+                              }
+                            </ChainOfThoughtHeader>
+                            <ChainOfThoughtContent>
+                              <ChainOfThoughtStep
+                                icon={BrainIcon}
+                                label="Thinking Process"
+                                status={isStreaming && index === messages.length - 1 && !message.content ? "active" : "complete"}
+                              >
+                                <div className="prose prose-sm dark:prose-invert max-w-none mt-2 text-muted-foreground">
+                                  <Response>{message.reasoning}</Response>
+                                </div>
+                              </ChainOfThoughtStep>
+                            </ChainOfThoughtContent>
+                          </ChainOfThought>
+                        </div>
+                      )}
+                      <Response>{message.content}</Response>
+
+                    </div>
+
+                    {/* Assistant Action Buttons */}
+                    <div className="flex justify-end mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Actions>
+                        <Action tooltip="Copy message" onClick={() => handleCopyMessage(message.content)}>
+                          <Copy className="w-4 h-4" />
+                        </Action>
+                        <Action tooltip="Delete message" onClick={() => handleDeleteMessage(message.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Action>
+                      </Actions>
+                    </div>
                   </div>
                 )}
               </div>
