@@ -42,8 +42,10 @@ interface ConnectionStatus {
 interface RepoAgentState {
   connectionStatus: ConnectionStatus | null
   repositories: GitHubRepo[]
+  branches: string[]
   isLoadingConnection: boolean
   isLoadingRepos: boolean
+  isLoadingBranches: boolean
   error: string | null
 }
 
@@ -51,8 +53,10 @@ export function useRepoAgent() {
   const [state, setState] = useState<RepoAgentState>({
     connectionStatus: null,
     repositories: [],
+    branches: [],
     isLoadingConnection: false,
     isLoadingRepos: false,
+    isLoadingBranches: false,
     error: null
   })
 
@@ -147,6 +151,56 @@ export function useRepoAgent() {
     }
   }, [])
 
+  // Fetch branches for a specific repository
+  const fetchBranches = useCallback(async (repoFullName: string): Promise<string[]> => {
+    if (!repoFullName) return []
+
+    setState(prev => ({ ...prev, isLoadingBranches: true, error: null }))
+
+    try {
+      const response = await fetch(`/api/repo-agent/branches?repo=${encodeURIComponent(repoFullName)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Failed to fetch branches')
+      }
+
+      const data = await response.json()
+
+      const branches = data.branches || []
+
+      setState(prev => ({
+        ...prev,
+        branches,
+        isLoadingBranches: false
+      }))
+
+      return branches
+    } catch (error: any) {
+      const errorMessage = error.message || 'Failed to fetch branches'
+      console.error('Error fetching branches:', error)
+
+      setState(prev => ({
+        ...prev,
+        isLoadingBranches: false,
+        error: errorMessage
+      }))
+
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
+      })
+
+      return []
+    }
+  }, [])
+
   // Refresh both connection and repositories
   const refresh = useCallback(async () => {
     const connected = await checkConnection()
@@ -159,14 +213,17 @@ export function useRepoAgent() {
     // State
     connectionStatus: state.connectionStatus,
     repositories: state.repositories,
+    branches: state.branches,
     isLoadingConnection: state.isLoadingConnection,
     isLoadingRepos: state.isLoadingRepos,
+    isLoadingBranches: state.isLoadingBranches,
     error: state.error,
     isConnected: state.connectionStatus?.connected || false,
 
     // Actions
     checkConnection,
     fetchRepositories,
+    fetchBranches,
     refresh
   }
 }
