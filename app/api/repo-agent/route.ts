@@ -239,6 +239,7 @@ const escapeRegExp = (string: string): string => {
 }
 
 export async function POST(req: Request) {
+  let requestId = crypto.randomUUID()
   let startTime = Date.now()
   let authContext: any = null
 
@@ -248,6 +249,8 @@ export async function POST(req: Request) {
   let currentRepo: string | undefined
   let currentBranch: string = 'main'
   let githubToken: string | undefined
+
+  console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🚀 Incoming POST request at ${new Date().toISOString()}`)
 
   try {
     // ============================================================================
@@ -286,6 +289,13 @@ export async function POST(req: Request) {
 
     // Parse request body
     const body = await req.json()
+    console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Request body received:`, {
+      messages: body.messages?.length || 0,
+      repo: body.repo,
+      branch: body.branch || 'main',
+      modelId: body.modelId,
+      lastMessagePreview: body.messages?.[body.messages.length - 1]?.content?.substring(0, 100)
+    })
     ;({
       messages,
       modelId,
@@ -295,16 +305,21 @@ export async function POST(req: Request) {
     } = body)
 
     if (!messages || !Array.isArray(messages)) {
+      console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Invalid request: Messages array is required`)
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
     }
 
     if (!currentRepo) {
+      console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Invalid request: Repository is required`)
       return NextResponse.json({ error: 'Repository is required' }, { status: 400 })
     }
 
     if (!githubToken) {
+      console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Invalid request: GitHub token is required`)
       return NextResponse.json({ error: 'GitHub token is required' }, { status: 400 })
     }
+
+    console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ Request validation passed - Repo: ${currentRepo}, Branch: ${currentBranch}, Model: ${modelId}`)
 
     // Initialize Octokit client
     const octokit = createOctokitClient(githubToken)
@@ -335,13 +350,14 @@ export async function POST(req: Request) {
           per_page: z.number().min(1).max(100).optional().describe('Number of results per page')
         }),
         execute: async ({ type = 'all', sort = 'updated', per_page = 30 }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_list_repos - Input:`, { type, sort, per_page })
           try {
             const response = await octokit.rest.repos.listForAuthenticatedUser({
               type,
               sort,
               per_page
             })
-            return {
+            const result = {
               success: true,
               repositories: response.data.map(repo => ({
                 name: repo.name,
@@ -353,10 +369,14 @@ export async function POST(req: Request) {
                 updated_at: repo.updated_at
               }))
             }
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_list_repos completed - Found ${result.repositories.length} repositories`)
+            return result
           } catch (error) {
+            const errorMsg = `Failed to list repositories: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_list_repos failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to list repositories: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
@@ -368,11 +388,12 @@ export async function POST(req: Request) {
           repo: z.string().describe('Repository in format "owner/repo"')
         }),
         execute: async ({ repo }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_get_repo_info - Input:`, { repo })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
             const response = await octokit.rest.repos.get({ owner, repo: repoName })
 
-            return {
+            const result = {
               success: true,
               repository: {
                 name: response.data.name,
@@ -389,10 +410,14 @@ export async function POST(req: Request) {
                 updated_at: response.data.updated_at
               }
             }
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_get_repo_info completed - Repo: ${result.repository.full_name}`)
+            return result
           } catch (error) {
+            const errorMsg = `Failed to get repository info: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_get_repo_info failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to get repository info: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
@@ -407,6 +432,7 @@ export async function POST(req: Request) {
           branch: z.string().optional().describe('Branch name, defaults to repository default')
         }),
         execute: async ({ repo, path, branch }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_read_file - Input:`, { repo, path, branch: branch || 'default' })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
             const response = await octokit.rest.repos.getContent({
@@ -418,7 +444,7 @@ export async function POST(req: Request) {
 
             if (Array.isArray(response.data)) {
               // It's a directory
-              return {
+              const result = {
                 success: true,
                 type: 'directory',
                 contents: response.data.map(item => ({
@@ -429,12 +455,14 @@ export async function POST(req: Request) {
                   download_url: item.download_url
                 }))
               }
+              console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_read_file completed - Directory: ${path} with ${result.contents.length} items`)
+              return result
             } else {
               // It's a file - type check before accessing properties
               const fileData = response.data as any
               if (fileData.type === 'file' && fileData.content && fileData.encoding) {
                 const content = Buffer.from(fileData.content, 'base64').toString('utf-8')
-                return {
+                const result = {
                   success: true,
                   type: 'file',
                   path: fileData.path,
@@ -444,7 +472,10 @@ export async function POST(req: Request) {
                   encoding: fileData.encoding,
                   sha: fileData.sha
                 }
+                console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_read_file completed - File: ${path} (${result.size} bytes)`)
+                return result
               } else {
+                console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_read_file failed - Invalid file response`)
                 return {
                   success: false,
                   error: 'Invalid file response from GitHub API'
@@ -452,9 +483,11 @@ export async function POST(req: Request) {
               }
             }
           } catch (error) {
+            const errorMsg = `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_read_file failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
@@ -470,6 +503,7 @@ export async function POST(req: Request) {
           branch: z.string().optional().describe('Branch name, defaults to repository default')
         }),
         execute: async ({ repo, path, content, message, branch }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_write_file - Input:`, { repo, path, messageLen: message.length, contentLen: content.length, branch: branch || 'default' })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
 
@@ -499,7 +533,7 @@ export async function POST(req: Request) {
               branch
             })
 
-            return {
+            const result = {
               success: true,
               commit: {
                 sha: response.data.commit.sha,
@@ -512,10 +546,14 @@ export async function POST(req: Request) {
                 sha: response.data.content?.sha
               }
             }
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_write_file completed - File: ${path}, Commit: ${result.commit.sha?.slice(0, 8) || 'unknown'}`)
+            return result
           } catch (error) {
+            const errorMsg = `Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_write_file failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to write file: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
@@ -530,6 +568,7 @@ export async function POST(req: Request) {
           branch: z.string().optional().describe('Branch name, defaults to repository default')
         }),
         execute: async ({ repo, path, message, branch }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_delete_file - Input:`, { repo, path, message, branch: branch || 'default' })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
 
@@ -542,6 +581,7 @@ export async function POST(req: Request) {
             })
 
             if (Array.isArray(existingFile.data)) {
+              console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_delete_file failed - Cannot delete directory: ${path}`)
               return {
                 success: false,
                 error: 'Cannot delete a directory'
@@ -557,7 +597,7 @@ export async function POST(req: Request) {
               branch
             })
 
-            return {
+            const result = {
               success: true,
               commit: {
                 sha: response.data.commit.sha,
@@ -565,10 +605,14 @@ export async function POST(req: Request) {
                 url: response.data.commit.html_url
               }
             }
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_delete_file completed - File: ${path}, Commit: ${result.commit.sha?.slice(0, 8) || 'unknown'}`)
+            return result
           } catch (error) {
+            const errorMsg = `Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_delete_file failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
@@ -1385,6 +1429,7 @@ export async function POST(req: Request) {
     }
 
     // Stream the response
+    console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🤖 Starting streamText with ${messages.length} messages`)
     const result = await streamText({
       model,
       system: systemPrompt,
@@ -1392,14 +1437,13 @@ export async function POST(req: Request) {
       tools,
       stopWhen: stepCountIs(60),
       onFinish: async (result) => {
-        console.log('[RepoAgent] Stream finished')
+        const responseTime = Date.now() - startTime
+        console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ Stream finished in ${responseTime}ms - Total tokens: ${result.usage.totalTokens}`)
 
         // ============================================================================
         // ABE BILLING - Deduct credits for successful request
         // ============================================================================
         if (authContext) {
-          const responseTime = Date.now() - startTime
-
           const billingResult = await processRequestBilling({
             userId: authContext.userId,
             model: modelId || DEFAULT_CHAT_MODEL,
@@ -1411,10 +1455,10 @@ export async function POST(req: Request) {
 
           if (billingResult.success) {
             console.log(
-              `[RepoAgent] 💰 Deducted ${billingResult.creditsUsed} credits. New balance: ${billingResult.newBalance} credits (${Math.floor((billingResult.newBalance || 0) / CREDITS_PER_MESSAGE)} messages remaining)`
+              `[RepoAgent:${requestId.slice(0, 8)}] 💰 Deducted ${billingResult.creditsUsed} credits. New balance: ${billingResult.newBalance} credits (${Math.floor((billingResult.newBalance || 0) / CREDITS_PER_MESSAGE)} messages remaining)`
             )
           } else {
-            console.error(`[RepoAgent] ⚠️ Failed to deduct credits:`, billingResult.error)
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ⚠️ Failed to deduct credits:`, billingResult.error)
           }
         }
       }
@@ -1429,11 +1473,26 @@ export async function POST(req: Request) {
           try {
             // Stream the text and tool calls
             for await (const part of result.fullStream) {
+              // Log tool calls and deltas
+              if (part.type === 'tool-call') {
+                console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔨 Tool call initiated:`, {
+                  toolName: (part as any).toolName,
+                  toolCallId: (part as any).toolCallId
+                })
+              } else if (part.type === 'tool-result') {
+                console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🎯 Tool result received:`, {
+                  toolName: (part as any).toolName,
+                  toolCallId: (part as any).toolCallId,
+                  resultPreview: JSON.stringify((part as any).result).substring(0, 100)
+                })
+              } else if (part.type === 'text-delta') {
+                // Text deltas are frequent, just count them silently
+              }
               // Send each part as newline-delimited JSON (no SSE "data:" prefix)
               controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
             }
           } catch (error) {
-            console.error('[RepoAgent] Stream error:', error)
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Stream error:`, error)
           } finally {
             controller.close()
           }
@@ -1449,13 +1508,19 @@ export async function POST(req: Request) {
     )
 
   } catch (error: any) {
-    console.error('[RepoAgent] Error:', error)
+    const responseTime = Date.now() - startTime
+    console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Error in POST handler (${responseTime}ms):`, {
+      message: error?.message,
+      code: error?.code,
+      status: error?.status,
+      repo: currentRepo,
+      branch: currentBranch
+    })
 
     // ============================================================================
     // ABE BILLING - Log failed request (no charge)
     // ============================================================================
     if (authContext) {
-      const responseTime = Date.now() - startTime
       await processRequestBilling({
         userId: authContext.userId,
         model: modelId || DEFAULT_CHAT_MODEL,
