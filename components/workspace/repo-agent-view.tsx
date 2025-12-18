@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { createClient } from '@/lib/supabase/client'
 import { getDeploymentTokens } from '@/lib/cloud-sync'
 import { useToast } from '@/hooks/use-toast'
@@ -48,7 +49,13 @@ import {
   MessageSquare,
   Zap,
   HelpCircle,
-  History
+  History,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  X,
+  StopCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 interface RepoAgentViewProps {
@@ -98,6 +105,15 @@ interface ActionLog {
   success: boolean
 }
 
+interface Attachment {
+  id: string
+  type: 'file' | 'image' | 'url'
+  name: string
+  content?: string
+  url?: string
+  size?: number
+}
+
 export function RepoAgentView({ userId }: RepoAgentViewProps) {
   // Landing page state
   const [currentView, setCurrentView] = useState<'landing' | 'workspace'>('landing')
@@ -127,6 +143,22 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatBodyRef = useRef<HTMLDivElement>(null)
+
+  // Attachment state
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [showFileDialog, setShowFileDialog] = useState(false)
+  const [showImageDialog, setShowImageDialog] = useState(false)
+  const [showUrlDialog, setShowUrlDialog] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // Streaming control
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamController, setStreamController] = useState<AbortController | null>(null)
+
+  // Message expansion state
+  const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({})
 
   // GitHub tokens state (following deployment client pattern)
   const [storedTokens, setStoredTokens] = useState<{
@@ -187,12 +219,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   // Load all conversations for current user
   const loadConversationsList = async () => {
     if (!userId) return
-    
+
     try {
       await storageManager.init()
       const allConversations = await storageManager.getAllRepoConversations(userId)
       // Sort by lastActivity descending
-      const sorted = allConversations.sort((a, b) => 
+      const sorted = allConversations.sort((a, b) =>
         new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
       )
       setConversationHistory(sorted)
@@ -210,7 +242,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       try {
         await storageManager.init()
         const conversation = await storageManager.getRepoConversation(selectedRepo, selectedBranch, userId)
-        
+
         if (conversation) {
           console.log('[RepoAgent] Loaded conversation history:', conversation.messages.length, 'messages')
           setConversationId(conversation.id)
@@ -385,7 +417,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       const branchesData = await response.json()
       const branchNames = branchesData.map((branch: any) => branch.name)
       setBranches(branchNames)
-      
+
       // Set default branch if not set
       if (branchNames.length > 0 && !selectedBranch) {
         setSelectedBranch(branchNames[0])
@@ -480,7 +512,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       let lineBuffer = ''
       let accumulatedContent = ''
       const agentMessageId = (Date.now() + 1).toString()
-      
+
       // Create placeholder assistant message
       const assistantMessage: Message = {
         id: agentMessageId,
@@ -534,27 +566,81 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             }
             // Handle tool results
             else if (parsed.type === 'tool-result') {
+              console.log('[RepoAgent] Tool result:', parsed.toolName, parsed.result)
+
               // Update action log status
               setActionLogs(prev => prev.map(log => {
                 if (log.description.includes(parsed.toolName)) {
-                  return { ...log, success: true }
+                  return { ...log, success: parsed.result?.success || false }
                 }
                 return log
               }))
 
-              // Track file changes
-              if (parsed.toolName === 'github_write_file' && parsed.result?.success) {
-                const fileChange: FileChange = {
-                  path: parsed.args?.path || 'unknown',
-                  status: parsed.result?.created ? 'created' : 'modified'
+              // Track file changes for ALL file operation tools
+              if (parsed.result?.success) {
+                let fileChange: FileChange | null = null
+
+                // github_write_file - creates or updates files
+                if (parsed.toolName === 'github_write_file') {
+                  fileChange = {
+                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    status: parsed.result.action === 'created' ? 'created' : 'modified',
+                    additions: parsed.result.changes?.new_length || 0,
+                    deletions: parsed.result.changes?.old_length || 0,
+                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
+                  }
                 }
-                setFileChanges(prev => [fileChange, ...prev])
-              } else if (parsed.toolName === 'github_delete_file' && parsed.result?.success) {
-                const fileChange: FileChange = {
-                  path: parsed.args?.path || 'unknown',
-                  status: 'deleted'
+                // github_edit_file - edits existing files with search/replace
+                else if (parsed.toolName === 'github_edit_file') {
+                  fileChange = {
+                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    status: 'modified',
+                    additions: parsed.result.changes?.new_length || 0,
+                    deletions: parsed.result.changes?.old_length || 0,
+                    diff: [
+                      `Commit: ${parsed.result.commit?.message || 'File edited'}`,
+                      `Replacements: ${parsed.result.replacements_made || 0}`,
+                      `Size change: ${parsed.result.changes?.diff_length || 0} bytes`
+                    ]
+                  }
                 }
-                setFileChanges(prev => [fileChange, ...prev])
+                // github_replace_string - replaces strings in files
+                else if (parsed.toolName === 'github_replace_string') {
+                  fileChange = {
+                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    status: 'modified',
+                    additions: parsed.result.changes?.new_length || 0,
+                    deletions: parsed.result.changes?.old_length || 0,
+                    diff: [
+                      `Commit: ${parsed.result.commit?.message || 'String replaced'}`,
+                      `Replacements: ${parsed.result.replacements_made || 0}`,
+                      `Size change: ${parsed.result.changes?.diff || 0} bytes`
+                    ]
+                  }
+                }
+                // github_delete_file - deletes files
+                else if (parsed.toolName === 'github_delete_file') {
+                  fileChange = {
+                    path: parsed.args?.path || 'unknown',
+                    status: 'deleted',
+                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
+                  }
+                }
+
+                // Add file change to state if we captured one
+                if (fileChange) {
+                  console.log('[RepoAgent] Adding file change:', fileChange)
+                  setFileChanges(prev => {
+                    // Check if this file is already tracked, update it instead of duplicating
+                    const existingIndex = prev.findIndex(fc => fc.path === fileChange!.path)
+                    if (existingIndex >= 0) {
+                      const updated = [...prev]
+                      updated[existingIndex] = fileChange!
+                      return updated
+                    }
+                    return [fileChange!, ...prev]
+                  })
+                }
               }
             }
           } catch (parseError) {
@@ -588,18 +674,39 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   }
 
   const sendMessage = async (content: string) => {
-    if (!content.trim()) return
+    if (!content.trim() && attachments.length === 0) return
+
+    // Build message content with attachments
+    let messageContent = content
+    if (attachments.length > 0) {
+      messageContent += '\n\n**Attachments:**\n'
+      attachments.forEach(att => {
+        if (att.type === 'file') {
+          messageContent += `\n### File: ${att.name}\n\`\`\`\n${att.content}\n\`\`\`\n`
+        } else if (att.type === 'image') {
+          messageContent += `\n![${att.name}](${att.content})\n`
+        } else if (att.type === 'url') {
+          messageContent += `\n- [${att.url}](${att.url})\n`
+        }
+      })
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content,
+      content: messageContent,
       isUser: true,
       timestamp: new Date()
     }
 
     setMessages(prev => [...prev, userMessage])
     setCurrentInput('')
+    setAttachments([]) // Clear attachments after sending
     setIsLoading(true)
+    setIsStreaming(true)
+
+    // Create abort controller for stream cancellation
+    const controller = new AbortController()
+    setStreamController(controller)
 
     try {
       // Create placeholder assistant message
@@ -630,7 +737,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           repo: selectedRepo,
           branch: selectedBranch,
           githubToken: storedTokens.github
-        })
+        }),
+        signal: controller.signal
       })
 
       if (!response.ok) {
@@ -687,25 +795,80 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               setActionLogs(prev => [...prev, actionLog])
             }
             else if (parsed.type === 'tool-result') {
+              console.log('[RepoAgent] Tool result:', parsed.toolName, parsed.result)
+
               setActionLogs(prev => prev.map(log => {
                 if (log.description.includes(parsed.toolName)) {
-                  return { ...log, success: true }
+                  return { ...log, success: parsed.result?.success || false }
                 }
                 return log
               }))
 
-              if (parsed.toolName === 'github_write_file' && parsed.result?.success) {
-                const fileChange: FileChange = {
-                  path: parsed.args?.path || 'unknown',
-                  status: parsed.result?.created ? 'created' : 'modified'
+              // Track file changes for ALL file operation tools
+              if (parsed.result?.success) {
+                let fileChange: FileChange | null = null
+
+                // github_write_file - creates or updates files
+                if (parsed.toolName === 'github_write_file') {
+                  fileChange = {
+                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    status: parsed.result.action === 'created' ? 'created' : 'modified',
+                    additions: parsed.result.changes?.new_length || 0,
+                    deletions: parsed.result.changes?.old_length || 0,
+                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
+                  }
                 }
-                setFileChanges(prev => [fileChange, ...prev])
-              } else if (parsed.toolName === 'github_delete_file' && parsed.result?.success) {
-                const fileChange: FileChange = {
-                  path: parsed.args?.path || 'unknown',
-                  status: 'deleted'
+                // github_edit_file - edits existing files with search/replace
+                else if (parsed.toolName === 'github_edit_file') {
+                  fileChange = {
+                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    status: 'modified',
+                    additions: parsed.result.changes?.new_length || 0,
+                    deletions: parsed.result.changes?.old_length || 0,
+                    diff: [
+                      `Commit: ${parsed.result.commit?.message || 'File edited'}`,
+                      `Replacements: ${parsed.result.replacements_made || 0}`,
+                      `Size change: ${parsed.result.changes?.diff_length || 0} bytes`
+                    ]
+                  }
                 }
-                setFileChanges(prev => [fileChange, ...prev])
+                // github_replace_string - replaces strings in files
+                else if (parsed.toolName === 'github_replace_string') {
+                  fileChange = {
+                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
+                    status: 'modified',
+                    additions: parsed.result.changes?.new_length || 0,
+                    deletions: parsed.result.changes?.old_length || 0,
+                    diff: [
+                      `Commit: ${parsed.result.commit?.message || 'String replaced'}`,
+                      `Replacements: ${parsed.result.replacements_made || 0}`,
+                      `Size change: ${parsed.result.changes?.diff || 0} bytes`
+                    ]
+                  }
+                }
+                // github_delete_file - deletes files
+                else if (parsed.toolName === 'github_delete_file') {
+                  fileChange = {
+                    path: parsed.args?.path || 'unknown',
+                    status: 'deleted',
+                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
+                  }
+                }
+
+                // Add file change to state if we captured one
+                if (fileChange) {
+                  console.log('[RepoAgent] Adding file change:', fileChange)
+                  setFileChanges(prev => {
+                    // Check if this file is already tracked, update it instead of duplicating
+                    const existingIndex = prev.findIndex(fc => fc.path === fileChange!.path)
+                    if (existingIndex >= 0) {
+                      const updated = [...prev]
+                      updated[existingIndex] = fileChange!
+                      return updated
+                    }
+                    return [fileChange!, ...prev]
+                  })
+                }
               }
             }
           } catch (parseError) {
@@ -725,14 +888,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       // Save conversation after stream completes
       await saveConversationToStorage()
     } catch (error) {
-      console.error('Error sending message:', error)
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive"
-      })
+      // Handle abort separately - don't show error toast for user-initiated stops
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[RepoAgent] Stream aborted by user')
+        // Save partial message when aborted
+        await saveConversationToStorage()
+      } else {
+        console.error('Error sending message:', error)
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive"
+        })
+      }
     } finally {
       setIsLoading(false)
+      setIsStreaming(false)
+      setStreamController(null)
     }
   }
 
@@ -742,7 +914,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
     try {
       await storageManager.init()
-      
+
       // Convert messages to storage format
       const storageMessages = messages.map(msg => ({
         id: msg.id,
@@ -781,6 +953,130 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     setFileChanges([])
     setActionLogs([])
     setLandingInput('')
+    setAttachments([])
+  }
+
+  // Attachment handlers
+  const handleFileAttach = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+
+      // Check file size (max 1MB)
+      if (file.size > 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds 1MB limit`,
+          variant: "destructive"
+        })
+        continue
+      }
+
+      const reader = new FileReader()
+
+      reader.onload = (e) => {
+        const content = e.target?.result as string
+        setAttachments(prev => [...prev, {
+          id: Date.now().toString() + i,
+          type: 'file',
+          name: file.name,
+          content,
+          size: file.size
+        }])
+      }
+
+      reader.readAsText(file)
+    }
+
+    setShowFileDialog(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleImageAttach = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+
+      // Check file size (max 5MB for images)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Image too large",
+          description: `${file.name} exceeds 5MB limit`,
+          variant: "destructive"
+        })
+        continue
+      }
+
+      const reader = new FileReader()
+
+      reader.onload = (e) => {
+        const content = e.target?.result as string
+        setAttachments(prev => [...prev, {
+          id: Date.now().toString() + i,
+          type: 'image',
+          name: file.name,
+          content,
+          size: file.size
+        }])
+      }
+
+      reader.readAsDataURL(file)
+    }
+
+    setShowImageDialog(false)
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ''
+    }
+  }
+
+  const handleUrlAttach = () => {
+    if (!urlInput.trim()) return
+
+    setAttachments(prev => [...prev, {
+      id: Date.now().toString(),
+      type: 'url',
+      name: urlInput,
+      url: urlInput
+    }])
+
+    setUrlInput('')
+    setShowUrlDialog(false)
+  }
+
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== id))
+  }
+
+  // Stop streaming handler
+  const handleStopStream = async () => {
+    if (streamController) {
+      streamController.abort()
+      setStreamController(null)
+    }
+    setIsStreaming(false)
+    setIsLoading(false)
+    setIsLandingLoading(false)
+
+    // Save the partial message that was already streamed
+    await saveConversationToStorage()
+
+    toast({
+      title: "Stream stopped",
+      description: "Partial response has been saved",
+      variant: "default"
+    })
+  }
+
+  // Toggle message expansion
+  const toggleMessageExpansion = (messageId: string) => {
+    setExpandedMessages(prev => ({
+      ...prev,
+      [messageId]: !prev[messageId]
+    }))
   }
 
   const toggleDiff = (filePath: string) => {
@@ -863,8 +1159,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         </div>
                       </>
                     ) : (
-                      <a 
-                        href="/workspace/account" 
+                      <a
+                        href="/workspace/account"
                         className="flex items-center gap-2 text-sm text-yellow-400 hover:text-yellow-300"
                       >
                         <Github className="h-4 w-4" />
@@ -904,7 +1200,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   {selectedRepo && (
                     <>
                       <GitBranch className="h-3.5 w-3.5 text-gray-500" />
-                      
+
                       {/* Branch Dropdown */}
                       <Select
                         value={selectedBranch}
@@ -955,7 +1251,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     >
                       <History className="h-3.5 w-3.5" />
                     </Button>
-                    
+
                     {showHistoryDropdown && (
                       <div
                         className="absolute top-full mt-2 right-0 w-72 rounded-xl overflow-hidden z-50"
@@ -980,7 +1276,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                               const firstUserMsg = conv.messages?.find((m: any) => m.role === 'user')
                               const title = firstUserMsg?.content?.substring(0, 15) + (firstUserMsg?.content?.length > 15 ? '...' : '') || 'Untitled'
                               const isCurrent = conv.id === conversationId
-                              
+
                               return (
                                 <button
                                   key={conv.id}
@@ -1036,7 +1332,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       }
                     }}
                   />
-                  
+
                   {/* Bottom Controls */}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">
@@ -1110,7 +1406,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             <span className="header-title">Agent</span>
           </div>
           <div className="repo-selector flex items-center gap-2">
-            <select 
+            <select
               value={selectedRepo}
               onChange={(e) => setSelectedRepo(e.target.value)}
               className="selector bg-gray-800/60 border border-blue-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-blue-500"
@@ -1129,7 +1425,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 </option>
               ))}
             </select>
-            <select 
+            <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
               className="selector bg-gray-800/60 border border-blue-500/30 rounded-lg px-3.5 py-2 text-gray-200 text-sm cursor-pointer outline-none transition-all hover:border-blue-500"
@@ -1161,31 +1457,59 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             paddingBottom: '160px'
           }}
         >
-          {messages.map(message => (
-            <div
-              key={message.id}
-              className={`message max-w-[80%] p-4 rounded-2xl leading-relaxed text-sm transition-all relative`}
-              style={{
-                alignSelf: message.isUser ? 'flex-end' : 'flex-start',
-                background: message.isUser 
-                  ? 'linear-gradient(135deg, #3b82f6, #2563eb)' 
-                  : 'transparent',
-                color: 'white',
-                borderBottomRightRadius: message.isUser ? '4px' : '16px',
-                borderBottomLeftRadius: message.isUser ? '16px' : '4px',
-                boxShadow: message.isUser ? '0 4px 20px rgba(59, 130, 246, 0.3)' : 'none',
-                animation: 'messageSlide 0.4s ease-out'
-              }}
-            >
-              {message.isUser ? (
-                <div className="whitespace-pre-wrap">{message.content}</div>
-              ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
-                  <Response>{message.content}</Response>
-                </div>
-              )}
-            </div>
-          ))}
+          {messages.map(message => {
+            const isLongMessage = message.isUser && message.content.length > 200
+            const isExpanded = expandedMessages[message.id]
+            const displayContent = isLongMessage && !isExpanded
+              ? message.content.substring(0, 200) + '...'
+              : message.content
+
+            return (
+              <div
+                key={message.id}
+                className={`message max-w-[80%] p-4 rounded-2xl leading-relaxed text-sm transition-all relative`}
+                style={{
+                  alignSelf: message.isUser ? 'flex-end' : 'flex-start',
+                  background: message.isUser
+                    ? 'linear-gradient(135deg, #3b82f6, #2563eb)'
+                    : 'transparent',
+                  color: 'white',
+                  borderBottomRightRadius: message.isUser ? '4px' : '16px',
+                  borderBottomLeftRadius: message.isUser ? '16px' : '4px',
+                  boxShadow: message.isUser ? '0 4px 20px rgba(59, 130, 246, 0.3)' : 'none',
+                  animation: 'messageSlide 0.4s ease-out'
+                }}
+              >
+                {message.isUser ? (
+                  <div>
+                    <div className="whitespace-pre-wrap">{displayContent}</div>
+                    {isLongMessage && (
+                      <button
+                        onClick={() => toggleMessageExpansion(message.id)}
+                        className="mt-2 text-xs text-blue-200 hover:text-white flex items-center gap-1 transition-colors"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="w-3 h-3" />
+                            Show less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3" />
+                            Show more
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:text-foreground prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
+                    <Response>{message.content}</Response>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* Input Area */}
@@ -1195,8 +1519,38 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           borderTop: '1px solid rgba(59, 130, 246, 0.2)',
           boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
         }}>
+          {/* Attachment Badges */}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3 p-2 bg-gray-800/50 rounded-xl border border-gray-700/50">
+              {attachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 rounded-lg text-sm border border-gray-600/50"
+                >
+                  {attachment.type === 'file' && <FileText className="w-3.5 h-3.5 text-blue-400" />}
+                  {attachment.type === 'image' && <ImageIcon className="w-3.5 h-3.5 text-green-400" />}
+                  {attachment.type === 'url' && <LinkIcon className="w-3.5 h-3.5 text-purple-400" />}
+                  <span className="text-gray-300 truncate max-w-[150px]">
+                    {attachment.name}
+                  </span>
+                  {attachment.size && (
+                    <span className="text-gray-500 text-xs">
+                      ({(attachment.size / 1024).toFixed(1)}KB)
+                    </span>
+                  )}
+                  <button
+                    onClick={() => removeAttachment(attachment.id)}
+                    className="ml-1 text-gray-400 hover:text-red-400 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="input-wrapper flex items-end gap-3 relative">
-            <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex items-center gap-2 p-1 min-w-0" style={{
+            <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex flex-col min-w-0" style={{
               background: 'rgba(17, 24, 39, 0.8)',
               border: '2px solid rgba(59, 130, 246, 0.3)',
               boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
@@ -1224,48 +1578,96 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   }}
                 />
               </div>
-              <div className="input-actions flex items-center gap-2 p-1 flex-shrink-0">
-                <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      disabled={isLoading}
-                    >
-                      <Plus className="size-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-2 z-[70]" side="top" align="start">
-                    <div className="flex flex-col gap-1">
-                      <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Add to message</div>
-                      <button
-                        onClick={() => {
-                          setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
-                          setShowAttachmentMenu(false)
-                        }}
-                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+              <div className="input-actions flex items-center justify-between p-2 border-t border-gray-700/50">
+                <div className="flex items-center gap-2">
+                  <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-white hover:bg-gray-700/50"
+                        disabled={isLoading}
                       >
-                        <Code className="size-4" /> Code Block
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCurrentInput(prev => prev + '\n\n[File reference]()')
-                          setShowAttachmentMenu(false)
-                        }}
-                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
-                      >
-                        <FileText className="size-4" /> File Reference
-                      </button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                        <Plus className="size-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-52 p-2 z-[70] bg-gray-900 border-gray-700" side="top" align="start">
+                      <div className="flex flex-col gap-1">
+                        <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Attach to message</div>
+
+                        <button
+                          onClick={() => {
+                            setShowFileDialog(true)
+                            setShowAttachmentMenu(false)
+                          }}
+                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                        >
+                          <FileText className="size-4 text-blue-400" /> Upload File
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setShowImageDialog(true)
+                            setShowAttachmentMenu(false)
+                          }}
+                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                        >
+                          <ImageIcon className="size-4 text-green-400" /> Upload Image
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setShowUrlDialog(true)
+                            setShowAttachmentMenu(false)
+                          }}
+                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                        >
+                          <LinkIcon className="size-4 text-purple-400" /> Attach URL
+                        </button>
+
+                        <div className="border-t border-gray-700/50 my-1"></div>
+
+                        <button
+                          onClick={() => {
+                            setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
+                            setShowAttachmentMenu(false)
+                          }}
+                          className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                        >
+                          <Code className="size-4 text-yellow-400" /> Code Block
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {attachments.length > 0 && (
+                    <span className="text-xs text-gray-500">{attachments.length} attachment{attachments.length > 1 ? 's' : ''}</span>
+                  )}
+                </div>
               </div>
+            </div>
+
+            {/* Send / Stop Button */}
+            {isStreaming ? (
+              <button
+                onClick={handleStopStream}
+                className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  boxShadow: '0 2px 12px rgba(239, 68, 68, 0.4)'
+                }}
+                title="Stop generating"
+              >
+                <StopCircle className="w-5 h-5" />
+              </button>
+            ) : (
               <button
                 onClick={() => sendMessage(currentInput)}
-                disabled={!currentInput.trim() || isLoading}
-                className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0"
+                disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
+                className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
                   boxShadow: '0 2px 12px rgba(59, 130, 246, 0.4)'
@@ -1277,7 +1679,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   <Send className="w-5 h-5" />
                 )}
               </button>
-            </div>
+            )}
           </div>
           <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center gap-2">
             Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">↵</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">⇧ ↵</kbd> for new line
@@ -1316,17 +1718,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           }}>
             <button
               onClick={() => setActiveTab('changes')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${
-                activeTab === 'changes'
-                  ? 'text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'changes'
+                ? 'text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
               style={{
-                background: activeTab === 'changes' 
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)' 
+                background: activeTab === 'changes'
+                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
                   : 'transparent',
-                boxShadow: activeTab === 'changes' 
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)' 
+                boxShadow: activeTab === 'changes'
+                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
                   : 'none'
               }}
             >
@@ -1334,17 +1735,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             </button>
             <button
               onClick={() => setActiveTab('diffs')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${
-                activeTab === 'diffs'
-                  ? 'text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'diffs'
+                ? 'text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
               style={{
-                background: activeTab === 'diffs' 
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)' 
+                background: activeTab === 'diffs'
+                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
                   : 'transparent',
-                boxShadow: activeTab === 'diffs' 
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)' 
+                boxShadow: activeTab === 'diffs'
+                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
                   : 'none'
               }}
             >
@@ -1352,17 +1752,16 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             </button>
             <button
               onClick={() => setActiveTab('actions')}
-              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${
-                activeTab === 'actions'
-                  ? 'text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'actions'
+                ? 'text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
               style={{
-                background: activeTab === 'actions' 
-                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)' 
+                background: activeTab === 'actions'
+                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
                   : 'transparent',
-                boxShadow: activeTab === 'actions' 
-                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)' 
+                boxShadow: activeTab === 'actions'
+                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
                   : 'none'
               }}
             >
@@ -1509,9 +1908,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       </div>
                     </button>
                     <div
-                      className={`accordion-content overflow-hidden transition-all ${
-                        showDiffs[change.path] ? 'active' : ''
-                      }`}
+                      className={`accordion-content overflow-hidden transition-all ${showDiffs[change.path] ? 'active' : ''
+                        }`}
                       style={{
                         maxHeight: showDiffs[change.path] ? '1000px' : '0'
                       }}
@@ -1615,6 +2013,100 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* File Upload Dialog */}
+      <Dialog open={showFileDialog} onOpenChange={setShowFileDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Upload Files</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Select code files to attach to your message. Max 1MB per file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => handleFileAttach(e.target.files)}
+              className="w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer"
+              accept=".txt,.md,.json,.js,.ts,.tsx,.jsx,.css,.html,.py,.java,.cpp,.c,.go,.rs,.yaml,.yml,.xml,.sh,.bat,.ps1,.sql"
+            />
+            <p className="text-xs text-gray-500">
+              Supported: .txt, .md, .json, .js, .ts, .tsx, .jsx, .css, .html, .py, .java, .cpp, .go, .rs, .yaml, .xml, .sql, etc.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFileDialog(false)} className="border-gray-600 text-gray-300 hover:bg-gray-800">
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Upload Dialog */}
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Upload Images</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Select images to attach to your message. Max 5MB per image.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <input
+              ref={imageInputRef}
+              type="file"
+              multiple
+              onChange={(e) => handleImageAttach(e.target.files)}
+              className="w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-600 file:text-white hover:file:bg-green-700 file:cursor-pointer"
+              accept="image/*"
+            />
+            <p className="text-xs text-gray-500">
+              Supported: PNG, JPG, GIF, WebP, SVG
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImageDialog(false)} className="border-gray-600 text-gray-300 hover:bg-gray-800">
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* URL Attachment Dialog */}
+      <Dialog open={showUrlDialog} onOpenChange={setShowUrlDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Attach URL</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Enter a URL to attach to your message as a reference.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://example.com/docs"
+              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleUrlAttach()
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowUrlDialog(false)} className="border-gray-600 text-gray-300 hover:bg-gray-800">
+              Cancel
+            </Button>
+            <Button onClick={handleUrlAttach} disabled={!urlInput.trim()} className="bg-purple-600 hover:bg-purple-700">
+              Attach
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

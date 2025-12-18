@@ -354,8 +354,8 @@ const ToolActivityPanel = ({
       return '📊 Data Visualization'
     }
     return '⚡ Other Operations'
-  } 
-   const getToolIcon = (tool: string) => {
+  }
+  const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file':
         return <FileText className="w-3.5 h-3.5" />
@@ -1384,10 +1384,10 @@ export function ChatPanelV2({
   // Confirm revert with robust checkpoint finding and state management
   const confirmRevert = async () => {
     if (!project || !revertMessageId) return
-    
+
     setIsReverting(true)
     setShowRevertDialog(false)
-    
+
     // Show reverting progress toast
     const { dismiss: dismissReverting } = toast({
       title: "Reverting...",
@@ -1399,17 +1399,17 @@ export function ChatPanelV2({
       ),
       duration: Infinity
     })
-    
+
     try {
       // Get the chat session for this project
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (!activeSession) {
         dismissReverting()
         toast({
@@ -1421,24 +1421,24 @@ export function ChatPanelV2({
         setRevertMessageId(null)
         return
       }
-      
+
       // Capture the current state before revert for potential restore
       const { capturePreRevertState } = await import('@/lib/checkpoint-utils')
       await capturePreRevertState(project.id, activeSession.id, revertMessageId)
-      
+
       // Get all checkpoints for this workspace
       const { getCheckpoints } = await import('@/lib/checkpoint-utils')
       const checkpoints = await getCheckpoints(project.id)
-      
+
       // Find the checkpoint associated with this message
       let checkpoint = checkpoints.find(cp => cp.messageId === revertMessageId) || undefined
-      
+
       if (!checkpoint) {
         // Try to find checkpoint by timestamp if message ID doesn't match
         // This handles cases where message ID might not match due to timing issues
         const allMessages = await storageManager.getMessages(activeSession.id)
         const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
-        
+
         if (targetMessage) {
           // Find checkpoint closest to message creation time
           const targetTime = new Date(targetMessage.createdAt).getTime()
@@ -1447,12 +1447,12 @@ export function ChatPanelV2({
             const timeDiff = Math.abs(checkpointTime - targetTime)
             return timeDiff <= 2000 // 2 seconds tolerance
           });
-          
+
           if (foundCheckpoint) {
             checkpoint = foundCheckpoint;
           }
         }
-        
+
         if (!checkpoint) {
           dismissReverting()
           toast({
@@ -1465,15 +1465,15 @@ export function ChatPanelV2({
           return
         }
       }
-      
+
       // Get all messages in the session
       const allMessages = await storageManager.getMessages(activeSession.id)
-      
+
       // Try to find the message by ID first
       let revertMessageIndex = allMessages.findIndex(msg => msg.id === revertMessageId)
       let revertTimestamp = ''
       let revertMessage = null
-      
+
       if (revertMessageIndex !== -1) {
         // Found the message by ID
         revertMessage = allMessages[revertMessageIndex]
@@ -1487,12 +1487,12 @@ export function ChatPanelV2({
           content: msg.content.substring(0, 50) + '...',
           createdAt: msg.createdAt
         })))
-        
+
         // If we can't find by ID, try to find by checkpoint creation time
         // This handles cases where the message hasn't been saved to DB yet or there's a timing issue
         const checkpointTime = new Date(checkpoint.createdAt).getTime()
         console.log(`[Checkpoint] Looking for message near checkpoint time: ${checkpoint.createdAt} (${checkpointTime})`)
-        
+
         // Find the message closest to the checkpoint creation time
         revertMessageIndex = allMessages.findIndex(msg => {
           const msgTime = new Date(msg.createdAt).getTime()
@@ -1501,7 +1501,7 @@ export function ChatPanelV2({
           console.log(`[Checkpoint] Message ${msg.id} time diff: ${timeDiff}ms`)
           return timeDiff <= 2000
         })
-        
+
         if (revertMessageIndex !== -1) {
           // Found a message close to checkpoint time
           revertMessage = allMessages[revertMessageIndex]
@@ -1513,7 +1513,7 @@ export function ChatPanelV2({
           console.log(`[Checkpoint] Using checkpoint timestamp as fallback: ${revertTimestamp}`)
         }
       }
-      
+
       if (!revertTimestamp) {
         dismissReverting()
         toast({
@@ -1525,12 +1525,12 @@ export function ChatPanelV2({
         setRevertMessageId(null)
         return
       }
-      
+
       // Delete messages that came after this timestamp
       const { deleteMessagesAfter } = await import('@/lib/checkpoint-utils')
       const deletedCount = await deleteMessagesAfter(activeSession.id, revertTimestamp)
       console.log(`[Checkpoint] Deleted ${deletedCount} messages after timestamp ${revertTimestamp}`)
-      
+
       // Update the messages state to remove messages after the revert point
       // First, we'll update the UI immediately for better UX
       setMessages(prevMessages => {
@@ -1542,35 +1542,35 @@ export function ChatPanelV2({
         // If we couldn't find by ID, we'll reload after the restore completes
         return prevMessages
       })
-      
+
       // Restore the checkpoint
       const { restoreCheckpoint } = await import('@/lib/checkpoint-utils')
       const success = await restoreCheckpoint(checkpoint.id)
-      
+
       if (success) {
         // Force refresh the file explorer
-        window.dispatchEvent(new CustomEvent('files-changed', { 
-          detail: { projectId: project.id, forceRefresh: true } 
+        window.dispatchEvent(new CustomEvent('files-changed', {
+          detail: { projectId: project.id, forceRefresh: true }
         }))
-        
+
         // Small delay to ensure UI updates properly
         await new Promise(resolve => setTimeout(resolve, 100))
-        
+
         // Reload messages to ensure consistency between UI and database
         // This also helps avoid "Node cannot be found" errors
         await loadMessages()
-        
+
         // Set this message to show restore icon
         setRestoreMessageId(revertMessageId)
-        
+
         // Populate the input area with the reverted message content for editing
         if (revertMessage) {
           setInput(revertMessage.content)
         }
-        
+
         // Dismiss the reverting toast
         dismissReverting()
-        
+
         // Show success toast with restore information
         toast({
           title: "✓ Reverted Successfully",
@@ -1587,7 +1587,7 @@ export function ChatPanelV2({
       } else {
         // Dismiss the reverting toast
         dismissReverting()
-        
+
         // Reload messages if file restoration failed
         await loadMessages()
         toast({
@@ -1599,7 +1599,7 @@ export function ChatPanelV2({
     } catch (error) {
       // Dismiss the reverting toast on error
       dismissReverting()
-      
+
       console.error('[Checkpoint] Error reverting to checkpoint:', error)
       // Reload messages on error
       if (project) {
@@ -1615,7 +1615,7 @@ export function ChatPanelV2({
       setRevertMessageId(null)
     }
   }
-  
+
   const cancelRevert = () => {
     setShowRevertDialog(false)
     setRevertMessageId(null)
@@ -2706,12 +2706,39 @@ export function ChatPanelV2({
 
     // Immediate submission like initial prompt - no delay
     const syntheticEvent = {
-      preventDefault: () => {},
+      preventDefault: () => { },
       target: null,
       currentTarget: null
     } as unknown as React.FormEvent
 
     handleEnhancedSubmit(syntheticEvent)
+  }
+
+  // Handle stopping the stream and saving partial response
+  const handleStop = async () => {
+    if (abortController) {
+      console.log('[ChatPanelV2] 🛑 Stopping generation as requested by user')
+      abortController.abort()
+      setAbortController(null)
+      setIsLoading(false)
+      setIsContinuationInProgress(false)
+
+      // Find the last message (which should be the assistant's partial response)
+      // Since state updates are async, we use the messages state which contains the latest updates from the stream loop
+      const lastMessage = messages[messages.length - 1]
+
+      if (lastMessage && lastMessage.role === 'assistant') {
+        console.log('[ChatPanelV2] Saving partial message due to user stop:', lastMessage.id)
+
+        // Save the partial message to the database
+        await saveMessageToIndexedDB(lastMessage)
+
+        toast({
+          title: "Stopped",
+          description: "Generation stopped and partial response saved."
+        })
+      }
+    }
   }
 
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
@@ -2830,13 +2857,13 @@ ${taggedComponent.sourceFile ? `File: ${taggedComponent.sourceFile}${taggedCompo
 Classes: ${taggedComponent.className || 'none'}
 ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"` : ''}
 --- End Tagged Component ---`
-      
+
       enhancedContent = `${enhancedContent}\n\n=== TAGGED COMPONENT CONTEXT ===${componentContext}\n=== END TAGGED COMPONENT ===`
-      
+
       // Display content should also include the rich context for user visibility
       const displayComponentContext = `\n\n📌 **Tagged Component:**\n- Element: \`<${taggedComponent.tagName}>\`${taggedComponent.sourceFile ? `\n- File: \`${taggedComponent.sourceFile}${taggedComponent.sourceLine ? `:${taggedComponent.sourceLine}` : ''}\`` : ''}${taggedComponent.className ? `\n- Classes: \`${taggedComponent.className}\`` : ''}${taggedComponent.textContent ? `\n- Content: "${taggedComponent.textContent}"` : ''}`
       displayContent = `${displayContent}${displayComponentContext}`
-      
+
       // Clear the tagged component after including it
       if (onClearTaggedComponent) {
         onClearTaggedComponent()
@@ -3913,7 +3940,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   "{taggedComponent.textContent.slice(0, 20)}{taggedComponent.textContent.length > 20 ? '...' : ''}"
                 </span>
               )}
-              <button 
+              <button
                 onClick={onClearTaggedComponent}
                 className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
               >
@@ -3922,7 +3949,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             </div>
           </div>
         )}
-        
+
         {/* Attachments Display */}
         {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0) && (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -4333,7 +4360,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 variant="default"
                 size="icon"
                 className="h-8 w-8"
-                onClick={stop}
+                onClick={handleStop}
               >
                 <Square className="w-4 h-4 bg-red-500 animate-pulse" />
               </Button>
@@ -4416,7 +4443,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel 
+              <AlertDialogCancel
                 className="bg-gray-700 text-gray-300 hover:bg-gray-600"
                 onClick={cancelRevert}
               >
