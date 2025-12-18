@@ -293,16 +293,16 @@ export async function POST(req: Request) {
       messages: body.messages?.length || 0,
       repo: body.repo,
       branch: body.branch || 'main',
-      modelId: body.modelId,
-      lastMessagePreview: body.messages?.[body.messages.length - 1]?.content?.substring(0, 100)
+      modelId: body.modelId || DEFAULT_CHAT_MODEL,
+      lastMessagePreview: body.messages?.[body.messages.length - 1]?.content?.substring(0, 100) || 'N/A'
     })
-    ;({
-      messages,
-      modelId,
-      repo: currentRepo,
-      branch: currentBranch = 'main',
-      githubToken
-    } = body)
+      ; ({
+        messages,
+        modelId,
+        repo: currentRepo,
+        branch: currentBranch = 'main',
+        githubToken
+      } = body)
 
     if (!messages || !Array.isArray(messages)) {
       console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Invalid request: Messages array is required`)
@@ -1483,7 +1483,7 @@ export async function POST(req: Request) {
                 console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🎯 Tool result received:`, {
                   toolName: (part as any).toolName,
                   toolCallId: (part as any).toolCallId,
-                  resultPreview: JSON.stringify((part as any).result).substring(0, 100)
+                  resultPreview: JSON.stringify((part as any).result)?.substring(0, 100) || 'N/A'
                 })
               } else if (part.type === 'text-delta') {
                 // Text deltas are frequent, just count them silently
