@@ -971,6 +971,7 @@ export async function POST(req: Request) {
           branch: z.string().optional().describe('Branch name, defaults to repository default')
         }),
         execute: async ({ repo, path, oldString, newString, message, useRegex = false, replaceAll = false, caseInsensitive = false, branch }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_replace_string - Input:`, { repo, path, oldStringLen: oldString.length, newStringLen: newString.length, useRegex, replaceAll, branch: branch || 'default' })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
 
@@ -1051,7 +1052,7 @@ export async function POST(req: Request) {
               branch
             })
 
-            return {
+            const result = {
               success: true,
               replacements_made: replacementCount,
               commit: {
@@ -1071,10 +1072,15 @@ export async function POST(req: Request) {
                 diff: updatedContent.length - currentContent.length
               }
             }
+
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_replace_string completed - File: ${path}, Replacements: ${replacementCount}, Commit: ${result.commit.sha?.slice(0, 8) || 'unknown'}`)
+            return result
           } catch (error) {
+            const errorMsg = `Failed to replace string: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_replace_string failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to replace string: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
@@ -1227,7 +1233,7 @@ export async function POST(req: Request) {
 
       // Advanced File Editing Tool
       github_edit_file: tool({
-        description: 'Edit an existing file in GitHub repository using search/replace blocks with advanced options. Supports regex patterns, multiple replacements, and detailed diff reporting. Uses Git diff-style format for precise edits. IMPORTANT: If this tool fails more than 3 times consecutively on the same file, automatically switch to using the github_write_file tool instead.',
+        description: 'Edit an existing file in GitHub repository using search/replace blocks with advanced options. Supports regex patterns, multiple replacements. Uses Git diff-style format for precise edits. IMPORTANT: If this tool fails more than 3 times consecutively on the same file, automatically switch to using the github_write_file tool instead.',
         inputSchema: z.object({
           repo: z.string().describe('Repository in format "owner/repo"'),
           path: z.string().describe('File path in repository'),
@@ -1243,39 +1249,43 @@ export async function POST(req: Request) {
           branch: z.string().optional().describe('Branch name, defaults to repository default')
         }),
         execute: async ({ repo, path, searchReplaceBlock, message, useRegex = false, replaceAll = false, branch }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_edit_file - Input:`, { repo, path, messageLen: message.length, branch: branch || 'default' })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
 
-            // Parse the search/replace block
-            const searchMarker = '<<<<<<< SEARCH'
-            const replaceMarker = '======='
-            const endMarker = '>>>>>>> REPLACE'
+            // Parse the search/replace block using line-by-line parsing (more efficient)
+            const SEARCH_START = '<<<<<<< SEARCH'
+            const DIVIDER = '======='
+            const REPLACE_END = '>>>>>>> REPLACE'
 
-            const searchStart = searchReplaceBlock.indexOf(searchMarker)
-            const replaceStart = searchReplaceBlock.indexOf(replaceMarker, searchStart)
-            const endPos = searchReplaceBlock.indexOf(endMarker, replaceStart)
+            const lines = searchReplaceBlock.split('\n')
+            let searchLines: string[] = []
+            let replaceLines: string[] = []
+            let mode: 'none' | 'search' | 'replace' = 'none'
 
-            if (searchStart === -1 || replaceStart === -1 || endPos === -1) {
-              return {
-                success: false,
-                error: 'Invalid search/replace block format. Must contain <<<<<<< SEARCH, =======, and >>>>>>> REPLACE markers.'
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i]
+
+              if (line.trim() === SEARCH_START) {
+                mode = 'search'
+              } else if (line.trim() === DIVIDER && mode === 'search') {
+                mode = 'replace'
+              } else if (line.trim() === REPLACE_END && mode === 'replace') {
+                break // End of block
+              } else if (mode === 'search') {
+                searchLines.push(line)
+              } else if (mode === 'replace') {
+                replaceLines.push(line)
               }
             }
 
-            const oldString = searchReplaceBlock.substring(
-              searchStart + searchMarker.length,
-              replaceStart
-            ).trim()
+            const oldString = searchLines.join('\n')
+            const newString = replaceLines.join('\n')
 
-            const newString = searchReplaceBlock.substring(
-              replaceStart + replaceMarker.length,
-              endPos
-            ).trim()
-
-            if (!oldString) {
+            if (!oldString && !newString) {
               return {
                 success: false,
-                error: 'Search content cannot be empty'
+                error: 'Invalid search/replace block format. Must contain <<<<<<< SEARCH, =======, and >>>>>>> REPLACE markers.'
               }
             }
 
@@ -1297,21 +1307,25 @@ export async function POST(req: Request) {
             const fileData = fileResponse.data as any
             const currentContent = Buffer.from(fileData.content, 'base64').toString('utf-8')
 
-            // Perform the replacement
+            // Perform the replacement (simplified logic from chat-v2)
             let updatedContent: string
             let replacementCount = 0
 
             if (useRegex) {
-              const regex = new RegExp(oldString, 'g')
-              if (replaceAll) {
+              const regexFlags = replaceAll ? 'g' : ''
+              const regex = new RegExp(oldString, regexFlags)
+
+              if (regex.test(currentContent)) {
                 updatedContent = currentContent.replace(regex, newString)
-                const matches = currentContent.match(regex)
-                replacementCount = matches ? matches.length : 0
+                replacementCount = replaceAll ? (currentContent.match(regex) || []).length : 1
               } else {
-                updatedContent = currentContent.replace(regex, newString)
-                replacementCount = currentContent.match(regex) ? 1 : 0
+                return {
+                  success: false,
+                  error: 'Regex pattern not found in file content'
+                }
               }
             } else {
+              // Handle string replacement
               if (replaceAll) {
                 let count = 0
                 updatedContent = currentContent
@@ -1322,16 +1336,25 @@ export async function POST(req: Request) {
                   index = updatedContent.indexOf(oldString, index + newString.length)
                 }
                 replacementCount = count
+
+                if (count === 0) {
+                  return {
+                    success: false,
+                    error: 'Search text not found in file content'
+                  }
+                }
               } else {
-                const index = currentContent.indexOf(oldString)
-                if (index === -1) {
+                // Replace first occurrence only
+                if (currentContent.includes(oldString)) {
+                  const index = currentContent.indexOf(oldString)
+                  updatedContent = currentContent.substring(0, index) + newString + currentContent.substring(index + oldString.length)
+                  replacementCount = 1
+                } else {
                   return {
                     success: false,
                     error: `Search string not found in file. Content length: ${currentContent.length} chars. Make sure the search string matches exactly including whitespace and indentation.`
                   }
                 }
-                updatedContent = currentContent.substring(0, index) + newString + currentContent.substring(index + oldString.length)
-                replacementCount = 1
               }
             }
 
@@ -1354,50 +1377,7 @@ export async function POST(req: Request) {
               branch
             })
 
-            // Generate diff for reporting
-            const generateDiff = (oldContent: string, newContent: string): string => {
-              const oldLines = oldContent.split('\n')
-              const newLines = newContent.split('\n')
-              const diff = []
-
-              let i = 0, j = 0
-              while (i < oldLines.length || j < newLines.length) {
-                if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
-                  diff.push(` ${oldLines[i]}`)
-                  i++
-                  j++
-                } else {
-                  // Find the actual change
-                  let oldEnd = i
-                  let newEnd = j
-
-                  // Look for matching lines after the change
-                  while (oldEnd < oldLines.length && newEnd < newLines.length) {
-                    if (oldLines[oldEnd] === newLines[newEnd]) break
-                    oldEnd++
-                    newEnd++
-                  }
-
-                  // Add removed lines
-                  while (i < oldEnd && i < oldLines.length) {
-                    diff.push(`-${oldLines[i]}`)
-                    i++
-                  }
-
-                  // Add added lines
-                  while (j < newEnd && j < newLines.length) {
-                    diff.push(`+${newLines[j]}`)
-                    j++
-                  }
-                }
-              }
-
-              return diff.join('\n')
-            }
-
-            const diff = generateDiff(currentContent, updatedContent)
-
-            return {
+            const result = {
               success: true,
               replacements_made: replacementCount,
               commit: {
@@ -1415,13 +1395,17 @@ export async function POST(req: Request) {
                 old_length: currentContent.length,
                 new_length: updatedContent.length,
                 diff_length: updatedContent.length - currentContent.length
-              },
-              diff: diff
+              }
             }
+
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_edit_file completed - File: ${path}, Replacements: ${replacementCount}, Commit: ${result.commit.sha?.slice(0, 8) || 'unknown'}`)
+            return result
           } catch (error) {
+            const errorMsg = `Failed to edit file: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_edit_file failed:`, errorMsg)
             return {
               success: false,
-              error: `Failed to edit file: ${error instanceof Error ? error.message : 'Unknown error'}`
+              error: errorMsg
             }
           }
         }
