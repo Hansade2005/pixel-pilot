@@ -11,12 +11,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { createClient } from '@/lib/supabase/client'
 import { getDeploymentTokens } from '@/lib/cloud-sync'
 import { useToast } from '@/hooks/use-toast'
 import { useRepoAgent } from "@/hooks/use-repo-agent"
 import { storageManager } from '@/lib/storage-manager'
 import { Response } from '@/components/ai-elements/response'
+import { FileAttachmentDropdown } from '@/components/ui/file-attachment-dropdown'
 import {
   Send,
   Paperclip,
@@ -122,6 +124,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false)
   const [conversationHistory, setConversationHistory] = useState<any[]>([])
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const chatBodyRef = useRef<HTMLDivElement>(null)
 
@@ -984,6 +987,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                                   onClick={() => {
                                     setSelectedRepo(conv.repo)
                                     setSelectedBranch(conv.branch)
+                                    setCurrentView('workspace')
                                     setShowHistoryDropdown(false)
                                   }}
                                   className="w-full text-left p-3 transition-all border-none cursor-pointer hover:bg-blue-500/10"
@@ -1013,15 +1017,18 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 </div>
 
                 {/* Input Area */}
-                <div className="relative p-4 flex items-center gap-2">
-                  {/* Dollar Sign before input */}
-                  <div className="text-blue-400 text-lg font-mono font-semibold">$</div>
+                <div className="relative p-4 flex flex-col">
                   <Textarea
                     ref={textareaRef}
                     value={landingInput}
                     onChange={(e) => setLandingInput(e.target.value)}
                     placeholder="Describe your coding task or ask a question..."
-                    className="min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
+                    className="w-full min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 mb-3"
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word'
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault()
@@ -1029,36 +1036,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       }
                     }}
                   />
-                </div>
-
-                {/* Bottom Bar */}
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-900/30 border-t border-gray-700/50">
-                  <div className="flex items-center gap-3">
-                    {/* Action Icons */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-700/30"
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-700/30"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-gray-500 hover:text-white hover:bg-gray-700/30"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-4">
+                  
+                  {/* Bottom Controls */}
+                  <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">
                       Press <kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Cmd</kbd>+<kbd className="px-1.5 py-0.5 bg-gray-700/50 rounded text-xs border border-gray-600">Enter</kbd> to send
                     </span>
@@ -1127,7 +1107,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               animation: 'pulse 2s infinite',
               boxShadow: '0 0 12px #10b981'
             }}></div>
-            <span className="header-title">Repo Agent</span>
+            <span className="header-title">Agent</span>
           </div>
           <div className="repo-selector flex items-center gap-2">
             <select 
@@ -1216,14 +1196,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
         }}>
           <div className="input-wrapper flex items-end gap-3 relative">
-            <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex items-center gap-2 p-1" style={{
+            <div className="input-container flex-1 relative overflow-hidden rounded-2xl flex items-center gap-2 p-1 min-w-0" style={{
               background: 'rgba(17, 24, 39, 0.8)',
               border: '2px solid rgba(59, 130, 246, 0.3)',
               boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05)',
               transition: 'all 0.3s ease'
             }}>
-              <div className="dollar-sign px-3 text-gray-400 text-lg font-semibold">$</div>
-              <div className="textarea-wrapper flex-1">
+              <div className="textarea-wrapper flex-1 min-w-0 overflow-hidden">
                 <Textarea
                   ref={textareaRef}
                   value={currentInput}
@@ -1232,7 +1211,10 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   className="w-full bg-transparent border-none text-gray-200 placeholder-gray-500 resize-none outline-none p-3 leading-relaxed"
                   style={{
                     maxHeight: '200px',
-                    minHeight: '44px'
+                    minHeight: '44px',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word'
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
@@ -1242,13 +1224,43 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   }}
                 />
               </div>
-              <div className="input-actions flex items-center gap-2 p-1">
-                <button className="action-icon w-9 h-9 flex items-center justify-center rounded-full text-gray-400 cursor-pointer transition-all hover:bg-blue-900/30 hover:text-blue-400 bg-transparent border-none">
-                  <Paperclip className="w-4.5 h-4.5" />
-                </button>
-                <button className="action-icon w-9 h-9 flex items-center justify-center rounded-full text-gray-400 cursor-pointer transition-all hover:bg-blue-900/30 hover:text-blue-400 bg-transparent border-none">
-                  <Plus className="w-4.5 h-4.5" />
-                </button>
+              <div className="input-actions flex items-center gap-2 p-1 flex-shrink-0">
+                <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={isLoading}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-2 z-[70]" side="top" align="start">
+                    <div className="flex flex-col gap-1">
+                      <div className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase">Add to message</div>
+                      <button
+                        onClick={() => {
+                          setCurrentInput(prev => prev + '\n\n```\n// Code snippet\n```')
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <Code className="size-4" /> Code Block
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCurrentInput(prev => prev + '\n\n[File reference]()')
+                          setShowAttachmentMenu(false)
+                        }}
+                        className="w-full justify-start text-sm px-2 py-2 text-gray-300 hover:bg-gray-700/50 rounded transition-colors flex items-center gap-2"
+                      >
+                        <FileText className="size-4" /> File Reference
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <button
                 onClick={() => sendMessage(currentInput)}
