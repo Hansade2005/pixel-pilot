@@ -1811,11 +1811,10 @@ Assistant:
             id: todoId,
             title,
             description,
-            status,
-            created_at: new Date().toISOString()
+            status
           }
 
-          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Created todo: ${title}`)
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Created todo: ${title}`, todo)
           return { success: true, todo }
         }
       }),
@@ -1830,16 +1829,17 @@ Assistant:
         }),
         execute: async ({ id, title, description, status }) => {
           console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Updated todo ${id}:`, { title, description, status })
-          return {
+          const result = {
             success: true,
             todo: {
               id,
               title,
               description,
-              status,
-              updated_at: new Date().toISOString()
+              status
             }
           }
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Update result:`, result)
+          return result
         }
       }),
 

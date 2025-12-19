@@ -171,9 +171,7 @@ export interface RepoConversation {
     id: string
     title: string
     description?: string
-    status: 'pending' | 'completed'
-    created_at?: string
-    updated_at?: string
+    status?: 'pending' | 'completed'
   }>
   lastActivity: string
   createdAt: string

@@ -21,8 +21,21 @@ import { storageManager } from '@/lib/storage-manager'
 import { Response } from '@/components/ai-elements/response'
 import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent, ChainOfThoughtStep } from '@/components/ai-elements/chain-of-thought'
 import { Actions, Action } from '@/components/ai-elements/actions'
-import { FileAttachmentDropdown } from '@/components/ui/file-attachment-dropdown'
-import { cn } from '@/lib/utils'
+import {
+  Queue,
+  QueueItem,
+  QueueItemAction,
+  QueueItemActions,
+  QueueItemContent,
+  QueueItemDescription,
+  QueueItemIndicator,
+  QueueList,
+  type QueueTodo,
+  QueueSection,
+  QueueSectionContent,
+  QueueSectionLabel,
+  QueueSectionTrigger,
+} from "@/components/ai-elements/queue"
 import {
   Send,
   Paperclip,
@@ -278,15 +291,6 @@ interface ActionLog {
   timestamp: Date
 }
 
-interface TodoItem {
-  id: string
-  title: string
-  description?: string
-  status: 'pending' | 'completed'
-  created_at?: string
-  updated_at?: string
-}
-
 interface Attachment {
   id: string
   type: 'file' | 'image' | 'url'
@@ -351,7 +355,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({})
 
   // Todo state
-  const [todos, setTodos] = useState<TodoItem[]>([])
+  const [todos, setTodos] = useState<QueueTodo[]>([])
 
   // GitHub tokens state (following deployment client pattern)
   const [storedTokens, setStoredTokens] = useState<{
@@ -865,17 +869,33 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               // This follows the chat-panel-v2.tsx pattern of using tool execution data directly
 
               // Handle todo operations
-              if (parsed.result?.success && parsed.toolName?.startsWith('github_') && parsed.toolName?.includes('todo')) {
-                if (parsed.toolName === 'github_create_todo' && parsed.result.todo) {
-                  setTodos(prev => [...prev, parsed.result.todo])
-                } else if (parsed.toolName === 'github_update_todo' && parsed.result.todo) {
-                  setTodos(prev => prev.map(todo =>
-                    todo.id === parsed.result.todo.id
-                      ? { ...todo, ...parsed.result.todo }
-                      : todo
-                  ))
-                } else if (parsed.toolName === 'github_delete_todo' && parsed.result.deleted_id) {
-                  setTodos(prev => prev.filter(todo => todo.id !== parsed.result.deleted_id))
+              if (parsed.type === 'tool-result' && parsed.toolName?.includes('todo')) {
+                console.log('[RepoAgent] Todo tool result detected:', parsed.toolName, parsed.result)
+                if (parsed.toolName === 'github_create_todo' && parsed.result?.todo) {
+                  console.log('[RepoAgent] Adding todo:', parsed.result.todo)
+                  setTodos(prev => {
+                    const newTodos = [...prev, parsed.result.todo]
+                    console.log('[RepoAgent] New todos state:', newTodos)
+                    return newTodos
+                  })
+                } else if (parsed.toolName === 'github_update_todo' && parsed.result?.todo) {
+                  console.log('[RepoAgent] Updating todo:', parsed.result.todo)
+                  setTodos(prev => {
+                    const newTodos = prev.map(todo =>
+                      todo.id === parsed.result.todo.id
+                        ? { ...todo, ...parsed.result.todo }
+                        : todo
+                    )
+                    console.log('[RepoAgent] Updated todos state:', newTodos)
+                    return newTodos
+                  })
+                } else if (parsed.toolName === 'github_delete_todo' && parsed.result?.deleted_id) {
+                  console.log('[RepoAgent] Deleting todo:', parsed.result.deleted_id)
+                  setTodos(prev => {
+                    const newTodos = prev.filter(todo => todo.id !== parsed.result.deleted_id)
+                    console.log('[RepoAgent] Filtered todos state:', newTodos)
+                    return newTodos
+                  })
                 }
               }
             }
@@ -894,7 +914,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       ))
 
       // Set streaming to true for the view transition
-      setIsStreaming(true)
+      setIsStreaming(false)
 
       // Save initial conversation after first stream completes
       await saveConversationToStorage()
@@ -914,9 +934,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   const sendMessage = async (content: string) => {
     if (!content.trim() && attachments.length === 0) return
-
-    // Clear todos for new conversation turn
-    setTodos([])
 
     // Build message content with attachments
     let messageContent = content
@@ -1385,6 +1402,40 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   const handleDeleteMessage = (messageId: string) => {
     setMessages(prev => prev.filter(msg => msg.id !== messageId))
+  }
+
+  // Todo handler
+  const handleRemoveTodo = (id: string) => {
+    setTodos((prev) => prev.filter((todo) => todo.id !== id))
+  }
+
+  const handleTodoToggle = async (id: string) => {
+    const todo = todos.find(t => t.id === id)
+    if (!todo) return
+
+    const newStatus: 'pending' | 'completed' = todo.status === 'completed' ? 'pending' : 'completed'
+
+    const updatedTodo: QueueTodo = {
+      ...todo,
+      status: newStatus
+    }
+
+    // Update local state
+    setTodos(prev => prev.map(t => t.id === id ? updatedTodo : t))
+
+    // Update in storage if we have a conversation
+    if (conversationId) {
+      try {
+        await storageManager.init()
+        const updatedTodos = todos.map(t => t.id === id ? updatedTodo : t)
+        await storageManager.updateRepoConversation(conversationId, {
+          todos: updatedTodos,
+          lastActivity: new Date().toISOString()
+        })
+      } catch (error) {
+        console.error('Failed to update todo in storage', error)
+      }
+    }
   }
 
   const handleClearMessages = async () => {
@@ -1871,37 +1922,51 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           borderTop: '1px solid rgba(59, 130, 246, 0.2)',
           boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
         }}>
-          {/* Todo Section */}
+          {/* Queue Section */}
           {todos.length > 0 && (
-            <div className="mb-4 p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400" />
-                  Todo Items ({todos.filter(t => t.status === 'completed').length}/{todos.length})
-                </h4>
-              </div>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {todos.map((todo) => (
-                  <div
-                    key={todo.id}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30 border border-gray-600/30"
-                  >
-                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                      todo.status === 'completed' ? 'bg-green-500' : 'bg-gray-500'
-                    }`} />
-                    <span className={`text-sm flex-1 ${
-                      todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-200'
-                    }`}>
-                      {todo.title}
-                    </span>
-                    {todo.description && (
-                      <span className="text-xs text-gray-500 truncate max-w-[100px]">
-                        {todo.description}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+            <div className="mb-4">
+              <Queue>
+                <QueueSection>
+                  <QueueSectionTrigger>
+                    <QueueSectionLabel count={todos.length} label="Todo" />
+                  </QueueSectionTrigger>
+                  <QueueSectionContent>
+                    <QueueList>
+                      {todos.map((todo) => {
+                        const isCompleted = todo.status === "completed";
+
+                        return (
+                          <QueueItem key={todo.id}>
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleTodoToggle(todo.id)}>
+                              <QueueItemIndicator completed={isCompleted} />
+                              <QueueItemContent completed={isCompleted}>
+                                {todo.title}
+                              </QueueItemContent>
+                              <QueueItemActions>
+                                <QueueItemAction
+                                  aria-label="Remove todo"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleRemoveTodo(todo.id)
+                                  }}
+                                >
+                                  <Trash2 size={12} />
+                                </QueueItemAction>
+                              </QueueItemActions>
+                            </div>
+                            {todo.description && (
+                              <QueueItemDescription completed={isCompleted}>
+                                {todo.description}
+                              </QueueItemDescription>
+                            )}
+                          </QueueItem>
+                        );
+                      })}
+                    </QueueList>
+                  </QueueSectionContent>
+                </QueueSection>
+              </Queue>
             </div>
           )}
 
