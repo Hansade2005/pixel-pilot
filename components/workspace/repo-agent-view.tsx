@@ -220,6 +220,7 @@ interface Message {
   reasoning?: string
   toolInvocations?: any[]
   role?: 'user' | 'assistant'
+  metadata?: Record<string, any>
 }
 
 
@@ -384,12 +385,57 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             id: msg.id,
             content: msg.content,
             isUser: msg.role === 'user',
-            timestamp: new Date(msg.timestamp)
+            timestamp: new Date(msg.timestamp),
+            reasoning: msg.metadata?.reasoning || '',
+            toolInvocations: msg.toolInvocations || [],
+            metadata: msg.metadata || {}
           }))
           setMessages(loadedMessages)
+
+          // Reconstruct sidebar state from loaded tool invocations
+          const reconstructedActionLogs: ActionLog[] = []
+          const reconstructedActiveToolCalls = new Map<string, Array<{
+            toolName: string
+            toolCallId: string
+            args?: any
+            status: 'executing' | 'completed' | 'failed'
+          }>>()
+
+          loadedMessages.forEach((msg: Message) => {
+            if (msg.toolInvocations && msg.toolInvocations.length > 0) {
+              msg.toolInvocations.forEach((inv: any) => {
+                // Reconstruct action logs
+                const actionLog: ActionLog = {
+                  id: inv.toolCallId || `${msg.id}-${Date.now()}`,
+                  type: inv.toolName?.includes('file') || inv.toolName?.includes('folder') ? 'file_operation' : 'api_call',
+                  description: getToolLabel(inv.toolName, inv.args),
+                  timestamp: msg.timestamp
+                }
+                reconstructedActionLogs.push(actionLog)
+
+                // Reconstruct active tool calls
+                const toolCallEntry = {
+                  toolName: inv.toolName,
+                  toolCallId: inv.toolCallId,
+                  args: inv.args,
+                  status: (inv.state === 'result' ? 'completed' as const : inv.state === 'call' ? 'executing' as const : 'failed' as const)
+                }
+
+                if (!reconstructedActiveToolCalls.has(msg.id)) {
+                  reconstructedActiveToolCalls.set(msg.id, [])
+                }
+                reconstructedActiveToolCalls.get(msg.id)!.push(toolCallEntry)
+              })
+            }
+          })
+
+          setActionLogs(reconstructedActionLogs)
+          setActiveToolCalls(reconstructedActiveToolCalls)
         } else {
           console.log('[RepoAgent] No conversation history found for', selectedRepo, selectedBranch)
           setConversationId(null)
+          setActionLogs([])
+          setActiveToolCalls(new Map())
         }
       } catch (error) {
         console.error('[RepoAgent] Error loading conversation history:', error)
@@ -781,17 +827,18 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
       // Final update: ensure the complete accumulated content is in the message
       console.log('[RepoAgent] Landing stream complete, final content length:', accumulatedContent.length)
-      setMessages(prev => prev.map(msg =>
+      const updatedMessages = messages.map(msg =>
         msg.id === agentMessageId
           ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
-      ))
+      )
+      setMessages(updatedMessages)
 
-      // Set streaming to true for the view transition
-      setIsStreaming(true)
+      // Set streaming to false after stream completes
+      setIsStreaming(false)
 
       // Save initial conversation after first stream completes
-      await saveConversationToStorage()
+      await saveConversationToStorage(updatedMessages)
     } catch (error) {
       console.error('Error starting repo agent:', error)
       toast({
@@ -803,6 +850,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       setMessages([])
     } finally {
       setIsLandingLoading(false)
+      setIsStreaming(false)
     }
   }
 
@@ -1014,14 +1062,15 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
       // Final update
       console.log('[RepoAgent] Stream complete, final content length:', accumulatedContent.length)
-      setMessages(prev => prev.map(msg =>
+      const updatedMessages = messages.map(msg =>
         msg.id === assistantMessageId
           ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
-      ))
+      )
+      setMessages(updatedMessages)
 
       // Save conversation after stream completes
-      await saveConversationToStorage()
+      await saveConversationToStorage(updatedMessages)
     } catch (error) {
       // Handle abort separately - don't show error toast for user-initiated stops
       if (error instanceof Error && error.name === 'AbortError') {
@@ -1044,20 +1093,24 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   }
 
   // Save conversation to IndexedDB
-  const saveConversationToStorage = async () => {
-    if (!selectedRepo || !selectedBranch || !userId || messages.length === 0) return
+  const saveConversationToStorage = async (customMessages?: Message[]) => {
+    const messagesToSave = customMessages || messages
+    if (!selectedRepo || !selectedBranch || !userId || messagesToSave.length === 0) return
 
     try {
       await storageManager.init()
 
       // Convert messages to storage format
-      const storageMessages = messages.map(msg => ({
+      const storageMessages = messagesToSave.map(msg => ({
         id: msg.id,
         role: msg.isUser ? 'user' as const : 'assistant' as const,
         content: msg.content,
         timestamp: msg.timestamp.toISOString(),
-        reasoning: msg.reasoning,
-        toolInvocations: msg.toolInvocations
+        toolInvocations: msg.toolInvocations,
+        metadata: {
+          reasoning: msg.reasoning || '',
+          ...msg.metadata
+        }
       }))
 
       if (conversationId) {
@@ -1087,6 +1140,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     setCurrentView('landing')
     setMessages([])
     setActionLogs([])
+    setActiveToolCalls(new Map())
+    setShowDiffs({})
     setLandingInput('')
     setAttachments([])
   }
@@ -1279,6 +1334,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     if (confirm('Are you sure you want to clear the entire conversation history? This cannot be undone.')) {
       setMessages([])
       setActionLogs([])
+      setActiveToolCalls(new Map())
+      setShowDiffs({})
       setAttachments([])
 
       if (conversationId) {
@@ -1322,11 +1379,11 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             <div className="text-center mb-8 max-w-3xl">
               <h1 className="text-5xl sm:text-6xl font-bold mb-3">
                 <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                  PiPilot Repo Agent
+                  PiPilot SWE Agent
                 </span>
               </h1>
               <p className="text-lg text-gray-400">
-                AI-powered GitHub repository management
+               Your SWE companion for complex projects.
               </p>
             </div>
 
@@ -1506,7 +1563,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     value={landingInput}
                     onChange={(e) => setLandingInput(e.target.value)}
                     placeholder="Describe your coding task or ask a question..."
-                    className="w-full min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 mb-3"
+                    className="w-full min-h-[140px] bg-transparent border-0 text-white text-base placeholder-gray-500 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 px-4 py-4 mb-3 rounded-lg"
                     style={{
                       whiteSpace: 'pre-wrap',
                       wordWrap: 'break-word',

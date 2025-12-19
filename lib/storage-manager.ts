@@ -158,13 +158,13 @@ export interface RepoConversation {
     role: 'user' | 'assistant'
     content: string
     timestamp: string
-    reasoning?: string
     toolInvocations?: any[]
     toolCalls?: any[]
     fileChanges?: Array<{
       path: string
       status: 'created' | 'modified' | 'deleted'
     }>
+    metadata?: Record<string, any> // Store reasoning and other metadata here
   }>
   lastActivity: string
   createdAt: string
