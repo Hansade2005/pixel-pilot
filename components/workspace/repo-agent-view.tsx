@@ -68,48 +68,123 @@ import {
   ArrowLeft
 } from 'lucide-react'
 
-// Helper for user-friendly tool labels
+// Helper for user-friendly tool labels (past tense for completed actions)
 const getToolLabel = (tool: string, args?: any) => {
   switch (tool) {
     case 'github_write_file':
-      return `Creating/Updating ${args?.path ? args.path.split('/').pop() : 'file'}`
+      return `Created/Updated ${args?.path ? args.path.split('/').pop() : 'file'}`
     case 'github_read_file':
-      return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
+      return `Read ${args?.path ? args.path.split('/').pop() : 'file'}`
     case 'github_list_files':
-      return `Listing files in ${args?.path || 'root'}`
+      return `Listed files in ${args?.path || 'root'}`
     case 'github_create_branch':
-      return `Creating branch ${args?.branch || 'unknown'}`
+      return `Created branch ${args?.branch || 'unknown'}`
     case 'github_delete_branch':
-      return `Deleting branch ${args?.branch || 'unknown'}`
+      return `Deleted branch ${args?.branch || 'unknown'}`
     case 'github_stage_change':
-      return `Staging ${args?.operation || 'change'} for ${args?.path ? args.path.split('/').pop() : 'file'}`
+      return `Staged ${args?.operation || 'change'} for ${args?.path ? args.path.split('/').pop() : 'file'}`
     case 'github_commit_changes':
-      return `Committing changes: "${args?.message || 'Update'}"`
+      return `Committed changes: "${args?.message || 'Update'}"`
     case 'github_edit_file':
-      return `Editing ${args?.path ? args.path.split('/').pop() : 'file'}`
+      return `Edited ${args?.path ? args.path.split('/').pop() : 'file'}`
     case 'github_replace_string':
-      return `Replacing text in ${args?.path ? args.path.split('/').pop() : 'file'}`
+      return `Replaced text in ${args?.path ? args.path.split('/').pop() : 'file'}`
     case 'github_delete_file':
-      return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      return `Deleted ${args?.path ? args.path.split('/').pop() : 'file'}`
     case 'github_search_code':
-      return `Searching code for "${args?.query || ''}"`
+      return `Searched code for "${args?.query || ''}"`
     case 'github_list_repos':
-      return 'Listing repositories'
+      return 'Listed repositories'
     case 'github_get_commit_statuses':
-      return `Checking status for ${args?.ref?.slice(0, 7) || 'commit'}`
+      return `Checked status for ${args?.ref?.slice(0, 7) || 'commit'}`
     case 'github_get_repo_info':
-      return 'Getting repository info'
+      return 'Retrieved repository info'
     case 'github_create_repo':
-      return `Creating repository ${args?.name || 'unknown'}`
+      return `Created repository ${args?.name || 'unknown'}`
     case 'github_create_tag':
-      return `Creating tag ${args?.tag || 'unknown'}`
+      return `Created tag ${args?.tag || 'unknown'}`
     case 'github_list_tags':
-      return `Listing tags for ${args?.repo || 'current repo'}`
+      return `Listed tags for ${args?.repo || 'current repo'}`
     case 'github_delete_tag':
-      return `Deleting tag ${args?.tag || 'unknown'}`
+      return `Deleted tag ${args?.tag || 'unknown'}`
     default:
       // Fallback to cleaner text if possible
       return tool.replace('github_', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }
+}
+
+// Helper function to parse edit file diffs
+function parseEditFileDiff(searchReplaceBlock: string): { additions: number; deletions: number; diffLines: string[] } {
+  if (!searchReplaceBlock) return { additions: 0, deletions: 0, diffLines: [] }
+  
+  const diffLines: string[] = []
+  let additions = 0
+  let deletions = 0
+  
+  const searchMatch = searchReplaceBlock.match(/<<<<<<< SEARCH\n([\s\S]*?)\n=======/)
+  const replaceMatch = searchReplaceBlock.match(/=======\n([\s\S]*?)\n>>>>>>> REPLACE/)
+  
+  if (searchMatch) {
+    const searchLines = searchMatch[1].split('\n').filter(line => line.trim())
+    deletions = searchLines.length
+    searchLines.forEach(line => {
+      diffLines.push(`- ${line}`)
+    })
+  }
+  
+  if (replaceMatch) {
+    const replaceLines = replaceMatch[1].split('\n').filter(line => line.trim())
+    additions = replaceLines.length
+    replaceLines.forEach(line => {
+      diffLines.push(`+ ${line}`)
+    })
+  }
+  
+  return { additions, deletions, diffLines }
+}
+
+// Helper function to parse string replacement diffs
+function parseReplacementDiff(oldString: string, newString: string): { additions: number; deletions: number; diffLines: string[] } {
+  if (!oldString || !newString) return { additions: 0, deletions: 0, diffLines: [] }
+  
+  const diffLines: string[] = []
+  const oldLines = oldString.split('\n').filter(line => line.trim())
+  const newLines = newString.split('\n').filter(line => line.trim())
+  
+  oldLines.forEach(line => {
+    diffLines.push(`- ${line}`)
+  })
+  newLines.forEach(line => {
+    diffLines.push(`+ ${line}`)
+  })
+  
+  return {
+    additions: newLines.length,
+    deletions: oldLines.length,
+    diffLines
+  }
+}
+
+// Helper function to count file creation diffs
+function parseFileCreationDiff(content: string): { additions: number; deletions: number; diffLines: string[] } {
+  if (!content) return { additions: 0, deletions: 0, diffLines: [] }
+  
+  const lines = content.split('\n')
+  const diffLines = lines.slice(0, 20).map(line => `+ ${line}`) // Show first 20 lines
+  
+  return {
+    additions: lines.length,
+    deletions: 0,
+    diffLines: diffLines.length < lines.length ? [...diffLines, `... and ${lines.length - 20} more lines`] : diffLines
+  }
+}
+
+// Helper function to parse file deletion diffs
+function parseFileDeletionDiff(fileLength: number = 0): { additions: number; deletions: number; diffLines: string[] } {
+  return {
+    additions: 0,
+    deletions: fileLength || 1,
+    diffLines: ['File deleted']
   }
 }
 
@@ -153,7 +228,6 @@ interface ActionLog {
   type: 'file_operation' | 'api_call' | 'commit' | 'error'
   description: string
   timestamp: Date
-  success: boolean
 }
 
 interface Attachment {
@@ -652,8 +726,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 id: parsed.toolCallId || Date.now().toString(),
                 type: parsed.toolName?.includes('file') || parsed.toolName?.includes('stage') ? 'file_operation' : 'api_call',
                 description: getToolLabel(parsed.toolName, parsed.args || parsed.input),
-                timestamp: new Date(),
-                success: false
+                timestamp: new Date()
               }
               setActionLogs(prev => [...prev, actionLog])
 
@@ -695,13 +768,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   : msg
               ))
 
-              // Update action log status
-              setActionLogs(prev => prev.map(log => {
-                if (log.description.includes(parsed.toolName)) {
-                  return { ...log, success: parsed.result?.success || false }
-                }
-                return log
-              }))
+              // Actions are tracked on tool-call, no need to update on result
 
               // File changes are tracked in toolInvocations instead of separate state
               // This follows the chat-panel-v2.tsx pattern of using tool execution data directly
@@ -890,8 +957,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 id: parsed.toolCallId || Date.now().toString(),
                 type: parsed.toolName?.includes('file') || parsed.toolName?.includes('folder') ? 'file_operation' : 'api_call',
                 description: getToolLabel(parsed.toolName, parsed.args || parsed.input),
-                timestamp: new Date(),
-                success: false
+                timestamp: new Date()
               }
               setActionLogs(prev => [...prev, actionLog])
 
@@ -928,13 +994,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 return newMap
               })
 
-              // Update sidebar log
-              setActionLogs(prev => prev.map(log => {
-                if (log.id === parsed.toolCallId || log.description.includes(parsed.toolName)) {
-                  return { ...log, success: parsed.result?.success || false }
-                }
-                return log
-              }))
+              // Actions are tracked on tool-call, no need to update on result
 
               // Update message
               setMessages(prev => prev.map(msg =>
@@ -2067,70 +2127,84 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   <p>No diffs to review</p>
                 </div>
               ) : (
-                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).map((change: any, index: number) => (
-                  <div
-                    key={index}
-                    className="accordion overflow-hidden mb-5 rounded-xl"
-                    style={{
-                      background: 'rgba(31, 41, 55, 0.4)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
-                    }}
-                  >
-                    <button
-                      onClick={() => toggleDiff(change.args?.path || change.args?.filePath || 'unknown')}
-                      className="accordion-header w-full p-4 font-medium text-white flex items-center justify-between gap-2.5 cursor-pointer transition-all"
-                      style={{
-                        background: 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'linear-gradient(135deg, #1e40af, #1d4ed8)'
-                      }}
-                    >
-                      <div className="file-info flex items-center gap-2.5">
-                        <File className="w-4 h-4" />
-                        {change.args?.path || change.args?.filePath || 'unknown'}
-                      </div>
-                      <div className="diff-stats text-sm flex gap-3">
-                        <span className="text-gray-400">Tool: {change.toolName}</span>
-                      </div>
-                    </button>
+                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).map((change: any, index: number) => {
+                  const filePath = change.args?.path || change.args?.filePath || 'unknown'
+                  let diffStats = { additions: 0, deletions: 0, diffLines: [] as string[] }
+                  
+                  if (change.toolName === 'github_edit_file' && change.args?.searchReplaceBlock) {
+                    diffStats = parseEditFileDiff(change.args.searchReplaceBlock)
+                  } else if (change.toolName === 'github_replace_string' && change.args?.oldString && change.args?.newString) {
+                    diffStats = parseReplacementDiff(change.args.oldString, change.args.newString)
+                  } else if (change.toolName === 'github_write_file' && change.args?.content) {
+                    diffStats = parseFileCreationDiff(change.args.content)
+                  } else if (change.toolName === 'github_delete_file') {
+                    diffStats = parseFileDeletionDiff()
+                  }
+                  
+                  return (
                     <div
-                      className={`accordion-content overflow-hidden transition-all ${showDiffs[change.args?.path || change.args?.filePath || 'unknown'] ? 'active' : ''
-                        }`}
+                      key={index}
+                      className="accordion overflow-hidden mb-5 rounded-xl"
                       style={{
-                        maxHeight: showDiffs[change.args?.path || change.args?.filePath || 'unknown'] ? '1000px' : '0'
+                        background: 'rgba(31, 41, 55, 0.4)',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
                       }}
                     >
-                      {change.result?.commit?.message && [
-                        `Commit: ${change.result.commit.message}`,
-                        `Tool: ${change.toolName}`,
-                        `Time: ${new Date().toLocaleTimeString()}`
-                      ].map((line: string, lineIndex: number) => (
-                        <div
-                          key={lineIndex}
-                          className="diff-line p-4 text-sm font-mono whitespace-pre-wrap break-all transition-all"
-                          style={{
-                            borderLeft: '3px solid transparent',
-                            background: 'rgba(59, 130, 246, 0.05)',
-                            borderLeftColor: '#3b82f6'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)'
-                          }}
-                        >
-                          {line}
+                      <button
+                        onClick={() => toggleDiff(filePath)}
+                        className="accordion-header w-full p-4 font-medium text-white flex items-center justify-between gap-2.5 cursor-pointer transition-all"
+                        style={{
+                          background: 'linear-gradient(135deg, #1e40af, #1d4ed8)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #1e40af, #1d4ed8)'
+                        }}
+                      >
+                        <div className="file-info flex items-center gap-2.5 flex-1">
+                          <File className="w-4 h-4" />
+                          <div className="flex flex-col items-start">
+                            <span>{filePath}</span>
+                            <span className="text-xs text-gray-400 mt-1">
+                              {diffStats.additions > 0 && <span className="text-green-400">+{diffStats.additions}</span>}
+                              {diffStats.additions > 0 && diffStats.deletions > 0 && <span className="mx-1">•</span>}
+                              {diffStats.deletions > 0 && <span className="text-red-400">-{diffStats.deletions}</span>}
+                            </span>
+                          </div>
                         </div>
-                      ))}
+                        <div className="diff-indicator text-xs">
+                          {showDiffs[filePath] ? '▼' : '▶'}
+                        </div>
+                      </button>
+                      <div
+                        className={`accordion-content overflow-hidden transition-all ${showDiffs[filePath] ? 'active' : ''
+                          }`}
+                        style={{
+                          maxHeight: showDiffs[filePath] ? `${Math.min(diffStats.diffLines.length * 24 + 100, 1000)}px` : '0'
+                        }}
+                      >
+                        <div className="p-4 space-y-1">
+                          {diffStats.diffLines.map((line: string, lineIndex: number) => (
+                            <div
+                              key={lineIndex}
+                              className="diff-line text-xs font-mono whitespace-pre-wrap break-all transition-all p-2 rounded"
+                              style={{
+                                background: line.startsWith('+') ? 'rgba(34, 197, 94, 0.1)' : line.startsWith('-') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.05)',
+                                borderLeft: line.startsWith('+') ? '3px solid #22c55e' : line.startsWith('-') ? '3px solid #ef4444' : 'transparent',
+                                color: line.startsWith('+') ? '#86efac' : line.startsWith('-') ? '#fca5a5' : '#9ca3af'
+                              }}
+                            >
+                              {line}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           )}
@@ -2178,12 +2252,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
                     }}
                   >
-                    <div className={action.success ? 'text-green-400' : 'text-yellow-400'}>
-                      {action.success ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      )}
+                    <div className="text-green-400">
+                      <CheckCircle2 className="w-5 h-5" />
                     </div>
                     <div className="flex-1">
                       <div className="font-medium text-white">{action.description}</div>
