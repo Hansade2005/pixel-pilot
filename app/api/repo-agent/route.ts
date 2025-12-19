@@ -51,6 +51,7 @@ CORE CAPABILITIES
 - **github_list_files** - Browse repository directory structure
 - **github_list_repos** - Show user's accessible repositories
 - **github_get_repo_info** - Get repository metadata and details
+- **github_get_commit_statuses** - Get deployment/CI statuses for a commit
 - **github_create_branch** - Create new branches for changes
 - **github_create_repo** - Create new GitHub repositories
 - **github_create_tag** - Create tags (releases)
@@ -571,6 +572,47 @@ Assistant:
           } catch (error) {
             const errorMsg = `Failed to list repositories: ${error instanceof Error ? error.message : 'Unknown error'}`
             console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_list_repos failed:`, errorMsg)
+            return {
+              success: false,
+              error: errorMsg
+            }
+          }
+        }
+      }),
+
+      github_get_commit_statuses: tool({
+        description: 'Get the deployment or CI statuses for a specific commit SHA or ref',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          ref: z.string().describe('Commit SHA, branch name, or tag name')
+        }),
+        execute: async ({ repo, ref }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_get_commit_statuses - Input:`, { repo, ref })
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.repos.listCommitStatusesForRef({
+              owner,
+              repo: repoName,
+              ref
+            })
+
+            const result = {
+              success: true,
+              total_count: response.data.length,
+              statuses: response.data.map(status => ({
+                state: status.state, // 'error', 'failure', 'pending', 'success'
+                description: status.description,
+                context: status.context,
+                target_url: status.target_url,
+                created_at: status.created_at,
+                updated_at: status.updated_at
+              }))
+            }
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_get_commit_statuses completed - Found ${result.total_count} statuses`)
+            return result
+          } catch (error) {
+            const errorMsg = `Failed to get commit statuses: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_get_commit_statuses failed:`, errorMsg)
             return {
               success: false,
               error: errorMsg

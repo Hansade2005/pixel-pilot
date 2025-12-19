@@ -95,6 +95,8 @@ const getToolLabel = (tool: string, args?: any) => {
       return `Searching code for "${args?.query || ''}"`
     case 'github_list_repos':
       return 'Listing repositories'
+    case 'github_get_commit_statuses':
+      return `Checking status for ${args?.ref?.slice(0, 7) || 'commit'}`
     case 'github_get_repo_info':
       return 'Getting repository info'
     case 'github_create_repo':
@@ -145,13 +147,6 @@ interface Message {
   role?: 'user' | 'assistant'
 }
 
-interface FileChange {
-  path: string
-  status: 'created' | 'modified' | 'deleted'
-  additions?: number
-  deletions?: number
-  diff?: string[]
-}
 
 interface ActionLog {
   id: string
@@ -185,9 +180,17 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   // Sidebar state
   const [activeTab, setActiveTab] = useState<'changes' | 'diffs' | 'actions'>('changes')
-  const [fileChanges, setFileChanges] = useState<FileChange[]>([])
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([])
   const [showDiffs, setShowDiffs] = useState<Record<string, boolean>>({})
+
+  // Tool invocations tracking - following chat-panel-v2.tsx pattern
+  // Maps message ID to array of tool calls with their status
+  const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
+    toolName: string
+    toolCallId: string
+    args?: any
+    status: 'executing' | 'completed' | 'failed'
+  }>>>(new Map())
 
   // UI state
   const [chatWidth, setChatWidth] = useState(50)
@@ -629,70 +632,30 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 state: 'call'
               })
 
+              // Track in activeToolCalls for status management
+              const toolEntry = {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId || Date.now().toString(),
+                args: parsed.args || parsed.input,
+                status: 'executing' as const
+              }
+
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(agentMessageId) || []
+                messageCalls.push(toolEntry)
+                newMap.set(agentMessageId, messageCalls)
+                return newMap
+              })
+
               const actionLog: ActionLog = {
                 id: parsed.toolCallId || Date.now().toString(),
                 type: parsed.toolName?.includes('file') || parsed.toolName?.includes('stage') ? 'file_operation' : 'api_call',
-                description: getToolLabel(parsed.toolName, parsed.args), // Use friendly Label
+                description: getToolLabel(parsed.toolName, parsed.args || parsed.input),
                 timestamp: new Date(),
                 success: false
               }
               setActionLogs(prev => [...prev, actionLog])
-
-              // --- File Change Tracking based on ARGS ---
-              const toolName = parsed.toolName
-              const args = parsed.args || {}
-
-              if (['github_write_file', 'github_edit_file', 'github_replace_string', 'github_stage_change'].includes(toolName)) {
-                let additions = 0
-                let deletions = 0
-                let path = args.path
-                let diffLines: string[] = []
-
-                const countLines = (str: string) => str ? str.split('\n').length : 0
-                const getLines = (str: string) => str ? str.split('\n') : []
-
-                if (toolName === 'github_write_file') {
-                  additions = countLines(args.content)
-                  deletions = 0
-                  diffLines = getLines(args.content).map(l => '+' + l)
-                } else if (toolName === 'github_edit_file') {
-                  deletions = countLines(args.target)
-                  additions = countLines(args.replacement)
-                  diffLines = [
-                    ...getLines(args.target).map(l => '-' + l),
-                    ...getLines(args.replacement).map(l => '+' + l)
-                  ]
-                } else if (toolName === 'github_replace_string') {
-                  deletions = countLines(args.search)
-                  additions = countLines(args.replace)
-                  diffLines = [
-                    ...getLines(args.search).map(l => '-' + l),
-                    ...getLines(args.replace).map(l => '+' + l)
-                  ]
-                } else if (toolName === 'github_stage_change') {
-                  // For staging, we trust the operation
-                  if (args.operation === 'delete') {
-                    deletions = 1 // Nominal
-                    diffLines = ['- (File Deleted)']
-                  } else {
-                    additions = countLines(args.content)
-                    diffLines = getLines(args.content).map(l => '+' + l)
-                  }
-                }
-
-                setFileChanges(prev => {
-                  // Dedup by path
-                  const existing = prev.filter(f => f.path !== path)
-                  return [...existing, {
-                    path: path || 'unknown',
-                    status: args.operation === 'delete' ? 'deleted' : 'modified', // Simplify status
-                    additions,
-                    deletions,
-                    diff: diffLines
-                  }]
-                })
-              }
-              // ------------------------------------------
 
               setMessages(prev => prev.map(msg =>
                 msg.id === agentMessageId
@@ -713,6 +676,19 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 }
               }
 
+              // Update tool status in activeToolCalls
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(agentMessageId) || []
+                const updatedCalls = messageCalls.map(call =>
+                  call.toolCallId === parsed.toolCallId
+                    ? { ...call, status: (parsed.result?.success || !parsed.result?.error) ? 'completed' as const : 'failed' as const }
+                    : call
+                )
+                newMap.set(agentMessageId, updatedCalls)
+                return newMap
+              })
+
               setMessages(prev => prev.map(msg =>
                 msg.id === agentMessageId
                   ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
@@ -727,72 +703,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 return log
               }))
 
-              // Track file changes for ALL file operation tools
-              if (parsed.result?.success) {
-                let fileChange: FileChange | null = null
-
-                // github_write_file - creates or updates files
-                if (parsed.toolName === 'github_write_file') {
-                  fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
-                    status: parsed.result.action === 'created' ? 'created' : 'modified',
-                    additions: parsed.result.changes?.new_length || 0,
-                    deletions: parsed.result.changes?.old_length || 0,
-                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
-                  }
-                }
-                // github_edit_file - edits existing files with search/replace
-                else if (parsed.toolName === 'github_edit_file') {
-                  fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
-                    status: 'modified',
-                    additions: parsed.result.changes?.new_length || 0,
-                    deletions: parsed.result.changes?.old_length || 0,
-                    diff: [
-                      `Commit: ${parsed.result.commit?.message || 'File edited'}`,
-                      `Replacements: ${parsed.result.replacements_made || 0}`,
-                      `Size change: ${parsed.result.changes?.diff_length || 0} bytes`
-                    ]
-                  }
-                }
-                // github_replace_string - replaces strings in files
-                else if (parsed.toolName === 'github_replace_string') {
-                  fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
-                    status: 'modified',
-                    additions: parsed.result.changes?.new_length || 0,
-                    deletions: parsed.result.changes?.old_length || 0,
-                    diff: [
-                      `Commit: ${parsed.result.commit?.message || 'String replaced'}`,
-                      `Replacements: ${parsed.result.replacements_made || 0}`,
-                      `Size change: ${parsed.result.changes?.diff || 0} bytes`
-                    ]
-                  }
-                }
-                // github_delete_file - deletes files
-                else if (parsed.toolName === 'github_delete_file') {
-                  fileChange = {
-                    path: parsed.args?.path || 'unknown',
-                    status: 'deleted',
-                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
-                  }
-                }
-
-                // Add file change to state if we captured one
-                if (fileChange) {
-                  console.log('[RepoAgent] Adding file change:', fileChange)
-                  setFileChanges(prev => {
-                    // Check if this file is already tracked, update it instead of duplicating
-                    const existingIndex = prev.findIndex(fc => fc.path === fileChange!.path)
-                    if (existingIndex >= 0) {
-                      const updated = [...prev]
-                      updated[existingIndex] = fileChange!
-                      return updated
-                    }
-                    return [fileChange!, ...prev]
-                  })
-                }
-              }
+              // File changes are tracked in toolInvocations instead of separate state
+              // This follows the chat-panel-v2.tsx pattern of using tool execution data directly
             }
           } catch (parseError) {
             console.warn('[RepoAgent] Parse error:', parseError)
@@ -957,11 +869,27 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 state: 'call'
               })
 
+              // Track in activeToolCalls for status management
+              const toolEntry = {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId || Date.now().toString(),
+                args: parsed.args || parsed.input,
+                status: 'executing' as const
+              }
+
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(assistantMessageId) || []
+                messageCalls.push(toolEntry)
+                newMap.set(assistantMessageId, messageCalls)
+                return newMap
+              })
+
               // Update sidebar log
               const actionLog: ActionLog = {
                 id: parsed.toolCallId || Date.now().toString(),
                 type: parsed.toolName?.includes('file') || parsed.toolName?.includes('folder') ? 'file_operation' : 'api_call',
-                description: `${parsed.toolName} ${parsed.args?.path ? `(${parsed.args.path})` : ''}`,
+                description: getToolLabel(parsed.toolName, parsed.args || parsed.input),
                 timestamp: new Date(),
                 success: false
               }
@@ -987,6 +915,19 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 }
               }
 
+              // Update tool status in activeToolCalls
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(assistantMessageId) || []
+                const updatedCalls = messageCalls.map(call =>
+                  call.toolCallId === parsed.toolCallId
+                    ? { ...call, status: (parsed.result?.success || !parsed.result?.error) ? 'completed' as const : 'failed' as const }
+                    : call
+                )
+                newMap.set(assistantMessageId, updatedCalls)
+                return newMap
+              })
+
               // Update sidebar log
               setActionLogs(prev => prev.map(log => {
                 if (log.id === parsed.toolCallId || log.description.includes(parsed.toolName)) {
@@ -1002,71 +943,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   : msg
               ))
 
-              // Track file changes for ALL file operation tools
-              if (parsed.result?.success) {
-                let fileChange: FileChange | null = null
-
-                // github_write_file
-                if (parsed.toolName === 'github_write_file' || parsed.toolName === 'write_file') {
-                  fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || 'unknown',
-                    status: parsed.result.action === 'created' ? 'created' : 'modified',
-                    additions: parsed.result.changes?.new_length || 0,
-                    deletions: parsed.result.changes?.old_length || 0,
-                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
-                  }
-                }
-                // github_edit_file
-                else if (parsed.toolName === 'github_edit_file' || parsed.toolName === 'edit_file') {
-                  fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || parsed.args?.filePath || 'unknown',
-                    status: 'modified',
-                    additions: parsed.result.changes?.new_length || 0,
-                    deletions: parsed.result.changes?.old_length || 0,
-                    diff: [
-                      `Commit: ${parsed.result.commit?.message || 'File edited'}`,
-                      `Replacements: ${parsed.result.replacements_made || 0}`,
-                      `Size change: ${parsed.result.changes?.diff_length || 0} bytes`
-                    ]
-                  }
-                }
-                // github_replace_string
-                else if (parsed.toolName === 'github_replace_string' || parsed.toolName === 'client_replace_string_in_file') {
-                  fileChange = {
-                    path: parsed.result.file?.path || parsed.args?.path || parsed.args?.filePath || 'unknown',
-                    status: 'modified',
-                    additions: parsed.result.changes?.new_length || 0,
-                    deletions: parsed.result.changes?.old_length || 0,
-                    diff: [
-                      `Commit: ${parsed.result.commit?.message || 'String replaced'}`,
-                      `Replacements: ${parsed.result.replacements_made || 0}`,
-                      `Size change: ${parsed.result.changes?.diff || 0} bytes`
-                    ]
-                  }
-                }
-                // github_delete_file
-                else if (parsed.toolName === 'github_delete_file' || parsed.toolName === 'delete_file') {
-                  fileChange = {
-                    path: parsed.args?.path || 'unknown',
-                    status: 'deleted',
-                    diff: parsed.result.commit?.message ? [parsed.result.commit.message] : undefined
-                  }
-                }
-
-                // Add file change to state if we captured one
-                if (fileChange) {
-                  console.log('[RepoAgent] Adding file change:', fileChange)
-                  setFileChanges(prev => {
-                    const existingIndex = prev.findIndex(fc => fc.path === fileChange!.path)
-                    if (existingIndex >= 0) {
-                      const updated = [...prev]
-                      updated[existingIndex] = fileChange!
-                      return updated
-                    }
-                    return [fileChange!, ...prev]
-                  })
-                }
-              }
+              // File changes are tracked in toolInvocations instead of separate state
+              // This follows the chat-panel-v2.tsx pattern of using tool execution data directly
             }
           } catch (parseError) {
             console.warn('[RepoAgent] Parse error:', parseError)
@@ -1119,8 +997,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         content: msg.content,
         timestamp: msg.timestamp.toISOString(),
         reasoning: msg.reasoning,
-        toolInvocations: msg.toolInvocations,
-        fileChanges: fileChanges.length > 0 ? fileChanges : undefined
+        toolInvocations: msg.toolInvocations
       }))
 
       if (conversationId) {
@@ -1149,7 +1026,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const handleBackToLanding = () => {
     setCurrentView('landing')
     setMessages([])
-    setFileChanges([])
     setActionLogs([])
     setLandingInput('')
     setAttachments([])
@@ -1342,7 +1218,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const handleClearMessages = async () => {
     if (confirm('Are you sure you want to clear the entire conversation history? This cannot be undone.')) {
       setMessages([])
-      setFileChanges([])
       setActionLogs([])
       setAttachments([])
 
@@ -2114,13 +1989,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 Files Modified
               </h3>
 
-              {fileChanges.length === 0 ? (
+              {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <File className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No file changes yet</p>
                 </div>
               ) : (
-                fileChanges.map((change, index) => (
+                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).map((tool: any, index: number) => (
                   <div
                     key={index}
                     className="file-item flex items-center justify-between p-4.5 mb-3 rounded-xl cursor-pointer transition-all"
@@ -2143,23 +2018,22 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   >
                     <div className="flex items-center">
                       <div className="file-icon mr-3">
-                        {change.status === 'created' && (
+                        {tool.toolName === 'github_delete_file' && (
+                          <Minus className="w-5 h-5 text-red-400" />
+                        )}
+                        {tool.toolName === 'github_write_file' && (
                           <Plus className="w-5 h-5 text-green-400" />
                         )}
-                        {change.status === 'modified' && (
+                        {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && (
                           <File className="w-5 h-5 text-blue-400" />
-                        )}
-                        {change.status === 'deleted' && (
-                          <Minus className="w-5 h-5 text-red-400" />
                         )}
                       </div>
                       <div>
-                        <div className="font-medium text-white">{change.path}</div>
+                        <div className="font-medium text-white">{tool.args?.path || tool.args?.filePath || 'unknown'}</div>
                         <div className="text-green-400 text-sm mt-1">
-                          {change.status === 'created' && 'created'}
-                          {change.status === 'modified' && 'modified'}
-                          {change.status === 'deleted' && 'deleted'}
-                          {change.additions !== undefined && ` • +${change.additions} lines`}
+                          {tool.toolName === 'github_write_file' && 'created'}
+                          {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && 'modified'}
+                          {tool.toolName === 'github_delete_file' && 'deleted'}
                         </div>
                       </div>
                     </div>
@@ -2187,13 +2061,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 Review Changes
               </h3>
 
-              {fileChanges.length === 0 ? (
+              {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No diffs to review</p>
                 </div>
               ) : (
-                fileChanges.map((change, index) => (
+                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).map((change: any, index: number) => (
                   <div
                     key={index}
                     className="accordion overflow-hidden mb-5 rounded-xl"
@@ -2204,7 +2078,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     }}
                   >
                     <button
-                      onClick={() => toggleDiff(change.path)}
+                      onClick={() => toggleDiff(change.args?.path || change.args?.filePath || 'unknown')}
                       className="accordion-header w-full p-4 font-medium text-white flex items-center justify-between gap-2.5 cursor-pointer transition-all"
                       style={{
                         background: 'linear-gradient(135deg, #1e40af, #1d4ed8)'
@@ -2218,38 +2092,37 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     >
                       <div className="file-info flex items-center gap-2.5">
                         <File className="w-4 h-4" />
-                        {change.path}
+                        {change.args?.path || change.args?.filePath || 'unknown'}
                       </div>
                       <div className="diff-stats text-sm flex gap-3">
-                        {change.additions !== undefined && (
-                          <span className="added-stat text-green-400">+{change.additions}</span>
-                        )}
-                        {change.deletions !== undefined && (
-                          <span className="removed-stat text-red-400">-{change.deletions}</span>
-                        )}
+                        <span className="text-gray-400">Tool: {change.toolName}</span>
                       </div>
                     </button>
                     <div
-                      className={`accordion-content overflow-hidden transition-all ${showDiffs[change.path] ? 'active' : ''
+                      className={`accordion-content overflow-hidden transition-all ${showDiffs[change.args?.path || change.args?.filePath || 'unknown'] ? 'active' : ''
                         }`}
                       style={{
-                        maxHeight: showDiffs[change.path] ? '1000px' : '0'
+                        maxHeight: showDiffs[change.args?.path || change.args?.filePath || 'unknown'] ? '1000px' : '0'
                       }}
                     >
-                      {change.diff && change.diff.map((line, lineIndex) => (
+                      {change.result?.commit?.message && [
+                        `Commit: ${change.result.commit.message}`,
+                        `Tool: ${change.toolName}`,
+                        `Time: ${new Date().toLocaleTimeString()}`
+                      ].map((line: string, lineIndex: number) => (
                         <div
                           key={lineIndex}
                           className="diff-line p-4 text-sm font-mono whitespace-pre-wrap break-all transition-all"
                           style={{
                             borderLeft: '3px solid transparent',
-                            background: line.startsWith('+') ? 'rgba(16, 185, 129, 0.1)' : undefined,
-                            borderLeftColor: line.startsWith('+') ? '#10b981' : undefined
+                            background: 'rgba(59, 130, 246, 0.05)',
+                            borderLeftColor: '#3b82f6'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)'
+                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = line.startsWith('+') ? 'rgba(16, 185, 129, 0.1)' : ''
+                            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)'
                           }}
                         >
                           {line}
@@ -2305,16 +2178,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                       e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
                     }}
                   >
-                    <div className="text-green-400">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className={action.success ? 'text-green-400' : 'text-yellow-400'}>
+                      {action.success ? (
+                        <CheckCircle2 className="w-5 h-5" />
+                      ) : (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      )}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-white">{action.description}</div>
-                      <div className="text-gray-400 text-sm mt-1">
-                        {action.type === 'file_operation' && 'File operation'}
-                        {action.type === 'api_call' && 'API call'}
-                        {action.type === 'commit' && 'Git commit'}
-                        {action.type === 'error' && 'Error'}
+                      <div className="text-gray-500 text-xs mt-1 flex items-center gap-2">
+                        <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">
+                          {action.type === 'file_operation' && 'File'}
+                          {action.type === 'api_call' && 'API'}
+                          {action.type === 'commit' && 'Commit'}
+                          {action.type === 'error' && 'Error'}
+                        </span>
+                        <span>{new Date(action.timestamp).toLocaleTimeString()}</span>
                       </div>
                     </div>
                   </div>
