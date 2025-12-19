@@ -220,7 +220,6 @@ interface Message {
   reasoning?: string
   toolInvocations?: any[]
   role?: 'user' | 'assistant'
-  metadata?: Record<string, any>
 }
 
 
@@ -385,57 +384,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             id: msg.id,
             content: msg.content,
             isUser: msg.role === 'user',
-            timestamp: new Date(msg.timestamp),
-            reasoning: msg.metadata?.reasoning || '',
-            toolInvocations: msg.toolInvocations || [],
-            metadata: msg.metadata || {}
+            timestamp: new Date(msg.timestamp)
           }))
           setMessages(loadedMessages)
-
-          // Reconstruct sidebar state from loaded tool invocations
-          const reconstructedActionLogs: ActionLog[] = []
-          const reconstructedActiveToolCalls = new Map<string, Array<{
-            toolName: string
-            toolCallId: string
-            args?: any
-            status: 'executing' | 'completed' | 'failed'
-          }>>()
-
-          loadedMessages.forEach((msg: Message) => {
-            if (msg.toolInvocations && msg.toolInvocations.length > 0) {
-              msg.toolInvocations.forEach((inv: any) => {
-                // Reconstruct action logs
-                const actionLog: ActionLog = {
-                  id: inv.toolCallId || `${msg.id}-${Date.now()}`,
-                  type: inv.toolName?.includes('file') || inv.toolName?.includes('folder') ? 'file_operation' : 'api_call',
-                  description: getToolLabel(inv.toolName, inv.args),
-                  timestamp: msg.timestamp
-                }
-                reconstructedActionLogs.push(actionLog)
-
-                // Reconstruct active tool calls
-                const toolCallEntry = {
-                  toolName: inv.toolName,
-                  toolCallId: inv.toolCallId,
-                  args: inv.args,
-                  status: (inv.state === 'result' ? 'completed' as const : inv.state === 'call' ? 'executing' as const : 'failed' as const)
-                }
-
-                if (!reconstructedActiveToolCalls.has(msg.id)) {
-                  reconstructedActiveToolCalls.set(msg.id, [])
-                }
-                reconstructedActiveToolCalls.get(msg.id)!.push(toolCallEntry)
-              })
-            }
-          })
-
-          setActionLogs(reconstructedActionLogs)
-          setActiveToolCalls(reconstructedActiveToolCalls)
         } else {
           console.log('[RepoAgent] No conversation history found for', selectedRepo, selectedBranch)
           setConversationId(null)
-          setActionLogs([])
-          setActiveToolCalls(new Map())
         }
       } catch (error) {
         console.error('[RepoAgent] Error loading conversation history:', error)
@@ -827,18 +781,17 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
       // Final update: ensure the complete accumulated content is in the message
       console.log('[RepoAgent] Landing stream complete, final content length:', accumulatedContent.length)
-      const updatedMessages = messages.map(msg =>
+      setMessages(prev => prev.map(msg =>
         msg.id === agentMessageId
           ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
-      )
-      setMessages(updatedMessages)
+      ))
 
       // Set streaming to false after stream completes
       setIsStreaming(false)
 
       // Save initial conversation after first stream completes
-      await saveConversationToStorage(updatedMessages)
+      await saveConversationToStorage()
     } catch (error) {
       console.error('Error starting repo agent:', error)
       toast({
@@ -1062,15 +1015,14 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
       // Final update
       console.log('[RepoAgent] Stream complete, final content length:', accumulatedContent.length)
-      const updatedMessages = messages.map(msg =>
+      setMessages(prev => prev.map(msg =>
         msg.id === assistantMessageId
           ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
-      )
-      setMessages(updatedMessages)
+      ))
 
       // Save conversation after stream completes
-      await saveConversationToStorage(updatedMessages)
+      await saveConversationToStorage()
     } catch (error) {
       // Handle abort separately - don't show error toast for user-initiated stops
       if (error instanceof Error && error.name === 'AbortError') {
@@ -1093,24 +1045,20 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   }
 
   // Save conversation to IndexedDB
-  const saveConversationToStorage = async (customMessages?: Message[]) => {
-    const messagesToSave = customMessages || messages
-    if (!selectedRepo || !selectedBranch || !userId || messagesToSave.length === 0) return
+  const saveConversationToStorage = async () => {
+    if (!selectedRepo || !selectedBranch || !userId || messages.length === 0) return
 
     try {
       await storageManager.init()
 
       // Convert messages to storage format
-      const storageMessages = messagesToSave.map(msg => ({
+      const storageMessages = messages.map(msg => ({
         id: msg.id,
         role: msg.isUser ? 'user' as const : 'assistant' as const,
         content: msg.content,
         timestamp: msg.timestamp.toISOString(),
-        toolInvocations: msg.toolInvocations,
-        metadata: {
-          reasoning: msg.reasoning || '',
-          ...msg.metadata
-        }
+        reasoning: msg.reasoning,
+        toolInvocations: msg.toolInvocations
       }))
 
       if (conversationId) {
@@ -1140,8 +1088,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     setCurrentView('landing')
     setMessages([])
     setActionLogs([])
-    setActiveToolCalls(new Map())
-    setShowDiffs({})
     setLandingInput('')
     setAttachments([])
   }
@@ -1334,8 +1280,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     if (confirm('Are you sure you want to clear the entire conversation history? This cannot be undone.')) {
       setMessages([])
       setActionLogs([])
-      setActiveToolCalls(new Map())
-      setShowDiffs({})
       setAttachments([])
 
       if (conversationId) {
