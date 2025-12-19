@@ -158,6 +158,8 @@ export interface RepoConversation {
     role: 'user' | 'assistant'
     content: string
     timestamp: string
+    reasoning?: string
+    toolInvocations?: any[]
     toolCalls?: any[]
     fileChanges?: Array<{
       path: string
@@ -340,26 +342,26 @@ export interface StorageInterface {
   getToken(userId: string, provider: string): Promise<TokenEntry | null>;
   updateToken(id: string, updates: Partial<TokenEntry>): Promise<TokenEntry | null>;
   deleteToken(id: string): Promise<boolean>;
-  
+
   // Checkpoint methods for versioning and revert functionality
   createCheckpoint(checkpoint: Omit<Checkpoint, 'id' | 'createdAt'>): Promise<Checkpoint>;
   getCheckpoints(workspaceId: string): Promise<Checkpoint[]>;
   getCheckpoint(id: string): Promise<Checkpoint | null>;
   deleteCheckpoint(id: string): Promise<boolean>;
   restoreCheckpoint(checkpointId: string): Promise<boolean>;
-  
+
   // Conversation memory methods for persistent chat history
   createConversationMemory(memory: Omit<ConversationMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationMemory>;
   getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null>;
   updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null>;
   deleteConversationMemory(id: string): Promise<boolean>;
-  
+
   // Conversation summary methods for Codestral-generated summaries
   createConversationSummary(summary: Omit<ConversationSummary, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationSummary>;
   getConversationSummary(projectId: string, userId: string): Promise<ConversationSummary | null>;
   updateConversationSummary(id: string, updates: Partial<ConversationSummary>): Promise<ConversationSummary | null>;
   deleteConversationSummary(id: string): Promise<boolean>;
-  
+
   // Tool execution tracking methods for preventing duplicate executions
   createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution>;
   getToolExecution(id: string): Promise<ToolExecution | null>;
@@ -367,48 +369,48 @@ export interface StorageInterface {
   updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null>;
   deleteToolExecution(id: string): Promise<boolean>;
   findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null>;
-  
+
   // Vercel project management methods
   createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject>;
   getVercelProject(workspaceId: string): Promise<VercelProject | null>;
   getVercelProjectById(id: string): Promise<VercelProject | null>;
   updateVercelProject(id: string, updates: Partial<VercelProject>): Promise<VercelProject | null>;
   deleteVercelProject(id: string): Promise<boolean>;
-  
+
   // Vercel deployment methods
   createVercelDeployment(deployment: Omit<VercelDeployment, 'id' | 'updatedAt'>): Promise<VercelDeployment>;
   getVercelDeployments(projectId: string): Promise<VercelDeployment[]>;
   getVercelDeploymentsByWorkspace(workspaceId: string): Promise<VercelDeployment[]>;
   updateVercelDeployment(id: string, updates: Partial<VercelDeployment>): Promise<VercelDeployment | null>;
   deleteVercelDeployment(id: string): Promise<boolean>;
-  
+
   // Vercel environment variable methods
   createVercelEnvVariable(envVar: Omit<VercelEnvVariable, 'id' | 'updatedAt'>): Promise<VercelEnvVariable>;
   getVercelEnvVariables(projectId: string): Promise<VercelEnvVariable[]>;
   updateVercelEnvVariable(id: string, updates: Partial<VercelEnvVariable>): Promise<VercelEnvVariable | null>;
   deleteVercelEnvVariable(id: string): Promise<boolean>;
-  
+
   // Vercel domain methods
   createVercelDomain(domain: Omit<VercelDomain, 'id' | 'updatedAt'>): Promise<VercelDomain>;
   getVercelDomains(projectId: string): Promise<VercelDomain[]>;
   updateVercelDomain(id: string, updates: Partial<VercelDomain>): Promise<VercelDomain | null>;
   deleteVercelDomain(id: string): Promise<boolean>;
-  
+
   // Vercel log methods
   createVercelLog(log: Omit<VercelLog, 'id' | 'createdAt'>): Promise<VercelLog>;
   getVercelLogs(deploymentId: string): Promise<VercelLog[]>;
   deleteVercelLogs(deploymentId: string): Promise<boolean>;
-  
+
   // Repo conversation methods for GitHub repo agent chat persistence
   getRepoConversation(repo: string, branch: string, userId: string): Promise<RepoConversation | null>;
   createRepoConversation(conversation: Omit<RepoConversation, 'id' | 'createdAt' | 'updatedAt' | 'lastActivity'>): Promise<RepoConversation>;
   updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null>;
   deleteRepoConversation(id: string): Promise<boolean>;
   getAllRepoConversations(userId: string): Promise<RepoConversation[]>;
-  
+
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
-  
+
   clearAll(): Promise<void>;
   exportData(): Promise<any>;
 }
@@ -429,7 +431,7 @@ class InMemoryStorage implements StorageInterface {
   private repoConversations: Map<string, RepoConversation> = new Map() // Add repo conversations map
   private toolExecutions: Map<string, ToolExecution> = new Map() // Add tool executions map
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): InMemoryStorage {
     if (!InMemoryStorage.instance) {
@@ -468,7 +470,7 @@ class InMemoryStorage implements StorageInterface {
   async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace | null> {
     const workspace = this.workspaces.get(id)
     if (!workspace) return null
-    
+
     const updatedWorkspace: Workspace = {
       ...workspace,
       ...updates,
@@ -507,7 +509,7 @@ class InMemoryStorage implements StorageInterface {
   async updateFile(workspaceId: string, path: string, updates: Partial<File>): Promise<File | null> {
     const file = await this.getFile(workspaceId, path)
     if (!file) return null
-    
+
     const updatedFile: File = {
       ...file,
       ...updates,
@@ -548,7 +550,7 @@ class InMemoryStorage implements StorageInterface {
   async updateChatSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
     const chatSession = this.chatSessions.get(id)
     if (!chatSession) return null
-    
+
     const updatedChatSession: ChatSession = {
       ...chatSession,
       ...updates,
@@ -609,7 +611,7 @@ class InMemoryStorage implements StorageInterface {
   async updateDeployment(id: string, updates: Partial<Deployment>): Promise<Deployment | null> {
     const deployment = this.deployments.get(id)
     if (!deployment) return null
-    
+
     const updatedDeployment: Deployment = {
       ...deployment,
       ...updates
@@ -646,7 +648,7 @@ class InMemoryStorage implements StorageInterface {
   async updateEnvironmentVariable(id: string, updates: Partial<EnvironmentVariable>): Promise<EnvironmentVariable | null> {
     const envVar = this.environmentVariables.get(id)
     if (!envVar) return null
-    
+
     const updatedEnvVar: EnvironmentVariable = {
       ...envVar,
       ...updates,
@@ -692,7 +694,7 @@ class InMemoryStorage implements StorageInterface {
   async updateVercelProject(id: string, updates: Partial<VercelProject>): Promise<VercelProject | null> {
     const project = this.vercelProjects.get(id)
     if (!project) return null
-    
+
     const updatedProject: VercelProject = {
       ...project,
       ...updates,
@@ -729,7 +731,7 @@ class InMemoryStorage implements StorageInterface {
   async updateVercelDeployment(id: string, updates: Partial<VercelDeployment>): Promise<VercelDeployment | null> {
     const deployment = this.vercelDeployments.get(id)
     if (!deployment) return null
-    
+
     const updatedDeployment: VercelDeployment = {
       ...deployment,
       ...updates,
@@ -762,7 +764,7 @@ class InMemoryStorage implements StorageInterface {
   async updateVercelEnvVariable(id: string, updates: Partial<VercelEnvVariable>): Promise<VercelEnvVariable | null> {
     const envVar = this.vercelEnvVariables.get(id)
     if (!envVar) return null
-    
+
     const updatedEnvVar: VercelEnvVariable = {
       ...envVar,
       ...updates,
@@ -795,7 +797,7 @@ class InMemoryStorage implements StorageInterface {
   async updateVercelDomain(id: string, updates: Partial<VercelDomain>): Promise<VercelDomain | null> {
     const domain = this.vercelDomains.get(id)
     if (!domain) return null
-    
+
     const updatedDomain: VercelDomain = {
       ...domain,
       ...updates,
@@ -905,8 +907,8 @@ class InMemoryStorage implements StorageInterface {
       messages: Array.from(this.messages.values()),
       deployments: Array.from(this.deployments.values()),
       environmentVariables: Array.from(this.environmentVariables.values())
-  ,
-  tokens: Array.from(this.tokens.values())
+      ,
+      tokens: Array.from(this.tokens.values())
     }
   }
 
@@ -964,7 +966,7 @@ class InMemoryStorage implements StorageInterface {
     // In memory storage doesn't persist data, so we just populate the maps
     // This is primarily for testing and server-side operations
     if (!data || data.length === 0) return
-    
+
     // Map table names to their respective maps
     const tableMap: Record<string, Map<string, any>> = {
       workspaces: this.workspaces,
@@ -975,16 +977,16 @@ class InMemoryStorage implements StorageInterface {
       environmentVariables: this.environmentVariables,
       checkpoints: this.checkpoints
     }
-    
+
     const targetMap = tableMap[tableName]
     if (!targetMap) {
       console.warn(`Unknown table ${tableName} for import`)
       return
     }
-    
+
     // Clear existing data for this table
     targetMap.clear()
-    
+
     // Import new data
     data.forEach(item => {
       if (item.id) {
@@ -1100,7 +1102,7 @@ class InMemoryStorage implements StorageInterface {
   async updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null> {
     const memory = this.conversationMemories.get(id)
     if (!memory) return null
-    
+
     const updatedMemory: ConversationMemory = {
       ...memory,
       ...updates,
@@ -1141,7 +1143,7 @@ class InMemoryStorage implements StorageInterface {
   async updateConversationSummary(id: string, updates: Partial<ConversationSummary>): Promise<ConversationSummary | null> {
     const summary = this.conversationSummaries.get(id)
     if (!summary) return null
-    
+
     const updatedSummary: ConversationSummary = {
       ...summary,
       ...updates,
@@ -1183,7 +1185,7 @@ class InMemoryStorage implements StorageInterface {
   async updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null> {
     const conversation = this.repoConversations.get(id)
     if (!conversation) return null
-    
+
     const updatedConversation: RepoConversation = {
       ...conversation,
       ...updates,
@@ -1205,7 +1207,7 @@ class InMemoryStorage implements StorageInterface {
         conversations.push(conversation)
       }
     }
-    return conversations.sort((a, b) => 
+    return conversations.sort((a, b) =>
       new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
     )
   }
@@ -1235,7 +1237,7 @@ class InMemoryStorage implements StorageInterface {
   async updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null> {
     const existing = this.toolExecutions.get(id)
     if (!existing) return null
-    
+
     const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() }
     this.toolExecutions.set(id, updated)
     return updated
@@ -1247,9 +1249,9 @@ class InMemoryStorage implements StorageInterface {
 
   async findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null> {
     const executions = Array.from(this.toolExecutions.values())
-    return executions.find(exec => 
-      exec.workspaceId === workspaceId && 
-      exec.toolName === toolName && 
+    return executions.find(exec =>
+      exec.workspaceId === workspaceId &&
+      exec.toolName === toolName &&
       JSON.stringify(exec.args) === JSON.stringify(args) &&
       (exec.status === 'completed' || exec.status === 'executing')
     ) || null
@@ -1439,7 +1441,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getWorkspace(id: string): Promise<Workspace | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['workspaces'], 'readonly')
       const store = transaction.objectStore('workspaces')
@@ -1452,7 +1454,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getWorkspaces(userId: string): Promise<Workspace[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['workspaces'], 'readonly')
       const store = transaction.objectStore('workspaces')
@@ -1466,7 +1468,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getWorkspaceBySlug(userId: string, slug: string): Promise<Workspace | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['workspaces'], 'readonly')
       const store = transaction.objectStore('workspaces')
@@ -1563,7 +1565,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getFile(workspaceId: string, path: string): Promise<File | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['files'], 'readonly')
       const store = transaction.objectStore('files')
@@ -1580,7 +1582,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getFiles(workspaceId: string): Promise<File[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['files'], 'readonly')
       const store = transaction.objectStore('files')
@@ -1667,7 +1669,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getChatSessions(userId: string): Promise<ChatSession[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['chatSessions'], 'readonly')
       const store = transaction.objectStore('chatSessions')
@@ -1681,7 +1683,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getChatSession(id: string): Promise<ChatSession | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['chatSessions'], 'readonly')
       const store = transaction.objectStore('chatSessions')
@@ -1694,16 +1696,16 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateChatSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const chatSession = await this.getChatSession(id)
     if (!chatSession) return null
-    
+
     const updatedChatSession: ChatSession = {
       ...chatSession,
       ...updates,
       updatedAt: new Date().toISOString()
     }
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['chatSessions'], 'readwrite')
       const store = transaction.objectStore('chatSessions')
@@ -1742,7 +1744,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getMessages(chatSessionId: string): Promise<Message[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['messages'], 'readonly')
       const store = transaction.objectStore('messages')
@@ -1760,13 +1762,13 @@ class IndexedDBStorage implements StorageInterface {
   // Add deleteMessage function
   async deleteMessage(chatSessionId: string, messageId: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     // First, verify that the message belongs to the specified chat session
     const message = await new Promise<Message | null>((resolve, reject) => {
       const transaction = this.db!.transaction(['messages'], 'readonly')
       const store = transaction.objectStore('messages')
       const request = store.get(messageId)
-      
+
       request.onsuccess = () => {
         const msg = request.result
         if (!msg || msg.chatSessionId !== chatSessionId) {
@@ -1777,18 +1779,18 @@ class IndexedDBStorage implements StorageInterface {
       }
       request.onerror = () => reject(request.error)
     })
-    
+
     // If message doesn't exist or doesn't belong to the session, return false
     if (!message) {
       return false
     }
-    
+
     // Delete the message
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['messages'], 'readwrite')
       const store = transaction.objectStore('messages')
       const request = store.delete(messageId)
-      
+
       request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
     })
@@ -2593,14 +2595,14 @@ class IndexedDBStorage implements StorageInterface {
 
   // Utility methods
   async clearAll(): Promise<void> {
-  if (!this.db) throw new Error('Database not initialized')
+    if (!this.db) throw new Error('Database not initialized')
     return new Promise((resolve, reject) => {
       const storeNames = [
-        'workspaces', 
-        'files', 
-        'chatSessions', 
-        'messages', 
-        'deployments', 
+        'workspaces',
+        'files',
+        'chatSessions',
+        'messages',
+        'deployments',
         'environmentVariables',
         'vercelProjects',
         'vercelDeployments',
@@ -2623,7 +2625,7 @@ class IndexedDBStorage implements StorageInterface {
   }
   async exportData(): Promise<any> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     // Get all data from all tables
     const [workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens] = await Promise.all([
       this.getAllEntries('workspaces'),
@@ -2634,7 +2636,7 @@ class IndexedDBStorage implements StorageInterface {
       this.getEnvironmentVariables(), // This already gets all environment variables when no workspaceId is provided
       this.getAllTokens()
     ])
-    
+
     return { workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens }
   }
 
@@ -2645,25 +2647,25 @@ class IndexedDBStorage implements StorageInterface {
   // Add this method to the IndexedDBStorage class
   async deleteMessagesAfter(chatSessionId: string, timestamp: string): Promise<number> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['messages'], 'readwrite')
       const store = transaction.objectStore('messages')
       const index = store.index('chatSessionId')
-      
+
       // Get all messages for this session
       const getRequest = index.getAll(chatSessionId)
-      
+
       getRequest.onsuccess = () => {
         const messages = getRequest.result || []
         const messagesToDelete = messages.filter((msg: any) => msg.createdAt > timestamp)
-        
+
         let deletedCount = 0
         if (messagesToDelete.length === 0) {
           resolve(0)
           return
         }
-        
+
         messagesToDelete.forEach((msg: any) => {
           const deleteRequest = store.delete(msg.id)
           deleteRequest.onsuccess = () => {
@@ -2675,7 +2677,7 @@ class IndexedDBStorage implements StorageInterface {
           deleteRequest.onerror = () => reject(deleteRequest.error)
         })
       }
-      
+
       getRequest.onerror = () => reject(getRequest.error)
     })
   }
@@ -2683,7 +2685,7 @@ class IndexedDBStorage implements StorageInterface {
   // Checkpoint methods
   async createCheckpoint(checkpoint: Omit<Checkpoint, 'id' | 'createdAt'>): Promise<Checkpoint> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newCheckpoint: Checkpoint = {
@@ -2704,7 +2706,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getCheckpoints(workspaceId: string): Promise<Checkpoint[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['checkpoints'], 'readonly')
       const store = transaction.objectStore('checkpoints')
@@ -2713,7 +2715,7 @@ class IndexedDBStorage implements StorageInterface {
 
       request.onsuccess = () => {
         // Sort checkpoints by creation time, newest first
-        const checkpoints = (request.result || []).sort((a, b) => 
+        const checkpoints = (request.result || []).sort((a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
         resolve(checkpoints)
@@ -2724,7 +2726,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getCheckpoint(id: string): Promise<Checkpoint | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['checkpoints'], 'readonly')
       const store = transaction.objectStore('checkpoints')
@@ -2737,7 +2739,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async deleteCheckpoint(id: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['checkpoints'], 'readwrite')
       const store = transaction.objectStore('checkpoints')
@@ -2749,28 +2751,28 @@ class IndexedDBStorage implements StorageInterface {
 
   async restoreCheckpoint(checkpointId: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const checkpoint = await this.getCheckpoint(checkpointId)
     if (!checkpoint) return false
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['files', 'checkpoints'], 'readwrite')
       const fileStore = transaction.objectStore('files')
-      
+
       // Delete all current files in the workspace
       const fileIndex = fileStore.index('workspaceId')
       const deleteRequest = fileIndex.getAllKeys(checkpoint.workspaceId)
-      
+
       deleteRequest.onsuccess = () => {
         const fileKeys = deleteRequest.result || []
         let deleteCount = 0
-        
+
         if (fileKeys.length === 0) {
           // No files to delete, proceed with restoration
           restoreFiles()
           return
         }
-        
+
         fileKeys.forEach(key => {
           const deleteReq = fileStore.delete(key)
           deleteReq.onsuccess = () => {
@@ -2782,9 +2784,9 @@ class IndexedDBStorage implements StorageInterface {
           deleteReq.onerror = () => reject(deleteReq.error)
         })
       }
-      
+
       deleteRequest.onerror = () => reject(deleteRequest.error)
-      
+
       const restoreFiles = () => {
         // Restore files from checkpoint
         let restoreCount = 0
@@ -2792,7 +2794,7 @@ class IndexedDBStorage implements StorageInterface {
           resolve(true)
           return
         }
-        
+
         checkpoint.files.forEach(fileData => {
           const id = this.generateId()
           const restoredFile: File = {
@@ -2803,7 +2805,7 @@ class IndexedDBStorage implements StorageInterface {
             updatedAt: new Date().toISOString(),
             type: fileData.fileType // Add the missing 'type' property
           }
-          
+
           const addRequest = fileStore.add(restoredFile)
           addRequest.onsuccess = () => {
             restoreCount++
@@ -2822,34 +2824,34 @@ class IndexedDBStorage implements StorageInterface {
    */
   async importTable(tableName: string, data: any[]): Promise<void> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     // Skip if no data to import
     if (!data || data.length === 0) return
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([tableName], 'readwrite')
       const store = transaction.objectStore(tableName)
-      
+
       let importedCount = 0
       const totalItems = data.length
-      
+
       // Add each item to the store
       data.forEach(item => {
         const request = store.add(item)
-        
+
         request.onsuccess = () => {
           importedCount++
           if (importedCount === totalItems) {
             resolve()
           }
         }
-        
+
         request.onerror = (event) => {
           console.error(`Error importing item to ${tableName}:`, event)
           reject(new Error(`Failed to import item to ${tableName}`))
         }
       })
-      
+
       // Handle case where data array is empty
       if (totalItems === 0) {
         resolve()
@@ -2860,7 +2862,7 @@ class IndexedDBStorage implements StorageInterface {
   // Conversation memory methods for IndexedDB
   async createConversationMemory(memory: Omit<ConversationMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationMemory> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newMemory: ConversationMemory = {
@@ -2882,7 +2884,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['conversationMemories'], 'readonly')
       const store = transaction.objectStore('conversationMemories')
@@ -2901,12 +2903,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['conversationMemories'], 'readwrite')
       const store = transaction.objectStore('conversationMemories')
       const getRequest = store.get(id)
-      
+
       getRequest.onsuccess = () => {
         const memory = getRequest.result
         if (memory) {
@@ -2924,12 +2926,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async deleteConversationMemory(id: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['conversationMemories'], 'readwrite')
       const store = transaction.objectStore('conversationMemories')
       const request = store.delete(id)
-      
+
       request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
     })
@@ -2938,7 +2940,7 @@ class IndexedDBStorage implements StorageInterface {
   // Conversation summary methods for IndexedDB
   async createConversationSummary(summary: Omit<ConversationSummary, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationSummary> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newSummary: ConversationSummary = {
@@ -2960,7 +2962,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getConversationSummary(projectId: string, userId: string): Promise<ConversationSummary | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['conversationSummaries'], 'readonly')
       const store = transaction.objectStore('conversationSummaries')
@@ -2979,12 +2981,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateConversationSummary(id: string, updates: Partial<ConversationSummary>): Promise<ConversationSummary | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['conversationSummaries'], 'readwrite')
       const store = transaction.objectStore('conversationSummaries')
       const getRequest = store.get(id)
-      
+
       getRequest.onsuccess = () => {
         const summary = getRequest.result
         if (summary) {
@@ -3002,12 +3004,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async deleteConversationSummary(id: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['conversationSummaries'], 'readwrite')
       const store = transaction.objectStore('conversationSummaries')
       const request = store.delete(id)
-      
+
       request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
     })
@@ -3016,7 +3018,7 @@ class IndexedDBStorage implements StorageInterface {
   // Repo conversation methods for GitHub repository chat history
   async createRepoConversation(conversation: Omit<RepoConversation, 'id' | 'createdAt' | 'updatedAt' | 'lastActivity'>): Promise<RepoConversation> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = `repo_conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const now = new Date().toISOString()
     const newConversation: RepoConversation = {
@@ -3039,7 +3041,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getRepoConversation(repo: string, branch: string, userId: string): Promise<RepoConversation | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['repoConversations'], 'readonly')
       const store = transaction.objectStore('repoConversations')
@@ -3058,12 +3060,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateRepoConversation(id: string, updates: Partial<RepoConversation>): Promise<RepoConversation | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['repoConversations'], 'readwrite')
       const store = transaction.objectStore('repoConversations')
       const getRequest = store.get(id)
-      
+
       getRequest.onsuccess = () => {
         const conversation = getRequest.result
         if (conversation) {
@@ -3086,12 +3088,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async deleteRepoConversation(id: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['repoConversations'], 'readwrite')
       const store = transaction.objectStore('repoConversations')
       const request = store.delete(id)
-      
+
       request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
     })
@@ -3099,7 +3101,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async getAllRepoConversations(userId: string): Promise<RepoConversation[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['repoConversations'], 'readonly')
       const store = transaction.objectStore('repoConversations')
@@ -3109,7 +3111,7 @@ class IndexedDBStorage implements StorageInterface {
       request.onsuccess = () => {
         const conversations = request.result || []
         // Sort by last activity (most recent first)
-        conversations.sort((a, b) => 
+        conversations.sort((a, b) =>
           new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
         )
         resolve(conversations)
@@ -3121,7 +3123,7 @@ class IndexedDBStorage implements StorageInterface {
   // Tool execution tracking methods
   async createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const now = new Date().toISOString()
     const newExecution: ToolExecution = {
@@ -3130,12 +3132,12 @@ class IndexedDBStorage implements StorageInterface {
       createdAt: now,
       updatedAt: now
     }
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['toolExecutions'], 'readwrite')
       const store = transaction.objectStore('toolExecutions')
       const request = store.add(newExecution)
-      
+
       request.onsuccess = () => resolve(newExecution)
       request.onerror = () => reject(request.error)
     })
@@ -3143,12 +3145,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async getToolExecution(id: string): Promise<ToolExecution | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['toolExecutions'], 'readonly')
       const store = transaction.objectStore('toolExecutions')
       const request = store.get(id)
-      
+
       request.onsuccess = () => resolve(request.result || null)
       request.onerror = () => reject(request.error)
     })
@@ -3156,13 +3158,13 @@ class IndexedDBStorage implements StorageInterface {
 
   async getToolExecutions(workspaceId: string): Promise<ToolExecution[]> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['toolExecutions'], 'readonly')
       const store = transaction.objectStore('toolExecutions')
       const index = store.index('workspaceId')
       const request = index.getAll(workspaceId)
-      
+
       request.onsuccess = () => resolve(request.result || [])
       request.onerror = () => reject(request.error)
     })
@@ -3170,22 +3172,22 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['toolExecutions'], 'readwrite')
       const store = transaction.objectStore('toolExecutions')
       const getRequest = store.get(id)
-      
+
       getRequest.onsuccess = () => {
         const existing = getRequest.result
         if (!existing) {
           resolve(null)
           return
         }
-        
+
         const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() }
         const putRequest = store.put(updated)
-        
+
         putRequest.onsuccess = () => resolve(updated)
         putRequest.onerror = () => reject(putRequest.error)
       }
@@ -3195,12 +3197,12 @@ class IndexedDBStorage implements StorageInterface {
 
   async deleteToolExecution(id: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['toolExecutions'], 'readwrite')
       const store = transaction.objectStore('toolExecutions')
       const request = store.delete(id)
-      
+
       request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
     })
@@ -3208,17 +3210,17 @@ class IndexedDBStorage implements StorageInterface {
 
   async findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['toolExecutions'], 'readonly')
       const store = transaction.objectStore('toolExecutions')
       const index = store.index('workspaceId')
       const request = index.getAll(workspaceId)
-      
+
       request.onsuccess = () => {
         const executions = request.result || []
-        const existing = executions.find(exec => 
-          exec.toolName === toolName && 
+        const existing = executions.find(exec =>
+          exec.toolName === toolName &&
           JSON.stringify(exec.args) === JSON.stringify(args) &&
           (exec.status === 'completed' || exec.status === 'executing')
         )
@@ -3253,7 +3255,7 @@ class StorageManager {
 
   async init(): Promise<void> {
     if (this.isInitialized) return
-    
+
     if (!this.storage) {
       // Fallback initialization with environment detection
       if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
@@ -3262,7 +3264,7 @@ class StorageManager {
         this.storage = InMemoryStorage.getInstance()
       }
     }
-    
+
     await this.storage.init()
     this.isInitialized = true
   }

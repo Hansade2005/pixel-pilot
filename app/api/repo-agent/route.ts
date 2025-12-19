@@ -52,6 +52,10 @@ CORE CAPABILITIES
 - **github_list_repos** - Show user's accessible repositories
 - **github_get_repo_info** - Get repository metadata and details
 - **github_create_branch** - Create new branches for changes
+- **github_create_repo** - Create new GitHub repositories
+- **github_create_tag** - Create tags (releases)
+- **github_list_tags** - List repository tags
+- **github_delete_tag** - Delete tags
 - **github_search_code** - Search for code patterns across the repository
 - **github_get_commits** - View commit history and changes
 - **github_create_pull_request** - Create PRs for your changes
@@ -612,6 +616,131 @@ Assistant:
               success: false,
               error: errorMsg
             }
+          }
+        }
+      }),
+
+      github_create_repo: tool({
+        description: 'Create a new GitHub repository for the authenticated user',
+        inputSchema: z.object({
+          name: z.string().describe('Repository name'),
+          description: z.string().optional().describe('Repository description'),
+          private: z.boolean().optional().describe('Whether the repository should be private'),
+          auto_init: z.boolean().optional().describe('Initialize with README')
+        }),
+        execute: async ({ name, description, private: isPrivate, auto_init }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_create_repo - Input:`, { name })
+          try {
+            const response = await octokit.rest.repos.createForAuthenticatedUser({
+              name,
+              description,
+              private: isPrivate,
+              auto_init
+            })
+            return {
+              success: true,
+              repository: {
+                name: response.data.name,
+                full_name: response.data.full_name,
+                html_url: response.data.html_url
+              }
+            }
+          } catch (error) {
+            const errorMsg = `Failed to create repository: ${error instanceof Error ? error.message : 'Unknown error'}`
+            return { success: false, error: errorMsg }
+          }
+        }
+      }),
+
+      github_create_tag: tool({
+        description: 'Create a tag in the repository. Provide "message" for an annotated tag, or leave it empty for a lightweight tag.',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository name (owner/repo)'),
+          tag: z.string().describe('Tag name (e.g., v1.0.0)'),
+          sha: z.string().describe('Commit SHA to tag'),
+          message: z.string().optional().describe('Optional message for annotated tag')
+        }),
+        execute: async ({ repo, tag, sha, message }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_create_tag - Input:`, { repo, tag, sha })
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+
+            if (message) {
+              // Annotated Tag
+              const tagObject = await octokit.rest.git.createTag({
+                owner,
+                repo: repoName,
+                tag,
+                message,
+                object: sha,
+                type: 'commit'
+              })
+              await octokit.rest.git.createRef({
+                owner,
+                repo: repoName,
+                ref: `refs/tags/${tag}`,
+                sha: tagObject.data.sha
+              })
+            } else {
+              // Lightweight Tag
+              await octokit.rest.git.createRef({
+                owner,
+                repo: repoName,
+                ref: `refs/tags/${tag}`,
+                sha
+              })
+            }
+            return { success: true, message: `Tag ${tag} created successfully` }
+          } catch (error) {
+            const errorMsg = `Failed to create tag: ${error instanceof Error ? error.message : 'Unknown error'}`
+            return { success: false, error: errorMsg }
+          }
+        }
+      }),
+
+      github_list_tags: tool({
+        description: 'List tags in a repository',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository name (owner/repo)'),
+          per_page: z.number().optional().describe('Items per page')
+        }),
+        execute: async ({ repo, per_page = 30 }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.repos.listTags({
+              owner,
+              repo: repoName,
+              per_page
+            })
+            return {
+              success: true,
+              tags: response.data.map(t => ({ name: t.name, commit: t.commit }))
+            }
+          } catch (error) {
+            const errorMsg = `Failed to list tags: ${error instanceof Error ? error.message : 'Unknown error'}`
+            return { success: false, error: errorMsg }
+          }
+        }
+      }),
+
+      github_delete_tag: tool({
+        description: 'Delete a tag from the repository',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository name (owner/repo)'),
+          tag: z.string().describe('Tag name to delete')
+        }),
+        execute: async ({ repo, tag }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            await octokit.rest.git.deleteRef({
+              owner,
+              repo: repoName,
+              ref: `tags/${tag}`
+            })
+            return { success: true, message: `Tag ${tag} deleted` }
+          } catch (error) {
+            const errorMsg = `Failed to delete tag: ${error instanceof Error ? error.message : 'Unknown error'}`
+            return { success: false, error: errorMsg }
           }
         }
       }),

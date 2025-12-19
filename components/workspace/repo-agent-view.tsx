@@ -97,6 +97,14 @@ const getToolLabel = (tool: string, args?: any) => {
       return 'Listing repositories'
     case 'github_get_repo_info':
       return 'Getting repository info'
+    case 'github_create_repo':
+      return `Creating repository ${args?.name || 'unknown'}`
+    case 'github_create_tag':
+      return `Creating tag ${args?.tag || 'unknown'}`
+    case 'github_list_tags':
+      return `Listing tags for ${args?.repo || 'current repo'}`
+    case 'github_delete_tag':
+      return `Deleting tag ${args?.tag || 'unknown'}`
     default:
       // Fallback to cleaner text if possible
       return tool.replace('github_', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -1110,6 +1118,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         role: msg.isUser ? 'user' as const : 'assistant' as const,
         content: msg.content,
         timestamp: msg.timestamp.toISOString(),
+        reasoning: msg.reasoning,
+        toolInvocations: msg.toolInvocations,
         fileChanges: fileChanges.length > 0 ? fileChanges : undefined
       }))
 
@@ -1327,6 +1337,29 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   const handleDeleteMessage = (messageId: string) => {
     setMessages(prev => prev.filter(msg => msg.id !== messageId))
+  }
+
+  const handleClearMessages = async () => {
+    if (confirm('Are you sure you want to clear the entire conversation history? This cannot be undone.')) {
+      setMessages([])
+      setFileChanges([])
+      setActionLogs([])
+      setAttachments([])
+
+      if (conversationId) {
+        try {
+          await storageManager.init()
+          await storageManager.updateRepoConversation(conversationId, {
+            messages: [],
+            lastActivity: new Date().toISOString()
+          })
+          toast({ title: 'Conversation cleared' })
+        } catch (error) {
+          console.error('Failed to clear conversation in storage', error)
+          toast({ title: 'Error clearing conversation', variant: 'destructive' })
+        }
+      }
+    }
   }
 
   const handleRetryMessage = (messageId: string, content: string) => {
@@ -1953,8 +1986,27 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               </button>
             )}
           </div>
-          <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center gap-2">
-            Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">↵</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">⇧ ↵</kbd> for new line
+          <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">↵</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">⇧ ↵</kbd> for new line
+            </div>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleClearMessages}
+                    className="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800/50 transition-colors"
+                    disabled={isLoading || messages.length === 0}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="bg-red-900 border-red-800 text-white">
+                  <p>Clear chat history</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>
