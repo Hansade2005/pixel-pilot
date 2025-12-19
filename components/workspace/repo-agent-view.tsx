@@ -848,34 +848,34 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               setActionLogs(prev => [...prev, actionLog])
 
               // Handle todo creation from tool calls
-              if (parsed.toolName === 'github_create_todo') {
-                console.log('[RepoAgent] 🎯 CREATE TODO TOOL DETECTED')
-                if (parsed.args) {
-                  console.log('[RepoAgent] Tool call args for create_todo:', parsed.args)
-                  const { title, description, status = 'pending' } = parsed.args
-                  const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-                  const todo: QueueTodo = {
-                    id: todoId,
-                    title,
-                    description,
-                    status
-                  }
-                  console.log('[RepoAgent] Creating todo from tool call:', todo)
-                  setTodos(prev => {
-                    const newTodos = [...prev, todo]
-                    console.log('[RepoAgent] Todos after creation from tool call:', newTodos.length, 'todos')
-                    return newTodos
-                  })
-                } else {
-                  console.log('[RepoAgent] No args for create_todo tool')
-                }
-              } else if (parsed.toolName === 'github_update_todo') {
-                console.log('[RepoAgent] 🎯 UPDATE TODO TOOL DETECTED')
-                // ... existing code
-              } else if (parsed.toolName === 'github_delete_todo') {
-                console.log('[RepoAgent] 🎯 DELETE TODO TOOL DETECTED')
-                // ... existing code
-              }
+              // MOVED TO TOOL-RESULT: if (parsed.toolName === 'github_create_todo') {
+              //   console.log('[RepoAgent] 🎯 CREATE TODO TOOL DETECTED')
+              //   if (parsed.args) {
+              //     console.log('[RepoAgent] Tool call args for create_todo:', parsed.args)
+              //     const { title, description, status = 'pending' } = parsed.args
+              //     const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+              //     const todo: QueueTodo = {
+              //       id: todoId,
+              //       title,
+              //       description,
+              //       status
+              //     }
+              //     console.log('[RepoAgent] Creating todo from tool call:', todo)
+              //     setTodos(prev => {
+              //       const newTodos = [...prev, todo]
+              //       console.log('[RepoAgent] Todos after creation from tool call:', newTodos.length, 'todos')
+              //       return newTodos
+              //     })
+              //   } else {
+              //     console.log('[RepoAgent] No args for create_todo tool')
+              //   }
+              // MOVED TO TOOL-RESULT: } else if (parsed.toolName === 'github_update_todo') {
+              //   console.log('[RepoAgent] 🎯 UPDATE TODO TOOL DETECTED')
+              //   // ... existing code
+              // } else if (parsed.toolName === 'github_delete_todo') {
+              //   console.log('[RepoAgent] 🎯 DELETE TODO TOOL DETECTED')
+              //   // ... existing code
+              // }
 
               // TEMP: Create a test todo for ANY tool call to verify UI works
               if (parsed.toolName && parsed.toolName.includes('todo')) {
@@ -931,7 +931,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               // File changes are tracked in toolInvocations instead of separate state
               // This follows the chat-panel-v2.tsx pattern of using tool execution data directly
 
-              // Handle todo operations (only updates and deletes, creation is handled in tool-call)
+              // Handle todo operations in tool-result events (creation, updates, and deletes)
               if (parsed.type === 'tool-result' && parsed.toolName?.includes('todo')) {
                 console.log('[RepoAgent] Processing todo tool result:', {
                   toolName: parsed.toolName,
@@ -940,8 +940,29 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   hasSuccess: parsed.result?.success,
                   resultKeys: Object.keys(parsed.result || {})
                 })
-                // For now, we handle todo operations in tool-call events
-                // Tool-result events can be used for additional validation or error handling
+
+                // Handle todo creation from tool results
+                if (parsed.toolName === 'github_create_todo' && parsed.result?.todo) {
+                  console.log('[RepoAgent] 🎯 CREATE TODO FROM TOOL RESULT:', parsed.result.todo)
+                  const todo = parsed.result.todo
+                  setTodos(prev => {
+                    const newTodos = [...prev, todo]
+                    console.log('[RepoAgent] Todos after creation from tool result:', newTodos.length, 'todos')
+                    return newTodos
+                  })
+                } else if (parsed.toolName === 'github_update_todo' && parsed.result?.todo) {
+                  console.log('[RepoAgent] 🎯 UPDATE TODO FROM TOOL RESULT:', parsed.result.todo)
+                  const updatedTodo = parsed.result.todo
+                  setTodos(prev => prev.map(todo =>
+                    todo.id === updatedTodo.id ? updatedTodo : todo
+                  ))
+                } else if (parsed.toolName === 'github_delete_todo' && parsed.result?.deleted_id) {
+                  console.log('[RepoAgent] 🎯 DELETE TODO FROM TOOL RESULT:', parsed.result.deleted_id)
+                  setTodos(prev => prev.filter(todo => todo.id !== parsed.result.deleted_id))
+                }
+
+                // Handle all todo operations in tool-result events
+                // Tool-result events contain the actual todo data returned from the server
                 if (!parsed.result?.success && parsed.result?.error) {
                   console.log('[RepoAgent] Todo tool failed:', parsed.result.error)
                 }
