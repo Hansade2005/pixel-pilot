@@ -158,6 +158,7 @@ export interface RepoConversation {
     role: 'user' | 'assistant'
     content: string
     timestamp: string
+    reasoning?: string // Add reasoning field
     toolInvocations?: any[]
     toolCalls?: any[]
     fileChanges?: Array<{

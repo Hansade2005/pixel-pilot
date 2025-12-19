@@ -789,8 +789,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           : msg
       ))
 
-      // Set streaming to false after stream completes
-      setIsStreaming(false)
+      // Set streaming to true for the view transition
+      setIsStreaming(true)
 
       // Save initial conversation after first stream completes
       await saveConversationToStorage()
@@ -805,7 +805,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       setMessages([])
     } finally {
       setIsLandingLoading(false)
-      setIsStreaming(false)
     }
   }
 
