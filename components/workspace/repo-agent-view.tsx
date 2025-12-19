@@ -1654,9 +1654,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             <div className="status-dot w-2 h-2 bg-green-500 rounded-full" style={{
               animation: 'pulse 2s infinite',
               boxShadow: '0 0 12px #10b981'
-            }}></div>
-            <span className="header-title">Agent</span>
-          </div>
+            }}></div>          </div>
           <div className="repo-selector flex items-center gap-2">
             <select
               value={selectedRepo}
