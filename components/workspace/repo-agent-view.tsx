@@ -926,12 +926,15 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             }
             // Handle tool results
             else if (parsed.type === 'tool-result') {
-              console.log('[RepoAgent] Tool result received:', {
+              console.log('[RepoAgent] 🔄 TOOL-RESULT EVENT RECEIVED:', {
+                type: parsed.type,
                 toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId,
                 result: parsed.result,
                 resultType: typeof parsed.result,
-                resultKeys: parsed.result ? Object.keys(parsed.result) : []
+                hasTodo: !!parsed.result?.todo,
+                todoType: typeof parsed.result?.todo,
+                resultKeys: parsed.result ? Object.keys(parsed.result) : 'no result'
               })
 
               // Clean up accumulated tool args
@@ -978,21 +981,30 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
               // Handle todo operations in tool-result events (creation, updates, and deletes)
               if (parsed.type === 'tool-result' && parsed.toolName?.includes('todo')) {
-                console.log('[RepoAgent] Processing todo tool result:', {
+                console.log('[RepoAgent] 🎯 TODO TOOL RESULT DETECTED:', {
                   toolName: parsed.toolName,
-                  result: parsed.result,
-                  hasTodo: !!parsed.result?.todo,
-                  hasSuccess: parsed.result?.success,
-                  resultKeys: Object.keys(parsed.result || {})
+                  hasResult: !!parsed.result,
+                  resultKeys: parsed.result ? Object.keys(parsed.result) : [],
+                  todoExists: !!parsed.result?.todo
                 })
 
                 // Handle todo creation from tool results
                 if (parsed.toolName === 'github_create_todo' && parsed.result?.todo) {
                   console.log('[RepoAgent] 🎯 CREATE TODO FROM TOOL RESULT:', parsed.result.todo)
                   const todo = parsed.result.todo
+                  console.log('[RepoAgent] 🎯 TODO OBJECT STRUCTURE:', {
+                    id: todo.id,
+                    title: todo.title,
+                    description: todo.description,
+                    status: todo.status,
+                    todoKeys: Object.keys(todo)
+                  })
                   setTodos(prev => {
                     const newTodos = [...prev, todo]
-                    console.log('[RepoAgent] Todos after creation from tool result:', newTodos.length, 'todos')
+                    console.log('[RepoAgent] 🎯 TODOS AFTER AI CREATION:', {
+                      count: newTodos.length,
+                      lastTodo: newTodos[newTodos.length - 1]
+                    })
                     return newTodos
                   })
                 } else if (parsed.toolName === 'github_update_todo' && parsed.result?.todo) {
