@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
 import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
 import { Octokit } from '@octokit/rest'
+import { getOptimizedFileContext, getStagedChanges } from './helpers'
 
 // Disable Next.js body parser for binary data handling
 export const config = {
@@ -335,12 +336,204 @@ export async function POST(req: Request) {
       }, { status: 403 })
     }
 
+    // Initialize request-scoped staging storage
+    const requestStagedChanges = new Map<string, any>()
+
+    // Get optimized context
+    const { owner, repo } = parseRepoString(currentRepo)
+    const repoContext = await getOptimizedFileContext(octokit, owner, repo, currentBranch)
+
     // Get AI model
     const model = getAIModel(modelId)
-    const systemPrompt = getRepoAgentSystemPrompt(modelId || DEFAULT_CHAT_MODEL)
+    const baseSystemPrompt = getRepoAgentSystemPrompt(modelId || DEFAULT_CHAT_MODEL)
+
+    // Enhanced System Prompt
+    const systemPrompt = `${baseSystemPrompt}
+
+═══════════════════════════════════════════════════════════════
+CONTEXT & STATE
+═══════════════════════════════════════════════════════════════
+Current Repository: ${currentRepo}
+Current Branch: ${currentBranch}
+
+${repoContext}
+
+═══════════════════════════════════════════════════════════════
+STAGING & COMMIT WORKFLOW (MANDATORY)
+═══════════════════════════════════════════════════════════════
+You MUST use the Staging Workflow for ALL code changes:
+
+1. **STAGE**: Use \`github_stage_change\` to record changes in memory.
+   - You can stage multiple files in sequence or parallel.
+   - NO changes are applied to GitHub yet.
+
+2. **COMMIT**: Use \`github_commit_changes\` to apply ALL staged changes.
+   - This performs the Git Tree operations (Blobs -> Tree -> Commit -> Ref).
+   - Require a SINGLE clear commit message (Conventional Commits format preferred).
+
+DO NOT use \`github_write_file\` or \`github_delete_file\` for code changes anymore. 
+Use them ONLY if specifically asked for direct operations, but prefer Staging.
+
+Example:
+User: "Update auth.ts and user.ts"
+Assistant:
+- github_stage_change(auth.ts, ...)
+- github_stage_change(user.ts, ...)
+- github_commit_changes("feat: update auth and user models")
+`
 
     // Define GitHub repository tools
     const tools = {
+      // --- Staging & Commits ---
+      github_stage_change: tool({
+        description: 'Stage a file change (create, update, or delete) in memory. DOES NOT apply to GitHub immediately.',
+        inputSchema: z.object({
+          path: z.string().describe('File path'),
+          content: z.string().optional().describe('New content (required for create/update)'),
+          operation: z.enum(['create', 'update', 'delete']).describe('Type of operation'),
+          description: z.string().optional().describe('Brief description of change')
+        }),
+        execute: async ({ path, content, operation }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Staging change: ${operation} ${path}`)
+          requestStagedChanges.set(path, { operation, content })
+          return { success: true, status: 'staged', path, operation }
+        }
+      }),
+
+      github_commit_changes: tool({
+        description: 'Commit all staged changes to the repository using Git Tree API.',
+        inputSchema: z.object({
+          message: z.string().describe('Commit message (Conventional Commits format)'),
+          branch: z.string().optional().describe('Branch to commit to (defaults to current)')
+        }),
+        execute: async ({ message, branch: targetBranch }) => {
+          const branch = targetBranch || currentBranch
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 💾 Committing staged changes to ${branch}`)
+
+          try {
+            // 1. Gather all staged changes (History + Current Request)
+            const allChanges = getStagedChanges(messages || [], requestStagedChanges)
+
+            if (allChanges.size === 0) {
+              return { success: false, error: 'No staged changes found to commit.' }
+            }
+
+            console.log(`[RepoAgent] Found ${allChanges.size} files to commit`)
+
+            // 2. Get latest commit SHA
+            const ref = await octokit.rest.git.getRef({
+              owner,
+              repo,
+              ref: `heads/${branch}`
+            })
+            const latestCommitSha = ref.data.object.sha
+            const latestCommit = await octokit.rest.git.getCommit({
+              owner,
+              repo,
+              commit_sha: latestCommitSha
+            })
+            const baseTreeSha = latestCommit.data.tree.sha
+
+            // 3. Create Blobs for updated/created files
+            const treeItems = []
+
+            for (const [path, change] of allChanges.entries()) {
+              if (change.operation === 'delete') {
+                console.log(`[RepoAgent] Handling delete for ${path} via separate operation`)
+                await octokit.rest.repos.deleteFile({
+                  owner,
+                  repo,
+                  path,
+                  message: `Delete ${path} (part of ${message})`,
+                  sha: (await octokit.rest.repos.getContent({ owner, repo, path }) as any).data.sha,
+                  branch
+                })
+              } else {
+                const blob = await octokit.rest.git.createBlob({
+                  owner,
+                  repo,
+                  content: change.content,
+                  encoding: 'utf-8'
+                })
+
+                treeItems.push({
+                  path,
+                  mode: '100644' as const, // standard file
+                  type: 'blob' as const,
+                  sha: blob.data.sha
+                })
+              }
+            }
+
+            if (treeItems.length === 0) {
+              return { success: true, message: "No content updates to commit (deletes may have occurred)" }
+            }
+
+            // 4. Create Tree
+            const newTree = await octokit.rest.git.createTree({
+              owner,
+              repo,
+              base_tree: baseTreeSha,
+              tree: treeItems
+            })
+
+            // 5. Create Commit
+            const newCommit = await octokit.rest.git.createCommit({
+              owner,
+              repo,
+              message,
+              tree: newTree.data.sha,
+              parents: [latestCommitSha]
+            })
+
+            // 6. Update Ref
+            await octokit.rest.git.updateRef({
+              owner,
+              repo,
+              ref: `heads/${branch}`,
+              sha: newCommit.data.sha
+            })
+
+            // Clear staged changes (conceptually, for this turn)
+            requestStagedChanges.clear()
+
+            return {
+              success: true,
+              commit: {
+                sha: newCommit.data.sha,
+                message,
+                url: newCommit.data.html_url
+              }
+            }
+          } catch (error) {
+            const errorMsg = `Failed to commit changes: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error('[RepoAgent] Commit failed:', errorMsg)
+            return { success: false, error: errorMsg }
+          }
+        }
+      }),
+
+      github_delete_branch: tool({
+        description: 'Delete a branch from the repository',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository (owner/repo)'),
+          branch: z.string().describe('Branch to delete')
+        }),
+        execute: async ({ repo, branch }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            await octokit.rest.git.deleteRef({
+              owner,
+              repo: repoName,
+              ref: `heads/${branch}`
+            })
+            return { success: true, message: `Branch ${branch} deleted` }
+          } catch (error) {
+            return { success: false, error: `Failed to delete branch: ${error}` }
+          }
+        }
+      }),
+
       // Repository Management
       github_list_repos: tool({
         description: 'List all repositories the user has access to',

@@ -64,8 +64,44 @@ import {
   ArrowUp,
   Trash2,
   Copy,
-  RotateCcw
+  RotateCcw,
+  ArrowLeft
 } from 'lucide-react'
+
+// Helper for user-friendly tool labels
+const getToolLabel = (tool: string, args?: any) => {
+  switch (tool) {
+    case 'github_write_file':
+      return `Creating/Updating ${args?.path ? args.path.split('/').pop() : 'file'}`
+    case 'github_read_file':
+      return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
+    case 'github_list_files':
+      return `Listing files in ${args?.path || 'root'}`
+    case 'github_create_branch':
+      return `Creating branch ${args?.branch || 'unknown'}`
+    case 'github_delete_branch':
+      return `Deleting branch ${args?.branch || 'unknown'}`
+    case 'github_stage_change':
+      return `Staging ${args?.operation || 'change'} for ${args?.path ? args.path.split('/').pop() : 'file'}`
+    case 'github_commit_changes':
+      return `Committing changes: "${args?.message || 'Update'}"`
+    case 'github_edit_file':
+      return `Editing ${args?.path ? args.path.split('/').pop() : 'file'}`
+    case 'github_replace_string':
+      return `Replacing text in ${args?.path ? args.path.split('/').pop() : 'file'}`
+    case 'github_delete_file':
+      return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+    case 'github_search_code':
+      return `Searching code for "${args?.query || ''}"`
+    case 'github_list_repos':
+      return 'Listing repositories'
+    case 'github_get_repo_info':
+      return 'Getting repository info'
+    default:
+      // Fallback to cleaner text if possible
+      return tool.replace('github_', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }
+}
 
 interface RepoAgentViewProps {
   userId?: string
@@ -587,12 +623,68 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
               const actionLog: ActionLog = {
                 id: parsed.toolCallId || Date.now().toString(),
-                type: parsed.toolName?.includes('file') ? 'file_operation' : 'api_call',
-                description: `${parsed.toolName}`,
+                type: parsed.toolName?.includes('file') || parsed.toolName?.includes('stage') ? 'file_operation' : 'api_call',
+                description: getToolLabel(parsed.toolName, parsed.args), // Use friendly Label
                 timestamp: new Date(),
                 success: false
               }
               setActionLogs(prev => [...prev, actionLog])
+
+              // --- File Change Tracking based on ARGS ---
+              const toolName = parsed.toolName
+              const args = parsed.args || {}
+
+              if (['github_write_file', 'github_edit_file', 'github_replace_string', 'github_stage_change'].includes(toolName)) {
+                let additions = 0
+                let deletions = 0
+                let path = args.path
+                let diffLines: string[] = []
+
+                const countLines = (str: string) => str ? str.split('\n').length : 0
+                const getLines = (str: string) => str ? str.split('\n') : []
+
+                if (toolName === 'github_write_file') {
+                  additions = countLines(args.content)
+                  deletions = 0
+                  diffLines = getLines(args.content).map(l => '+' + l)
+                } else if (toolName === 'github_edit_file') {
+                  deletions = countLines(args.target)
+                  additions = countLines(args.replacement)
+                  diffLines = [
+                    ...getLines(args.target).map(l => '-' + l),
+                    ...getLines(args.replacement).map(l => '+' + l)
+                  ]
+                } else if (toolName === 'github_replace_string') {
+                  deletions = countLines(args.search)
+                  additions = countLines(args.replace)
+                  diffLines = [
+                    ...getLines(args.search).map(l => '-' + l),
+                    ...getLines(args.replace).map(l => '+' + l)
+                  ]
+                } else if (toolName === 'github_stage_change') {
+                  // For staging, we trust the operation
+                  if (args.operation === 'delete') {
+                    deletions = 1 // Nominal
+                    diffLines = ['- (File Deleted)']
+                  } else {
+                    additions = countLines(args.content)
+                    diffLines = getLines(args.content).map(l => '+' + l)
+                  }
+                }
+
+                setFileChanges(prev => {
+                  // Dedup by path
+                  const existing = prev.filter(f => f.path !== path)
+                  return [...existing, {
+                    path: path || 'unknown',
+                    status: args.operation === 'delete' ? 'deleted' : 'modified', // Simplify status
+                    additions,
+                    deletions,
+                    diff: diffLines
+                  }]
+                })
+              }
+              // ------------------------------------------
 
               setMessages(prev => prev.map(msg =>
                 msg.id === agentMessageId
@@ -707,6 +799,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: accumulatedToolInvocations }
           : msg
       ))
+
+      // Set streaming to true for the view transition
+      setIsStreaming(true)
 
       // Save initial conversation after first stream completes
       await saveConversationToStorage()
