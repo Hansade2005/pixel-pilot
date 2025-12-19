@@ -389,6 +389,28 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             toolInvocations: msg.toolInvocations
           }))
           setMessages(loadedMessages)
+
+          // Reconstruct actionLogs from toolInvocations
+          const reconstructedActionLogs: ActionLog[] = []
+          loadedMessages.forEach((msg: Message) => {
+            if (msg.toolInvocations) {
+              msg.toolInvocations.forEach((tool: any) => {
+                if (tool.state === 'call' || tool.state === 'result') {
+                  const actionLog: ActionLog = {
+                    id: tool.toolCallId || Date.now().toString(),
+                    type: tool.toolName?.includes('file') || tool.toolName?.includes('folder') ? 'file_operation' : 'api_call',
+                    description: getToolLabel(tool.toolName, tool.args),
+                    timestamp: msg.timestamp
+                  }
+                  reconstructedActionLogs.push(actionLog)
+                }
+              })
+            }
+          })
+          setActionLogs(reconstructedActionLogs)
+
+          // Reset diff expansion state
+          setShowDiffs({})
         } else {
           console.log('[RepoAgent] No conversation history found for', selectedRepo, selectedBranch)
           setConversationId(null)
@@ -602,7 +624,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       return
     }
 
-    setIsLandingLoading(true)
+    setIsLandingLoading(false)
 
     try {
       // Add initial message
