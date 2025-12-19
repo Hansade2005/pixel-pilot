@@ -808,6 +808,14 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             }
             // Handle tool calls
             else if (parsed.type === 'tool-call') {
+              console.log('[RepoAgent] 🔧 TOOL-CALL EVENT RECEIVED:', {
+                type: parsed.type,
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId,
+                args: parsed.args,
+                input: parsed.input,
+                allKeys: Object.keys(parsed)
+              })
               accumulatedToolInvocations.push({
                 toolCallId: parsed.toolCallId || Date.now().toString(),
                 toolName: parsed.toolName,
@@ -840,41 +848,38 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               setActionLogs(prev => [...prev, actionLog])
 
               // Handle todo creation from tool calls
-              if (parsed.toolName === 'github_create_todo' && parsed.args) {
-                const { title, description, status = 'pending' } = parsed.args
-                const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-                const todo: QueueTodo = {
-                  id: todoId,
-                  title,
-                  description,
-                  status
+              if (parsed.toolName === 'github_create_todo') {
+                console.log('[RepoAgent] 🎯 CREATE TODO TOOL DETECTED')
+                if (parsed.args) {
+                  console.log('[RepoAgent] Tool call args for create_todo:', parsed.args)
+                  const { title, description, status = 'pending' } = parsed.args
+                  const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                  const todo: QueueTodo = {
+                    id: todoId,
+                    title,
+                    description,
+                    status
+                  }
+                  console.log('[RepoAgent] Creating todo from tool call:', todo)
+                  setTodos(prev => {
+                    const newTodos = [...prev, todo]
+                    console.log('[RepoAgent] Todos after creation from tool call:', newTodos.length, 'todos')
+                    return newTodos
+                  })
+                } else {
+                  console.log('[RepoAgent] No args for create_todo tool')
                 }
-                console.log('[RepoAgent] Creating todo from tool call:', todo)
-                setTodos(prev => {
-                  const newTodos = [...prev, todo]
-                  console.log('[RepoAgent] Todos after creation from tool call:', newTodos)
-                  return newTodos
-                })
-              } else if (parsed.toolName === 'github_update_todo' && parsed.args) {
-                const { id, title, description, status } = parsed.args
-                console.log('[RepoAgent] Updating todo from tool call:', { id, title, description, status })
-                setTodos(prev => {
-                  const newTodos = prev.map(todo =>
-                    todo.id === id
-                      ? { ...todo, ...(title !== undefined && { title }), ...(description !== undefined && { description }), ...(status !== undefined && { status }) }
-                      : todo
-                  )
-                  console.log('[RepoAgent] Todos after update from tool call:', newTodos)
-                  return newTodos
-                })
-              } else if (parsed.toolName === 'github_delete_todo' && parsed.args) {
-                const { id } = parsed.args
-                console.log('[RepoAgent] Deleting todo from tool call:', id)
-                setTodos(prev => {
-                  const newTodos = prev.filter(todo => todo.id !== id)
-                  console.log('[RepoAgent] Todos after deletion from tool call:', newTodos)
-                  return newTodos
-                })
+              } else if (parsed.toolName === 'github_update_todo') {
+                console.log('[RepoAgent] 🎯 UPDATE TODO TOOL DETECTED')
+                // ... existing code
+              } else if (parsed.toolName === 'github_delete_todo') {
+                console.log('[RepoAgent] 🎯 DELETE TODO TOOL DETECTED')
+                // ... existing code
+              }
+
+              // TEMP: Create a test todo for ANY tool call to verify UI works
+              if (parsed.toolName && parsed.toolName.includes('todo')) {
+                console.log('[RepoAgent] TODO TOOL DETECTED - should create todo')
               }
 
               setMessages(prev => prev.map(msg =>
@@ -1969,6 +1974,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           {todos.length > 0 && (
             <>
               {console.log('[RepoAgent] Rendering Queue component with todos:', todos)}
+              <div className="mb-4 p-4 bg-red-500 text-white rounded border-4 border-yellow-400">
+                <h3 className="font-bold text-xl">🔴 DEBUG: {todos.length} Todos Found!</h3>
+                <p className="mb-2">If you see this, todos are in state but UI might not be rendering properly.</p>
+                {todos.map((todo, index) => (
+                  <div key={todo.id} className="mb-2 p-3 bg-red-600 rounded border-2 border-yellow-300">
+                    <div className="font-bold text-lg">#{index + 1}: {todo.title}</div>
+                    <div className="text-sm opacity-90 italic">{todo.description || 'No description'}</div>
+                    <div className="text-xs font-mono bg-red-700 p-1 rounded mt-1">Status: {todo.status} | ID: {todo.id}</div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setTodos([])}
+                  className="mt-2 px-3 py-1 bg-yellow-500 text-black rounded font-bold hover:bg-yellow-400"
+                >
+                  Clear All Todos
+                </button>
+              </div>
               <div className="mb-4">
                 <Queue>
                   <QueueSection>
@@ -2161,14 +2183,32 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 <StopCircle className="w-5 h-5" />
               </button>
             ) : (
-              <button
-                onClick={() => sendMessage(currentInput)}
-                disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
-                className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                  boxShadow: '0 2px 12px rgba(59, 130, 246, 0.4)'
-                }}
+              <>
+                <button
+                  onClick={() => {
+                    // Test todo creation
+                    const testTodo: QueueTodo = {
+                      id: `test-${Date.now()}`,
+                      title: 'Test Todo',
+                      description: 'This is a test todo to verify UI works',
+                      status: 'pending'
+                    }
+                    console.log('[TEST] Adding test todo:', testTodo)
+                    setTodos(prev => [...prev, testTodo])
+                  }}
+                  className="test-todo-button mr-2 w-9 h-9 flex items-center justify-center border border-gray-600 rounded-full text-gray-400 hover:text-white cursor-pointer transition-all flex-shrink-0"
+                  title="Add Test Todo"
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={() => sendMessage(currentInput)}
+                  disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
+                  className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                    boxShadow: '0 2px 12px rgba(59, 130, 246, 0.4)'
+                  }}
               >
                 {isLoading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -2176,11 +2216,12 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   <Send className="w-5 h-5" />
                 )}
               </button>
-            )}
+            </>
+          )}
           </div>
           <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">↵</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">⇧ ↵</kbd> for new line
+              Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Enter</kbd> to send, <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Shift + Enter</kbd> for new line
             </div>
 
             <TooltipProvider>
