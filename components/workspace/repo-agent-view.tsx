@@ -384,7 +384,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             id: msg.id,
             content: msg.content,
             isUser: msg.role === 'user',
-            timestamp: new Date(msg.timestamp)
+            timestamp: new Date(msg.timestamp),
+            reasoning: msg.reasoning,
+            toolInvocations: msg.toolInvocations
           }))
           setMessages(loadedMessages)
         } else {
