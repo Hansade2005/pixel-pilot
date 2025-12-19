@@ -188,6 +188,46 @@ function parseFileDeletionDiff(fileLength: number = 0): { additions: number; del
   }
 }
 
+// Helper function to parse staging change diffs
+function parseStagingChangeDiff(operation: string, content?: string, edit_operations?: any[], edit_mode?: string): { additions: number; deletions: number; diffLines: string[] } {
+  if (operation === 'delete') {
+    return parseFileDeletionDiff()
+  }
+
+  if (operation === 'create' && content) {
+    return parseFileCreationDiff(content)
+  }
+
+  if (operation === 'update') {
+    if (edit_mode === 'incremental' && edit_operations && edit_operations.length > 0) {
+      // Parse incremental edits
+      let totalAdditions = 0
+      let totalDeletions = 0
+      const allDiffLines: string[] = []
+
+      edit_operations.forEach((edit: any) => {
+        const { old_string, new_string } = edit
+        const diffStats = parseReplacementDiff(old_string, new_string)
+        totalAdditions += diffStats.additions
+        totalDeletions += diffStats.deletions
+        allDiffLines.push(...diffStats.diffLines)
+      })
+
+      return {
+        additions: totalAdditions,
+        deletions: totalDeletions,
+        diffLines: allDiffLines
+      }
+    } else if (edit_mode === 'rewrite' && content) {
+      // For rewrite mode, show full content as additions
+      return parseFileCreationDiff(content)
+    }
+  }
+
+  // Fallback
+  return { additions: 0, deletions: 0, diffLines: [`${operation} operation`] }
+}
+
 interface RepoAgentViewProps {
   userId?: string
 }
@@ -2073,13 +2113,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 Files Modified
               </h3>
 
-              {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).length === 0 ? (
+              {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <File className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No file changes yet</p>
                 </div>
               ) : (
-                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).map((tool: any, index: number) => (
+                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).map((tool: any, index: number) => (
                   <div
                     key={index}
                     className="file-item flex items-center justify-between p-4.5 mb-3 rounded-xl cursor-pointer transition-all"
@@ -2111,6 +2151,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                         {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && (
                           <File className="w-5 h-5 text-blue-400" />
                         )}
+                        {tool.toolName === 'github_stage_change' && (
+                          <GitBranch className="w-5 h-5 text-yellow-400" />
+                        )}
                       </div>
                       <div>
                         <div className="font-medium text-white">{tool.args?.path || tool.args?.filePath || 'unknown'}</div>
@@ -2118,6 +2161,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                           {tool.toolName === 'github_write_file' && 'created'}
                           {['github_edit_file', 'github_replace_string'].includes(tool.toolName) && 'modified'}
                           {tool.toolName === 'github_delete_file' && 'deleted'}
+                          {tool.toolName === 'github_stage_change' && `staged ${tool.args?.operation || 'change'}`}
                         </div>
                       </div>
                     </div>
@@ -2145,13 +2189,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 Review Changes
               </h3>
 
-              {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).length === 0 ? (
+              {messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <Code className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No diffs to review</p>
                 </div>
               ) : (
-                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file'].includes(t.toolName)) || []).map((change: any, index: number) => {
+                messages.flatMap((msg: Message) => msg.toolInvocations?.filter((t: any) => t.state === 'result' && ['github_write_file', 'github_edit_file', 'github_replace_string', 'github_delete_file', 'github_stage_change'].includes(t.toolName)) || []).map((change: any, index: number) => {
                   const filePath = change.args?.path || change.args?.filePath || 'unknown'
                   let diffStats = { additions: 0, deletions: 0, diffLines: [] as string[] }
                   
@@ -2163,6 +2207,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     diffStats = parseFileCreationDiff(change.args.content)
                   } else if (change.toolName === 'github_delete_file') {
                     diffStats = parseFileDeletionDiff()
+                  } else if (change.toolName === 'github_stage_change') {
+                    diffStats = parseStagingChangeDiff(
+                      change.args?.operation,
+                      change.args?.content,
+                      change.args?.edit_operations,
+                      change.args?.edit_mode
+                    )
                   }
                   
                   return (

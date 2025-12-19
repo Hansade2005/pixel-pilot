@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
 import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
 import { Octokit } from '@octokit/rest'
-import { getOptimizedFileContext, getStagedChanges } from './helpers'
+import { getOptimizedFileContext, getStagedChanges, getFileContent, applyIncrementalEdits } from './helpers'
 
 // Disable Next.js body parser for binary data handling
 export const config = {
@@ -391,17 +391,39 @@ Assistant:
     const tools = {
       // --- Staging & Commits ---
       github_stage_change: tool({
-        description: 'Stage a file change (create, update, or delete) in memory. DOES NOT apply to GitHub immediately.',
+        description: 'Stage a file change (create, update, or delete) in memory. Supports both full rewrites and incremental edits. DOES NOT apply to GitHub immediately.',
         inputSchema: z.object({
           path: z.string().describe('File path'),
-          content: z.string().optional().describe('New content (required for create/update)'),
+          content: z.string().optional().describe('New content (required for create/update in rewrite mode)'),
           operation: z.enum(['create', 'update', 'delete']).describe('Type of operation'),
+          edit_mode: z.enum(['rewrite', 'incremental']).default('rewrite').describe('How to apply changes: rewrite (provide full content) or incremental (apply specific edits)'),
+          edit_operations: z.array(z.object({
+            old_string: z.string().describe('Text to replace (must be unique within context)'),
+            new_string: z.string().describe('Replacement text'),
+            context_lines: z.number().optional().default(3).describe('Lines of context before/after for uniqueness (3-5 recommended)')
+          })).optional().describe('Incremental edits to apply (only used in incremental mode)'),
           description: z.string().optional().describe('Brief description of change')
         }),
-        execute: async ({ path, content, operation }) => {
-          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Staging change: ${operation} ${path}`)
-          requestStagedChanges.set(path, { operation, content })
-          return { success: true, status: 'staged', path, operation }
+        execute: async ({ path, content, operation, edit_mode = 'rewrite', edit_operations }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Staging change: ${operation} ${path} (${edit_mode} mode)`)
+
+          let finalContent = content
+
+          if (edit_mode === 'incremental' && edit_operations && operation !== 'delete') {
+            try {
+              // Read current file content for incremental editing
+              const currentContent = await getFileContent(octokit, owner, repo, path, currentBranch)
+              finalContent = applyIncrementalEdits(currentContent, edit_operations)
+              console.log(`[RepoAgent] Applied ${edit_operations.length} incremental edits to ${path}`)
+            } catch (error) {
+              console.error(`[RepoAgent] Failed to apply incremental edits to ${path}:`, error)
+              const errorMessage = error instanceof Error ? error.message : String(error)
+              return { success: false, error: `Failed to apply incremental edits: ${errorMessage}` }
+            }
+          }
+
+          requestStagedChanges.set(path, { operation, content: finalContent })
+          return { success: true, status: 'staged', path, operation, edit_mode, edits_applied: edit_operations?.length || 0 }
         }
       }),
 
