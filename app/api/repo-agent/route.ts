@@ -1815,7 +1815,7 @@ Assistant:
           }
 
           console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Created todo: ${title}`, todo)
-          return { success: true, todo }
+          return { success: true, todo, message: `Created todo: "${title}"` }
         }
       }),
 
