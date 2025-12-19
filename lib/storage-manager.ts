@@ -167,6 +167,14 @@ export interface RepoConversation {
     }>
     metadata?: Record<string, any> // Store reasoning and other metadata here
   }>
+  todos?: Array<{
+    id: string
+    title: string
+    description?: string
+    status: 'pending' | 'completed'
+    created_at?: string
+    updated_at?: string
+  }>
   lastActivity: string
   createdAt: string
   updatedAt: string

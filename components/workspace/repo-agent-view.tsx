@@ -98,6 +98,14 @@ const getToolLabel = (tool: string, args?: any) => {
     case 'github_get_commit_statuses':
       return `Checked status for ${args?.ref?.slice(0, 7) || 'commit'}`
     case 'github_get_repo_info':
+      return `Got info for ${args?.repo || 'repository'}`
+    case 'github_create_todo':
+      return `Created todo: "${args?.title || 'Task'}"`
+    case 'github_update_todo':
+      return `Updated todo: "${args?.title || args?.id || 'Task'}"`
+    case 'github_delete_todo':
+      return `Deleted todo ${args?.id || 'item'}`
+    case 'github_get_repo_info':
       return 'Retrieved repository info'
     case 'github_create_repo':
       return `Created repository ${args?.name || 'unknown'}`
@@ -270,6 +278,15 @@ interface ActionLog {
   timestamp: Date
 }
 
+interface TodoItem {
+  id: string
+  title: string
+  description?: string
+  status: 'pending' | 'completed'
+  created_at?: string
+  updated_at?: string
+}
+
 interface Attachment {
   id: string
   type: 'file' | 'image' | 'url'
@@ -332,6 +349,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   // Message expansion state
   const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({})
+
+  // Todo state
+  const [todos, setTodos] = useState<TodoItem[]>([])
 
   // GitHub tokens state (following deployment client pattern)
   const [storedTokens, setStoredTokens] = useState<{
@@ -429,6 +449,13 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
             toolInvocations: msg.toolInvocations
           }))
           setMessages(loadedMessages)
+
+          // Load todos if they exist in the conversation
+          if (conversation.todos && Array.isArray(conversation.todos)) {
+            setTodos(conversation.todos)
+          } else {
+            setTodos([])
+          }
 
           // Reconstruct actionLogs from toolInvocations
           const reconstructedActionLogs: ActionLog[] = []
@@ -836,6 +863,21 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
               // File changes are tracked in toolInvocations instead of separate state
               // This follows the chat-panel-v2.tsx pattern of using tool execution data directly
+
+              // Handle todo operations
+              if (parsed.result?.success && parsed.toolName?.startsWith('github_') && parsed.toolName?.includes('todo')) {
+                if (parsed.toolName === 'github_create_todo' && parsed.result.todo) {
+                  setTodos(prev => [...prev, parsed.result.todo])
+                } else if (parsed.toolName === 'github_update_todo' && parsed.result.todo) {
+                  setTodos(prev => prev.map(todo =>
+                    todo.id === parsed.result.todo.id
+                      ? { ...todo, ...parsed.result.todo }
+                      : todo
+                  ))
+                } else if (parsed.toolName === 'github_delete_todo' && parsed.result.deleted_id) {
+                  setTodos(prev => prev.filter(todo => todo.id !== parsed.result.deleted_id))
+                }
+              }
             }
           } catch (parseError) {
             console.warn('[RepoAgent] Parse error:', parseError)
@@ -872,6 +914,9 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
 
   const sendMessage = async (content: string) => {
     if (!content.trim() && attachments.length === 0) return
+
+    // Clear todos for new conversation turn
+    setTodos([])
 
     // Build message content with attachments
     let messageContent = content
@@ -1128,6 +1173,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
         // Update existing conversation
         await storageManager.updateRepoConversation(conversationId, {
           messages: storageMessages,
+          todos: todos,
           lastActivity: new Date().toISOString()
         })
         console.log('[RepoAgent] Updated conversation:', conversationId)
@@ -1137,7 +1183,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           userId,
           repo: selectedRepo,
           branch: selectedBranch,
-          messages: storageMessages
+          messages: storageMessages,
+          todos: todos
         })
         setConversationId(newConversation.id)
         console.log('[RepoAgent] Created new conversation:', newConversation.id)
@@ -1151,6 +1198,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
     setCurrentView('landing')
     setMessages([])
     setActionLogs([])
+    setTodos([])
     setLandingInput('')
     setAttachments([])
   }
@@ -1344,12 +1392,14 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       setMessages([])
       setActionLogs([])
       setAttachments([])
+      setTodos([])
 
       if (conversationId) {
         try {
           await storageManager.init()
           await storageManager.updateRepoConversation(conversationId, {
             messages: [],
+            todos: [],
             lastActivity: new Date().toISOString()
           })
           toast({ title: 'Conversation cleared' })
@@ -1821,6 +1871,40 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           borderTop: '1px solid rgba(59, 130, 246, 0.2)',
           boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
         }}>
+          {/* Todo Section */}
+          {todos.length > 0 && (
+            <div className="mb-4 p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-blue-400" />
+                  Todo Items ({todos.filter(t => t.status === 'completed').length}/{todos.length})
+                </h4>
+              </div>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {todos.map((todo) => (
+                  <div
+                    key={todo.id}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-gray-700/30 border border-gray-600/30"
+                  >
+                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                      todo.status === 'completed' ? 'bg-green-500' : 'bg-gray-500'
+                    }`} />
+                    <span className={`text-sm flex-1 ${
+                      todo.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-200'
+                    }`}>
+                      {todo.title}
+                    </span>
+                    {todo.description && (
+                      <span className="text-xs text-gray-500 truncate max-w-[100px]">
+                        {todo.description}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Attachment Badges */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 p-2 bg-gray-800/50 rounded-xl border border-gray-700/50">

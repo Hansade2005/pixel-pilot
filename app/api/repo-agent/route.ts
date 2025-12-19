@@ -1795,6 +1795,63 @@ Assistant:
             }
           }
         }
+      }),
+
+      // --- Todo Management ---
+      github_create_todo: tool({
+        description: 'Create a new todo item to track progress on tasks',
+        inputSchema: z.object({
+          title: z.string().describe('Todo title/summary'),
+          description: z.string().optional().describe('Optional detailed description'),
+          status: z.enum(['pending', 'completed']).default('pending').describe('Initial status')
+        }),
+        execute: async ({ title, description, status = 'pending' }) => {
+          const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          const todo = {
+            id: todoId,
+            title,
+            description,
+            status,
+            created_at: new Date().toISOString()
+          }
+
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Created todo: ${title}`)
+          return { success: true, todo }
+        }
+      }),
+
+      github_update_todo: tool({
+        description: 'Update an existing todo item (status, title, or description)',
+        inputSchema: z.object({
+          id: z.string().describe('Todo ID to update'),
+          title: z.string().optional().describe('New title (if updating)'),
+          description: z.string().optional().describe('New description (if updating)'),
+          status: z.enum(['pending', 'completed']).optional().describe('New status (if updating)')
+        }),
+        execute: async ({ id, title, description, status }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📝 Updated todo ${id}:`, { title, description, status })
+          return {
+            success: true,
+            todo: {
+              id,
+              title,
+              description,
+              status,
+              updated_at: new Date().toISOString()
+            }
+          }
+        }
+      }),
+
+      github_delete_todo: tool({
+        description: 'Delete a todo item',
+        inputSchema: z.object({
+          id: z.string().describe('Todo ID to delete')
+        }),
+        execute: async ({ id }) => {
+          console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🗑️ Deleted todo: ${id}`)
+          return { success: true, deleted_id: id }
+        }
       })
     }
 
