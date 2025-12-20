@@ -60,6 +60,7 @@ CORE CAPABILITIES
 - **github_search_code** - Search for code patterns across the repository
 - **github_get_commits** - View commit history and changes
 - **github_get_commit** - Get detailed information about a specific commit (files changed, additions/deletions, diffs)
+- **github_revert_to_commit** - Revert repository to a specific commit (force reset all changes after that commit)
 - **github_create_pull_request** - Create PRs for your changes
 - **github_semantic_search** - Advanced semantic code search and analysis
 - **github_replace_string** - Powerful string replacement with regex support
@@ -69,6 +70,13 @@ CORE CAPABILITIES
 - **github_update_todo** - Update existing todo items (status, title, description)
 - **github_delete_todo** - Delete todo items
 - **check_dev_errors** - Run error checks on the repository (JavaScript/TypeScript build or Python syntax)
+- **github_list_workflows** - List all GitHub Actions workflows in the repository
+- **github_trigger_workflow** - Manually trigger a workflow run with optional input parameters
+- **github_list_workflow_runs** - List runs for a specific workflow with status filtering
+- **github_get_workflow_run** - Get detailed information about a specific workflow run (status, timing, logs URL)
+- **github_get_workflow_run_logs** - Download and retrieve complete logs from a workflow run
+- **github_cancel_workflow_run** - Cancel an in-progress workflow run
+- **github_rerun_workflow** - Rerun a failed or previous workflow execution
 
 ## 🎯 WORKFLOW PRINCIPLES
 1. **Repository Context**: Always maintain awareness of the current repository and branch
@@ -1269,6 +1277,47 @@ Assistant:
         }
       }),
 
+      // Revert/Reset to specific commit
+      github_revert_to_commit: tool({
+        description: 'Revert all changes after a specific commit by moving the branch pointer to that commit (force reset). WARNING: This is destructive and cannot be undone.',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in "owner/repo" format'),
+          branch: z.string().describe('Branch name to revert (e.g., "main", "dev")'),
+          sha: z.string().describe('Commit SHA to revert to - all changes after this commit will be removed')
+        }),
+        execute: async ({ repo, branch, sha }) => {
+          try {
+            const [owner, repoName] = repo.split('/')
+            if (!owner || !repoName) {
+              return {
+                success: false,
+                error: 'Invalid repo format. Use "owner/repo"'
+              }
+            }
+
+            const result = await octokit.git.updateRef({
+              owner,
+              repo: repoName,
+              ref: `heads/${branch}`,
+              sha,
+              force: true
+            })
+
+            return {
+              success: true,
+              message: `Successfully reverted ${branch} to commit ${sha}`,
+              previousSha: result.data.object.sha,
+              url: result.data.url
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to revert to commit: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
       // Pull Requests
       github_create_pull_request: tool({
         description: 'Create a pull request between branches',
@@ -2198,6 +2247,344 @@ Assistant:
               logs,
               errors: [error?.message || 'Unknown error occurred during error check'],
               executionTimeMs: Date.now() - toolStartTime
+            }
+          }
+        }
+      }),
+
+      // GitHub Actions Workflow Management
+      github_list_workflows: tool({
+        description: 'List all GitHub Actions workflows in the repository',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"')
+        }),
+        execute: async ({ repo }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.actions.listRepoWorkflows({
+              owner,
+              repo: repoName
+            })
+
+            return {
+              success: true,
+              total_count: response.data.total_count,
+              workflows: response.data.workflows.map(workflow => ({
+                id: workflow.id,
+                node_id: workflow.node_id,
+                name: workflow.name,
+                path: workflow.path,
+                state: workflow.state,
+                created_at: workflow.created_at,
+                updated_at: workflow.updated_at,
+                url: workflow.url,
+                html_url: workflow.html_url
+              }))
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to list workflows: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_trigger_workflow: tool({
+        description: 'Trigger a GitHub Actions workflow run manually',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          workflow: z.string().describe('Workflow ID or filename (e.g., "ci.yml")'),
+          ref: z.string().describe('The ref (branch, tag, or commit SHA) to run the workflow on'),
+          inputs: z.record(z.string()).optional().describe('Optional input parameters for the workflow')
+        }),
+        execute: async ({ repo, workflow, ref, inputs }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.actions.createWorkflowDispatch({
+              owner,
+              repo: repoName,
+              workflow_id: workflow,
+              ref,
+              inputs: inputs || {}
+            })
+
+            return {
+              success: true,
+              message: `Workflow "${workflow}" triggered on ${ref}`,
+              workflow,
+              ref,
+              status: 'dispatched'
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to trigger workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_list_workflow_runs: tool({
+        description: 'List runs for a specific workflow',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          workflow: z.string().describe('Workflow ID or filename (e.g., "ci.yml")'),
+          status: z.enum(['completed', 'action_required', 'cancelled', 'failure', 'neutral', 'skipped', 'stale', 'success', 'timed_out', 'in_progress', 'queued', 'requested', 'waiting']).optional().describe('Filter by run status'),
+          per_page: z.number().min(1).max(100).optional().describe('Results per page (default: 30)')
+        }),
+        execute: async ({ repo, workflow, status, per_page = 30 }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.actions.listWorkflowRuns({
+              owner,
+              repo: repoName,
+              workflow_id: workflow,
+              status: status as any,
+              per_page
+            })
+
+            return {
+              success: true,
+              total_count: response.data.total_count,
+              workflow_runs: response.data.workflow_runs.map(run => ({
+                id: run.id,
+                name: run.name,
+                node_id: run.node_id,
+                head_branch: run.head_branch,
+                head_sha: run.head_sha,
+                path: run.path,
+                display_title: run.display_title,
+                run_number: run.run_number,
+                event: run.event,
+                status: run.status,
+                conclusion: run.conclusion,
+                workflow_id: run.workflow_id,
+                check_suite_id: run.check_suite_id,
+                url: run.url,
+                html_url: run.html_url,
+                pull_requests: run.pull_requests,
+                created_at: run.created_at,
+                updated_at: run.updated_at,
+                actor: {
+                  login: run.actor?.login,
+                  id: run.actor?.id,
+                  avatar_url: run.actor?.avatar_url
+                },
+                run_attempt: run.run_attempt,
+                referenced_workflows: run.referenced_workflows
+              }))
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to list workflow runs: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_get_workflow_run: tool({
+        description: 'Get detailed information about a specific workflow run including status, conclusion, timing, and logs',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          run_id: z.number().describe('The workflow run ID')
+        }),
+        execute: async ({ repo, run_id }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.actions.getWorkflowRun({
+              owner,
+              repo: repoName,
+              run_id
+            })
+
+            return {
+              success: true,
+              run: {
+                id: response.data.id,
+                name: response.data.name,
+                node_id: response.data.node_id,
+                head_branch: response.data.head_branch,
+                head_sha: response.data.head_sha,
+                path: response.data.path,
+                run_number: response.data.run_number,
+                event: response.data.event,
+                display_title: response.data.display_title,
+                status: response.data.status,
+                conclusion: response.data.conclusion,
+                workflow_id: response.data.workflow_id,
+                check_suite_id: response.data.check_suite_id,
+                url: response.data.url,
+                html_url: response.data.html_url,
+                pull_requests: response.data.pull_requests,
+                created_at: response.data.created_at,
+                updated_at: response.data.updated_at,
+                actor: {
+                  login: response.data.actor?.login,
+                  id: response.data.actor?.id
+                },
+                run_attempt: response.data.run_attempt,
+                referenced_workflows: response.data.referenced_workflows,
+                jobs_url: response.data.jobs_url,
+                logs_url: response.data.logs_url,
+                cancel_url: response.data.cancel_url,
+                rerun_url: response.data.rerun_url,
+                previous_attempt_url: response.data.previous_attempt_url,
+                workflow_url: response.data.workflow_url,
+                head_commit: response.data.head_commit ? {
+                  id: response.data.head_commit.id,
+                  tree_id: response.data.head_commit.tree_id,
+                  message: response.data.head_commit.message,
+                  timestamp: response.data.head_commit.timestamp,
+                  author: response.data.head_commit.author,
+                  committer: response.data.head_commit.committer
+                } : null
+              }
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to get workflow run: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_get_workflow_run_logs: tool({
+        description: 'Get readable logs from a workflow run by retrieving individual job logs',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          run_id: z.number().describe('The workflow run ID')
+        }),
+        execute: async ({ repo, run_id }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+
+            // Get workflow run details
+            const runResponse = await octokit.rest.actions.getWorkflowRun({
+              owner,
+              repo: repoName,
+              run_id
+            })
+
+            // Get jobs for this run
+            const jobsResponse = await octokit.rest.actions.listJobsForWorkflowRun({
+              owner,
+              repo: repoName,
+              run_id,
+              per_page: 100
+            })
+
+            // Get logs for each job
+            const jobLogs = []
+            for (const job of jobsResponse.data.jobs) {
+              try {
+                const jobLogsResponse = await octokit.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner,
+                  repo: repoName,
+                  job_id: job.id
+                })
+
+                const logsText = Buffer.from(jobLogsResponse as any).toString('utf-8')
+
+                jobLogs.push({
+                  job_id: job.id,
+                  job_name: job.name,
+                  status: job.status,
+                  conclusion: job.conclusion,
+                  started_at: job.started_at,
+                  completed_at: job.completed_at,
+                  logs: logsText,
+                  logs_length: logsText.length
+                })
+              } catch (jobError) {
+                jobLogs.push({
+                  job_id: job.id,
+                  job_name: job.name,
+                  status: job.status,
+                  conclusion: job.conclusion,
+                  error: `Failed to get logs: ${jobError instanceof Error ? jobError.message : 'Unknown error'}`
+                })
+              }
+            }
+
+            return {
+              success: true,
+              run_id,
+              run_name: runResponse.data.name,
+              status: runResponse.data.status,
+              conclusion: runResponse.data.conclusion,
+              created_at: runResponse.data.created_at,
+              updated_at: runResponse.data.updated_at,
+              html_url: runResponse.data.html_url,
+              jobs_count: jobsResponse.data.total_count,
+              jobs: jobLogs
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to get workflow logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_cancel_workflow_run: tool({
+        description: 'Cancel a running workflow',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          run_id: z.number().describe('The workflow run ID to cancel')
+        }),
+        execute: async ({ repo, run_id }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            await octokit.rest.actions.cancelWorkflowRun({
+              owner,
+              repo: repoName,
+              run_id
+            })
+
+            return {
+              success: true,
+              message: `Workflow run ${run_id} has been cancelled`,
+              run_id
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to cancel workflow run: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_rerun_workflow: tool({
+        description: 'Rerun a failed or previous workflow run',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          run_id: z.number().describe('The workflow run ID to rerun')
+        }),
+        execute: async ({ repo, run_id }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const response = await octokit.rest.actions.reRunWorkflow({
+              owner,
+              repo: repoName,
+              run_id
+            })
+
+            return {
+              success: true,
+              message: `Workflow run ${run_id} has been rerun`,
+              new_run_id: response.data.id,
+              status: response.data.status,
+              html_url: response.data.html_url
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to rerun workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
             }
           }
         }
