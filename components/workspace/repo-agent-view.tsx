@@ -2666,11 +2666,20 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                               </div>
                               {/* Code Content */}
                               <div className="flex-1 overflow-x-auto">
-                                <pre className="p-4 bg-[#1e1e1e] m-0 min-h-full">
+                                <pre className="p-0 bg-[#1e1e1e] m-0 min-h-full">
                                   <code className={`hljs language-${getFileExtension(filePath)} text-sm text-white font-mono leading-relaxed block`}>
                                     {diffStats.diffLines.map((line, index) => (
-                                      <div key={index} className="h-[1.5rem] flex items-center whitespace-pre">
-                                        {line}
+                                      <div
+                                        key={index}
+                                        className={`px-4 py-0 h-[1.5rem] flex items-center whitespace-pre-wrap break-all ${
+                                          line.startsWith('+') ? 'bg-green-900/30' :
+                                          line.startsWith('-') ? 'bg-red-900/30' :
+                                          ''
+                                        }`}
+                                      >
+                                        <span className="block w-full">
+                                          {line}
+                                        </span>
                                       </div>
                                     ))}
                                   </code>
