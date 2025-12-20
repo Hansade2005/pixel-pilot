@@ -59,6 +59,7 @@ CORE CAPABILITIES
 - **github_delete_tag** - Delete tags
 - **github_search_code** - Search for code patterns across the repository
 - **github_get_commits** - View commit history and changes
+- **github_get_commit** - Get detailed information about a specific commit (files changed, additions/deletions, diffs)
 - **github_create_pull_request** - Create PRs for your changes
 - **github_semantic_search** - Advanced semantic code search and analysis
 - **github_replace_string** - Powerful string replacement with regex support
@@ -1206,6 +1207,63 @@ Assistant:
             return {
               success: false,
               error: `Failed to get commits: ${error instanceof Error ? error.message : 'Unknown error'}`
+            }
+          }
+        }
+      }),
+
+      github_get_commit: tool({
+        description: 'Get detailed information about a specific commit including files changed, additions, deletions, and full diff',
+        inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
+          sha: z.string().describe('Commit SHA or ref (branch/tag name)')
+        }),
+        execute: async ({ repo, sha }) => {
+          try {
+            const { owner, repo: repoName } = parseRepoString(repo)
+            const commit = await octokit.repos.getCommit({
+              owner,
+              repo: repoName,
+              ref: sha
+            })
+
+            return {
+              success: true,
+              commit: {
+                sha: commit.data.sha,
+                message: commit.data.commit.message,
+                author: {
+                  name: commit.data.commit.author?.name,
+                  email: commit.data.commit.author?.email,
+                  date: commit.data.commit.author?.date
+                },
+                committer: {
+                  name: commit.data.commit.committer?.name,
+                  email: commit.data.commit.committer?.email,
+                  date: commit.data.commit.committer?.date
+                },
+                html_url: commit.data.html_url,
+                parentShas: commit.data.parents.map(p => p.sha),
+                stats: commit.data.stats ? {
+                  total: commit.data.stats.total,
+                  additions: commit.data.stats.additions,
+                  deletions: commit.data.stats.deletions
+                } : undefined,
+                files: (commit.data.files || []).map(file => ({
+                  filename: file.filename,
+                  status: file.status,
+                  additions: file.additions,
+                  deletions: file.deletions,
+                  changes: file.changes,
+                  patch: file.patch || 'No patch available',
+                  previousFilename: file.previous_filename
+                }))
+              }
+            }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Failed to get commit: ${error instanceof Error ? error.message : 'Unknown error'}`
             }
           }
         }
