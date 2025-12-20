@@ -323,7 +323,7 @@ module.exports = nextConfig`,
           parents: [ref.object.sha], // Reference the existing commit
           author: {
             name: 'PiPilot Bot',
-            email: 'bot@pipilot.dev'
+            email: 'hello@pipilot.dev'
           }
         })
 
@@ -393,7 +393,7 @@ module.exports = nextConfig`,
           parents: [ref.object.sha],
           author: {
             name: 'PiPilot Bot',
-            email: 'bot@pipilot.dev'
+            email: 'hello@pipilot.dev'
           }
         });
 

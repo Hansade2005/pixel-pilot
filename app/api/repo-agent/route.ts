@@ -8,6 +8,7 @@ import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-midd
 import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
 import { Octokit } from '@octokit/rest'
 import { getOptimizedFileContext, getStagedChanges, getFileContent, applyIncrementalEdits } from './helpers'
+import JSZip from 'jszip'
 
 // Disable Next.js body parser for binary data handling
 export const config = {
@@ -512,7 +513,11 @@ Assistant:
                   path,
                   message: `Delete ${path} (part of ${message})`,
                   sha: (await octokit.rest.repos.getContent({ owner, repo, path }) as any).data.sha,
-                  branch
+                  branch,
+                  author: {
+                    name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                    email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+                  }
                 })
               } else {
                 const blob = await octokit.rest.git.createBlob({
@@ -549,7 +554,11 @@ Assistant:
               repo,
               message,
               tree: newTree.data.sha,
-              parents: [latestCommitSha]
+              parents: [latestCommitSha],
+              author: {
+                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+              }
             })
 
             // 6. Update Ref
@@ -955,7 +964,11 @@ Assistant:
               message,
               content: Buffer.from(content).toString('base64'),
               sha,
-              branch
+              branch,
+              author: {
+                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+              }
             })
 
             const result = {
@@ -1019,7 +1032,11 @@ Assistant:
               path,
               message,
               sha: existingFile.data.sha,
-              branch
+              branch,
+              author: {
+                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+              }
             })
 
             const result = {
@@ -1572,7 +1589,11 @@ Assistant:
               message,
               content: Buffer.from(updatedContent).toString('base64'),
               sha: fileData.sha,
-              branch
+              branch,
+              author: {
+                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+              }
             })
 
             const result = {
@@ -1897,7 +1918,11 @@ Assistant:
               message,
               content: Buffer.from(updatedContent).toString('base64'),
               sha: fileData.sha,
-              branch
+              branch,
+              author: {
+                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+              }
             })
 
             const result = {
@@ -2041,7 +2066,7 @@ Assistant:
 
             for (const filePath of filePathsToCheck) {
               try {
-                const content = await getFileContent(octokit, owner, repo, currentBranch, filePath)
+                const content = await getFileContent(octokit, owner, repo, filePath, currentBranch)
                 if (content) {
                   files.set(filePath, { path: filePath, content })
                   logs.push(`Loaded: ${filePath}`)
@@ -2486,7 +2511,17 @@ Assistant:
                   job_id: job.id
                 })
 
-                const logsText = Buffer.from(jobLogsResponse as any).toString('utf-8')
+                // Extract logs from zip
+                const zip = new JSZip()
+                await zip.loadAsync(jobLogsResponse.data as any)
+                
+                let logsText = ''
+                for (const [fileName, file] of Object.entries(zip.files)) {
+                  if (!file.dir) {
+                    const content = await file.async('text')
+                    logsText += `=== ${fileName} ===\n${content}\n\n`
+                  }
+                }
 
                 jobLogs.push({
                   job_id: job.id,
