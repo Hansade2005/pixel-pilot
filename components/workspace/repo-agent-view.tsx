@@ -2658,32 +2658,37 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                             <div className="flex">
                               {/* Line Numbers Column */}
                               <div className="bg-[#1e1e1e] border-r border-gray-600 px-2 py-4 text-xs text-gray-500 font-mono select-none min-w-[3rem] text-right leading-relaxed">
-                                {diffStats.diffLines.map((_, index) => (
-                                  <div key={index} className="h-[1.5rem] flex items-center justify-end pr-2">
-                                    {index + 1}
-                                  </div>
-                                ))}
+                                {diffStats.diffLines.map((line, index) => {
+                                  const lineCount = line.split('\n').length;
+                                  return (
+                                    <div key={index} className="flex flex-col justify-start pr-2" style={{ minHeight: `${lineCount * 1.5}rem` }}>
+                                      <div className="flex items-start justify-end h-[1.5rem]">
+                                        {index + 1}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                               {/* Code Content */}
                               <div className="flex-1 overflow-x-auto">
-                                <pre className="p-0 bg-[#1e1e1e] m-0 min-h-full">
-                                  <code className={`hljs language-${getFileExtension(filePath)} text-sm text-white font-mono leading-relaxed block`}>
-                                    {diffStats.diffLines.map((line, index) => (
-                                      <div
-                                        key={index}
-                                        className={`px-4 py-0 h-[1.5rem] flex items-center whitespace-pre-wrap break-all ${
-                                          line.startsWith('+') ? 'bg-green-900/30' :
-                                          line.startsWith('-') ? 'bg-red-900/30' :
-                                          ''
-                                        }`}
-                                      >
-                                        <span className="block w-full">
+                                <div className="p-0 bg-[#1e1e1e] min-h-full">
+                                  {diffStats.diffLines.map((line, index) => (
+                                    <div
+                                      key={index}
+                                      className={`px-4 py-1 border-l-2 ${
+                                        line.startsWith('+') ? 'bg-green-900/30 border-green-500' :
+                                        line.startsWith('-') ? 'bg-red-900/30 border-red-500' :
+                                        'border-transparent'
+                                      }`}
+                                    >
+                                      <pre className={`hljs language-${getFileExtension(filePath)} text-sm text-white font-mono leading-relaxed m-0 whitespace-pre-wrap break-words`}>
+                                        <code className="block">
                                           {line}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </code>
-                                </pre>
+                                        </code>
+                                      </pre>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
