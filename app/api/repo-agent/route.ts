@@ -91,6 +91,7 @@ CORE CAPABILITIES
   - Modify titles/descriptions as needed for clarity
 - **github_delete_todo**: Remove todos that are no longer relevant
 - **ID Consistency**: Always use the exact same ID you created for updates/deletes
+- **Context Awareness**: Check existing todos above before creating new ones - update existing todos instead of creating duplicates
 
 ## 📋 RESPONSE FORMAT
 When performing operations:
@@ -324,6 +325,9 @@ export async function POST(req: Request) {
         githubToken
       } = body)
 
+    // Extract todos from request body
+    let todos = body.todos || []
+
     if (!messages || !Array.isArray(messages)) {
       console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Invalid request: Messages array is required`)
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
@@ -338,6 +342,10 @@ export async function POST(req: Request) {
       console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Invalid request: GitHub token is required`)
       return NextResponse.json({ error: 'GitHub token is required' }, { status: 400 })
     }
+
+    // Ensure todos is properly typed
+    const activeTodos = Array.isArray(todos) ? todos : []
+    console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📋 Active todos: ${activeTodos.length}`)
 
     console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ Request validation passed - Repo: ${currentRepo}, Branch: ${currentBranch}, Model: ${modelId}`)
 
@@ -376,6 +384,13 @@ Current Repository: ${currentRepo}
 Current Branch: ${currentBranch}
 
 ${repoContext}
+
+═══════════════════════════════════════════════════════════════
+ACTIVE TODO ITEMS
+═══════════════════════════════════════════════════════════════
+${activeTodos.length > 0 ? activeTodos.map((todo: any) => 
+  `• [${todo.status.toUpperCase()}] ${todo.id}: ${todo.title}${todo.description ? ` - ${todo.description}` : ''}`
+).join('\n') : 'No active todos'}
 
 ═══════════════════════════════════════════════════════════════
 STAGING & COMMIT WORKFLOW (MANDATORY)

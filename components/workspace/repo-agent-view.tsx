@@ -748,7 +748,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           }],
           repo: selectedRepo,
           branch: selectedBranch,
-          githubToken: storedTokens.github
+          githubToken: storedTokens.github,
+          todos: todos
         })
       })
 
@@ -1113,7 +1114,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           messages: conversationHistory,
           repo: selectedRepo,
           branch: selectedBranch,
-          githubToken: storedTokens.github
+          githubToken: storedTokens.github,
+          todos: todos
         }),
         signal: controller.signal
       })
