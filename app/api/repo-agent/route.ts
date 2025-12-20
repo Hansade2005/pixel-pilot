@@ -17,6 +17,13 @@ export const config = {
   },
 }
 
+// In-memory project storage for repo-agent sessions
+// Key: repoKey (owner/repo), Value: { fileTree: string[], files: Map<path, fileData> }
+const repoSessionStorage = new Map<string, {
+  fileTree: string[]
+  files: Map<string, any>
+}>()
+
 // Get AI model by ID with fallback to default
 const getAIModel = (modelId?: string) => {
   try {
@@ -279,6 +286,121 @@ const findSemanticMatches = (content: string, query: string): any[] => {
 
 const escapeRegExp = (string: string): string => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Function to import GitHub repository and store in session memory
+const importGithubRepoForSession = async (repoUrl: string, repoKey: string, octokit: any) => {
+  console.log(`[RepoAgent] 🚀 Importing GitHub repository for session: ${repoUrl}`)
+
+  try {
+    // Parse repo URL to get owner and repo
+    const repoUrlMatch = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
+    if (!repoUrlMatch) {
+      throw new Error('Invalid GitHub repository URL')
+    }
+    const [, owner, repo] = repoUrlMatch
+    const repoName = `${owner}-${repo}`
+
+    // Download repository archive directly using Octokit (works for private repos)
+    console.log(`[RepoAgent] 📦 Downloading repository archive for ${owner}/${repo}`)
+    const archiveResponse = await octokit.rest.repos.downloadZipballArchive({
+      owner,
+      repo,
+      ref: 'HEAD' // Get latest commit
+    })
+
+    // Get the ZIP data - Octokit returns the data directly
+    const zipData = Buffer.from(archiveResponse.data).toString('base64')
+    // Extract files from ZIP (similar to chat-input.tsx applyGithubFiles)
+    const zipBlob = new Blob([Uint8Array.from(atob(zipData), c => c.charCodeAt(0))], {
+      type: 'application/zip'
+    })
+
+    const zip = await JSZip.loadAsync(zipBlob)
+    const filesToCreate: Array<{ path: string; content: string }> = []
+
+    // Process each file in the zip
+    for (const [path, zipEntry] of Object.entries(zip.files)) {
+      const entry = zipEntry as any
+      if (entry.dir) continue // Skip directories
+
+      // Remove the repo name prefix from path (e.g., "repo-name-main/" -> "")
+      const cleanPath = path.replace(`${repoName}-main/`, '').replace(`${repoName}-master/`, '')
+
+      if (!cleanPath || cleanPath.startsWith('.') || cleanPath.includes('/.git/')) continue
+
+      try {
+        const content = await entry.async('text')
+        filesToCreate.push({
+          path: cleanPath,
+          content: content
+        })
+      } catch (error) {
+        console.warn(`⚠️ Could not extract text content for ${cleanPath}:`, error)
+      }
+    }
+
+    // Filter out unwanted files (similar to chat-input.tsx)
+    const filterUnwantedFiles = (files: Array<{ path: string; content: string }>) => {
+      return files.filter(file => {
+        const path = file.path.toLowerCase()
+        // Skip images, videos, PDFs, and other binary files
+        if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') ||
+            path.endsWith('.gif') || path.endsWith('.bmp') || path.endsWith('.webp') ||
+            path.endsWith('.svg') || path.endsWith('.ico') || path.endsWith('.mp4') ||
+            path.endsWith('.avi') || path.endsWith('.mov') || path.endsWith('.wmv') ||
+            path.endsWith('.pdf') || path.endsWith('.zip') || path.endsWith('.tar') ||
+            path.endsWith('.gz') || path.endsWith('.rar') || path.endsWith('.7z')) {
+          return false
+        }
+        // Skip certain folders
+        if (path.includes('/.git/') || path.includes('/node_modules/') ||
+            path.includes('/.next/') || path.includes('/dist/') ||
+            path.includes('/build/') || path.includes('/scripts/') ||
+            path.includes('/test') || path.includes('/tests/') ||
+            path.includes('/__tests__/') || path.includes('/coverage/')) {
+          return false
+        }
+        return true
+      })
+    }
+
+    const filteredFiles = filterUnwantedFiles(filesToCreate)
+    console.log(`[RepoAgent] 📦 Extracted ${filteredFiles.length} files from ${repoName}`)
+
+    // Convert to session storage format (like chat-v2)
+    const sessionFiles = new Map<string, any>()
+    const fileTree: string[] = []
+
+    for (const file of filteredFiles) {
+      const fileData = {
+        path: file.path,
+        content: file.content,
+        name: file.path.split('/').pop() || file.path,
+        fileType: file.path.split('.').pop() || 'text',
+        type: file.path.split('.').pop() || 'text',
+        size: file.content.length,
+        isDirectory: false,
+        folderId: undefined,
+        metadata: {}
+      }
+      sessionFiles.set(file.path, fileData)
+      fileTree.push(file.path)
+    }
+
+    // Store in session memory
+    repoSessionStorage.set(repoKey, {
+      fileTree,
+      files: sessionFiles
+    })
+
+    console.log(`[RepoAgent] ✅ Stored ${sessionFiles.size} files in session memory for ${repoKey}`)
+    return { success: true, fileCount: sessionFiles.size }
+
+  } catch (error) {
+    console.error('[RepoAgent] ❌ Failed to import GitHub repository:', error)
+    throw error
+  }
 }
 
 export async function POST(req: Request) {
@@ -2032,20 +2154,22 @@ Assistant:
 
       // --- Error Checking Tool ---
       check_dev_errors: tool({
-        description: 'Run error checks on the repository to detect syntax, compilation, or runtime errors. Supports JavaScript/TypeScript (npm run build) and Python projects (python3 -m compileall).',
+        description: 'Run build process for JavaScript/TypeScript projects or syntax check for Python projects. Monitors console logs to detect any errors and reports success/failure status.',
         inputSchema: z.object({
+          repo: z.string().describe('Repository in format "owner/repo"'),
           mode: z.enum(['build', 'python']).describe('Error check mode: "build" for JavaScript/TypeScript projects, "python" for Python projects'),
           timeoutSeconds: z.number().optional().describe('How long to wait for the error check (default: 30 seconds)')
         }),
-        execute: async ({ mode, timeoutSeconds = 30 }) => {
+        execute: async ({ repo, mode, timeoutSeconds = 30 }) => {
           const toolStartTime = Date.now()
           const logs: string[] = []
           const errors: string[] = []
 
           try {
-            console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔍 Starting error check in ${mode} mode`)
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔍 Starting error check in ${mode} mode for repo: ${repo}`)
 
-            // Check if E2B API key is available
+            // Parse repo string
+            const { owner, repo: repoName } = parseRepoString(repo)
             const e2bApiKey = process.env.E2B_API_KEY
             if (!e2bApiKey) {
               const executionTime = Date.now() - toolStartTime
@@ -2059,45 +2183,88 @@ Assistant:
               }
             }
 
-            // Import E2B functions
-            const { createEnhancedSandbox } = await import('@/lib/e2b-enhanced')
+            // Create repo key for session storage
+            const repoKey = `${owner}/${repoName}`
 
-            // Get repository files
-            const files = new Map<string, any>()
-            
-            // Read key files from the repository
-            const filePathsToCheck = [
-              'package.json',
-              'tsconfig.json',
-              'vite.config.ts',
-              'next.config.js',
-              'next.config.mjs',
-              'app.json',
-              'setup.py',
-              'requirements.txt',
-              'pyproject.toml'
-            ]
+            // Check if we already have this repo in session storage
+            let sessionData = repoSessionStorage.get(repoKey)
+            if (!sessionData) {
+              // Import the repository and store in session memory
+              console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📦 Importing repository for error checking: https://github.com/${repoKey}`)
+              const repoUrl = `https://github.com/${repoKey}`
+              await importGithubRepoForSession(repoUrl, repoKey, octokit)
+              sessionData = repoSessionStorage.get(repoKey)
+            }
 
-            for (const filePath of filePathsToCheck) {
-              try {
-                const content = await getFileContent(octokit, owner, repo, filePath, currentBranch)
-                if (content) {
-                  files.set(filePath, { path: filePath, content })
-                  logs.push(`Loaded: ${filePath}`)
-                }
-              } catch (error) {
-                // File doesn't exist, continue
+            if (!sessionData) {
+              const executionTime = Date.now() - toolStartTime
+              return {
+                success: false,
+                error: 'Failed to load repository files into session',
+                mode,
+                logs,
+                errors: ['Could not import repository files'],
+                executionTimeMs: executionTime
               }
             }
 
-            // Detect project type
-            const hasPythonFiles = files.has('setup.py') || files.has('requirements.txt') || files.has('pyproject.toml')
-            const hasPackageJson = files.has('package.json')
-            
+            const { files: sessionFiles } = sessionData
+            const allFiles = Array.from(sessionFiles.values())
+
+            if (!allFiles || allFiles.length === 0) {
+              const executionTime = Date.now() - toolStartTime
+              return {
+                success: false,
+                error: 'No files found in repository',
+                mode,
+                logs,
+                errors: ['Repository appears to be empty'],
+                executionTimeMs: executionTime
+              }
+            }
+
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📁 Loaded ${allFiles.length} files from session storage`)
+
+            // Import E2B functions
+            const {
+              createEnhancedSandbox,
+              SandboxError
+            } = await import('@/lib/e2b-enhanced')
+
+            let serverStarted = false
+            let buildCompleted = false
+
+            // Detect project type from session files
+            const hasPackageJson = allFiles.some((f: any) => f.path === 'package.json')
+            const hasPythonFiles = allFiles.some((f: any) =>
+              f.path === 'setup.py' || f.path === 'requirements.txt' || f.path === 'pyproject.toml'
+            )
+
             logs.push(`Detected: ${hasPythonFiles ? 'Python' : hasPackageJson ? 'Node.js/TypeScript' : 'Unknown'} project`)
 
+            // Create sandbox
+            const sandbox = await createEnhancedSandbox({
+              template: 'pipilot-expo',
+              timeoutMs: (timeoutSeconds || 30) * 1000 + 30000,
+              env: {}
+            })
+
+            logs.push('Sandbox created successfully')
+
+            // Prepare files for sandbox - use all files from session storage
+            const sandboxFiles: any[] = allFiles
+              .filter(file => file.content && typeof file.content === 'string')
+              .map(file => ({
+                path: `/project/${file.path}`,
+                content: file.content
+              }))
+
+            // Write files to sandbox
+            await sandbox.writeFiles(sandboxFiles)
+            logs.push(`Written ${sandboxFiles.length} files to sandbox`)
+
             if (mode === 'build') {
-              // For JavaScript/TypeScript projects - run build
+              // For build mode - run build process for JavaScript/TypeScript projects
               if (!hasPackageJson) {
                 return {
                   success: false,
@@ -2109,30 +2276,6 @@ Assistant:
                 }
               }
 
-              logs.push('Creating sandbox environment for build check...')
-
-              // Create sandbox
-              const sandbox = await createEnhancedSandbox({
-                template: 'pipilot-expo',
-                timeoutMs: (timeoutSeconds || 30) * 1000 + 30000, // Add buffer for installation
-                env: {}
-              })
-
-              logs.push('Sandbox created successfully')
-
-              // Prepare files for sandbox
-              const sandboxFiles: any[] = Array.from(files.values())
-                .filter(file => file.content && typeof file.content === 'string')
-                .map(file => ({
-                  path: `/project/${file.path}`,
-                  content: file.content
-                }))
-
-              // Write files to sandbox
-              await sandbox.writeFiles(sandboxFiles)
-              logs.push(`Written ${sandboxFiles.length} files to sandbox`)
-
-              // Install dependencies
               logs.push('Installing dependencies...')
               const installResult = await sandbox.installDependenciesRobust('/project', {
                 timeoutMs: 120000,
@@ -2198,40 +2341,17 @@ Assistant:
               }
 
             } else if (mode === 'python') {
-              // For Python projects - run compileall
+              // For Python projects - run compileall syntax check
               if (!hasPythonFiles) {
                 return {
                   success: false,
-                  error: 'No Python project files found (setup.py, requirements.txt, or pyproject.toml not found)',
+                  error: 'No Python files found. This doesn\'t appear to be a Python project.',
                   mode,
                   logs,
-                  errors: ['No Python project detected'],
+                  errors: ['No Python files found'],
                   executionTimeMs: Date.now() - toolStartTime
                 }
               }
-
-              logs.push('Creating sandbox environment for Python syntax check...')
-
-              // Create sandbox with Python support
-              const sandbox = await createEnhancedSandbox({
-                template: 'pipilot-expo',
-                timeoutMs: (timeoutSeconds || 30) * 1000 + 30000,
-                env: {}
-              })
-
-              logs.push('Sandbox created successfully')
-
-              // Prepare all Python files
-              const pythonFiles: any[] = Array.from(files.values())
-                .filter(file => file.content && typeof file.content === 'string')
-                .map(file => ({
-                  path: `/project/${file.path}`,
-                  content: file.content
-                }))
-
-              // Write files to sandbox
-              await sandbox.writeFiles(pythonFiles)
-              logs.push(`Written ${pythonFiles.length} files to sandbox`)
 
               // Run Python compile check
               logs.push('Executing: python3 -m compileall . -q -x ".*/(venv|\\.venv).*"')
@@ -2267,15 +2387,6 @@ Assistant:
                 exitCode: pythonResult.exitCode,
                 executionTimeMs: Date.now() - toolStartTime
               }
-            }
-
-            return {
-              success: false,
-              error: 'Invalid mode specified',
-              mode,
-              logs,
-              errors: ['Unknown mode. Use "build" for JavaScript/TypeScript or "python" for Python projects.'],
-              executionTimeMs: Date.now() - toolStartTime
             }
           } catch (error: any) {
             console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Error check failed:`, error)
