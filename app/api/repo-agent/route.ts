@@ -67,6 +67,7 @@ CORE CAPABILITIES
 - **github_create_todo** - Create todo items to track progress on tasks
 - **github_update_todo** - Update existing todo items (status, title, description)
 - **github_delete_todo** - Delete todo items
+- **check_dev_errors** - Run error checks on the repository (JavaScript/TypeScript build or Python syntax)
 
 ## 🎯 WORKFLOW PRINCIPLES
 1. **Repository Context**: Always maintain awareness of the current repository and branch
@@ -1880,6 +1881,267 @@ Assistant:
         execute: async ({ id }) => {
           console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🗑️ Deleted todo: ${id}`)
           return { success: true, deleted_id: id }
+        }
+      }),
+
+      // --- Error Checking Tool ---
+      check_dev_errors: tool({
+        description: 'Run error checks on the repository to detect syntax, compilation, or runtime errors. Supports JavaScript/TypeScript (npm run build) and Python projects (python3 -m compileall).',
+        inputSchema: z.object({
+          mode: z.enum(['build', 'python']).describe('Error check mode: "build" for JavaScript/TypeScript projects, "python" for Python projects'),
+          timeoutSeconds: z.number().optional().describe('How long to wait for the error check (default: 30 seconds)')
+        }),
+        execute: async ({ mode, timeoutSeconds = 30 }) => {
+          const toolStartTime = Date.now()
+          const logs: string[] = []
+          const errors: string[] = []
+
+          try {
+            console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔍 Starting error check in ${mode} mode`)
+
+            // Check if E2B API key is available
+            const e2bApiKey = process.env.E2B_API_KEY
+            if (!e2bApiKey) {
+              const executionTime = Date.now() - toolStartTime
+              return {
+                success: false,
+                error: 'E2B API key not configured',
+                mode,
+                logs,
+                errors: ['E2B_API_KEY environment variable not set'],
+                executionTimeMs: executionTime
+              }
+            }
+
+            // Import E2B functions
+            const { createEnhancedSandbox } = await import('@/lib/e2b-enhanced')
+
+            // Get repository files
+            const files = new Map<string, any>()
+            
+            // Read key files from the repository
+            const filePathsToCheck = [
+              'package.json',
+              'tsconfig.json',
+              'vite.config.ts',
+              'next.config.js',
+              'next.config.mjs',
+              'app.json',
+              'setup.py',
+              'requirements.txt',
+              'pyproject.toml'
+            ]
+
+            for (const filePath of filePathsToCheck) {
+              try {
+                const content = await getFileContent(octokit, owner, repo, currentBranch, filePath)
+                if (content) {
+                  files.set(filePath, { path: filePath, content })
+                  logs.push(`Loaded: ${filePath}`)
+                }
+              } catch (error) {
+                // File doesn't exist, continue
+              }
+            }
+
+            // Detect project type
+            const hasPythonFiles = files.has('setup.py') || files.has('requirements.txt') || files.has('pyproject.toml')
+            const hasPackageJson = files.has('package.json')
+            
+            logs.push(`Detected: ${hasPythonFiles ? 'Python' : hasPackageJson ? 'Node.js/TypeScript' : 'Unknown'} project`)
+
+            if (mode === 'build') {
+              // For JavaScript/TypeScript projects - run build
+              if (!hasPackageJson) {
+                return {
+                  success: false,
+                  error: 'package.json not found. This doesn\'t appear to be a Node.js/JavaScript project.',
+                  mode,
+                  logs,
+                  errors: ['No package.json found'],
+                  executionTimeMs: Date.now() - toolStartTime
+                }
+              }
+
+              logs.push('Creating sandbox environment for build check...')
+
+              // Create sandbox
+              const sandbox = await createEnhancedSandbox({
+                template: 'pipilot-expo',
+                timeoutMs: (timeoutSeconds || 30) * 1000 + 30000, // Add buffer for installation
+                env: {}
+              })
+
+              logs.push('Sandbox created successfully')
+
+              // Prepare files for sandbox
+              const sandboxFiles: any[] = Array.from(files.values())
+                .filter(file => file.content && typeof file.content === 'string')
+                .map(file => ({
+                  path: `/project/${file.path}`,
+                  content: file.content
+                }))
+
+              // Write files to sandbox
+              await sandbox.writeFiles(sandboxFiles)
+              logs.push(`Written ${sandboxFiles.length} files to sandbox`)
+
+              // Install dependencies
+              logs.push('Installing dependencies...')
+              const installResult = await sandbox.installDependenciesRobust('/project', {
+                timeoutMs: 120000,
+                envVars: {},
+                packageManager: 'pnpm',
+                onStdout: (data: string) => logs.push(`[INSTALL] ${data.trim()}`),
+                onStderr: (data: string) => {
+                  const msg = data.trim()
+                  logs.push(`[INSTALL] ${msg}`)
+                  if (msg.includes('error') || msg.includes('failed')) {
+                    errors.push(`[INSTALL ERROR] ${msg}`)
+                  }
+                }
+              })
+
+              if (installResult.exitCode !== 0) {
+                return {
+                  success: false,
+                  error: 'Dependency installation failed',
+                  mode,
+                  logs,
+                  errors,
+                  exitCode: installResult.exitCode,
+                  executionTimeMs: Date.now() - toolStartTime
+                }
+              }
+
+              logs.push('Dependencies installed successfully')
+
+              // Run build command
+              logs.push('Running: npm run build')
+              const buildResult = await sandbox.executeCommand('npm run build', {
+                workingDirectory: '/project',
+                timeoutMs: (timeoutSeconds || 30) * 1000,
+                envVars: {},
+                onStdout: (data: string) => logs.push(`[BUILD] ${data.trim()}`),
+                onStderr: (data: string) => {
+                  const msg = data.trim()
+                  errors.push(`[BUILD ERROR] ${msg}`)
+                  logs.push(`[BUILD ERROR] ${msg}`)
+                }
+              })
+
+              // Filter out non-error messages
+              const buildErrors = errors.filter(e =>
+                !e.includes('warning') &&
+                !e.includes('Warning') &&
+                !e.includes('⚠') &&
+                !e.includes('deprecated')
+              )
+
+              return {
+                success: buildResult.exitCode === 0 && buildErrors.length === 0,
+                message: buildResult.exitCode === 0
+                  ? 'Build completed successfully'
+                  : `Build failed with exit code ${buildResult.exitCode}`,
+                mode,
+                logs,
+                errors: buildErrors,
+                errorCount: buildErrors.length,
+                exitCode: buildResult.exitCode,
+                executionTimeMs: Date.now() - toolStartTime
+              }
+
+            } else if (mode === 'python') {
+              // For Python projects - run compileall
+              if (!hasPythonFiles) {
+                return {
+                  success: false,
+                  error: 'No Python project files found (setup.py, requirements.txt, or pyproject.toml not found)',
+                  mode,
+                  logs,
+                  errors: ['No Python project detected'],
+                  executionTimeMs: Date.now() - toolStartTime
+                }
+              }
+
+              logs.push('Creating sandbox environment for Python syntax check...')
+
+              // Create sandbox with Python support
+              const sandbox = await createEnhancedSandbox({
+                template: 'pipilot-expo',
+                timeoutMs: (timeoutSeconds || 30) * 1000 + 30000,
+                env: {}
+              })
+
+              logs.push('Sandbox created successfully')
+
+              // Prepare all Python files
+              const pythonFiles: any[] = Array.from(files.values())
+                .filter(file => file.content && typeof file.content === 'string')
+                .map(file => ({
+                  path: `/project/${file.path}`,
+                  content: file.content
+                }))
+
+              // Write files to sandbox
+              await sandbox.writeFiles(pythonFiles)
+              logs.push(`Written ${pythonFiles.length} files to sandbox`)
+
+              // Run Python compile check
+              logs.push('Executing: python3 -m compileall . -q -x ".*/(venv|\\.venv).*"')
+              const pythonResult = await sandbox.executeCommand(
+                'cd /project && python3 -m compileall . -q -x ".*/(venv|\\.venv).*"',
+                {
+                  workingDirectory: '/project',
+                  timeoutMs: (timeoutSeconds || 30) * 1000,
+                  envVars: {},
+                  onStdout: (data: string) => {
+                    const msg = data.trim()
+                    if (msg) logs.push(`[PYTHON] ${msg}`)
+                  },
+                  onStderr: (data: string) => {
+                    const msg = data.trim()
+                    if (msg) {
+                      errors.push(`[PYTHON ERROR] ${msg}`)
+                      logs.push(`[PYTHON ERROR] ${msg}`)
+                    }
+                  }
+                }
+              )
+
+              return {
+                success: pythonResult.exitCode === 0 && errors.length === 0,
+                message: pythonResult.exitCode === 0
+                  ? 'Python syntax check passed'
+                  : `Python syntax check failed with exit code ${pythonResult.exitCode}`,
+                mode,
+                logs,
+                errors,
+                errorCount: errors.length,
+                exitCode: pythonResult.exitCode,
+                executionTimeMs: Date.now() - toolStartTime
+              }
+            }
+
+            return {
+              success: false,
+              error: 'Invalid mode specified',
+              mode,
+              logs,
+              errors: ['Unknown mode. Use "build" for JavaScript/TypeScript or "python" for Python projects.'],
+              executionTimeMs: Date.now() - toolStartTime
+            }
+          } catch (error: any) {
+            console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ Error check failed:`, error)
+            return {
+              success: false,
+              error: error?.message || 'Error check failed',
+              mode,
+              logs,
+              errors: [error?.message || 'Unknown error occurred during error check'],
+              executionTimeMs: Date.now() - toolStartTime
+            }
+          }
         }
       })
     }
