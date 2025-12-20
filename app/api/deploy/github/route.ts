@@ -3,6 +3,17 @@ import { createClient } from '@/lib/supabase/server'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 
+const getUserEmail = async (octokit: Octokit) => {
+  try {
+    const emails = await octokit.users.listEmailsForAuthenticatedUser()
+    const primaryEmail = emails.data.find(email => email.primary && email.verified)
+    return primaryEmail ? primaryEmail.email : null
+  } catch (error) {
+    console.error('Failed to get user email:', error)
+    return null
+  }
+}
+
 // Extract project files from compressed data (LZ4 + Zip)
 async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Promise<{
   projectId: string
@@ -175,6 +186,9 @@ export async function POST(req: Request) {
     // Get user's GitHub info
     const { data: githubUser } = await octokit.rest.users.getAuthenticated()
 
+    // Get authenticated user's email for commits
+    const userEmail = await getUserEmail(octokit)
+
     let repo;
     let isNewRepo = false;
 
@@ -323,7 +337,7 @@ module.exports = nextConfig`,
           parents: [ref.object.sha], // Reference the existing commit
           author: {
             name: 'pipilot-swe-bot',
-            email: 'hello@pipilot.dev'
+            email: userEmail || 'noreply@github.com'
           }
         })
 
@@ -393,7 +407,7 @@ module.exports = nextConfig`,
           parents: [ref.object.sha],
           author: {
             name: 'pipilot-swe-bot',
-            email: 'hello@pipilot.dev'
+            email: userEmail || 'noreply@github.com'
           }
         });
 

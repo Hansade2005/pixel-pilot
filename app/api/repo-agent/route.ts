@@ -148,6 +148,17 @@ const createOctokitClient = (token: string) => {
   })
 }
 
+const getUserEmail = async (octokit: Octokit) => {
+  try {
+    const emails = await octokit.users.listEmailsForAuthenticatedUser()
+    const primaryEmail = emails.data.find(email => email.primary && email.verified)
+    return primaryEmail ? primaryEmail.email : null
+  } catch (error) {
+    console.error('Failed to get user email:', error)
+    return null
+  }
+}
+
 const parseRepoString = (repoString: string) => {
   const [owner, repo] = repoString.split('/')
   return { owner, repo }
@@ -363,6 +374,9 @@ export async function POST(req: Request) {
     // Initialize Octokit client
     const octokit = createOctokitClient(githubToken)
 
+    // Get authenticated user's email for commits
+    const userEmail = await getUserEmail(octokit)
+
     // Verify repository access
     try {
       const { owner, repo } = parseRepoString(currentRepo)
@@ -515,7 +529,8 @@ Assistant:
                   sha: (await octokit.rest.repos.getContent({ owner, repo, path }) as any).data.sha,
                   branch,
                   author: {
-                    name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot'
+                    name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                    email: userEmail || 'noreply@github.com'
                   }
                 })
               } else {
@@ -555,8 +570,8 @@ Assistant:
               tree: newTree.data.sha,
               parents: [latestCommitSha],
               author: {
-               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: 'noreply@github.com'
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: userEmail || 'noreply@github.com'
               }
             })
 
@@ -965,8 +980,8 @@ Assistant:
               sha,
               branch,
               author: {
-               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: 'noreply@github.com'
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: userEmail || 'noreply@github.com'
               }
             })
 
@@ -1033,7 +1048,8 @@ Assistant:
               sha: existingFile.data.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot'
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: userEmail || 'noreply@github.com'
               }
             })
 
@@ -1589,9 +1605,8 @@ Assistant:
               sha: fileData.sha,
               branch,
               author: {
-               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: 'noreply@github.com'
-                
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: userEmail || 'noreply@github.com'
               }
             })
 
@@ -1919,9 +1934,8 @@ Assistant:
               sha: fileData.sha,
               branch,
               author: {
-               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: 'noreply@github.com'
-                
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: userEmail || 'noreply@github.com'
               }
             })
 
