@@ -515,7 +515,7 @@ Assistant:
                   sha: (await octokit.rest.repos.getContent({ owner, repo, path }) as any).data.sha,
                   branch,
                   author: {
-                    name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                    name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
                     email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
                   }
                 })
@@ -556,7 +556,7 @@ Assistant:
               tree: newTree.data.sha,
               parents: [latestCommitSha],
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
                 email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
               }
             })
@@ -966,7 +966,7 @@ Assistant:
               sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
                 email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
               }
             })
@@ -1034,7 +1034,7 @@ Assistant:
               sha: existingFile.data.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
                 email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
               }
             })
@@ -1591,7 +1591,7 @@ Assistant:
               sha: fileData.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
                 email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
               }
             })
@@ -1920,7 +1920,7 @@ Assistant:
               sha: fileData.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'PiPilot Bot',
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
                 email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
               }
             })
