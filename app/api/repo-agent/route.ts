@@ -64,6 +64,9 @@ CORE CAPABILITIES
 - **github_replace_string** - Powerful string replacement with regex support
 - **github_grep_search** - Elite multi-strategy search engine
 - **github_edit_file** - Precise file editing with Git diff-style search/replace blocks
+- **github_create_todo** - Create todo items to track progress on tasks
+- **github_update_todo** - Update existing todo items (status, title, description)
+- **github_delete_todo** - Delete todo items
 
 ## 🎯 WORKFLOW PRINCIPLES
 1. **Repository Context**: Always maintain awareness of the current repository and branch
@@ -77,6 +80,17 @@ CORE CAPABILITIES
 - **github_edit_file**: For precise edits using Git diff-style search/replace blocks (recommended for most edits)
 - **github_replace_string**: For simple string replacements with regex support
 - **github_delete_file**: For removing files entirely
+
+## 📋 TODO MANAGEMENT
+- **github_create_todo**: Create todo items with unique IDs to track task progress
+  - Always provide a descriptive, unique ID (e.g., "setup-database-schema", "implement-user-auth", "add-error-handling")
+  - Use clear, actionable titles and detailed descriptions
+  - Set appropriate initial status (usually "pending")
+- **github_update_todo**: Modify existing todos by their exact ID
+  - Update status to "completed" when tasks are finished
+  - Modify titles/descriptions as needed for clarity
+- **github_delete_todo**: Remove todos that are no longer relevant
+- **ID Consistency**: Always use the exact same ID you created for updates/deletes
 
 ## 📋 RESPONSE FORMAT
 When performing operations:
@@ -1801,14 +1815,14 @@ Assistant:
       github_create_todo: tool({
         description: 'Create a new todo item to track progress on tasks',
         inputSchema: z.object({
+          id: z.string().describe('Unique identifier for the todo item'),
           title: z.string().describe('Todo title/summary'),
           description: z.string().optional().describe('Optional detailed description'),
           status: z.enum(['pending', 'completed']).default('pending').describe('Initial status')
         }),
-        execute: async ({ title, description, status = 'pending' }) => {
-          const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        execute: async ({ id, title, description, status = 'pending' }) => {
           const todo = {
-            id: todoId,
+            id,
             title,
             description,
             status

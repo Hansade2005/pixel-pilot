@@ -314,7 +314,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   // Sidebar state
-  const [activeTab, setActiveTab] = useState<'changes' | 'diffs' | 'actions'>('changes')
+  const [activeTab, setActiveTab] = useState<'changes' | 'diffs' | 'actions' | 'todos'>('changes')
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([])
   const [showDiffs, setShowDiffs] = useState<Record<string, boolean>>({})
 
@@ -989,9 +989,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 // Handle todo creation from tool results (using args like file operations do)
                 if (parsed.toolName === 'github_create_todo' && toolCallArgs?.title) {
                   console.log('[RepoAgent] 🎯 CREATING TODO FROM ARGS:', toolCallArgs)
-                  const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
                   const todo: QueueTodo = {
-                    id: todoId,
+                    id: toolCallArgs.id,
                     title: toolCallArgs.title,
                     description: toolCallArgs.description,
                     status: toolCallArgs.status || 'pending'
@@ -1272,9 +1271,8 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 // Handle todo creation from tool results (using args like file operations do)
                 if (parsed.toolName === 'github_create_todo' && toolCallArgs?.title) {
                   console.log('[RepoAgent] 🎯 CREATING TODO FROM ARGS:', toolCallArgs)
-                  const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
                   const todo: QueueTodo = {
-                    id: todoId,
+                    id: toolCallArgs.id,
                     title: toolCallArgs.title,
                     description: toolCallArgs.description,
                     status: toolCallArgs.status || 'pending'
@@ -2094,56 +2092,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           borderTop: '1px solid rgba(59, 130, 246, 0.2)',
           boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)'
         }}>
-          {/* Queue Section */}
-          {todos.length > 0 && (
-            <>
-              <div className="mb-4">
-                <Queue>
-                  <QueueSection>
-                    <QueueSectionTrigger>
-                      <QueueSectionLabel count={todos.length} label="Todo" />
-                    </QueueSectionTrigger>
-                    <QueueSectionContent>
-                      <QueueList>
-                        {todos.map((todo) => {
-                          const isCompleted = todo.status === "completed";
-
-                          return (
-                            <QueueItem key={todo.id}>
-                              <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleTodoToggle(todo.id)}>
-                                <QueueItemIndicator completed={isCompleted} />
-                                <QueueItemContent completed={isCompleted}>
-                                  {todo.title}
-                                </QueueItemContent>
-                                <QueueItemActions>
-                                  <QueueItemAction
-                                    aria-label="Remove todo"
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      handleRemoveTodo(todo.id)
-                                    }}
-                                  >
-                                    <Trash2 size={12} />
-                                  </QueueItemAction>
-                                </QueueItemActions>
-                              </div>
-                              {todo.description && (
-                                <QueueItemDescription completed={isCompleted}>
-                                  {todo.description}
-                                </QueueItemDescription>
-                              )}
-                            </QueueItem>
-                          );
-                        })}
-                      </QueueList>
-                    </QueueSectionContent>
-                  </QueueSection>
-                </Queue>
-              </div>
-            </>
-          )}
-
           {/* Attachment Badges */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3 p-2 bg-gray-800/50 rounded-xl border border-gray-700/50">
@@ -2289,25 +2237,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 <StopCircle className="w-5 h-5" />
               </button>
             ) : (
-              <>
-                <button
-                  onClick={() => {
-                    // Test todo creation
-                    const testTodo: QueueTodo = {
-                      id: `test-${Date.now()}`,
-                      title: 'Test Todo',
-                      description: 'This is a test todo to verify UI works',
-                      status: 'pending'
-                    }
-                    console.log('[TEST] Adding test todo:', testTodo)
-                    setTodos(prev => [...prev, testTodo])
-                  }}
-                  className="test-todo-button mr-2 w-9 h-9 flex items-center justify-center border border-gray-600 rounded-full text-gray-400 hover:text-white cursor-pointer transition-all flex-shrink-0"
-                  title="Add Test Todo"
-                >
-                  ✓
-                </button>
-                <button
+              <button
                   onClick={() => sendMessage(currentInput)}
                   disabled={(!currentInput.trim() && attachments.length === 0) || isLoading}
                   className="send-button w-9 h-9 flex items-center justify-center border-none rounded-full text-white cursor-pointer transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2322,8 +2252,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   <Send className="w-5 h-5" />
                 )}
               </button>
-            </>
-          )}
+            )}
           </div>
           <div className="input-hint text-xs text-gray-400 p-2 pt-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -2429,6 +2358,23 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               }}
             >
               Actions
+            </button>
+            <button
+              onClick={() => setActiveTab('todos')}
+              className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all relative ${activeTab === 'todos'
+                ? 'text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
+              style={{
+                background: activeTab === 'todos'
+                  ? 'linear-gradient(135deg, #1e40af, #1d4ed8)'
+                  : 'transparent',
+                boxShadow: activeTab === 'todos'
+                  ? '0 4px 16px rgba(30, 64, 175, 0.5), 0 0 30px rgba(30, 64, 175, 0.2)'
+                  : 'none'
+              }}
+            >
+              Todos
             </button>
           </div>
         </div>
@@ -2686,6 +2632,77 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'todos' && (
+            <div className="tab-content">
+              <h3 className="section-title text-xl font-semibold mb-6 text-white flex items-center gap-3" style={{
+                position: 'relative'
+              }}>
+                <span style={{
+                  content: '""',
+                  width: '4px',
+                  height: '24px',
+                  background: 'linear-gradient(180deg, #3b82f6, #2563eb)',
+                  borderRadius: '2px',
+                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
+                  display: 'inline-block',
+                  marginRight: '8px'
+                }}></span>
+                Todo List
+              </h3>
+
+              {todos.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <CheckCircle2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No todos yet</p>
+                  <p className="text-sm mt-2">Ask me to create a todo and I'll add it here!</p>
+                </div>
+              ) : (
+                <Queue>
+                  <QueueSection>
+                    <QueueSectionTrigger>
+                      <QueueSectionLabel count={todos.length} label="Todo" />
+                    </QueueSectionTrigger>
+                    <QueueSectionContent>
+                      <QueueList>
+                        {todos.map((todo) => {
+                          const isCompleted = todo.status === "completed";
+
+                          return (
+                            <QueueItem key={todo.id}>
+                              <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleTodoToggle(todo.id)}>
+                                <QueueItemIndicator completed={isCompleted} />
+                                <QueueItemContent completed={isCompleted}>
+                                  {todo.title}
+                                </QueueItemContent>
+                                <QueueItemActions>
+                                  <QueueItemAction
+                                    aria-label="Remove todo"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleRemoveTodo(todo.id)
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </QueueItemAction>
+                                </QueueItemActions>
+                              </div>
+                              {todo.description && (
+                                <QueueItemDescription completed={isCompleted}>
+                                  {todo.description}
+                                </QueueItemDescription>
+                              )}
+                            </QueueItem>
+                          );
+                        })}
+                      </QueueList>
+                    </QueueSectionContent>
+                  </QueueSection>
+                </Queue>
               )}
             </div>
           )}
