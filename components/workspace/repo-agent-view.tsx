@@ -134,6 +134,41 @@ const getToolLabel = (tool: string, args?: any) => {
   }
 }
 
+// Helper function to get file extension for syntax highlighting
+function getFileExtension(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  // Map common extensions to highlight.js language names
+  const extMap: Record<string, string> = {
+    'js': 'javascript',
+    'jsx': 'javascript',
+    'ts': 'typescript',
+    'tsx': 'typescript',
+    'py': 'python',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c': 'c',
+    'cs': 'csharp',
+    'php': 'php',
+    'rb': 'ruby',
+    'go': 'go',
+    'rs': 'rust',
+    'html': 'html',
+    'css': 'css',
+    'scss': 'scss',
+    'sass': 'sass',
+    'json': 'json',
+    'xml': 'xml',
+    'yaml': 'yaml',
+    'yml': 'yaml',
+    'md': 'markdown',
+    'sql': 'sql',
+    'sh': 'bash',
+    'bash': 'bash',
+    'zsh': 'bash'
+  }
+  return extMap[ext] || 'plaintext'
+}
+
 // Helper function to parse edit file diffs
 function parseEditFileDiff(searchReplaceBlock: string): { additions: number; deletions: number; diffLines: string[] } {
   if (!searchReplaceBlock) return { additions: 0, deletions: 0, diffLines: [] }
@@ -146,17 +181,17 @@ function parseEditFileDiff(searchReplaceBlock: string): { additions: number; del
   const replaceMatch = searchReplaceBlock.match(/=======\n([\s\S]*?)\n>>>>>>> REPLACE/)
   
   if (searchMatch) {
-    const searchLines = searchMatch[1].split('\n').filter(line => line.trim())
+    const searchLines = searchMatch[1].split('\n').filter((line: string) => line.trim())
     deletions = searchLines.length
-    searchLines.forEach(line => {
+    searchLines.forEach((line: string) => {
       diffLines.push(`- ${line}`)
     })
   }
   
   if (replaceMatch) {
-    const replaceLines = replaceMatch[1].split('\n').filter(line => line.trim())
+    const replaceLines = replaceMatch[1].split('\n').filter((line: string) => line.trim())
     additions = replaceLines.length
-    replaceLines.forEach(line => {
+    replaceLines.forEach((line: string) => {
       diffLines.push(`+ ${line}`)
     })
   }
@@ -169,13 +204,13 @@ function parseReplacementDiff(oldString: string, newString: string): { additions
   if (!oldString || !newString) return { additions: 0, deletions: 0, diffLines: [] }
   
   const diffLines: string[] = []
-  const oldLines = oldString.split('\n').filter(line => line.trim())
-  const newLines = newString.split('\n').filter(line => line.trim())
+  const oldLines = oldString.split('\n').filter((line: string) => line.trim())
+  const newLines = newString.split('\n').filter((line: string) => line.trim())
   
-  oldLines.forEach(line => {
+  oldLines.forEach((line: string) => {
     diffLines.push(`- ${line}`)
   })
-  newLines.forEach(line => {
+  newLines.forEach((line: string) => {
     diffLines.push(`+ ${line}`)
   })
   
@@ -247,6 +282,65 @@ function parseStagingChangeDiff(operation: string, content?: string, edit_operat
 
   // Fallback
   return { additions: 0, deletions: 0, diffLines: [`${operation} operation`] }
+}
+
+// Loader for highlight.js and CSS, and auto-highlighting code blocks
+const HighlightLoader = () => {
+  const loadedRef = useRef(false)
+  
+  useEffect(() => {
+    if (loadedRef.current) return
+    loadedRef.current = true
+    
+    // Load highlight.js script from CDN
+    if (!(window as any).hljs) {
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js'
+      script.async = true
+      document.body.appendChild(script)
+      
+      // Load additional language support
+      script.onload = () => {
+        // Load common languages
+        const languages = ['javascript', 'typescript', 'python', 'java', 'cpp', 'csharp', 'php', 'ruby', 'go', 'rust', 'html', 'css', 'json', 'xml', 'yaml', 'markdown', 'sql', 'bash']
+        languages.forEach(lang => {
+          const langScript = document.createElement('script')
+          langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/${lang}.min.js`
+          langScript.async = true
+          document.body.appendChild(langScript)
+        })
+      }
+    }
+    
+    // Load highlight.js CSS (Monaco dark theme style) from CDN
+    if (!document.getElementById('hljs-css')) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.id = 'hljs-css'
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css' // Dark theme similar to Monaco
+      document.head.appendChild(link)
+    }
+    
+    // Highlight code blocks after each render
+    const highlight = () => {
+      if ((window as any).hljs) {
+        document.querySelectorAll('pre code').forEach(block => {
+          (window as any).hljs.highlightElement(block)
+        })
+      }
+    }
+    
+    // Initial highlight
+    highlight()
+    
+    // Re-highlight on content changes
+    const observer = new MutationObserver(highlight)
+    observer.observe(document.body, { childList: true, subtree: true })
+    
+    return () => observer.disconnect()
+  }, [])
+  
+  return null
 }
 
 interface RepoAgentViewProps {
@@ -1893,6 +1987,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
       background: 'var(--bg, #0a0e14)',
       color: 'var(--text, #e5e7eb)'
     }}>
+      <HighlightLoader />
       {/* Chat Panel */}
       <div
         className="chat-panel flex flex-col"
@@ -2541,7 +2636,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                           </div>
                         </div>
                         <div className="diff-indicator text-xs">
-                          {showDiffs[filePath] ? '▼' : '▶'}
+                          {showDiffs[filePath] ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                         </div>
                       </button>
                       <div
@@ -2551,21 +2646,39 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                           maxHeight: showDiffs[filePath] ? `${Math.min(diffStats.diffLines.length * 24 + 100, 1000)}px` : '0'
                         }}
                       >
-                        <div className="p-4 space-y-1">
-                          {diffStats.diffLines.map((line: string, lineIndex: number) => (
-                            <div
-                              key={lineIndex}
-                              className="diff-line text-xs font-mono whitespace-pre-wrap break-all transition-all p-2 rounded"
-                              style={{
-                                background: line.startsWith('+') ? 'rgba(34, 197, 94, 0.1)' : line.startsWith('-') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.05)',
-                                borderLeft: line.startsWith('+') ? '3px solid #22c55e' : line.startsWith('-') ? '3px solid #ef4444' : 'transparent',
-                                color: line.startsWith('+') ? '#86efac' : line.startsWith('-') ? '#fca5a5' : '#9ca3af'
-                              }}
-                            >
-                              {line}
+                        <ScrollArea className="h-full max-h-96">
+                          <div className="bg-[#1e1e1e] border border-gray-600 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 bg-[#252526] border-b border-gray-600 text-xs font-medium text-gray-300 flex items-center justify-between">
+                              <span>{filePath.split('/').pop()}</span>
+                              <div className="flex items-center gap-2">
+                                {diffStats.additions > 0 && <span className="text-green-400 text-xs">+{diffStats.additions}</span>}
+                                {diffStats.deletions > 0 && <span className="text-red-400 text-xs">-{diffStats.deletions}</span>}
+                              </div>
                             </div>
-                          ))}
-                        </div>
+                            <div className="flex">
+                              {/* Line Numbers Column */}
+                              <div className="bg-[#1e1e1e] border-r border-gray-600 px-2 py-4 text-xs text-gray-500 font-mono select-none min-w-[3rem] text-right leading-relaxed">
+                                {diffStats.diffLines.map((_, index) => (
+                                  <div key={index} className="h-[1.5rem] flex items-center justify-end pr-2">
+                                    {index + 1}
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Code Content */}
+                              <div className="flex-1 overflow-x-auto">
+                                <pre className="p-4 bg-[#1e1e1e] m-0 min-h-full">
+                                  <code className={`hljs language-${getFileExtension(filePath)} text-sm text-white font-mono leading-relaxed block`}>
+                                    {diffStats.diffLines.map((line, index) => (
+                                      <div key={index} className="h-[1.5rem] flex items-center whitespace-pre">
+                                        {line}
+                                      </div>
+                                    ))}
+                                  </code>
+                                </pre>
+                              </div>
+                            </div>
+                          </div>
+                        </ScrollArea>
                       </div>
                     </div>
                   )
