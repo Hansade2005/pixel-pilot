@@ -2097,24 +2097,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
           {/* Queue Section */}
           {todos.length > 0 && (
             <>
-              {console.log('[RepoAgent] Rendering Queue component with todos:', todos)}
-              <div className="mb-4 p-4 bg-red-500 text-white rounded border-4 border-yellow-400">
-                <h3 className="font-bold text-xl">🔴 DEBUG: {todos.length} Todos Found!</h3>
-                <p className="mb-2">If you see this, todos are in state but UI might not be rendering properly.</p>
-                {todos.map((todo, index) => (
-                  <div key={todo.id} className="mb-2 p-3 bg-red-600 rounded border-2 border-yellow-300">
-                    <div className="font-bold text-lg">#{index + 1}: {todo.title}</div>
-                    <div className="text-sm opacity-90 italic">{todo.description || 'No description'}</div>
-                    <div className="text-xs font-mono bg-red-700 p-1 rounded mt-1">Status: {todo.status} | ID: {todo.id}</div>
-                  </div>
-                ))}
-                <button
-                  onClick={() => setTodos([])}
-                  className="mt-2 px-3 py-1 bg-yellow-500 text-black rounded font-bold hover:bg-yellow-400"
-                >
-                  Clear All Todos
-                </button>
-              </div>
               <div className="mb-4">
                 <Queue>
                   <QueueSection>
