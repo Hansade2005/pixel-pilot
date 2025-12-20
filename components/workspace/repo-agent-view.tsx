@@ -937,15 +937,7 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 resultKeys: parsed.result ? Object.keys(parsed.result) : 'no result'
               })
 
-              // Clean up accumulated tool args
-              if (parsed.toolCallId) {
-                setAccumulatedToolArgs(prev => {
-                  const newMap = new Map(prev)
-                  newMap.delete(parsed.toolCallId)
-                  return newMap
-                })
-              }
-
+              // Update toolInvocations to mark as completed
               const toolIndex = accumulatedToolInvocations.findIndex(t => t.toolCallId === parsed.toolCallId)
               if (toolIndex !== -1) {
                 accumulatedToolInvocations[toolIndex] = {
@@ -983,45 +975,54 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
               if (parsed.type === 'tool-result' && parsed.toolName?.includes('todo')) {
                 console.log('[RepoAgent] 🎯 TODO TOOL RESULT DETECTED:', {
                   toolName: parsed.toolName,
+                  toolCallId: parsed.toolCallId,
                   hasResult: !!parsed.result,
                   resultKeys: parsed.result ? Object.keys(parsed.result) : [],
-                  todoExists: !!parsed.result?.todo
+                  resultValue: parsed.result
                 })
 
-                // Handle todo creation from tool results
-                if (parsed.toolName === 'github_create_todo' && parsed.result?.todo) {
-                  console.log('[RepoAgent] 🎯 CREATE TODO FROM TOOL RESULT:', parsed.result.todo)
-                  const todo = parsed.result.todo
-                  console.log('[RepoAgent] 🎯 TODO OBJECT STRUCTURE:', {
-                    id: todo.id,
-                    title: todo.title,
-                    description: todo.description,
-                    status: todo.status,
-                    todoKeys: Object.keys(todo)
-                  })
+                // Find the corresponding tool call args
+                const toolCallArgs = accumulatedToolArgs.get(parsed.toolCallId || '')
+                console.log('[RepoAgent] 🎯 TOOL CALL ARGS FOR RESULT:', toolCallArgs)
+
+                // Handle todo creation from tool results (using args like file operations do)
+                if (parsed.toolName === 'github_create_todo' && toolCallArgs?.title) {
+                  console.log('[RepoAgent] 🎯 CREATING TODO FROM ARGS:', toolCallArgs)
+                  const todoId = `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                  const todo: QueueTodo = {
+                    id: todoId,
+                    title: toolCallArgs.title,
+                    description: toolCallArgs.description,
+                    status: toolCallArgs.status || 'pending'
+                  }
+                  console.log('[RepoAgent] 🎯 CREATED TODO OBJECT:', todo)
                   setTodos(prev => {
                     const newTodos = [...prev, todo]
-                    console.log('[RepoAgent] 🎯 TODOS AFTER AI CREATION:', {
-                      count: newTodos.length,
-                      lastTodo: newTodos[newTodos.length - 1]
-                    })
+                    console.log('[RepoAgent] 🎯 TODOS AFTER AI CREATION:', newTodos.length, 'todos')
                     return newTodos
                   })
-                } else if (parsed.toolName === 'github_update_todo' && parsed.result?.todo) {
-                  console.log('[RepoAgent] 🎯 UPDATE TODO FROM TOOL RESULT:', parsed.result.todo)
-                  const updatedTodo = parsed.result.todo
+                } else if (parsed.toolName === 'github_update_todo' && toolCallArgs?.id) {
+                  console.log('[RepoAgent] 🎯 UPDATING TODO FROM ARGS:', toolCallArgs)
                   setTodos(prev => prev.map(todo =>
-                    todo.id === updatedTodo.id ? updatedTodo : todo
+                    todo.id === toolCallArgs.id ? {
+                      ...todo,
+                      ...(toolCallArgs.title && { title: toolCallArgs.title }),
+                      ...(toolCallArgs.description !== undefined && { description: toolCallArgs.description }),
+                      ...(toolCallArgs.status && { status: toolCallArgs.status })
+                    } : todo
                   ))
-                } else if (parsed.toolName === 'github_delete_todo' && parsed.result?.deleted_id) {
-                  console.log('[RepoAgent] 🎯 DELETE TODO FROM TOOL RESULT:', parsed.result.deleted_id)
-                  setTodos(prev => prev.filter(todo => todo.id !== parsed.result.deleted_id))
+                } else if (parsed.toolName === 'github_delete_todo' && toolCallArgs?.id) {
+                  console.log('[RepoAgent] 🎯 DELETING TODO:', toolCallArgs.id)
+                  setTodos(prev => prev.filter(todo => todo.id !== toolCallArgs.id))
                 }
 
-                // Handle all todo operations in tool-result events
-                // Tool-result events contain the actual todo data returned from the server
-                if (!parsed.result?.success && parsed.result?.error) {
-                  console.log('[RepoAgent] Todo tool failed:', parsed.result.error)
+                // Clean up accumulated args after processing
+                if (parsed.toolCallId) {
+                  setAccumulatedToolArgs(prev => {
+                    const newMap = new Map(prev)
+                    newMap.delete(parsed.toolCallId)
+                    return newMap
+                  })
                 }
               }
             }
