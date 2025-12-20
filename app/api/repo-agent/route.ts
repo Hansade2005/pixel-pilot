@@ -515,8 +515,7 @@ Assistant:
                   sha: (await octokit.rest.repos.getContent({ owner, repo, path }) as any).data.sha,
                   branch,
                   author: {
-                    name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                    email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+                    name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot'
                   }
                 })
               } else {
@@ -556,8 +555,8 @@ Assistant:
               tree: newTree.data.sha,
               parents: [latestCommitSha],
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: 'noreply@github.com'
               }
             })
 
@@ -966,8 +965,8 @@ Assistant:
               sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: 'noreply@github.com'
               }
             })
 
@@ -1034,8 +1033,7 @@ Assistant:
               sha: existingFile.data.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot'
               }
             })
 
@@ -1591,8 +1589,9 @@ Assistant:
               sha: fileData.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: 'noreply@github.com'
+                
               }
             })
 
@@ -1920,8 +1919,9 @@ Assistant:
               sha: fileData.sha,
               branch,
               author: {
-                name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
-                email: process.env.PIPILOT_BOT_EMAIL || 'hello@pipilot.dev'
+               name: process.env.PIPILOT_BOT_NAME || 'pipilot-swe-bot',
+                email: 'noreply@github.com'
+                
               }
             })
 
