@@ -981,9 +981,10 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   resultValue: parsed.result
                 })
 
-                // Find the corresponding tool call args
-                const toolCallArgs = accumulatedToolArgs.get(parsed.toolCallId || '')
-                console.log('[RepoAgent] 🎯 TOOL CALL ARGS FOR RESULT:', toolCallArgs)
+                // Find the corresponding tool invocation args (like file operations do)
+                const toolInvocation = accumulatedToolInvocations.find(t => t.toolCallId === parsed.toolCallId)
+                const toolCallArgs = toolInvocation?.args
+                console.log('[RepoAgent] 🎯 TOOL INVOCATION ARGS FOR RESULT:', toolCallArgs, 'from invocation:', toolInvocation)
 
                 // Handle todo creation from tool results (using args like file operations do)
                 if (parsed.toolName === 'github_create_todo' && toolCallArgs?.title) {
@@ -1014,15 +1015,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 } else if (parsed.toolName === 'github_delete_todo' && toolCallArgs?.id) {
                   console.log('[RepoAgent] 🎯 DELETING TODO:', toolCallArgs.id)
                   setTodos(prev => prev.filter(todo => todo.id !== toolCallArgs.id))
-                }
-
-                // Clean up accumulated args after processing
-                if (parsed.toolCallId) {
-                  setAccumulatedToolArgs(prev => {
-                    const newMap = new Map(prev)
-                    newMap.delete(parsed.toolCallId)
-                    return newMap
-                  })
                 }
               }
             }
@@ -1272,9 +1264,10 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                   resultValue: parsed.result
                 })
 
-                // Find the corresponding tool call args
-                const toolCallArgs = accumulatedToolArgs.get(parsed.toolCallId || '')
-                console.log('[RepoAgent] 🎯 TOOL CALL ARGS FOR RESULT:', toolCallArgs)
+                // Find the corresponding tool invocation args (like file operations do)
+                const toolInvocation = accumulatedToolInvocations.find(t => t.toolCallId === parsed.toolCallId)
+                const toolCallArgs = toolInvocation?.args
+                console.log('[RepoAgent] 🎯 TOOL INVOCATION ARGS FOR RESULT:', toolCallArgs, 'from invocation:', toolInvocation)
 
                 // Handle todo creation from tool results (using args like file operations do)
                 if (parsed.toolName === 'github_create_todo' && toolCallArgs?.title) {
@@ -1305,15 +1298,6 @@ export function RepoAgentView({ userId }: RepoAgentViewProps) {
                 } else if (parsed.toolName === 'github_delete_todo' && toolCallArgs?.id) {
                   console.log('[RepoAgent] 🎯 DELETING TODO:', toolCallArgs.id)
                   setTodos(prev => prev.filter(todo => todo.id !== toolCallArgs.id))
-                }
-
-                // Clean up accumulated args after processing
-                if (parsed.toolCallId) {
-                  setAccumulatedToolArgs(prev => {
-                    const newMap = new Map(prev)
-                    newMap.delete(parsed.toolCallId)
-                    return newMap
-                  })
                 }
               }
 
