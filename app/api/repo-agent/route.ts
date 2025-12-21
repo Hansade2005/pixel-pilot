@@ -10,6 +10,138 @@ import { Octokit } from '@octokit/rest'
 import { getOptimizedFileContext, getStagedChanges, getFileContent, applyIncrementalEdits } from './helpers'
 import JSZip from 'jszip'
 
+// Tavily API configuration for web search
+const tavilyConfig = {
+  apiKeys: [
+    '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',
+    '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',
+    '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'
+  ],
+  searchUrl: 'https://api.tavily.com/search',
+  extractUrl: 'https://api.tavily.com/extract',
+  currentKeyIndex: 0
+};
+
+// Timeout utility function
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operationName: string
+): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    // For fetch requests, we need to handle AbortController differently
+    if (promise instanceof Promise && 'abort' in (promise as any)) {
+      // This is likely a fetch request, pass the signal
+      const result = await promise;
+      clearTimeout(timeoutId);
+      return result;
+    } else {
+      const result = await promise;
+      clearTimeout(timeoutId);
+      return result;
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`${operationName} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
+// Clean and format web search results for better AI consumption
+function cleanWebSearchResults(results: any[], query: string): string {
+  if (!results || results.length === 0) {
+    return `No results found for query: "${query}"`
+  }
+
+  let cleanedText = `🔍 **Web Search Results for: "${query}"**\n\n`
+
+  results.forEach((result, index) => {
+    const title = result.title || 'Untitled'
+    const url = result.url || 'No URL'
+    const content = result.content || result.raw_content || 'No content available'
+
+    // Clean and truncate content to 1500 chars total
+    const maxContentPerResult = Math.floor(1500 / results.length)
+    const cleanedContent = content
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
+      .trim()
+      .substring(0, maxContentPerResult)
+
+    cleanedText += `**${index + 1}. ${title}**\n`
+    cleanedText += `🔗 ${url}\n`
+    cleanedText += `${cleanedContent}${cleanedContent.length >= maxContentPerResult ? '...' : ''}\n\n`
+  })
+
+  // Ensure total length doesn't exceed 1500 characters
+  if (cleanedText.length > 1500) {
+    cleanedText = cleanedText.substring(0, 1497) + '...'
+  }
+
+  return cleanedText
+}
+
+// Web search function using Tavily API
+async function searchWeb(query: string) {
+  // Check if API keys are available
+  if (tavilyConfig.apiKeys.length === 0) {
+    throw new Error('No Tavily API keys are configured.');
+  }
+
+  try {
+    console.log('Starting web search for:', query);
+
+    // Rotate through available API keys
+    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
+    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
+
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        query: query,
+        search_depth: "basic",
+        include_answer: false,
+        include_raw_content: true,
+        max_results: 5
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Web search failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Clean and format results for AI consumption
+    const cleanedResults = cleanWebSearchResults(data.results || [], query)
+
+    console.log('Web search successful (cleaned and formatted):', {
+      query,
+      resultCount: data.results?.length || 0,
+      cleanedLength: cleanedResults.length
+    })
+
+    return {
+      rawData: data,
+      cleanedResults: cleanedResults,
+      query: query,
+      resultCount: data.results?.length || 0
+    }
+  } catch (error) {
+    console.error('Web search error:', error);
+    throw error;
+  }
+}
+
 // Disable Next.js body parser for binary data handling
 export const config = {
   api: {
@@ -85,6 +217,8 @@ CORE CAPABILITIES
 - **github_get_workflow_run_logs** - Download and retrieve complete logs from a workflow run
 - **github_cancel_workflow_run** - Cancel an in-progress workflow run
 - **github_rerun_workflow** - Rerun a failed or previous workflow execution
+- **web_search** - Search the web for current information and context, returns clean structured text
+- **web_extract** - Extract content from web pages using AnyAPI web scraper
 
 ## 🎯 WORKFLOW PRINCIPLES
 1. **Repository Context**: Always maintain awareness of the current repository and branch
@@ -92,6 +226,16 @@ CORE CAPABILITIES
 3. **Clear Communication**: Explain every action you're taking
 4. **Version Control**: Create branches for significant changes
 5. **Code Quality**: Follow repository conventions and patterns
+
+## 🌐 WEB RESEARCH CAPABILITIES
+- **web_search**: Use when you need current information, documentation, or context from the internet
+  - Search for programming frameworks, APIs, best practices, or troubleshooting information
+  - Get up-to-date information about tools, libraries, or technologies
+  - Research solutions to technical problems or implementation approaches
+- **web_extract**: Use when you need to analyze specific web pages or documentation
+  - Extract content from API documentation, tutorials, or technical articles
+  - Get detailed information from specific URLs for implementation reference
+  - Combine with web_search to get comprehensive information about a topic
 
 ## 📋 EDITING TOOLS GUIDE
 - **github_write_file**: For creating new files or completely replacing existing ones
@@ -289,7 +433,7 @@ const escapeRegExp = (string: string): string => {
 }
 
 // Function to import GitHub repository and store in session memory
-const importGithubRepoForSession = async (repoUrl: string, repoKey: string, octokit: any) => {
+const importGithubRepoForSession = async (repoUrl: string, repoKey: string, octokit: any, ref: string = 'HEAD') => {
   console.log(`[RepoAgent] 🚀 Importing GitHub repository for session: ${repoUrl}`)
 
   try {
@@ -302,11 +446,11 @@ const importGithubRepoForSession = async (repoUrl: string, repoKey: string, octo
     const repoName = `${owner}-${repo}`
 
     // Download repository archive directly using Octokit (works for private repos)
-    console.log(`[RepoAgent] 📦 Downloading repository archive for ${owner}/${repo}`)
+    console.log(`[RepoAgent] 📦 Downloading repository archive for ${owner}/${repo} at ref ${ref}`)
     const archiveResponse = await octokit.rest.repos.downloadZipballArchive({
       owner,
       repo,
-      ref: 'HEAD' // Get latest commit
+      ref: ref // Use specified ref
     })
 
     // Get the ZIP data - Octokit returns the data directly
@@ -995,13 +1139,17 @@ Assistant:
 
       // File Operations
       github_read_file: tool({
-        description: 'Read the contents of a file from the repository',
+        description: 'Read the contents of a file from the repository with advanced line range and formatting options',
         inputSchema: z.object({
           repo: z.string().describe('Repository in format "owner/repo"'),
           path: z.string().describe('File path in repository'),
-          branch: z.string().optional().describe('Branch name, defaults to repository default')
+          branch: z.string().optional().describe('Branch name, defaults to repository default'),
+          includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
+          startLine: z.number().optional().describe('REQUIRED for files >200 lines: Starting line number (1-indexed) to read from'),
+          endLine: z.number().optional().describe('REQUIRED for files >200 lines: Ending line number (1-indexed) to read to. Maximum 150 lines per read'),
+          lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). REQUIRED for files >200 lines. Max 200 lines')
         }),
-        execute: async ({ repo, path, branch }) => {
+        execute: async ({ repo, path, branch, includeLineNumbers = false, startLine, endLine, lineRange }) => {
           console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🔧 Tool call: github_read_file - Input:`, { repo, path, branch: branch || 'default' })
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
@@ -1031,7 +1179,74 @@ Assistant:
               // It's a file - type check before accessing properties
               const fileData = response.data as any
               if (fileData.type === 'file' && fileData.content && fileData.encoding) {
-                const content = Buffer.from(fileData.content, 'base64').toString('utf-8')
+                const fullContent = Buffer.from(fileData.content, 'base64').toString('utf-8')
+                const lines = fullContent.split('\n')
+                const totalLines = lines.length
+
+                // Parse line range from lineRange parameter if provided
+                let actualStartLine = startLine
+                let actualEndLine = endLine
+
+                if (lineRange) {
+                  const rangeMatch = lineRange.match(/^(\d+)-(\d+)$/)
+                  if (rangeMatch) {
+                    actualStartLine = parseInt(rangeMatch[1])
+                    actualEndLine = parseInt(rangeMatch[2])
+                  } else {
+                    return {
+                      success: false,
+                      error: 'Invalid lineRange format. Use "start-end" (e.g., "654-661")'
+                    }
+                  }
+                }
+
+                // Validate line range requirements for large files
+                if (totalLines > 200) {
+                  if (!actualStartLine || !actualEndLine) {
+                    return {
+                      success: false,
+                      error: `File has ${totalLines} lines (>200). Line range parameters (startLine/endLine or lineRange) are REQUIRED. Maximum 150 lines per read.`
+                    }
+                  }
+
+                  const requestedLines = actualEndLine - actualStartLine + 1
+                  if (requestedLines > 150) {
+                    return {
+                      success: false,
+                      error: `Requested range (${requestedLines} lines) exceeds maximum of 150 lines per read`
+                    }
+                  }
+                }
+
+                // Set defaults for small files if no range specified
+                if (!actualStartLine) actualStartLine = 1
+                if (!actualEndLine) actualEndLine = totalLines
+
+                // Validate line numbers
+                if (actualStartLine < 1 || actualStartLine > totalLines) {
+                  return {
+                    success: false,
+                    error: `startLine ${actualStartLine} is out of range (1-${totalLines})`
+                  }
+                }
+                if (actualEndLine < actualStartLine || actualEndLine > totalLines) {
+                  return {
+                    success: false,
+                    error: `endLine ${actualEndLine} is out of range (${actualStartLine}-${totalLines})`
+                  }
+                }
+
+                // Extract the requested content
+                const requestedLines = lines.slice(actualStartLine - 1, actualEndLine)
+                let content = requestedLines.join('\n')
+
+                // Add line numbers if requested
+                if (includeLineNumbers) {
+                  content = requestedLines
+                    .map((line, index) => `${(actualStartLine + index).toString().padStart(4, ' ')}: ${line}`)
+                    .join('\n')
+                }
+
                 const result = {
                   success: true,
                   type: 'file',
@@ -1040,9 +1255,16 @@ Assistant:
                   content,
                   size: fileData.size,
                   encoding: fileData.encoding,
-                  sha: fileData.sha
+                  sha: fileData.sha,
+                  totalLines,
+                  requestedRange: {
+                    startLine: actualStartLine,
+                    endLine: actualEndLine,
+                    lineCount: actualEndLine - actualStartLine + 1
+                  },
+                  includeLineNumbers
                 }
-                console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_read_file completed - File: ${path} (${result.size} bytes)`)
+                console.log(`[RepoAgent:${requestId.slice(0, 8)}] ✅ github_read_file completed - File: ${path} (${result.size} bytes, lines ${actualStartLine}-${actualEndLine})`)
                 return result
               } else {
                 console.error(`[RepoAgent:${requestId.slice(0, 8)}] ❌ github_read_file failed - Invalid file response`)
@@ -1518,110 +1740,477 @@ Assistant:
 
       // Advanced Code Analysis Tools
       github_semantic_search: tool({
-        description: 'Advanced semantic code search and analysis tool for GitHub repositories. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries and detailed code analysis.',
+        description: 'Advanced semantic code search and analysis tool with cross-reference tracking and result grouping. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries, framework-specific patterns, and detailed code analysis. Uses session storage for fast, comprehensive analysis.',
         inputSchema: z.object({
           repo: z.string().describe('Repository in format "owner/repo"'),
-          query: z.string().describe('Natural language description of what to search for (e.g., "find React components", "show API endpoints", "locate error handling")'),
+          query: z.string().describe('Natural language description of what to search for (e.g., "find React components with useState", "show API endpoints", "locate error handling", "find database models")'),
           path: z.string().optional().describe('Optional: Specific path to search within'),
           fileType: z.string().optional().describe('Optional: Filter by file type (e.g., "tsx", "ts", "js", "py", "md")'),
           maxResults: z.number().optional().describe('Maximum number of results to return (default: 20)'),
+          analysisDepth: z.enum(['basic', 'detailed', 'comprehensive']).optional().describe('Analysis depth: basic (fast), detailed (balanced), comprehensive (thorough but slower)'),
+          includeDependencies: z.boolean().optional().describe('Include related code dependencies and relationships (default: false)'),
+          enableCrossReferences: z.boolean().optional().describe('Enable cross-reference tracking to find all usages of functions/variables (default: false)'),
+          groupByFunctionality: z.boolean().optional().describe('Group results by functionality (components, APIs, utilities, etc.) (default: false)'),
           branch: z.string().optional().describe('Branch name, defaults to repository default')
         }),
-        execute: async ({ repo, query, path, fileType, maxResults = 20, branch }) => {
+        execute: async ({ repo, query, path, fileType, maxResults = 20, analysisDepth = 'detailed', includeDependencies = false, enableCrossReferences = false, groupByFunctionality = false, branch }) => {
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
 
-            // First, get repository structure to understand what we're working with
+            // Get repository info for metadata
             const repoInfo = await octokit.rest.repos.get({ owner, repo: repoName })
             const defaultBranch = branch || repoInfo.data.default_branch
+            const repoKey = `${repo}-${defaultBranch}`
 
-            // Use GitHub's code search API with enhanced query building
-            let searchQuery = `repo:${repo}`
+            // Import repository into session storage if not already present
+            if (!repoSessionStorage.has(repoKey)) {
+              console.log(`[RepoAgent] 📦 Importing repository for semantic search: https://github.com/${repo} at ${defaultBranch}`)
+              const repoUrl = `https://github.com/${repo}`
+              await importGithubRepoForSession(repoUrl, repoKey, octokit, defaultBranch)
+            }
 
-            // Add path filter if specified
+            const sessionData = repoSessionStorage.get(repoKey)
+            if (!sessionData) {
+              return {
+                success: false,
+                error: 'Failed to load repository files into session',
+                query
+              }
+            }
+
+            const { files: sessionFiles } = sessionData
+            let filesToSearch = Array.from(sessionFiles.values())
+
+            // Filter by path if specified
             if (path) {
-              searchQuery += ` path:${path}`
+              filesToSearch = filesToSearch.filter(f => f.path.startsWith(path))
             }
 
-            // Add file extension filter if specified
+            // Filter by file type if specified
             if (fileType) {
-              const extensions = fileType.split(',').map(ext => ext.trim())
-              searchQuery += ` extension:${extensions.join(' extension:')}`
+              const extensions = fileType.split(',').map(ext => ext.trim().toLowerCase())
+              filesToSearch = filesToSearch.filter(f => {
+                const ext = f.path.split('.').pop()?.toLowerCase()
+                return ext && extensions.includes(ext)
+              })
             }
 
-            // Build semantic search terms based on query
-            const semanticTerms = buildSemanticSearchTerms(query)
-            searchQuery += ` ${semanticTerms}`
+            const results: any[] = []
 
-            const searchResponse = await octokit.rest.search.code({
-              q: searchQuery,
-              per_page: Math.min(maxResults, 100)
-            })
+            // Enhanced semantic code analysis with framework-specific patterns
+            const searchPatterns = [
+              // React/TypeScript specific patterns
+              {
+                type: 'react_component',
+                regex: /^\s*(export\s+)?(const|function)\s+(\w+)\s*[=:]\s*(React\.)?(memo\()?(\([^)]*\)\s*=>|function)/gm,
+                description: 'React component definition'
+              },
+              {
+                type: 'typescript_interface',
+                regex: /^\s*(export\s+)?interface\s+(\w+)/gm,
+                description: 'TypeScript interface definition'
+              },
+              {
+                type: 'typescript_type',
+                regex: /^\s*(export\s+)?type\s+(\w+)\s*=/gm,
+                description: 'TypeScript type definition'
+              },
+              {
+                type: 'api_route',
+                regex: /^\s*export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/gm,
+                description: 'Next.js API route handler'
+              },
+              {
+                type: 'database_query',
+                regex: /\b(SELECT|INSERT|UPDATE|DELETE)\b.*\bFROM\b|\bCREATE\s+TABLE\b|\bALTER\s+TABLE\b/gi,
+                description: 'Database query or schema definition'
+              },
+              {
+                type: 'async_function',
+                regex: /^\s*(export\s+)?async\s+(function|const)\s+(\w+)/gm,
+                description: 'Async function definition'
+              },
+              {
+                type: 'hook_definition',
+                regex: /^\s*(export\s+)?function\s+use\w+/gm,
+                description: 'React hook definition'
+              },
+              {
+                type: 'error_handling',
+                regex: /\btry\s*\{|\bcatch\s*\(|\bthrow\s+new\b|\bError\s*\(/gi,
+                description: 'Error handling code'
+              },
+              {
+                type: 'validation_schema',
+                regex: /\b(z\.)?(object|array|string|number|boolean)\(\)|\.refine\(|schema\.parse\b/gi,
+                description: 'Zod validation schema'
+              },
+              {
+                type: 'test_case',
+                regex: /^\s*(it|test|describe)\s*\(/gm,
+                description: 'Test case definition'
+              },
+              {
+                type: 'configuration',
+                regex: /\b(process\.env|NEXT_PUBLIC_|REACT_APP_)\b|\bconfig\b.*=|\bsettings\b.*=/gi,
+                description: 'Configuration or environment variables'
+              },
+              {
+                type: 'styling',
+                regex: /\bclassName\s*=|\bstyle\s*=|\btailwind\b|\bcss\b|\bsass\b/gi,
+                description: 'Styling and CSS classes'
+              },
+              // Generic patterns for broader coverage
+              {
+                type: 'function',
+                regex: /^\s*(export\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
+                description: 'Function or method definition'
+              },
+              {
+                type: 'class',
+                regex: /^\s*(export\s+)?(class|interface|type)\s+(\w+)/gm,
+                description: 'Class, interface, or type definition'
+              },
+              {
+                type: 'import',
+                regex: /^\s*import\s+.*from\s+['"`].*['"`]/gm,
+                description: 'Import statement'
+              },
+              {
+                type: 'export',
+                regex: /^\s*export\s+/gm,
+                description: 'Export statement'
+              },
+              // Semantic text search with context awareness
+              {
+                type: 'semantic_match',
+                regex: new RegExp(`\\b${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
+                description: 'Semantic code match'
+              }
+            ]
 
-            // Enhance results with file content analysis
-            const enhancedResults = await Promise.all(
-              searchResponse.data.items.slice(0, maxResults).map(async (item) => {
-                try {
-                  // Get file content for deeper analysis
-                  const contentResponse = await octokit.rest.repos.getContent({
-                    owner,
-                    repo: repoName,
-                    path: item.path,
-                    ref: defaultBranch
-                  })
+            // Search through each file
+            for (const file of filesToSearch) {
+              if (!file.content || typeof file.content !== 'string') continue
 
-                  if (!Array.isArray(contentResponse.data) && 'content' in contentResponse.data) {
-                    const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8')
+              const content = file.content
+              const lines = content.split('\n')
+              const lowerQuery = query.toLowerCase()
 
-                    return {
-                      name: item.name,
-                      path: item.path,
-                      sha: item.sha,
-                      html_url: item.html_url,
-                      repository: {
-                        full_name: repo,
-                        html_url: repoInfo.data.html_url
-                      },
-                      content: {
-                        lines: content.split('\n').length,
-                        size: content.length,
-                        language: detectLanguage(item.path, content),
-                        excerpt: getRelevantExcerpt(content, query, 3)
-                      },
-                      matches: findSemanticMatches(content, query)
+              // Search for each pattern
+              for (const pattern of searchPatterns) {
+                let match
+                while ((match = pattern.regex.exec(content)) !== null && results.length < maxResults) {
+                  // Calculate line number (1-indexed)
+                  const matchIndex = match.index
+                  let lineNumber = 1
+                  let charCount = 0
+
+                  for (let i = 0; i < lines.length; i++) {
+                    charCount += lines[i].length + 1 // +1 for newline
+                    if (charCount > matchIndex) {
+                      lineNumber = i + 1
+                      break
                     }
                   }
-                } catch (error) {
-                  // If we can't get content, return basic info
-                  console.warn(`Could not get content for ${item.path}:`, error)
-                }
 
-                return {
-                  name: item.name,
-                  path: item.path,
-                  sha: item.sha,
-                  html_url: item.html_url,
-                  repository: {
-                    full_name: repo,
-                    html_url: repoInfo.data.html_url
-                  },
-                  content: null,
-                  matches: []
+                  // Calculate relevance score based on pattern type and context
+                  let relevanceScore = 1
+                  switch (pattern.type) {
+                    case 'react_component':
+                    case 'api_route':
+                    case 'async_function':
+                      relevanceScore = 10
+                      break
+                    case 'typescript_interface':
+                    case 'typescript_type':
+                    case 'hook_definition':
+                      relevanceScore = 8
+                      break
+                    case 'database_query':
+                    case 'validation_schema':
+                    case 'error_handling':
+                      relevanceScore = 7
+                      break
+                    case 'test_case':
+                    case 'configuration':
+                      relevanceScore = 6
+                      break
+                    case 'function':
+                    case 'class':
+                      relevanceScore = 5
+                      break
+                    case 'styling':
+                    case 'import':
+                    case 'export':
+                      relevanceScore = 3
+                      break
+                    default:
+                      relevanceScore = 2
+                  }
+
+                  // Boost score for exact matches and word boundaries
+                  if (match[0].toLowerCase() === query.toLowerCase()) {
+                    relevanceScore += 5
+                  }
+                  if (new RegExp(`\\b${query}\\b`, 'i').test(match[0])) {
+                    relevanceScore += 3
+                  }
+
+                  // Extract context around the match
+                  const startLine = Math.max(1, lineNumber - 2)
+                  const endLine = Math.min(lines.length, lineNumber + 2)
+                  const contextLines = lines.slice(startLine - 1, endLine)
+                  const contextWithNumbers = contextLines.map((line: string, idx: number) =>
+                    `${String(startLine + idx).padStart(4, ' ')}: ${line}`
+                  ).join('\n')
+
+                  // Highlight the match in context
+                  const highlightedContext = contextWithNumbers.replace(
+                    new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                    '**$&**'
+                  )
+
+                  // Check for dependencies if requested
+                  let dependencies: string[] = []
+                  if (includeDependencies && pattern.type === 'import') {
+                    const importMatch = match[0].match(/from\s+['"`]([^'"`]+)['"`]/)
+                    if (importMatch) {
+                      dependencies.push(importMatch[1])
+                    }
+                  }
+
+                  results.push({
+                    file: file.path,
+                    type: pattern.type,
+                    description: pattern.description,
+                    lineNumber,
+                    match: match[0].trim(),
+                    context: highlightedContext,
+                    fullMatch: match[0],
+                    relevanceScore,
+                    dependencies: dependencies.length > 0 ? dependencies : undefined
+                  })
+
+                  // Prevent infinite loops for global regex
+                  if (!pattern.regex.global) break
+                }
+              }
+
+              if (results.length >= maxResults) break
+            }
+
+            // Sort results by relevance score and deduplicate
+            const uniqueResults = results
+              .sort((a, b) => b.relevanceScore - a.relevanceScore)
+              .filter((result, index, arr) =>
+                index === 0 || !(arr[index - 1].file === result.file &&
+                  arr[index - 1].lineNumber === result.lineNumber &&
+                  arr[index - 1].match === result.match)
+              )
+              .slice(0, maxResults)
+
+            // Perform dependency analysis if requested
+            let dependencyAnalysis: any = null
+            if (includeDependencies && uniqueResults.length > 0) {
+              const allDependencies = new Set<string>()
+              const dependencyMap = new Map<string, string[]>()
+
+              // Collect all dependencies from results
+              uniqueResults.forEach(result => {
+                if (result.dependencies) {
+                  result.dependencies.forEach((dep: string) => allDependencies.add(dep))
                 }
               })
-            )
+
+              // Analyze dependency relationships
+              filesToSearch.forEach((file: any) => {
+                if (!file.content || file.isDirectory) return
+
+                const content = file.content
+                const imports = content.match(/^\s*import\s+.*from\s+['"`]([^'"`]+)['"`]/gm) || []
+
+                imports.forEach((importStmt: string) => {
+                  const match = importStmt.match(/from\s+['"`]([^'"`]+)['"`]/)
+                  if (match) {
+                    const dep = match[1]
+                    if (allDependencies.has(dep)) {
+                      if (!dependencyMap.has(file.path)) {
+                        dependencyMap.set(file.path, [])
+                      }
+                      dependencyMap.get(file.path)!.push(dep)
+                    }
+                  }
+                })
+              })
+
+              dependencyAnalysis = {
+                totalDependencies: allDependencies.size,
+                dependencyFiles: Array.from(dependencyMap.entries()).map(([file, deps]) => ({
+                  file,
+                  imports: deps
+                })),
+                uniqueDependencies: Array.from(allDependencies)
+              }
+            }
+
+            // Perform cross-reference tracking if requested
+            let crossReferences: any[] = []
+            if (enableCrossReferences && uniqueResults.length > 0) {
+              // Find all function/variable/class definitions from the results
+              const definitions = uniqueResults.filter(result =>
+                ['function', 'async_function', 'react_component', 'hook_definition', 'class', 'typescript_interface', 'typescript_type'].includes(result.type)
+              )
+
+              // Extract identifiers from definitions
+              const identifiers = definitions.map(def => {
+                // Extract the identifier name from the match
+                const match = def.match
+                if (def.type === 'react_component') {
+                  const componentMatch = match.match(/(?:const|function)\s+(\w+)/)
+                  return componentMatch ? componentMatch[1] : null
+                } else if (def.type === 'typescript_interface' || def.type === 'typescript_type') {
+                  const typeMatch = match.match(/(?:interface|type)\s+(\w+)/)
+                  return typeMatch ? typeMatch[1] : null
+                } else if (def.type === 'hook_definition') {
+                  const hookMatch = match.match(/function\s+(use\w+)/)
+                  return hookMatch ? hookMatch[1] : null
+                } else if (def.type === 'function' || def.type === 'async_function') {
+                  const funcMatch = match.match(/(?:function|const|let|var)\s+(\w+)/)
+                  return funcMatch ? funcMatch[1] : null
+                } else if (def.type === 'class') {
+                  const classMatch = match.match(/(?:class|interface|type)\s+(\w+)/)
+                  return classMatch ? classMatch[1] : null
+                }
+                return null
+              }).filter(Boolean)
+
+              // Search for usages of these identifiers across all files
+              const usageResults: any[] = []
+              for (const file of filesToSearch) {
+                if (!file.content || file.isDirectory) continue
+
+                const content = file.content
+                const fileLines = content.split('\n')
+
+                identifiers.forEach(identifier => {
+                  // Create regex to find usages (word boundaries, property access, function calls)
+                  const usageRegex = new RegExp(`\\b${identifier}\\b`, 'g')
+                  let match: RegExpExecArray | null
+                  while ((match = usageRegex.exec(content)) !== null) {
+                    // Ensure match is not null (TypeScript guard)
+                    if (!match) continue
+
+                    const matchIndex = match.index
+
+                    // Skip the definition itself
+                    const isDefinition = definitions.some(def =>
+                      def.file === file.path &&
+                      Math.abs(def.lineNumber - (content.substring(0, matchIndex).split('\n').length)) <= 2
+                    )
+                    if (isDefinition) continue
+
+                    let lineNumber = 1
+                    let charCount = 0
+                    for (let i = 0; i < fileLines.length; i++) {
+                      charCount += fileLines[i].length + 1
+                      if (charCount > matchIndex) {
+                        lineNumber = i + 1
+                        break
+                      }
+                    }
+
+                    // Extract context
+                    const startLine = Math.max(1, lineNumber - 1)
+                    const endLine = Math.min(fileLines.length, lineNumber + 1)
+                    const contextLines = fileLines.slice(startLine - 1, endLine)
+                    const contextWithNumbers = contextLines.map((line: string, idx: number) =>
+                      `${String(startLine + idx).padStart(4, ' ')}: ${line}`
+                    ).join('\n')
+
+                    usageResults.push({
+                      identifier,
+                      file: file.path,
+                      lineNumber,
+                      context: contextWithNumbers,
+                      usage: match[0]
+                    })
+                  }
+                })
+              }
+
+              crossReferences = usageResults
+            }
+
+            // Group results by functionality if requested
+            let groupedResults: any = null
+            if (groupByFunctionality && uniqueResults.length > 0) {
+              const groups: { [key: string]: any[] } = {
+                components: [],
+                apis: [],
+                utilities: [],
+                types: [],
+                configuration: [],
+                tests: [],
+                styling: [],
+                other: []
+              }
+
+              uniqueResults.forEach(result => {
+                switch (result.type) {
+                  case 'react_component':
+                    groups.components.push(result)
+                    break
+                  case 'api_route':
+                  case 'async_function':
+                    groups.apis.push(result)
+                    break
+                  case 'hook_definition':
+                  case 'function':
+                    groups.utilities.push(result)
+                    break
+                  case 'typescript_interface':
+                  case 'typescript_type':
+                    groups.types.push(result)
+                    break
+                  case 'configuration':
+                    groups.configuration.push(result)
+                    break
+                  case 'test_case':
+                    groups.tests.push(result)
+                    break
+                  case 'styling':
+                    groups.styling.push(result)
+                    break
+                  default:
+                    groups.other.push(result)
+                }
+              })
+
+              // Remove empty groups
+              Object.keys(groups).forEach(key => {
+                if (groups[key].length === 0) {
+                  delete groups[key]
+                }
+              })
+
+              groupedResults = groups
+            }
 
             return {
               success: true,
+              message: `Found ${uniqueResults.length} code sections matching "${query}" (sorted by relevance)`,
               query,
-              total_count: searchResponse.data.total_count,
-              returned_count: enhancedResults.length,
+              results: uniqueResults,
+              totalResults: uniqueResults.length,
+              dependencyAnalysis,
+              crossReferences: crossReferences.length > 0 ? crossReferences : undefined,
+              groupedResults,
               repository: {
                 full_name: repo,
                 default_branch: defaultBranch,
                 language: repoInfo.data.language
-              },
-              results: enhancedResults
+              }
             }
           } catch (error) {
             return {
@@ -1767,7 +2356,7 @@ Assistant:
       }),
 
       github_grep_search: tool({
-        description: 'Elite multi-strategy search engine for GitHub repositories. Combines literal text search, regex patterns, intelligent code pattern detection, and semantic analysis.',
+        description: 'Elite multi-strategy search engine for GitHub repositories. Combines literal text search, regex patterns, intelligent code pattern detection, and semantic analysis. Uses session storage for comprehensive, fast analysis.',
         inputSchema: z.object({
           repo: z.string().describe('Repository in format "owner/repo"'),
           query: z.string().describe('Search pattern - can be literal text, regex, or natural language'),
@@ -1783,121 +2372,120 @@ Assistant:
           try {
             const { owner, repo: repoName } = parseRepoString(repo)
 
-            // Get repository info for default branch
+            // Get repository info for metadata
             const repoInfo = await octokit.rest.repos.get({ owner, repo: repoName })
             const defaultBranch = branch || repoInfo.data.default_branch
+            const repoKey = `${repo}-${defaultBranch}`
 
-            // Strategy 1: Use GitHub's code search API for initial results
-            let searchQuery = `repo:${repo}`
+            // Import repository into session storage if not already present
+            if (!repoSessionStorage.has(repoKey)) {
+              console.log(`[RepoAgent] 📦 Importing repository for grep search: https://github.com/${repo} at ${defaultBranch}`)
+              const repoUrl = `https://github.com/${repo}`
+              await importGithubRepoForSession(repoUrl, repoKey, octokit, defaultBranch)
+            }
 
+            const sessionData = repoSessionStorage.get(repoKey)
+            if (!sessionData) {
+              return {
+                success: false,
+                error: 'Failed to load repository files into session',
+                query
+              }
+            }
+
+            const { files: sessionFiles } = sessionData
+            let filesToSearch = Array.from(sessionFiles.values())
+
+            // Filter by path if specified
             if (path) {
-              searchQuery += ` path:${path}`
+              filesToSearch = filesToSearch.filter(f => f.path.startsWith(path))
             }
 
+            // Filter by file type if specified
             if (fileType) {
-              const extensions = fileType.split(',').map(ext => ext.trim())
-              searchQuery += ` extension:${extensions.join(' extension:')}`
+              const extensions = fileType.split(',').map(ext => ext.trim().toLowerCase())
+              filesToSearch = filesToSearch.filter(f => {
+                const ext = f.path.split('.').pop()?.toLowerCase()
+                return ext && extensions.includes(ext)
+              })
             }
 
-            // Add the search query
-            searchQuery += ` ${query}`
-
-            const searchResponse = await octokit.rest.search.code({
-              q: searchQuery,
-              per_page: Math.min(maxResults * 2, 100) // Get more for processing
-            })
-
-            // Strategy 2: Enhanced analysis of results
+            // Perform comprehensive grep search on all files
             const enhancedResults = []
-            const processedFiles = new Set()
+            const regexFlags = caseInsensitive ? 'gi' : 'g'
+            const searchRegex = useRegex ? new RegExp(query, regexFlags) : new RegExp(escapeRegExp(query), regexFlags)
 
-            for (const item of searchResponse.data.items.slice(0, maxResults)) {
-              if (processedFiles.has(item.path)) continue
-              processedFiles.add(item.path)
+            for (const file of filesToSearch) {
+              if (!file.content || typeof file.content !== 'string') continue
 
-              try {
-                // Get full file content for detailed analysis
-                const contentResponse = await octokit.rest.repos.getContent({
-                  owner,
-                  repo: repoName,
-                  path: item.path,
-                  ref: defaultBranch
+              const content = file.content
+              const lines = content.split('\n')
+              const fileMatches = []
+
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i]
+                const lineMatches = []
+
+                let match
+                while ((match = searchRegex.exec(line)) !== null) {
+                  lineMatches.push({
+                    match: match[0],
+                    start: match.index,
+                    end: match.index + match[0].length,
+                    groups: match.groups || {}
+                  })
+
+                  if (!useRegex) break // For literal searches, only find first match per line
+                }
+
+                if (lineMatches.length > 0) {
+                  // Get context lines
+                  const startLine = Math.max(0, i - contextLines)
+                  const endLine = Math.min(lines.length - 1, i + contextLines)
+                  const context = lines.slice(startLine, endLine + 1)
+
+                  fileMatches.push({
+                    lineNumber: i + 1,
+                    line: line,
+                    matches: lineMatches,
+                    context: {
+                      startLine: startLine + 1,
+                      endLine: endLine + 1,
+                      lines: context
+                    }
+                  })
+                }
+              }
+
+              if (fileMatches.length > 0) {
+                enhancedResults.push({
+                  file: {
+                    name: file.path.split('/').pop() || file.path,
+                    path: file.path,
+                    sha: file.sha || 'session',
+                    html_url: `https://github.com/${repo}/blob/${defaultBranch}/${file.path}`,
+                    language: detectLanguage(file.path, content),
+                    size: content.length,
+                    lines: lines.length
+                  },
+                  matches: fileMatches,
+                  total_matches: fileMatches.length
                 })
 
-                if (!Array.isArray(contentResponse.data) && 'content' in contentResponse.data) {
-                  const content = Buffer.from(contentResponse.data.content, 'base64').toString('utf-8')
-                  const lines = content.split('\n')
-
-                  // Perform grep-style search
-                  const matches = []
-                  const regexFlags = caseInsensitive ? 'gi' : 'g'
-                  const searchRegex = useRegex ? new RegExp(query, regexFlags) : new RegExp(escapeRegExp(query), regexFlags)
-
-                  for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i]
-                    const lineMatches = []
-
-                    let match
-                    while ((match = searchRegex.exec(line)) !== null) {
-                      lineMatches.push({
-                        match: match[0],
-                        start: match.index,
-                        end: match.index + match[0].length,
-                        groups: match.groups || {}
-                      })
-
-                      if (!useRegex) break // For literal searches, only find first match per line
-                    }
-
-                    if (lineMatches.length > 0) {
-                      // Get context lines
-                      const startLine = Math.max(0, i - contextLines)
-                      const endLine = Math.min(lines.length - 1, i + contextLines)
-                      const context = lines.slice(startLine, endLine + 1)
-
-                      matches.push({
-                        lineNumber: i + 1,
-                        line: line,
-                        matches: lineMatches,
-                        context: {
-                          startLine: startLine + 1,
-                          endLine: endLine + 1,
-                          lines: context
-                        }
-                      })
-                    }
-                  }
-
-                  if (matches.length > 0) {
-                    enhancedResults.push({
-                      file: {
-                        name: item.name,
-                        path: item.path,
-                        sha: item.sha,
-                        html_url: item.html_url,
-                        language: detectLanguage(item.path, content),
-                        size: content.length,
-                        lines: lines.length
-                      },
-                      matches: matches,
-                      total_matches: matches.length
-                    })
-                  }
-                }
-              } catch (error) {
-                console.warn(`Could not analyze ${item.path}:`, error)
+                if (enhancedResults.length >= maxResults) break
               }
             }
 
             return {
               success: true,
               query,
-              strategy: 'multi-strategy',
-              total_files_searched: searchResponse.data.total_count,
+              strategy: 'session-storage',
+              total_files_searched: filesToSearch.length,
               files_with_matches: enhancedResults.length,
               repository: {
                 full_name: repo,
-                default_branch: defaultBranch
+                default_branch: defaultBranch,
+                language: repoInfo.data.language
               },
               results: enhancedResults
             }
@@ -2192,7 +2780,7 @@ Assistant:
               // Import the repository and store in session memory
               console.log(`[RepoAgent:${requestId.slice(0, 8)}] 📦 Importing repository for error checking: https://github.com/${repoKey}`)
               const repoUrl = `https://github.com/${repoKey}`
-              await importGithubRepoForSession(repoUrl, repoKey, octokit)
+              await importGithubRepoForSession(repoUrl, repoKey, octokit, 'HEAD')
               sessionData = repoSessionStorage.get(repoKey)
             }
 
@@ -2746,6 +3334,263 @@ Assistant:
               success: false,
               error: `Failed to rerun workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
             }
+          }
+        }
+      }),
+
+      web_search: tool({
+        description: 'Search the web for current information and context. Returns clean, structured text instead of raw JSON data.',
+        inputSchema: z.object({
+          query: z.string().describe('Search query to find relevant web content')
+        }),
+        execute: async ({ query }) => {
+          try {
+            // Add strict 20-second timeout to prevent hanging
+            const searchResults = await withTimeout(
+              searchWeb(query),
+              20000, // Reduced from 30000 (30s) to 20000 (20s) - stricter timeout
+              'Web search'
+            )
+
+            // More generous truncation for 256k context models (50k total limit)
+            const MAX_SEARCH_CHARS = 50000;
+            let cleanResults = searchResults.cleanedResults;
+            let wasTruncated = false;
+
+            if (cleanResults.length > MAX_SEARCH_CHARS) {
+              cleanResults = cleanResults.substring(0, MAX_SEARCH_CHARS);
+              wasTruncated = true;
+            }
+
+            return {
+              success: true,
+              message: `Web search completed successfully for query: "${query}"${wasTruncated ? ` (truncated to ${MAX_SEARCH_CHARS} chars)` : ''}`,
+              // Send clean, structured text instead of raw JSON
+              cleanResults,
+              // Keep minimal metadata for reference
+              metadata: {
+                query: searchResults.query,
+                resultCount: searchResults.resultCount,
+                originalLength: searchResults.cleanedResults.length,
+                finalLength: cleanResults.length,
+                wasTruncated,
+                maxChars: MAX_SEARCH_CHARS
+              },
+              query
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            console.error('[ERROR] web_search failed:', error)
+
+            return {
+              success: false,
+              error: `Web search failed: ${errorMessage}`,
+              query
+            }
+          }
+        }
+      }),
+
+      web_extract: tool({
+        description: 'Extract content from web pages using AnyAPI. Returns clean, structured text.',
+        inputSchema: z.object({
+          urls: z.union([
+            z.string().url().describe('URL to extract content from'),
+            z.array(z.string().url()).describe('Array of URLs to extract content from')
+          ]).describe('URL or URLs to extract content from')
+        }),
+        execute: async ({ urls }) => {
+          // Ensure urls is always an array
+          const urlArray = Array.isArray(urls) ? urls : [urls];
+
+          try {
+            // Import the web scraper
+            const { webScraper } = await import('@/lib/web-scraper');
+
+            // Process URLs sequentially to manage API key usage, but with strict 30s total timeout
+            const extractPromise = Promise.all(
+              urlArray.map(async (url) => {
+                try {
+                  const scraperResult = await webScraper.execute({ url });
+
+                  // Debug logging for web extraction
+                  console.log(`[DEBUG] Web extract for ${url}:`, {
+                    hasResult: !!scraperResult,
+                    resultType: typeof scraperResult,
+                    resultKeys: scraperResult ? Object.keys(scraperResult) : [],
+                    hasCleanResults: scraperResult?.cleanResults ? true : false,
+                    cleanResultsType: typeof scraperResult?.cleanResults,
+                    cleanResultsLength: scraperResult?.cleanResults?.length || 0
+                  });
+
+                  // Extract content from the scraper result
+                  const extractContent = (result: any): string => {
+                    // The webScraper returns cleanResults directly
+                    if (result && typeof result === 'object' && result.cleanResults) {
+                      return result.cleanResults;
+                    }
+
+                    // Fallback to message if cleanResults not available
+                    if (result && typeof result === 'object' && result.message) {
+                      return result.message;
+                    }
+
+                    // Last resort: stringify the result (but avoid circular references)
+                    try {
+                      return JSON.stringify(result, (key, value) => {
+                        if (key === 'metadata' || key === 'apiKeyUsed') {
+                          return '[REDACTED]';
+                        }
+                        return value;
+                      }, 2);
+                    } catch {
+                      return 'Content extracted successfully';
+                    }
+                  };
+
+                  return {
+                    success: true,
+                    url,
+                    cleanResults: extractContent(scraperResult),
+                    metadata: {
+                      url,
+                      timestamp: new Date().toISOString(),
+                      apiKeyUsed: scraperResult.metadata?.apiKeyUsed || 'unknown'
+                    }
+                  };
+                } catch (error) {
+                  console.error(`[ERROR] Web extract failed for ${url}:`, error);
+                  return {
+                    success: false,
+                    url,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    cleanResults: ''
+                  };
+                }
+              })
+            );
+
+            // Add strict 30-second timeout but return partial results if available
+            let extractionResults: any[];
+            try {
+              extractionResults = await withTimeout(
+                extractPromise,
+                30000, // Reduced from 45000 (45s) to 30000 (30s) - stricter timeout
+                'Web content extraction'
+              );
+            } catch (timeoutError) {
+              // If we timeout, try to get partial results from any completed extractions
+              console.warn('[WEB_EXTRACT] Timeout occurred, attempting to return partial results');
+              try {
+                // Race the original promise against a very short timeout to get any completed results
+                extractionResults = await Promise.race([
+                  extractPromise,
+                  new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('Partial timeout')), 1000))
+                ]);
+              } catch (partialError) {
+                // If even partial results aren't available quickly, return empty results
+                extractionResults = urlArray.map(url => ({
+                  success: false,
+                  url,
+                  error: 'Extraction timed out - no partial results available',
+                  cleanResults: ''
+                }));
+              }
+            }
+
+            // Separate successful and failed extractions
+            const successfulResults = extractionResults.filter(result => result.success);
+            const failedResults = extractionResults.filter(result => !result.success);
+
+            // More generous truncation for 256k context models (15k per URL, 75k total)
+            const MAX_CHARS_PER_URL = 15000;
+            const MAX_TOTAL_CHARS = 75000;
+
+            let totalCharsUsed = 0;
+            const truncatedResults = successfulResults.map(result => {
+              const originalLength = result.cleanResults.length;
+              let truncatedContent = result.cleanResults;
+              let wasTruncated = false;
+              let truncationReason = '';
+
+              // Check per-URL limit
+              if (originalLength > MAX_CHARS_PER_URL) {
+                truncatedContent = result.cleanResults.substring(0, MAX_CHARS_PER_URL);
+                wasTruncated = true;
+                truncationReason = `per-URL limit (${MAX_CHARS_PER_URL} chars)`;
+              }
+
+              // Check total limit (but don't truncate if we're the first result)
+              if (totalCharsUsed + truncatedContent.length > MAX_TOTAL_CHARS && successfulResults.indexOf(result) > 0) {
+                const remainingChars = MAX_TOTAL_CHARS - totalCharsUsed;
+                if (remainingChars > 1000) { // Only include if we can fit meaningful content
+                  truncatedContent = truncatedContent.substring(0, remainingChars);
+                  wasTruncated = true;
+                  truncationReason = `total limit (${MAX_TOTAL_CHARS} chars)`;
+                } else {
+                  truncatedContent = ''; // Skip this result entirely
+                  wasTruncated = true;
+                  truncationReason = 'total limit exceeded';
+                }
+              }
+
+              totalCharsUsed += truncatedContent.length;
+
+              return {
+                ...result,
+                cleanResults: truncatedContent,
+                wasTruncated,
+                originalLength,
+                truncationReason: wasTruncated ? truncationReason : undefined
+              };
+            });
+
+            // Debug logging for final result
+            console.log('[DEBUG] Web extract final result:', {
+              totalUrls: urlArray.length,
+              successfulCount: successfulResults.length,
+              failedCount: failedResults.length,
+              totalCharsUsed,
+              maxTotalChars: MAX_TOTAL_CHARS,
+              maxPerUrlChars: MAX_CHARS_PER_URL,
+              cleanResultsLength: truncatedResults.map(r => r.cleanResults?.length || 0),
+              truncatedCount: truncatedResults.filter(r => r.wasTruncated).length,
+              sampleCleanResults: truncatedResults[0]?.cleanResults?.substring(0, 200) || 'none'
+            });
+
+            return {
+              success: successfulResults.length > 0,
+              message: successfulResults.length > 0
+                ? `Successfully extracted content from ${successfulResults.length} URL(s)${truncatedResults.some(r => r.wasTruncated) ? ` (truncated to fit ${MAX_TOTAL_CHARS} char limit)` : ''}`
+                : 'Failed to extract content from any URLs',
+              cleanResults: truncatedResults.map(result => result.cleanResults).join('\n\n'),
+              metadata: {
+                successCount: successfulResults.length,
+                failedCount: failedResults.length,
+                urls: urlArray,
+                totalCharsUsed,
+                maxTotalChars: MAX_TOTAL_CHARS,
+                maxPerUrlChars: MAX_CHARS_PER_URL,
+                truncationInfo: truncatedResults.map(r => ({
+                  url: r.url,
+                  originalLength: r.originalLength,
+                  finalLength: r.cleanResults.length,
+                  wasTruncated: r.wasTruncated,
+                  truncationReason: r.truncationReason
+                }))
+              }
+            };
+          } catch (error) {
+            console.error('[ERROR] Web extract failed:', error);
+
+            return {
+              success: false,
+              error: `Web extract failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              cleanResults: '',
+              metadata: {
+                urls: urlArray
+              }
+            };
           }
         }
       })
