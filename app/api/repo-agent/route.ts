@@ -453,10 +453,31 @@ const importGithubRepoForSession = async (repoUrl: string, repoKey: string, octo
       ref: ref // Use specified ref
     })
 
-    // Get the ZIP data - Octokit returns the data directly
-    const zipData = Buffer.from(archiveResponse.data).toString('base64')
-    // Extract files from ZIP (similar to chat-input.tsx applyGithubFiles)
-    const zipBlob = new Blob([Uint8Array.from(atob(zipData), c => c.charCodeAt(0))], {
+    // Handle the binary data correctly - Octokit returns data as Buffer/ArrayBuffer
+    // Convert to ArrayBuffer if it's not already, then create proper Blob
+    let arrayBuffer: ArrayBuffer
+
+    if (archiveResponse.data instanceof ArrayBuffer) {
+      arrayBuffer = archiveResponse.data
+    } else if (Buffer.isBuffer(archiveResponse.data)) {
+      arrayBuffer = archiveResponse.data.buffer.slice(
+        archiveResponse.data.byteOffset,
+        archiveResponse.data.byteOffset + archiveResponse.data.byteLength
+      )
+    } else if (archiveResponse.data instanceof Uint8Array) {
+      arrayBuffer = archiveResponse.data.buffer
+    } else {
+      // Fallback: try to convert from base64 if it's a string
+      const dataStr = archiveResponse.data.toString()
+      if (typeof dataStr === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(dataStr)) {
+        arrayBuffer = Uint8Array.from(atob(dataStr), c => c.charCodeAt(0)).buffer
+      } else {
+        throw new Error('Unable to convert archive data to ArrayBuffer')
+      }
+    }
+
+    // Create blob from ArrayBuffer (same as chat-input pattern)
+    const zipBlob = new Blob([arrayBuffer], {
       type: 'application/zip'
     })
 
