@@ -158,7 +158,7 @@ export default function DocsPage() {
   }
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`${isMobile ? '' : 'w-80 border-r border-gray-800'} h-full bg-gray-900/50 flex flex-col`}>
+    <div className={`${isMobile ? '' : 'w-80 border-r border-gray-800'} h-full bg-gray-900/50 flex flex-col max-h-screen`}>
       <div className="p-4 border-b border-gray-800 flex-shrink-0">
         <h2 className="text-lg font-semibold text-white mb-4">Documentation</h2>
         <div className="relative">
@@ -173,7 +173,7 @@ export default function DocsPage() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4 min-h-0">
         <div className="space-y-2">
           {filteredSections.map((section, index) => {
             const IconComponent = getIconForSection(section.title)
