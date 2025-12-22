@@ -158,8 +158,8 @@ export default function DocsPage() {
   }
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`${isMobile ? '' : 'w-80 border-r border-gray-800'} h-full bg-gray-900/50`}>
-      <div className="p-4 border-b border-gray-800">
+    <div className={`${isMobile ? '' : 'w-80 border-r border-gray-800'} h-full bg-gray-900/50 flex flex-col`}>
+      <div className="p-4 border-b border-gray-800 flex-shrink-0">
         <h2 className="text-lg font-semibold text-white mb-4">Documentation</h2>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -191,28 +191,13 @@ export default function DocsPage() {
                   isSelected ? 'bg-purple-600/20 border border-purple-500/30' : ''
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   <div className={`p-1.5 rounded-md bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]} flex-shrink-0`}>
                     <IconComponent className="h-4 w-4 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-white truncate">
-                      {section.title}
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-1 overflow-hidden" style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical' as const
-                    }}>
-                      {section.overview}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline" className="text-xs border-gray-600 text-gray-400 px-1.5 py-0.5">
-                        <Clock className="w-2.5 h-2.5 mr-1" />
-                        {getReadTime(section.content)}
-                      </Badge>
-                    </div>
-                  </div>
+                  <h3 className="text-sm font-medium text-white truncate">
+                    {section.title}
+                  </h3>
                 </div>
               </button>
             )
