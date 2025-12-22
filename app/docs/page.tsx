@@ -266,9 +266,73 @@ export default function DocsPage() {
 
             {/* Content */}
             <div className="prose prose-lg prose-invert max-w-none">
-              <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  h1: ({children, ...props}) => (
+                    <h1 className="text-3xl font-bold text-white mt-8 mb-4 first:mt-0" {...props}>
+                      {children}
+                    </h1>
+                  ),
+                  h2: ({children, ...props}) => (
+                    <h2 className="text-2xl font-semibold text-white mt-6 mb-3" {...props}>
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({children, ...props}) => (
+                    <h3 className="text-xl font-medium text-white mt-4 mb-2" {...props}>
+                      {children}
+                    </h3>
+                  ),
+                  p: ({children, ...props}) => (
+                    <p className="text-gray-300 leading-relaxed mb-4" {...props}>
+                      {children}
+                    </p>
+                  ),
+                  ul: ({children, ...props}) => (
+                    <ul className="text-gray-300 leading-relaxed mb-4 ml-6 list-disc" {...props}>
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({children, ...props}) => (
+                    <ol className="text-gray-300 leading-relaxed mb-4 ml-6 list-decimal" {...props}>
+                      {children}
+                    </ol>
+                  ),
+                  li: ({children, ...props}) => (
+                    <li className="mb-1" {...props}>
+                      {children}
+                    </li>
+                  ),
+                  code: ({children, ...props}) => (
+                    <code className="bg-gray-800 px-2 py-1 rounded text-sm font-mono text-green-400" {...props}>
+                      {children}
+                    </code>
+                  ),
+                  pre: ({children, ...props}) => (
+                    <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4" {...props}>
+                      {children}
+                    </pre>
+                  ),
+                  blockquote: ({children, ...props}) => (
+                    <blockquote className="border-l-4 border-purple-500 pl-4 italic text-gray-400 mb-4" {...props}>
+                      {children}
+                    </blockquote>
+                  ),
+                  strong: ({children, ...props}) => (
+                    <strong className="font-semibold text-white" {...props}>
+                      {children}
+                    </strong>
+                  ),
+                  em: ({children, ...props}) => (
+                    <em className="italic text-gray-300" {...props}>
+                      {children}
+                    </em>
+                  )
+                }}
+              >
                 {selectedSection.content}
-              </div>
+              </ReactMarkdown>
             </div>
 
             {/* Navigation */}
