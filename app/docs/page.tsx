@@ -199,7 +199,11 @@ export default function DocsPage() {
                     <h3 className="text-sm font-medium text-white truncate">
                       {section.title}
                     </h3>
-                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                    <p className="text-xs text-gray-400 mt-1 overflow-hidden" style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const
+                    }}>
                       {section.overview}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
