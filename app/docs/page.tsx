@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   BookOpen,
   Search,
   ArrowRight,
+  Menu,
   Zap,
   Database,
   Cloud,
@@ -47,6 +50,8 @@ export default function DocsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [docsData, setDocsData] = useState<DocsData | null>(null)
   const [filteredSections, setFilteredSections] = useState<DocSection[]>([])
+  const [selectedSection, setSelectedSection] = useState<DocSection | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const loadDocsData = async () => {
@@ -55,6 +60,7 @@ export default function DocsPage() {
         const data = await response.json()
         setDocsData(data)
         setFilteredSections(data.sections)
+        setSelectedSection(data.sections[0] || null) // Select first section by default
       } catch (error) {
         console.error('Failed to load docs data:', error)
       }
@@ -135,32 +141,9 @@ export default function DocsPage() {
     return `${minutes} min`
   }
 
-  const quickLinks = docsData ? [
-    {
-      title: "Getting Started",
-      href: "/docs/introduction",
-      icon: BookOpen,
-      description: docsData.sections.find(s => s.title === "Introduction")?.overview.substring(0, 100) + "..."
-    },
-    {
-      title: "AI Assistant",
-      href: "/docs/ai-powered-development-assistant",
-      icon: Brain,
-      description: docsData.sections.find(s => s.title === "AI-Powered Development Assistant")?.overview.substring(0, 100) + "..."
-    },
-    {
-      title: "Framework Support",
-      href: "/docs/framework-support",
-      icon: Layers,
-      description: docsData.sections.find(s => s.title === "Framework Support")?.overview.substring(0, 100) + "..."
-    },
-    {
-      title: "Security Guide",
-      href: "/docs/security-best-practices",
-      icon: Shield,
-      description: docsData.sections.find(s => s.title === "Security Best Practices")?.overview.substring(0, 100) + "..."
-    }
-  ] : []
+  const createSlug = (title: string) => {
+    return title.toLowerCase().replace(/[^\\w\\s-]/g, '').replace(/\\s+/g, '-').replace(/--+/g, '-')
+  }
 
   const colorClasses = {
     purple: "from-purple-500 to-pink-500",
@@ -174,211 +157,183 @@ export default function DocsPage() {
     gray: "from-gray-500 to-gray-600"
   }
 
-  return (
-    <div className="min-h-screen relative overflow-hidden bg-gray-950">
-      {/* Background */}
-      <div className="absolute inset-0 lovable-gradient" />
-      <div className="absolute inset-0 noise-texture" />
+  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className={`${isMobile ? '' : 'w-80 border-r border-gray-800'} h-full bg-gray-900/50`}>
+      <div className="p-4 border-b border-gray-800">
+        <h2 className="text-lg font-semibold text-white mb-4">Documentation</h2>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            type="text"
+            placeholder="Search docs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 bg-gray-800/50 border-gray-700 text-white placeholder-gray-400 text-sm"
+          />
+        </div>
+      </div>
 
-      <Navigation />
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-2">
+          {filteredSections.map((section, index) => {
+            const IconComponent = getIconForSection(section.title)
+            const color = getColorForSection(section.title)
+            const isSelected = selectedSection?.title === section.title
 
-      <main className="relative z-10">
-        {/* Hero Section */}
-        <section className="pt-32 pb-16 px-4">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-12">
-              <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
-                Documentation
-              </Badge>
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-                Everything you need to
-                <br />
-                <span className="bg-gradient-to-r from-purple-400 to-pink-400 text-transparent bg-clip-text">
-                  build amazing apps
-                </span>
-              </h1>
-              <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                Comprehensive guides, API references, and tutorials to help you get started and scale
-              </p>
-
-              {/* Search Bar */}
-              <div className="max-w-2xl mx-auto">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <Input
-                    type="text"
-                    placeholder="Search documentation..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-12 pr-4 py-6 bg-gray-800/50 border-gray-700 text-white placeholder-gray-400 text-lg"
-                  />
+            return (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedSection(section)
+                  if (isMobile) setSidebarOpen(false)
+                }}
+                className={`w-full text-left p-3 rounded-lg transition-all hover:bg-gray-800/50 ${
+                  isSelected ? 'bg-purple-600/20 border border-purple-500/30' : ''
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`p-1.5 rounded-md bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]} flex-shrink-0`}>
+                    <IconComponent className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-medium text-white truncate">
+                      {section.title}
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                      {section.overview}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs border-gray-600 text-gray-400 px-1.5 py-0.5">
+                        <Clock className="w-2.5 h-2.5 mr-1" />
+                        {getReadTime(section.content)}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
+              </button>
+            )
+          })}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+
+  const ContentArea = () => {
+    if (!selectedSection) {
+      return (
+        <div className="flex-1 p-8 flex items-center justify-center">
+          <div className="text-center">
+            <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Welcome to PiPilot Documentation</h3>
+            <p className="text-gray-400">Select a section from the sidebar to get started</p>
+          </div>
+        </div>
+      )
+    }
+
+    const IconComponent = getIconForSection(selectedSection.title)
+    const color = getColorForSection(selectedSection.title)
+    const slug = createSlug(selectedSection.title)
+
+    return (
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-8">
+            {/* Header */}
+            <div className="mb-8">
+              <div className="flex items-start gap-4 mb-4">
+                <div className={`p-3 rounded-lg bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]}`}>
+                  <IconComponent className="h-8 w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h1 className="text-3xl font-bold text-white mb-2">{selectedSection.title}</h1>
+                  <p className="text-lg text-gray-300 mb-4">{selectedSection.overview}</p>
+                  <div className="flex items-center gap-4">
+                    <Badge variant="outline" className="border-gray-600 text-gray-400">
+                      <Clock className="w-4 h-4 mr-1" />
+                      {getReadTime(selectedSection.content)} read
+                    </Badge>
+                    <Link href={`/docs/${slug}`}>
+                      <Button variant="outline" size="sm" className="border-gray-700 text-white hover:bg-gray-800">
+                        View Full Article
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Keywords */}
+              <div className="flex flex-wrap gap-2">
+                {selectedSection.search_keywords.map((keyword, index) => (
+                  <Badge key={index} variant="secondary" className="bg-gray-700/50 text-gray-300">
+                    {keyword}
+                  </Badge>
+                ))}
               </div>
             </div>
 
-            {/* Quick Links */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-              {quickLinks.map((link, index) => (
-                <Link key={index} href={link.href}>
-                  <Card className="bg-gray-800/50 border-gray-700 hover:border-purple-500/50 transition-all hover:scale-105 cursor-pointer h-full">
-                    <CardContent className="p-6 flex flex-col items-center text-center">
-                      <link.icon className="h-8 w-8 text-purple-400 mb-3" />
-                      <span className="text-white font-medium">{link.title}</span>
-                    </CardContent>
-                  </Card>
+            {/* Content */}
+            <div className="prose prose-lg prose-invert max-w-none">
+              <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                {selectedSection.content}
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="mt-12 pt-8 border-t border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800">
+                    Previous
+                  </Button>
+                  <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800">
+                    Next
+                  </Button>
+                </div>
+                <Link href={`/docs/${slug}`}>
+                  <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                    Read Full Article
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                 </Link>
-              ))}
+              </div>
             </div>
           </div>
-        </section>
+        </ScrollArea>
+      </div>
+    )
+  }
 
-        {/* Documentation Sections */}
-        <section className="py-16 px-4">
-          <div className="container mx-auto max-w-7xl">
-            <div className="grid gap-8">
-              {filteredSections.map((section, index) => {
-                const IconComponent = getIconForSection(section.title)
-                const color = getColorForSection(section.title)
-                const slug = section.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/--+/g, '-')
+  return (
+    <div className="min-h-screen bg-gray-950">
+      <Navigation />
 
-                return (
-                  <Card key={index} className="bg-gray-800/50 border-gray-700 hover:border-gray-600 transition-colors">
-                    <CardHeader className="pb-4">
-                      <div className="flex items-start gap-4">
-                        <div className={`p-3 rounded-lg bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]}`}>
-                          <IconComponent className="h-6 w-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <CardTitle className="text-white text-2xl mb-2">{section.title}</CardTitle>
-                          <CardDescription className="text-gray-400 text-base">
-                            {section.overview}
-                          </CardDescription>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Badge variant="outline" className="border-gray-600 text-gray-400">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {getReadTime(section.content)}
-                          </Badge>
-                          <div className="flex flex-wrap gap-1">
-                            {section.search_keywords.slice(0, 3).map((keyword, keywordIndex) => (
-                              <Badge key={keywordIndex} variant="secondary" className="text-xs bg-gray-700/50 text-gray-300">
-                                {keyword}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="text-sm text-gray-400">
-                            Learn about {section.title.toLowerCase()} features and capabilities
-                          </div>
-                        </div>
-                        <Link href={`/docs/${slug}`}>
-                          <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                            Read More
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        </section>
+      <div className="pt-16 h-screen flex">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <SidebarContent />
+        </div>
 
-        {/* Additional Resources */}
-        <section className="py-16 px-4 bg-gray-900/50">
-          <div className="container mx-auto max-w-6xl">
-            <h2 className="text-3xl font-bold text-white mb-8 text-center">Additional Resources</h2>
-            <div className="grid md:grid-cols-3 gap-6">
-              <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <Server className="h-8 w-8 text-blue-400 mb-4" />
-                  <CardTitle className="text-white">API Status</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Check the current status of our APIs and services
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Link href="https://status.pipilot.dev" target="_blank">
-                    <Button variant="outline" className="w-full border-gray-700 text-white hover:bg-gray-700">
-                      View Status
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
+        {/* Mobile Sidebar */}
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden fixed top-20 left-4 z-50 bg-gray-800/80 text-white hover:bg-gray-700"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-80 p-0 bg-gray-900 border-gray-800">
+            <SidebarContent isMobile />
+          </SheetContent>
+        </Sheet>
 
-              <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <Layers className="h-8 w-8 text-green-400 mb-4" />
-                  <CardTitle className="text-white">Community</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Join our Discord community for help and discussions
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Link href="/community">
-                    <Button variant="outline" className="w-full border-gray-700 text-white hover:bg-gray-700">
-                      Join Community
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <Shield className="h-8 w-8 text-purple-400 mb-4" />
-                  <CardTitle className="text-white">Enterprise Support</CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Get dedicated support for your production applications
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Link href="/enterprise">
-                    <Button variant="outline" className="w-full border-gray-700 text-white hover:bg-gray-700">
-                      Contact Sales
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-20 px-4">
-          <div className="container mx-auto max-w-4xl text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-              Ready to start building?
-            </h2>
-            <p className="text-xl text-gray-300 mb-8">
-              Get started for free and scale as you grow
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/signup">
-                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href="/docs/getting-started/quick-start">
-                <Button size="lg" variant="outline" className="border-gray-700 text-white hover:bg-gray-800">
-                  <BookOpen className="mr-2 h-5 w-5" />
-                  Quick Start Guide
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
-      </main>
+        {/* Content Area */}
+        <ContentArea />
+      </div>
 
       <Footer />
     </div>
