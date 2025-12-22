@@ -292,7 +292,7 @@ export function ModernSidebar({
             }`}
           >
             <Github size={18} />
-            {shouldExpand && <span className="ml-3 text-sm">Repo Agent</span>}
+            {shouldExpand && <span className="ml-3 text-sm">SWE Agent</span>}
           </button>
 
           {/* All Works Accordion */}
