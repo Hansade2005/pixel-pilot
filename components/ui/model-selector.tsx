@@ -82,6 +82,12 @@ export function ModelSelector({
     ];
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
     allowedModels = [
+      // Free models (pro users get access to everything)
+      'mistral/devstral-2',
+      'kwaipilot/kat-coder-pro-v1',
+      'mistral/devstral-small-2',
+      'meituan/longcat-flash-chat',
+      // Pro models
       'auto',
       'codestral-latest',
       'a0-dev-llm',
