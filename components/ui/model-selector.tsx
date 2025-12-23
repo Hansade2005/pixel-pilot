@@ -29,51 +29,31 @@ export function ModelSelector({
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
 
   // Set default selected model based on plan
-  const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-code-fast-1' : 'qwen3-coder-free'
+  const defaultSelectedModel: string = userPlan === 'pro' ? 'xai/grok-code-fast-1' : 'mistral/devstral-2'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   const currentModel = getModelById(effectiveSelectedModel)
 
   const displayNameMap = new Map<string, string>([
-    ['grok-code-fast-1', 'PiPilot 4.5 Pro'],
-    ['grok-3-mini', 'PiPilot 4 Flash'],
-    ['pipilot-pro', 'PiPilot Pro'],
-    ['pipilot-ultra', 'PiPilot Ultra'],
-    // PiPilot Local Models
-    ['pipilot-1-chat', 'PiPilot Chat 1.0'],
-    ['pipilot-1-code', 'PiPilot Code 1.0'],
-    ['pipilot-1-vision', 'PiPilot Vision 1.0'],
-    ['pipilot-1-chat-thinking', 'PiPilot Thinking 1.0'],
-    // OpenRouter Advanced Models
-    ['deepseek-v3.2-exp', 'PiPilot DeepSeek V3.2 Exp'],
-    ['grok-4-fast-reasoning', 'PiPilot Grok 4 Fast'],
-    ['qwen3-30b-thinking', 'PiPilot Qwen3 30B Think'],
-    ['qwen3-coder', 'PiPilot Qwen3 Coder'],
-    ['qwen3-coder-free', 'PiPilot Qwen3 Coder Free'],
-    ['qwen3-coder-30b-instruct', 'PiPilot Qwen3 Coder 30B'],
-    ['deepseek-r1t2-chimera-free', 'PiPilot DeepSeek Chimera Free'],
-    ['qwen3-next-80b-thinking', 'PiPilot Qwen3 80B Think'],
-    ['phi-4-multimodal', 'PiPilot Phi-4 Multimodal'],
-    ['deepseek-chat-v3.1', 'PiPilot DeepSeek V3.1'],
-    // New Grok 4.1 Models
-    ['grok-4-1-fast-non-reasoning', 'PiPilot Grok 4.1 Fast'],
-    ['grok-4-1-fast-reasoning', 'PiPilot Grok 4.1 Fast Reason'],
-    // Claude models
-    ['claude-sonnet-4.5', 'PiPilot Claude Sonnet 4.5'],
-    ['claude-sonnet-4', 'PiPilot Claude Sonnet 4'],
-    ['claude-haiku-4.5', 'PiPilot Claude Haiku 4.5'],
-    // MiniMax models
-    ['minimax-m2', 'PiPilot MiniMax M2'],
-    // ZenMux models
-    ['kuaishou/kat-coder-pro-v1', 'PiPilot Kat Coder Pro'],
-    // Volcengine models
-    ['volcengine/doubao-seed-code', 'PiPilot Doubao Seed Code'],
-    ['kwaipilot/kat-coder-pro:free', 'PiPilot Kwaipilot Kat Coder Pro Free'],
-    ['qwen/qwen-turbo', 'PiPilot Qwen Turbo'],
-    // New Vercel AI Gateway models
+    // Auto/Default Option
+    ['auto', 'PiPilot Auto'],
+    // Codestral Models
+    ['codestral-latest', 'PiPilot Codestral'],
+    // a0.dev Models
+    ['a0-dev-llm', 'PiPilot Pixela'],
+    // Mistral Models
+    ['pixtral-12b-2409', 'PiPilot Pixtral 12B'],
+    // Vercel AI Gateway Models
     ['mistral/devstral-2', 'PiPilot Mistral Devstral 2'],
     ['kwaipilot/kat-coder-pro-v1', 'PiPilot Kwaipilot Kat Coder Pro V1'],
+    ['xai/grok-code-fast-1', 'PiPilot xAI Grok Code Fast 1'],
+    ['nvidia/nemotron-nano-12b-v2-vl', 'PiPilot NVIDIA Nemotron Nano 12B'],
+    ['minimax/minimax-m2', 'PiPilot MiniMax M2'],
+    ['moonshotai/kimi-k2-thinking', 'PiPilot MoonshotAI Kimi K2 Thinking'],
     ['mistral/devstral-small-2', 'PiPilot Mistral Devstral Small 2'],
+    ['anthropic/claude-haiku-4.5', 'PiPilot Anthropic Claude Haiku 4.5'],
+    ['alibaba/qwen3-coder-plus', 'PiPilot Alibaba Qwen3 Coder Plus'],
+    ['anthropic/claude-sonnet-4.5', 'PiPilot Anthropic Claude Sonnet 4.5'],
     ['meituan/longcat-flash-chat', 'PiPilot Meituan LongCat Flash Chat'],
   ])
 
@@ -95,11 +75,6 @@ export function ModelSelector({
   let allowedModels: string[]
   if (userPlan === 'free') {
     allowedModels = [
-      'grok-3-mini',
-      // Free tier OpenRouter models
-      'qwen3-coder-free',
-      'deepseek-r1t2-chimera-free',
-      // Free tier Vercel AI Gateway models
       'mistral/devstral-2',
       'kwaipilot/kat-coder-pro-v1',
       'mistral/devstral-small-2',
@@ -107,42 +82,10 @@ export function ModelSelector({
     ];
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
     allowedModels = [
-      'grok-code-fast-1',
-      'grok-3-mini',
-      'pipilot-pro',
-      'pipilot-ultra',
-      // PiPilot Local Models
-      'pipilot-1-chat',
-      'pipilot-1-code',
-      'pipilot-1-vision',
-      'pipilot-1-chat-thinking',
-      // New Grok 4.1 Models
-      'grok-4-1-fast-non-reasoning',
-      'grok-4-1-fast-reasoning',
-      // OpenRouter Advanced Models
-      'deepseek-v3.2-exp',
-      'grok-4-fast-reasoning',
-      'qwen3-30b-thinking',
-      'qwen3-coder',
-      'qwen3-coder-free',
-      'qwen3-coder-30b-instruct',
-      'deepseek-r1t2-chimera-free',
-      'qwen3-next-80b-thinking',
-      'phi-4-multimodal',
-      'deepseek-chat-v3.1',
-      // Claude models
-      'claude-sonnet-4.5',
-      'claude-sonnet-4',
-      'claude-haiku-4.5',
-      // MiniMax models
-      'minimax-m2',
-      // ZenMux models
-      'kuaishou/kat-coder-pro-v1',
-      // Volcengine models
-      'volcengine/doubao-seed-code',
-      'kwaipilot/kat-coder-pro:free',
-      'qwen/qwen-turbo',
-      // Vercel AI Gateway models (Pro tier)
+      'auto',
+      'codestral-latest',
+      'a0-dev-llm',
+      'pixtral-12b-2409',
       'xai/grok-code-fast-1',
       'nvidia/nemotron-nano-12b-v2-vl',
       'minimax/minimax-m2',
