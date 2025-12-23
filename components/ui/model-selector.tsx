@@ -70,6 +70,11 @@ export function ModelSelector({
     ['volcengine/doubao-seed-code', 'PiPilot Doubao Seed Code'],
     ['kwaipilot/kat-coder-pro:free', 'PiPilot Kwaipilot Kat Coder Pro Free'],
     ['qwen/qwen-turbo', 'PiPilot Qwen Turbo'],
+    // New Vercel AI Gateway models
+    ['mistral/devstral-2', 'PiPilot Mistral Devstral 2'],
+    ['kwaipilot/kat-coder-pro-v1', 'PiPilot Kwaipilot Kat Coder Pro V1'],
+    ['mistral/devstral-small-2', 'PiPilot Mistral Devstral Small 2'],
+    ['meituan/longcat-flash-chat', 'PiPilot Meituan LongCat Flash Chat'],
   ])
 
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -93,7 +98,12 @@ export function ModelSelector({
       'grok-3-mini',
       // Free tier OpenRouter models
       'qwen3-coder-free',
-      'deepseek-r1t2-chimera-free'
+      'deepseek-r1t2-chimera-free',
+      // Free tier Vercel AI Gateway models
+      'mistral/devstral-2',
+      'kwaipilot/kat-coder-pro-v1',
+      'mistral/devstral-small-2',
+      'meituan/longcat-flash-chat'
     ];
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
     allowedModels = [
@@ -131,7 +141,15 @@ export function ModelSelector({
       // Volcengine models
       'volcengine/doubao-seed-code',
       'kwaipilot/kat-coder-pro:free',
-      'qwen/qwen-turbo'
+      'qwen/qwen-turbo',
+      // Vercel AI Gateway models (Pro tier)
+      'xai/grok-code-fast-1',
+      'nvidia/nemotron-nano-12b-v2-vl',
+      'minimax/minimax-m2',
+      'moonshotai/kimi-k2-thinking',
+      'anthropic/claude-haiku-4.5',
+      'alibaba/qwen3-coder-plus',
+      'anthropic/claude-sonnet-4.5'
     ];
   } else {
     // Fallback for pro inactive or other cases
