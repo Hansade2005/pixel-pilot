@@ -37,12 +37,6 @@ export function ModelSelector({
   const displayNameMap = new Map<string, string>([
     // Auto/Default Option
     ['auto', 'PiPilot Auto'],
-    // Codestral Models
-    ['codestral-latest', 'PiPilot Codestral'],
-    // a0.dev Models
-    ['a0-dev-llm', 'PiPilot Pixela'],
-    // Mistral Models
-    ['pixtral-12b-2409', 'PiPilot Pixtral 12B'],
     // Vercel AI Gateway Models
     ['mistral/devstral-2', 'PiPilot Mistral Devstral 2'],
     ['kwaipilot/kat-coder-pro-v1', 'PiPilot Kwaipilot Kat Coder Pro V1'],
@@ -89,9 +83,6 @@ export function ModelSelector({
       'meituan/longcat-flash-chat',
       // Pro models
       'auto',
-      'codestral-latest',
-      'a0-dev-llm',
-      'pixtral-12b-2409',
       'xai/grok-code-fast-1',
       'nvidia/nemotron-nano-12b-v2-vl',
       'minimax/minimax-m2',
