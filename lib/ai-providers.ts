@@ -1,7 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createMistral } from '@ai-sdk/mistral';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createGateway } from '@ai-sdk/gateway';
 
 // Custom a0.dev provider implementation (no API key required)
 function createA0Dev(options: { apiKey?: string } = {}) {
@@ -132,9 +131,10 @@ function createA0Dev(options: { apiKey?: string } = {}) {
 const a0devProvider = createA0Dev();
 
 // Create Vercel AI Gateway provider
-const vercelGateway = createGateway({
-  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
+const vercelGateway = createOpenAICompatible({
+  name: 'vercel-gateway',
   baseURL: 'https://ai-gateway.vercel.sh/v1/ai',
+  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
 });
 
 // Create the default Codestral client
