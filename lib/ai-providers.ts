@@ -133,7 +133,7 @@ const a0devProvider = createA0Dev();
 // Create Vercel AI Gateway provider
 const vercelGateway = createOpenAICompatible({
   name: 'vercel-gateway',
-  baseURL: 'https://ai-gateway.vercel.sh/v1/ai',
+  baseURL: 'https://ai-gateway.vercel.sh/v1',
   apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
 });
 
