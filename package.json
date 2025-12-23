@@ -14,6 +14,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.50",
     "@ai-sdk/cohere": "^2.0.5",
+    "@ai-sdk/gateway": "^3.0.0",
     "@ai-sdk/google": "^2.0.8",
     "@ai-sdk/groq": "^2.0.14",
     "@ai-sdk/mcp": "^0.0.8",
