@@ -3618,11 +3618,13 @@ Assistant:
     }
 
     // Stream the response
-    console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🤖 Starting streamText with ${messages.length} messages`)
+    // Limit to last 6 messages for performance, similar to chat-v2 route
+    const recentMessages = Array.isArray(messages) ? messages.slice(-6) : []
+    console.log(`[RepoAgent:${requestId.slice(0, 8)}] 🤖 Starting streamText with ${recentMessages.length} messages (limited from ${messages.length} total)`)
     const result = await streamText({
       model,
       system: systemPrompt,
-      messages,
+      messages: recentMessages,
       tools,
       stopWhen: stepCountIs(60),
       onFinish: async (result) => {

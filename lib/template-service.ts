@@ -397,6 +397,25 @@ export default {
       type: 'javascript',
       size: 0,
       isDirectory: false
+    },     
+    // Add vercel.json file 
+    {
+      name: 'vercel.json',
+      path: 'vercel.json',
+      content: `{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+} 
+`,
+      fileType: 'json',
+      type: 'json',
+      size: 0,
+      isDirectory: false
     },
     {
       name: 'index.html',
@@ -5497,8 +5516,8 @@ interface ThemeContextType {
 // Create context with undefined default value
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Theme provider component (logic only - no JSX)
-export function ThemeProviderLogic() {
+// Theme provider component
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Initialize theme state with localStorage or default to 'system'
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -5558,7 +5577,13 @@ export function ThemeProviderLogic() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
-  return { theme, setTheme, resolvedTheme };
+  const contextValue = { theme, setTheme, resolvedTheme };
+
+  return (
+    <ThemeContext.Provider value={contextValue}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 // Custom hook for using theme context
