@@ -284,7 +284,7 @@ export function ModernSidebar({
             {shouldExpand && <span className="ml-3 text-sm">Templates</span>}
           </button>
 
-          {/* Repo Agent */}
+          {/* SWE Agent */}
           <button
             onClick={() => router.push('/workspace?view=repo-agent')}
             className={`flex items-center w-full h-10 px-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors ${
@@ -292,7 +292,7 @@ export function ModernSidebar({
             }`}
           >
             <Github size={18} />
-            {shouldExpand && <span className="ml-3 text-sm">Repo Agent</span>}
+            {shouldExpand && <span className="ml-3 text-sm">SWE Agent</span>}
           </button>
 
           {/* All Works Accordion */}
