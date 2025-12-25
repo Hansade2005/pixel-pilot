@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      models: read
       contents: read
 
     steps:
@@ -19,16 +18,36 @@ jobs:
       - name: Run AI inference
         id: inference
         uses: actions/ai-inference@v1
+        continue-on-error: true
         with:
           prompt: |
             Summarize the following GitHub issue in one paragraph:
             Title: ${{ github.event.issue.title }}
             Body: ${{ github.event.issue.body }}
 
-      - name: Comment with AI summary
+      - name: Generate fallback summary
+        id: fallback
+        if: steps.inference.outcome == 'failure'
         run: |
-          gh issue comment $ISSUE_NUMBER --body '${{ steps.inference.outputs.response }}'
+          # Generate a simple fallback summary based on title
+          TITLE="${{ github.event.issue.title }}"
+          FALLBACK_SUMMARY="📋 **Issue Summary**: $TITLE
+
+          This issue was automatically opened and requires review. Please check the issue details for more information about the request or problem described in the title above."
+
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$FALLBACK_SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Comment with AI or fallback summary
+        run: |
+          if [ "${{ steps.inference.outcome }}" = "success" ]; then
+            SUMMARY="${{ steps.inference.outputs.response }}"
+          else
+            SUMMARY="${{ steps.fallback.outputs.summary }}"
+          fi
+
+          gh issue comment $ISSUE_NUMBER --body "$SUMMARY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          RESPONSE: ${{ steps.inference.outputs.response }}
