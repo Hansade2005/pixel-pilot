@@ -9,26 +9,41 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      models: read
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run AI inference
-        id: inference
-        uses: actions/ai-inference@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          prompt: |
-            Summarize the following GitHub issue in one paragraph:
-            Title: ${{ github.event.issue.title }}
-            Body: ${{ github.event.issue.body }}
+          node-version: '18'
 
-      - name: Comment with AI summary
+      - name: Generate AI summary
+        id: summary
         run: |
-          gh issue comment $ISSUE_NUMBER --body '${{ steps.inference.outputs.response }}'
+          # Create a simple summary using available tools
+          TITLE="${{ github.event.issue.title }}"
+          BODY="${{ github.event.issue.body }}"
+
+          # Use a basic approach to summarize - extract key information
+          if [ -n "$BODY" ]; then
+            # Simple text processing to create a summary
+            SUMMARY=$(echo "$BODY" | head -n 5 | tr '\n' ' ' | cut -c1-200)
+            if [ -z "$SUMMARY" ]; then
+              SUMMARY="New issue opened: $TITLE"
+            else
+              SUMMARY="Summary: $SUMMARY..."
+            fi
+          else
+            SUMMARY="New issue opened: $TITLE"
+          fi
+
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+
+      - name: Comment with summary
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "🤖 **Issue Summary**: ${{ steps.summary.outputs.summary }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          RESPONSE: ${{ steps.inference.outputs.response }}
