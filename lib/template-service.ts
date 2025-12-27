@@ -401,7 +401,7 @@ export default {
       type: 'javascript',
       size: 0,
       isDirectory: false
-    },     
+    },
     // Add vercel.json file 
     {
       name: 'vercel.json',
@@ -1512,26 +1512,19 @@ dist-ssr
       isDirectory: false
     },
     {
-      name: 'EXTERNAL_APP_INTEGRATION_GUIDE.md',
-      path: 'EXTERNAL_APP_INTEGRATION_GUIDE.md',
+      name: 'PIPILOT_DB_INTEGRATION_GUIDE.md',
+      path: 'PIPILOT_DB_INTEGRATION_GUIDE.md',
       content: `# 🚀 Quick Start: API Keys for External Apps
 
 ---
 
 ## 📋 **AUTOMATIC DATABASE SETUP - AI INSTRUCTIONS**
 
-**Great news!** You can now **automatically set up the entire database** using your agentic tools. No manual user setup required!
+**Great news!** You can now **automatically set up the entire pipilot database** using your agentic tools. No manual user setup required!
 
 ### 🤖 **Your Database Tools:**
 
-You have complete database management capabilities:
-- \`create_table\` - You generate optimized schemas from natural language descriptions
-- \`list_tables\` - You discover all existing tables
-- \`read_table\` - You inspect table structure and metadata
-- \`delete_table\` - You remove tables when needed
-- \`query_database\` - You perform advanced querying with MySQL-like syntax
-- \`manipulate_table_data\` - You handle full CRUD operations (insert, update, delete)
-- \`manage_api_keys\` - You generate secure API keys for external access
+You have complete PiPilot database management capabilities
 
 ### 💡 **When User Requests Database Setup:**
 
@@ -1547,9 +1540,9 @@ The user will ask you things like:
 **Your Response:**
 1. ✅ Use \`create_table\` to create tables with optimized schemas
 2. ✅ Set up relationships and constraints automatically
-3. ✅ Use \`manage_api_keys\` to generate API keys
+3. ✅ Use \`manage_api_keys\` to generate API keys  and writ it to env file
 4. ✅ Provide the user with database/table IDs
-5. ✅ Use \`manipulate_table_data\` to insert sample data if requested
+5. ✅ Insert sample data if requested
 
 ### 🔑 **What to Provide the User:**
 
@@ -12611,464 +12604,173 @@ Your external apps can now interact with your pipilot.dev databases! 🚀`,
 
     },
     {
-      name: 'USER_AUTHENTICATION_README.md',
-      path: 'USER_AUTHENTICATION_README.md',
-      content: `# Pipilot Authentication Setup Guide
+      name: 'PIPILOT_AUTH_SETUP.md',
+      path: 'PIPILOT_AUTH_SETUP.md',
+      content: `# Pipilot Authentication System — Usage Guide
 
-## Overview
-This guide provides a step-by-step walkthrough for implementing authentication in your Next.js or Vite/React projects using Pipilot's database and auth endpoints. Follow these exact steps to replicate the working auth setup.
+This document explains how to use the **Pipilot Auth API** for user authentication, based on the provided test script.
 
-**Framework Options:**
-- **Next.js**: Use API routes to proxy auth requests (recommended for security)
-- **Vite/React**: Make direct API calls to Pipilot (client-side implementation)
+---
 
 ## Prerequisites
-- Next.js project with App Router or Vite/React project
-- Pipilot account with database access
-- Valid API key from Pipilot
 
-## Step 1: Environment Setup
-1. Create a \`.env.local\` file in your project root (if it doesn't exist).
-2. Add your Pipilot API key to the file:
-   \`\`\`
-   PIPILOT_API_KEY=sk_live_your_api_key_here
-   \`\`\`
-3. Note your database ID (e.g., \`15\`).
+You need:
 
-## Step 2: Database Configuration
-Create or update \`src/lib/database.ts\` with the following exports:
+- **API Key** (server or trusted environment)
+- **Database ID**
+- HTTPS-capable HTTP client (\`fetch\`, Axios, etc.)
 
-\`\`\`typescript
-export const API_KEY = process.env.PIPILOT_API_KEY;
-export const DATABASE_ID = '15'; // Replace with your actual database ID
-\`\`\`
+const API_KEY = 'YOUR_API_KEY';
+const DATABASE_ID = 'YOUR_DATABASE_ID';
+All requests require this header:
 
-This file serves as the central configuration for your database connections.
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+Base URL
 
-## Next.js Implementation: Create Auth API Routes
-Create the following API route files in \`src/app/api/auth/\`. Each route proxies requests to Pipilot's auth endpoints.
+https://pipilot.dev/api/v1/databases/{DATABASE_ID}/auth
+1. User Signup
+Creates a new user account.
 
-**Skip this section if using Vite/React - proceed to Vite/React Implementation below.**
+Endpoint
 
-### Signup Route: \`src/app/api/auth/signup/route.ts\`
-\`\`\`typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { API_KEY, DATABASE_ID } from '@/lib/database';
+POST /signup
+Request Body
 
-export async function POST(request: NextRequest) {
-  try {
-    const { email, password, full_name } = await request.json();
+{
+  "email": "user@example.com",
+  "password": "StrongPassword123",
+  "full_name": "User Name"
+}
+Example
 
-    const response = await fetch(\`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/auth/signup\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        full_name
-      })
-    });
+await fetch(\`/auth/signup\`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ email, password, full_name })
+});
+Success Response
+User is created
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    return NextResponse.json({ error: 'Signup failed' }, { status: 500 });
+User profile is returned
+
+2. User Login
+Authenticates a user and returns access tokens.
+
+Endpoint
+
+POST /login
+Request Body
+
+{
+  "email": "user@example.com",
+  "password": "StrongPassword123"
+}
+Example
+
+await fetch(\`/auth/login\`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ email, password })
+});
+Success Response
+
+{
+  "user": { ... },
+  "tokens": {
+    "access_token": "jwt-access-token",
+    "refresh_token": "jwt-refresh-token"
   }
 }
-\`\`\`
+3. Verify Access Token
+Validates whether an access token is still valid.
 
-### Login Route: \`src/app/api/auth/login/route.ts\`
-\`\`\`typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { API_KEY, DATABASE_ID } from '@/lib/database';
+Endpoint
 
-export async function POST(request: NextRequest) {
-  try {
-    const { email, password } = await request.json();
+POST /verify
+Request Body
 
-    const response = await fetch(\`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/auth/login\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email,
-        password
-      })
-    });
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
-  }
+{
+  "token": "jwt-access-token"
 }
-\`\`\`
+Example
 
-### Verify Route: \`src/app/api/auth/verify/route.ts\`
-\`\`\`typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { API_KEY, DATABASE_ID } from '@/lib/database';
+await fetch(\`/auth/verify\`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ token })
+});
+Behavior
+✅ Valid token → user/session data returned
 
-export async function POST(request: NextRequest) {
-  try {
-    const { token } = await request.json();
+❌ Invalid/expired token → error response
 
-    const response = await fetch(\`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/auth/verify\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        token
-      })
-    });
+4. Refresh Access Token
+Generates a new access token using a refresh token.
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    return NextResponse.json({ error: 'Verification failed' }, { status: 500 });
-  }
+Endpoint
+
+POST /refresh
+Request Body
+
+{
+  "refresh_token": "jwt-refresh-token"
 }
-\`\`\`
+Example
 
-### Refresh Route: \`src/app/api/auth/refresh/route.ts\`
-\`\`\`typescript
-import { NextRequest, NextResponse } from 'next/server';
-import { API_KEY, DATABASE_ID } from '@/lib/database';
+await fetch(\`/auth/refresh\`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ refresh_token })
+});
+Success Response
 
-export async function POST(request: NextRequest) {
-  try {
-    const { refresh_token } = await request.json();
-
-    const response = await fetch(\`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/auth/refresh\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        refresh_token
-      })
-    });
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    return NextResponse.json({ error: 'Token refresh failed' }, { status: 500 });
-  }
+{
+  "access_token": "new-access-token",
+  "refresh_token": "new-refresh-token"
 }
-\`\`\`
+5. Invalid Token Handling
+Pipilot correctly rejects invalid tokens.
 
-## Vite/React Implementation: Direct API Calls
+Example
 
-**⚠️ Security Note:** This client-side approach exposes your API key in the browser. For production apps, consider using a backend proxy or serverless functions.
-
-For Vite/React projects, make direct API calls to Pipilot from your components. Update your \`src/lib/database.ts\`:
-
-\`\`\`typescript
-// For Vite, use VITE_ prefix to expose env vars to client
-export const API_KEY = import.meta.env.VITE_PIPILOT_API_KEY;
-export const DATABASE_ID = '15'; // Replace with your actual database ID
-\`\`\`
-
-And update your \`.env.local\`:
-\`\`\`
-VITE_PIPILOT_API_KEY=sk_live_your_api_key_here
-\`\`\`
-
-**Skip API routes creation - proceed to Step 4 below.**
-
-## Step 4: Frontend Integration
-Integrate authentication into your React components using an AuthContext. Create or update \`src/components/AuthContext.tsx\`:
-
-**For Vite/React:** Update the \`verifyToken\`, \`login\`, and \`signup\` functions to call Pipilot directly instead of \`/api/auth/\` endpoints. Replace with:
-\`\`\`typescript
-    const baseUrl = \`\${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth\`;
-
-const verifyToken = async (token: string) => {
-  try {
-    const response = await fetch(\`\${baseUrl}/verify\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ token })
-    });
-    // ... rest of the function
-  } catch (error) {
-    // ...
-  }
-};
-
-const login = async (email: string, password: string) => {
-  const response = await fetch(\`\${baseUrl}/login\`, {
-    method: 'POST',
-    headers: {
-      'Authorization': \`Bearer \${API_KEY}\`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email, password })
-  });
-  // ... rest of the function
-};
-
-const signup = async (email: string, password: string, fullName: string) => {
-  const response = await fetch(\`\${baseUrl}/signup\`, {
-    method: 'POST',
-    headers: {
-      'Authorization': \`Bearer \${API_KEY}\`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email, password, full_name: fullName })
-  });
-  // ... rest of the function
-};
-\`\`\`
-
-**For Next.js:** Use the code below as-is (calls your local API routes).
-
-\`\`\`typescript
-'use client';
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
-
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
+{
+  "token": "invalid.jwt.token"
 }
+Expected result:
 
-interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, fullName: string) => Promise<void>;
-  logout: () => void;
-  isLoading: boolean;
-}
+HTTP error response
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+Token is rejected
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+Typical Auth Flow
+Signup → create user
 
-  useEffect(() => {
-    // Check for existing token on app load
-    const token = localStorage.getItem('token');
-    if (token) {
-      verifyToken(token);
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
+Login → receive tokens
 
-  const verifyToken = async (token: string) => {
-    try {
-      const response = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
+Verify → validate access token on protected routes
 
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-      }
-    } catch (error) {
-      console.error('Token verification failed:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+Refresh → renew token when expired
 
-  const login = async (email: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
+Security Notes
+⚠️ Never expose API keys in frontend code
 
-    if (response.ok) {
-      const data = await response.json();
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('refreshToken', data.refresh_token);
-      setUser(data.user);
-    } else {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
-    }
-  };
+Store tokens securely (HTTP-only cookies recommended)
 
-  const signup = async (email: string, password: string, fullName: string) => {
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, full_name: fullName })
-    });
+Always verify tokens on protected endpoints
 
-    if (response.ok) {
-      const data = await response.json();
-      localStorage.setItem('token', data.access_token);
-      localStorage.setItem('refreshToken', data.refresh_token);
-      setUser(data.user);
-    } else {
-      const error = await response.json();
-      throw new Error(error.message || 'Signup failed');
-    }
-  };
+Summary
+The Pipilot Auth system provides:
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    setUser(null);
-  };
+Email/password authentication
 
-  return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isLoading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+JWT-based access & refresh tokens
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-\`\`\`
+Token verification and rotation
 
-**App Wrapping:**
-- **For Next.js:** Wrap your app with the AuthProvider in \`src/app/layout.tsx\`:
-  \`\`\`typescript
-  import { AuthProvider } from '@/components/AuthContext';
+Database-scoped authentication
 
-  export default function RootLayout({ children }: { children: React.ReactNode }) {
-    return (
-      <html lang="en">
-        <body>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </body>
-      </html>
-    );
-  }
-  \`\`\`
-
-- **For Vite/React:** Wrap your app in \`src/main.tsx\` or \`src/App.tsx\`:
-  \`\`\`typescript
-  import React from 'react';
-  import ReactDOM from 'react-dom/client';
-  import App from './App';
-  import { AuthProvider } from './components/AuthContext';
-
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </React.StrictMode>,
-  );
-  \`\`\`
-
-## Step 5: Testing the Setup
-Use this test script to verify your auth implementation works correctly:
-
-\`\`\`javascript
-// Test script for Pipilot authentication system
-async function testPipilotAuth() {
-  const API_KEY = 'your_api_key_here'; // From .env.local
-  const DATABASE_ID = '15'; // Your database ID
-
-  // Test credentials
-  let testEmail = '';
-  const testPassword = 'TestPass123';
-
-  try {
-    console.log('Testing Pipilot Authentication System...\n');
-
-    console.log('1. Testing user signup...');
-    // Test 1: User signup
-    testEmail = \`test\${Date.now()}@example.com\`;
-    const signupResponse = await fetch(\`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/auth/signup\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: testEmail,
-        password: testPassword,
-        full_name: 'Test User'
-      })
-    });
-
-    let signupData = null;
-    if (signupResponse.ok) {
-      signupData = await signupResponse.json();
-      console.log('✅ Signup successful:', JSON.stringify(signupData, null, 2));
-    } else {
-      const errorData = await signupResponse.json();
-      console.log(\`❌ Signup failed: \${signupResponse.status} \${signupResponse.statusText}\`, JSON.stringify(errorData, null, 2));
-      return; // Exit if signup fails
-    }
-
-    console.log('\n2. Testing user login...');
-    // Test 2: User login
-    const loginResponse = await fetch(\`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/auth/login\`, {
-      method: 'POST',
-      headers: {
-        'Authorization': \`Bearer \${API_KEY}\`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: testEmail,
-        password: testPassword
-      })
-    });
-
-    if (loginResponse.ok) {
-      const loginData = await loginResponse.json();
-      console.log('✅ Login successful:', JSON.stringify(loginData, null, 2));
-    } else {
-      const errorData = await loginResponse.json();
-      console.log(\`❌ Login failed: \${loginResponse.status} \${loginResponse.statusText}\`, JSON.stringify(errorData, null, 2));
-    }
-
-  } catch (error) {
-    console.error('❌ Test failed with error:', error);
-  }
-}
-
-// Run the test
-testPipilotAuth();
-\`\`\`
-
-## Troubleshooting
-- **"Invalid API key format"**: Ensure your API key starts with \`sk_live_\` and is correctly set in \`.env.local\`
-- **Environment variables not loading**: Restart your dev server after adding \`.env.local\`
-- **Database connection issues**: Verify your \`DATABASE_ID\` matches your Pipilot database
-- **Route errors**: Ensure all route files are created with the exact paths and code provided
-
-## Next Steps
-- Implement protected routes using the \`useAuth\` hook
-- Add token refresh logic for long-running sessions
-- Create user profile management features
-- Add logout functionality to your UI
-
-This setup provides a complete, production-ready authentication system for your Next.js or Vite/React projects using Pipilot's backend services.
+This makes it suitable for SaaS apps, AI platforms, and multi-tenant systems.
 **Built with ❤️ by the pipilot.dev team**`,
       fileType: 'markdown',
       type: 'markdown',
@@ -14038,7 +13740,7 @@ yarn-error.*
     try {
       console.log(`🎯 Applying Vite React template to workspace: ${workspaceId}`)
       console.log(`📁 Template files to create: ${this.VITE_REACT_TEMPLATE_FILES.length}`)
-      
+
       // Create all template files
       for (const templateFile of this.VITE_REACT_TEMPLATE_FILES) {
         console.log(`📝 Creating file: ${templateFile.path}`)
@@ -14054,12 +13756,12 @@ yarn-error.*
         })
         console.log(`✅ Created file: ${createdFile.name} with ID: ${createdFile.id}`)
       }
-      
+
       // Verify files were created
       const createdFiles = await storageManager.getFiles(workspaceId)
       console.log(`🔍 Verification: Found ${createdFiles.length} files in workspace ${workspaceId}`)
       console.log(`📋 Files:`, createdFiles.map(f => ({ name: f.name, path: f.path, size: f.size })))
-      
+
       console.log(`🎉 Vite React template applied successfully to workspace: ${workspaceId}`)
     } catch (error) {
       console.error(`❌ Error applying Vite React template to workspace ${workspaceId}:`, error)
@@ -14177,7 +13879,7 @@ yarn-error.*
       const finalFiles = await storageManager.getFiles(workspace.id)
       console.log(`🎯 Final verification: Workspace ${workspace.id} has ${finalFiles.length} files`)
 
-  // ...local storage only. No Supabase persistence...
+      // ...local storage only. No Supabase persistence...
 
       return workspace
     } catch (error) {
