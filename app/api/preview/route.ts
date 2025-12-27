@@ -26,8 +26,24 @@ const externalSupabase = createExternalClient(
 )
 
 // AI-powered domain availability checker and name generator
-export async function checkDomainAvailability(desiredSlug: string, externalSupabase: any): Promise<{ available: boolean, finalSlug: string }> {
+export async function checkDomainAvailability(desiredSlug: string, externalSupabase: any, projectId?: string, siteType: string = 'preview'): Promise<{ available: boolean, finalSlug: string, reused: boolean }> {
   try {
+    // First, check if this project already has an existing site record
+    if (projectId) {
+      const { data: existingProjectSite } = await externalSupabase
+        .from('sites')
+        .select('project_slug')
+        .eq('project_id', projectId)
+        .eq('site_type', siteType)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingProjectSite) {
+        console.log(`[Domain Check] Reusing existing slug "${existingProjectSite.project_slug}" for project ${projectId}`);
+        return { available: true, finalSlug: existingProjectSite.project_slug, reused: true };
+      }
+    }
+
     // Check if the desired slug is available
     const { data: existingSite } = await externalSupabase
       .from('sites')
@@ -38,7 +54,7 @@ export async function checkDomainAvailability(desiredSlug: string, externalSupab
 
     if (!existingSite) {
       // Domain is available
-      return { available: true, finalSlug: desiredSlug };
+      return { available: true, finalSlug: desiredSlug, reused: false };
     }
 
     // Domain not available, generate AI-powered unique name
@@ -90,13 +106,13 @@ OUTPUT: Only return the slug, nothing else.`
     }
 
     console.log(`[Domain Check] Generated unique slug: ${aiSlug}`);
-    return { available: false, finalSlug: aiSlug };
+    return { available: false, finalSlug: aiSlug, reused: false };
 
   } catch (error) {
     console.error('[Domain Check] Error:', error);
     // Fallback: add random suffix
     const fallbackSlug = `${desiredSlug}-${Math.random().toString(36).substring(2, 8)}`;
-    return { available: false, finalSlug: fallbackSlug };
+    return { available: false, finalSlug: fallbackSlug, reused: false };
   }
 }
 
@@ -699,12 +715,15 @@ async function handleStreamingPreview(req: Request) {
 
     // 🔍 Check domain availability and generate unique slug if needed
     console.log(`[Domain Check] Checking availability for: ${projectSlug}`)
-    const domainCheck = await checkDomainAvailability(projectSlug, externalSupabase)
+    const domainCheck = await checkDomainAvailability(projectSlug, externalSupabase, projectId, 'preview')
     const finalSlug = domainCheck.finalSlug
     const originalSlug = domainCheck.available ? null : projectSlug
+    const slugReused = domainCheck.reused
 
-    if (!domainCheck.available) {
+    if (!domainCheck.available && !slugReused) {
       console.log(`[Domain Check] "${projectSlug}" not available, using "${finalSlug}"`)
+    } else if (slugReused) {
+      console.log(`[Domain Check] Reusing existing slug "${finalSlug}" for project`)
     }
 
     console.log(`[Domain Check] Final slug: ${finalSlug}`)
@@ -1243,12 +1262,15 @@ async function handleRegularPreview(req: Request) {
 
     // 🔍 Check domain availability and generate unique slug if needed
     console.log(`[Domain Check] Checking availability for: ${projectSlug}`)
-    const domainCheck = await checkDomainAvailability(projectSlug, externalSupabase)
+    const domainCheck = await checkDomainAvailability(projectSlug, externalSupabase, projectId, 'preview')
     const finalSlug = domainCheck.finalSlug
     const originalSlug = domainCheck.available ? null : projectSlug
+    const slugReused = domainCheck.reused
 
-    if (!domainCheck.available) {
+    if (!domainCheck.available && !slugReused) {
       console.log(`[Domain Check] "${projectSlug}" not available, using "${finalSlug}"`)
+    } else if (slugReused) {
+      console.log(`[Domain Check] Reusing existing slug "${finalSlug}" for project`)
     }
 
     console.log(`[Domain Check] Final slug: ${finalSlug}`)
