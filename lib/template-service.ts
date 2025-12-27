@@ -134,6 +134,10 @@ export default defineConfig({
     // Set VITE_ENABLE_VISUAL_EDITOR=true to activate
     process.env.VITE_ENABLE_VISUAL_EDITOR === 'true' && visualEditorPlugin(),
   ].filter(Boolean),
+  define: {
+    // Make NODE_ENV available in the app for debugging system
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -469,12 +473,20 @@ export default {
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import { ThemeProvider } from './components/ThemeProvider'
+import { DebugBubble } from './components/DebugBubble'
+import { ErrorModal } from './components/ErrorModal'
 import './index.css'
+import { errorService } from './services/errorService'
+
+// Initialize error service
+window.__errorService = errorService
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <App />
+      <DebugBubble />
+      <ErrorModal />
     </ThemeProvider>
   </React.StrictMode>,
 )`,
@@ -6441,6 +6453,716 @@ export const ThemeToggle = () => {
       size: 0,
       isDirectory: false
     },
+    {
+      name: 'error.ts',
+      path: 'src/types/error.ts',
+      content: `export type ErrorType = 'error' | 'warn' | 'log' | 'info';
+export type ErrorSource = 'console' | 'window' | 'unhandledRejection';
+
+export interface CapturedError {
+  id: string;
+  type: ErrorType;
+  message: string;
+  stack?: string;
+  source: ErrorSource;
+  timestamp: number;
+  context: ErrorContext;
+  formattedForAI?: string;
+}
+
+export interface ErrorContext {
+  url: string;
+  userAgent: string;
+  customData?: Record<string, any>;
+}
+
+export interface ErrorStore {
+  errors: CapturedError[];
+  selectedErrorId?: string;
+  isOpen: boolean;
+}
+
+export interface ErrorStats {
+  total: number;
+  errors: number;
+  warnings: number;
+  logs: number;
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'errorService.ts',
+      path: 'src/services/errorService.ts',
+      content: `import { CapturedError, ErrorType, ErrorSource } from '../types/error';
+import { generateErrorId, generateFormattedError } from './errorFormatter';
+
+type ErrorListener = (error: CapturedError) => void;
+
+class ErrorService {
+  private errors: CapturedError[] = [];
+  private listeners: ErrorListener[] = [];
+  private maxErrors = 50;
+  private errorIds = new Set<string>();
+  constructor() {
+    this.setupGlobalErrorHandlers();
+    this.setupConsoleInterceptors();
+    this.setupUnhandledRejectionHandler();
+  }
+
+  private setupGlobalErrorHandlers() {
+    window.addEventListener('error', (event) => {
+      this.captureError(
+        event.error?.message || 'Unknown error',
+        event.error?.stack || '',
+        'error',
+        'window'
+      );
+    });
+  }
+
+  private setupConsoleInterceptors() {
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    console.log = (...args) => {
+      originalLog.apply(console, args);
+      this.captureConsoleMessage(args, 'log');
+    };
+
+    console.warn = (...args) => {
+      originalWarn.apply(console, args);
+      this.captureConsoleMessage(args, 'warn');
+    };
+
+    console.error = (...args) => {
+      originalError.apply(console, args);
+      this.captureConsoleMessage(args, 'error');
+    };
+  }
+
+  private setupUnhandledRejectionHandler() {
+    window.addEventListener('unhandledrejection', (event) => {
+      this.captureError(
+        event.reason?.message || String(event.reason),
+        event.reason?.stack || '',
+        'error',
+        'unhandledRejection'
+      );
+    });
+  }
+
+  private captureConsoleMessage(args: any[], type: ErrorType) {
+    const message = args
+      .map((arg) => {
+        if (typeof arg === 'object') {
+          try {
+            return JSON.stringify(arg);
+          } catch {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      })
+      .join(' ');
+
+    this.captureError(message, '', type, 'console');
+  }
+
+  public captureError(
+    message: string,
+    stack: string = '',
+    type: ErrorType = 'error',
+    source: ErrorSource = 'console'
+  ) {
+    if (!this.isDev) {
+      return;
+    }
+
+    const errorId = generateErrorId(message, stack);
+
+    // Deduplicate errors
+    if (this.errorIds.has(errorId)) {
+      return;
+    }
+
+    this.errorIds.add(errorId);
+
+    const error: CapturedError = {
+      id: errorId,
+      type,
+      message,
+      stack,
+      source,
+      timestamp: Date.now(),
+      context: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+      },
+      formattedForAI: generateFormattedError({
+        type,
+        message,
+        stack,
+        url: window.location.href,
+        timestamp: new Date().toLocaleString(),
+      }),
+    };
+
+    this.errors.push(error);
+
+    // Keep only last 50 errors
+    if (this.errors.length > this.maxErrors) {
+      const removed = this.errors.shift();
+      if (removed) {
+        this.errorIds.delete(removed.id);
+      }
+    }
+
+    // Notify all listeners
+    this.listeners.forEach((listener) => listener(error));
+  }
+
+  public subscribe(listener: ErrorListener): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  public getErrors(): CapturedError[] {
+    return [...this.errors];
+  }
+
+  public getErrorById(id: string): CapturedError | undefined {
+    return this.errors.find((e) => e.id === id);
+  }
+
+  public clearErrors() {
+    this.errors = [];
+    this.errorIds.clear();
+  }
+
+  public getErrorStats() {
+    return {
+      total: this.errors.length,
+      errors: this.errors.filter((e) => e.type === 'error').length,
+      warnings: this.errors.filter((e) => e.type === 'warn').length,
+      logs: this.errors.filter((e) => e.type === 'log').length,
+    };
+  }
+}
+
+export const errorService = new ErrorService();`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'errorFormatter.ts',
+      path: 'src/services/errorFormatter.ts',
+      content: `export interface ErrorFormatInput {
+  type: string;
+  message: string;
+  stack?: string;
+  url?: string;
+  timestamp?: string;
+}
+
+export function generateErrorId(message: string, stack: string): string {
+  const combined = message + (stack || '');
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return \`error-\${Math.abs(hash).toString(36)}\`;
+}
+
+export function generateFormattedError(input: ErrorFormatInput): string {
+  const separator = '═'.repeat(50);
+
+  let formatted = \`
+🐛 RUNTIME ERROR REPORT
+\${separator}
+
+Type: \${input.type.toUpperCase()}
+Message: \${input.message}
+\`;
+
+  if (input.stack) {
+    formatted += \`
+Stack Trace:
+\${input.stack
+  .split('\\n')
+  .slice(0, 5)
+  .map((line) => '  ' + line.trim())
+  .join('\\n')}
+\`;
+  }
+
+  if (input.url) {
+    formatted += \`
+URL: \${input.url}
+\`;
+  }
+
+  if (input.timestamp) {
+    formatted += \`
+Time: \${input.timestamp}
+\`;
+  }
+
+  formatted += \`
+\${separator}
+[Copy and paste this in ChatGPT for AI to fix]
+\`;
+
+  return formatted;
+}
+
+export function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  return new Promise((resolve, reject) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    try {
+      textarea.select();
+      document.execCommand('copy');
+      resolve();
+    } catch (error) {
+      reject(error);
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  });
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'errorStore.ts',
+      path: 'src/services/errorStore.ts',
+      content: `import { CapturedError, ErrorStore } from '../types/error';
+
+type StoreListener = (state: ErrorStore) => void;
+
+class ErrorStoreManager {
+  private store: ErrorStore = {
+    errors: [],
+    isOpen: false,
+  };
+  private listeners: StoreListener[] = [];
+
+  subscribe(listener: StoreListener): () => void {
+    this.listeners.push(listener);
+    listener(this.store);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((listener) => listener(this.store));
+  }
+
+  addError(error: CapturedError) {
+    this.store.errors.push(error);
+    if (this.store.errors.length > 50) {
+      this.store.errors.shift();
+    }
+    this.notify();
+  }
+
+  setSelectedError(id?: string) {
+    this.store.selectedErrorId = id;
+    this.notify();
+  }
+
+  toggleOpen() {
+    this.store.isOpen = !this.store.isOpen;
+    this.notify();
+  }
+
+  setOpen(isOpen: boolean) {
+    this.store.isOpen = isOpen;
+    this.notify();
+  }
+
+  clearErrors() {
+    this.store.errors = [];
+    this.store.selectedErrorId = undefined;
+    this.notify();
+  }
+
+  getState(): ErrorStore {
+    return this.store;
+  }
+}
+
+export const errorStore = new ErrorStoreManager();`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'useDebugger.ts',
+      path: 'src/hooks/useDebugger.ts',
+      content: `import { useState, useEffect } from 'react';
+import { CapturedError } from '../types/error';
+import { errorService } from '../services/errorService';
+import { errorStore } from '../services/errorStore';
+
+export function useDebugger() {
+  const [errors, setErrors] = useState<CapturedError[]>([]);
+  const [selectedErrorId, setSelectedErrorId] = useState<string | undefined>();
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubscribeErrors = errorService.subscribe((error) => {
+      setErrors((prev) => {
+        const updated = [...prev, error];
+        return updated.length > 50 ? updated.slice(-50) : updated;
+      });
+    });
+
+    const unsubscribeStore = errorStore.subscribe((state) => {
+      setErrors(state.errors);
+      setSelectedErrorId(state.selectedErrorId);
+      setIsOpen(state.isOpen);
+    });
+
+    setErrors(errorService.getErrors());
+
+    return () => {
+      unsubscribeErrors();
+      unsubscribeStore();
+    };
+  }, []);
+
+  const selectedError = errors.find((e) => e.id === selectedErrorId);
+
+  return {
+    errors,
+    selectedError,
+    selectedErrorId,
+    isOpen,
+    setSelectedErrorId: (id?: string) => errorStore.setSelectedError(id),
+    toggleOpen: () => errorStore.toggleOpen(),
+    setOpen: (open: boolean) => errorStore.setOpen(open),
+    clearErrors: () => {
+      errorService.clearErrors();
+      errorStore.clearErrors();
+    },
+    stats: errorService.getErrorStats(),
+  };
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'DebugBubble.tsx',
+      path: 'src/components/DebugBubble.tsx',
+      content: `import React from 'react';
+import { useDebugger } from '../hooks/useDebugger';
+
+export const DebugBubble = () => {
+  const { stats, toggleOpen, isOpen } = useDebugger();
+
+  if (stats.total === 0 && !isOpen) {
+    return null;
+  }
+
+  const hasErrors = stats.errors > 0;
+  const bgColor = hasErrors
+    ? 'bg-red-500 hover:bg-red-600'
+    : stats.warnings > 0
+      ? 'bg-yellow-500 hover:bg-yellow-600'
+      : 'bg-blue-500 hover:bg-blue-600';
+
+  return (
+    <button
+      onClick={toggleOpen}
+      className={\`fixed bottom-6 right-6 w-14 h-14 \${bgColor} text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-50 font-bold text-sm\`}
+      aria-label="Open debug panel"
+      title={\`Errors: \${stats.errors}, Warnings: \${stats.warnings}, Logs: \${stats.logs}\`}
+    >
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-lg">🐛</span>
+        <span className="text-xs">\${stats.total}</span>
+      </div>
+    </button>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ErrorDetails.tsx',
+      path: 'src/components/ErrorDetails.tsx',
+      content: `import React from 'react';
+import { CapturedError } from '../types/error';
+import { copyToClipboard } from '../services/errorFormatter';
+
+interface ErrorDetailsProps {
+  error: CapturedError | undefined;
+}
+
+export const ErrorDetails = ({ error }: ErrorDetailsProps) => {
+  const [copied, setCopied] = React.useState(false);
+
+  if (!error) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <p>Select an error to view details</p>
+      </div>
+    );
+  }
+
+  const handleCopy = async () => {
+    if (error.formattedForAI) {
+      try {
+        await copyToClipboard(error.formattedForAI);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
+  };
+
+  const typeColors: Record<string, string> = {
+    error: 'text-red-600 bg-red-50 dark:bg-red-900/20',
+    warn: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20',
+    log: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20',
+    info: 'text-green-600 bg-green-50 dark:bg-green-900/20',
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className={\`px-2 py-1 rounded text-sm font-semibold \${typeColors[error.type]}\`}>
+              {error.type.toUpperCase()}
+            </span>
+            <span className="text-gray-500 text-xs">
+              {new Date(error.timestamp).toLocaleTimeString()}
+            </span>
+          </div>
+          <h3 className="font-mono text-sm font-bold break-words">{error.message}</h3>
+        </div>
+
+        {error.stack && (
+          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded font-mono text-xs overflow-x-auto">
+            <p className="text-gray-600 dark:text-gray-400 mb-2">Stack Trace:</p>
+            <pre className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+              {error.stack}
+            </pre>
+          </div>
+        )}
+
+        <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs space-y-1">
+          <p className="text-gray-600 dark:text-gray-400 font-semibold mb-2">Context:</p>
+          <p className="text-gray-700 dark:text-gray-300 break-all">
+            <span className="text-gray-500">URL:</span> {error.context.url}
+          </p>
+          <p className="text-gray-700 dark:text-gray-300 break-all">
+            <span className="text-gray-500">Source:</span> {error.source}
+          </p>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+        <button
+          onClick={handleCopy}
+          className={\`w-full px-4 py-2 rounded font-semibold transition-colors \${
+            copied
+              ? 'bg-green-500 text-white'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }\`}
+        >
+          {copied ? '✓ Copied to Clipboard!' : 'Copy for AI'}
+        </button>
+      </div>
+    </div>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ErrorHistory.tsx',
+      path: 'src/components/ErrorHistory.tsx',
+      content: `import React from 'react';
+import { CapturedError } from '../types/error';
+
+interface ErrorHistoryProps {
+  errors: CapturedError[];
+  selectedId?: string;
+  onSelectError: (id: string) => void;
+}
+
+export const ErrorHistory = ({ errors, selectedId, onSelectError }: ErrorHistoryProps) => {
+  const typeIcons: Record<string, string> = {
+    error: '❌',
+    warn: '⚠️',
+    log: '📝',
+    info: 'ℹ️',
+  };
+
+  const typeColors: Record<string, string> = {
+    error: 'border-l-4 border-red-500',
+    warn: 'border-l-4 border-yellow-500',
+    log: 'border-l-4 border-blue-500',
+    info: 'border-l-4 border-green-500',
+  };
+
+  if (errors.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500 p-4 text-center">
+        <p>No errors captured yet. Errors will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-y-auto h-full">
+      {[...errors].reverse().map((error) => (
+        <button
+          key={error.id}
+          onClick={() => onSelectError(error.id)}
+          className={\`w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 transition-colors \${
+            selectedId === error.id ? 'bg-blue-100 dark:bg-blue-900/30' : ''
+          } \${typeColors[error.type]}\`}
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <span className="text-lg flex-shrink-0">{typeIcons[error.type]}</span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">
+                {error.message.substring(0, 50)}
+                {error.message.length > 50 ? '...' : ''}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {new Date(error.timestamp).toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ErrorModal.tsx',
+      path: 'src/components/ErrorModal.tsx',
+      content: `import React from 'react';
+import { useDebugger } from '../hooks/useDebugger';
+import { ErrorHistory } from './ErrorHistory';
+import { ErrorDetails } from './ErrorDetails';
+
+export const ErrorModal = () => {
+  const { errors, selectedError, selectedErrorId, isOpen, setSelectedErrorId, setOpen, clearErrors } = useDebugger();
+
+  if (!isOpen || errors.length === 0) {
+    return null;
+  }
+
+  React.useEffect(() => {
+    if (!selectedErrorId && errors.length > 0) {
+      setSelectedErrorId(errors[errors.length - 1].id);
+    }
+  }, [errors, selectedErrorId, setSelectedErrorId]);
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/50 dark:bg-black/70" onClick={() => setOpen(false)}>
+      <div
+        className="fixed bottom-0 right-0 h-[600px] w-full sm:w-[600px] bg-white dark:bg-gray-900 shadow-2xl rounded-t-lg sm:rounded-lg flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🐛</span>
+            <h2 className="font-bold text-gray-900 dark:text-white">Debug Panel</h2>
+            <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded">
+              {errors.length} error{errors.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearErrors}
+              className="px-3 py-1 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="px-2 py-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-1 min-h-0">
+          <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-hidden">
+            <ErrorHistory
+              errors={errors}
+              selectedId={selectedErrorId}
+              onSelectError={setSelectedErrorId}
+            />
+          </div>
+
+          <div className="flex-1 bg-white dark:bg-gray-900 overflow-hidden">
+            <ErrorDetails error={selectedError} />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400">
+          <p>Tip: Select an error and click "Copy for AI" to paste the full error report in ChatGPT</p>
+        </div>
+      </div>
+    </div>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: '.env.development',
+      path: '.env.development',
+      content: `# Development Environment Variables
+VITE_ENABLE_DEBUG=true
+NODE_ENV=development`,
+      fileType: 'plaintext',
+      type: 'plaintext',
+      size: 0,
+      isDirectory: false
+    },
   ]
 
   // Default Expo React Native + TypeScript template files
@@ -6923,12 +7645,21 @@ export default {
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
+import { DebugBubble } from '@/components/DebugBubble'
+import { ErrorModal } from '@/components/ErrorModal'
+import { ThemeProvider } from '@/components/ThemeProvider'
+import { errorService } from '@/services/errorService'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Next.js App',
   description: 'Generated by create next app',
+}
+
+// Initialize error service (development only)
+if (process.env.NODE_ENV === 'development') {
+  typeof globalThis !== 'undefined' && (globalThis as any).__errorService = errorService
 }
 
 export default function RootLayout({
@@ -6962,7 +7693,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=Audiowide&family=Oxanium:wght@300;400;500;600;700&family=Quantico:wght@400;700&family=Syncopate:wght@400;700&family=Teko:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Changa:wght@300;400;500;600;700&family=Michroma&display=swap" rel="stylesheet" />
       </head>
       <body className={inter.className}>
-        {children}
+        <ThemeProvider>
+          {children}
+          <DebugBubble />
+          <ErrorModal />
+        </ThemeProvider>
         {/* Visual Editor Client - enables visual editing when loaded in pipilot.dev iframe */}
         <Script src="/visual-editor-client.js" strategy="afterInteractive" />
       </body>
@@ -12362,7 +13097,734 @@ NEXT_PUBLIC_ENABLE_VISUAL_EDITOR=true
       size: 0,
       isDirectory: false
     },
-  ]
+    {
+      name: '.env.development',
+      path: '.env.development',
+      content: `# Development Environment Variables
+NEXT_PUBLIC_ENABLE_DEBUG=true
+NODE_ENV=development`,
+      fileType: 'plaintext',
+      type: 'plaintext',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'error.ts',
+      path: 'src/types/error.ts',
+      content: `export type ErrorType = 'error' | 'warn' | 'log' | 'info';
+export type ErrorSource = 'console' | 'window' | 'unhandledRejection';
+
+export interface CapturedError {
+  id: string;
+  type: ErrorType;
+  message: string;
+  stack?: string;
+  source: ErrorSource;
+  timestamp: number;
+  context: ErrorContext;
+  formattedForAI?: string;
+}
+
+export interface ErrorContext {
+  url: string;
+  userAgent: string;
+  customData?: Record<string, any>;
+}
+
+export interface ErrorStore {
+  errors: CapturedError[];
+  selectedErrorId?: string;
+  isOpen: boolean;
+}
+
+export interface ErrorStats {
+  total: number;
+  errors: number;
+  warnings: number;
+  logs: number;
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'errorService.ts',
+      path: 'src/services/errorService.ts',
+      content: `import { CapturedError, ErrorType, ErrorSource } from '../types/error';
+import { generateErrorId, generateFormattedError } from './errorFormatter';
+
+type ErrorListener = (error: CapturedError) => void;
+
+class ErrorService {
+  private errors: CapturedError[] = [];
+  private listeners: ErrorListener[] = [];
+  private maxErrors = 50;
+  private errorIds = new Set<string>();
+  private isDev = process.env.NODE_ENV === 'development';
+
+  constructor() {
+    if (!this.isDev || typeof window === 'undefined') {
+      return;
+    }
+
+    this.setupGlobalErrorHandlers();
+    this.setupConsoleInterceptors();
+    this.setupUnhandledRejectionHandler();
+  }
+
+  private setupGlobalErrorHandlers() {
+    window.addEventListener('error', (event) => {
+      this.captureError(
+        event.error?.message || 'Unknown error',
+        event.error?.stack || '',
+        'error',
+        'window'
+      );
+    });
+  }
+
+  private setupConsoleInterceptors() {
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    console.log = (...args) => {
+      originalLog.apply(console, args);
+      this.captureConsoleMessage(args, 'log');
+    };
+
+    console.warn = (...args) => {
+      originalWarn.apply(console, args);
+      this.captureConsoleMessage(args, 'warn');
+    };
+
+    console.error = (...args) => {
+      originalError.apply(console, args);
+      this.captureConsoleMessage(args, 'error');
+    };
+  }
+
+  private setupUnhandledRejectionHandler() {
+    window.addEventListener('unhandledrejection', (event) => {
+      this.captureError(
+        event.reason?.message || String(event.reason),
+        event.reason?.stack || '',
+        'error',
+        'unhandledRejection'
+      );
+    });
+  }
+
+  private captureConsoleMessage(args: any[], type: ErrorType) {
+    const message = args
+      .map((arg) => {
+        if (typeof arg === 'object') {
+          try {
+            return JSON.stringify(arg);
+          } catch {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      })
+      .join(' ');
+
+    this.captureError(message, '', type, 'console');
+  }
+
+  public captureError(
+    message: string,
+    stack: string = '',
+    type: ErrorType = 'error',
+    source: ErrorSource = 'console'
+  ) {
+    if (!this.isDev || typeof window === 'undefined') {
+      return;
+    }
+
+    const errorId = generateErrorId(message, stack);
+
+    if (this.errorIds.has(errorId)) {
+      return;
+    }
+
+    this.errorIds.add(errorId);
+
+    const error: CapturedError = {
+      id: errorId,
+      type,
+      message,
+      stack,
+      source,
+      timestamp: Date.now(),
+      context: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+      },
+      formattedForAI: generateFormattedError({
+        type,
+        message,
+        stack,
+        url: window.location.href,
+        timestamp: new Date().toLocaleString(),
+      }),
+    };
+
+    this.errors.push(error);
+
+    if (this.errors.length > this.maxErrors) {
+      const removed = this.errors.shift();
+      if (removed) {
+        this.errorIds.delete(removed.id);
+      }
+    }
+
+    this.listeners.forEach((listener) => listener(error));
+  }
+
+  public subscribe(listener: ErrorListener): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  public getErrors(): CapturedError[] {
+    return [...this.errors];
+  }
+
+  public getErrorById(id: string): CapturedError | undefined {
+    return this.errors.find((e) => e.id === id);
+  }
+
+  public clearErrors() {
+    this.errors = [];
+    this.errorIds.clear();
+  }
+
+  public getErrorStats() {
+    return {
+      total: this.errors.length,
+      errors: this.errors.filter((e) => e.type === 'error').length,
+      warnings: this.errors.filter((e) => e.type === 'warn').length,
+      logs: this.errors.filter((e) => e.type === 'log').length,
+    };
+  }
+}
+
+export const errorService = new ErrorService();`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'errorFormatter.ts',
+      path: 'src/services/errorFormatter.ts',
+      content: `export interface ErrorFormatInput {
+  type: string;
+  message: string;
+  stack?: string;
+  url?: string;
+  timestamp?: string;
+}
+
+export function generateErrorId(message: string, stack: string): string {
+  const combined = message + (stack || '');
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return \`error-\${Math.abs(hash).toString(36)}\`;
+}
+
+export function generateFormattedError(input: ErrorFormatInput): string {
+  const separator = '═'.repeat(50);
+
+  let formatted = \`
+🐛 RUNTIME ERROR REPORT
+\${separator}
+
+Type: \${input.type.toUpperCase()}
+Message: \${input.message}
+\`;
+
+  if (input.stack) {
+    formatted += \`
+Stack Trace:
+\${input.stack
+  .split('\\n')
+  .slice(0, 5)
+  .map((line) => '  ' + line.trim())
+  .join('\\n')}
+\`;
+  }
+
+  if (input.url) {
+    formatted += \`
+URL: \${input.url}
+\`;
+  }
+
+  if (input.timestamp) {
+    formatted += \`
+Time: \${input.timestamp}
+\`;
+  }
+
+  formatted += \`
+\${separator}
+[Copy and paste this in ChatGPT for AI to fix]
+\`;
+
+  return formatted;
+}
+
+export function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  return new Promise((resolve, reject) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    try {
+      textarea.select();
+      document.execCommand('copy');
+      resolve();
+    } catch (error) {
+      reject(error);
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  });
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'errorStore.ts',
+      path: 'src/services/errorStore.ts',
+      content: `import { CapturedError, ErrorStore } from '../types/error';
+
+type StoreListener = (state: ErrorStore) => void;
+
+class ErrorStoreManager {
+  private store: ErrorStore = {
+    errors: [],
+    isOpen: false,
+  };
+  private listeners: StoreListener[] = [];
+
+  subscribe(listener: StoreListener): () => void {
+    this.listeners.push(listener);
+    listener(this.store);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((listener) => listener(this.store));
+  }
+
+  addError(error: CapturedError) {
+    this.store.errors.push(error);
+    if (this.store.errors.length > 50) {
+      this.store.errors.shift();
+    }
+    this.notify();
+  }
+
+  setSelectedError(id?: string) {
+    this.store.selectedErrorId = id;
+    this.notify();
+  }
+
+  toggleOpen() {
+    this.store.isOpen = !this.store.isOpen;
+    this.notify();
+  }
+
+  setOpen(isOpen: boolean) {
+    this.store.isOpen = isOpen;
+    this.notify();
+  }
+
+  clearErrors() {
+    this.store.errors = [];
+    this.store.selectedErrorId = undefined;
+    this.notify();
+  }
+
+  getState(): ErrorStore {
+    return this.store;
+  }
+}
+
+export const errorStore = new ErrorStoreManager();`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'useDebugger.ts',
+      path: 'src/hooks/useDebugger.ts',
+      content: `'use client'
+
+import { useState, useEffect } from 'react';
+import { CapturedError } from '../types/error';
+import { errorService } from '../services/errorService';
+import { errorStore } from '../services/errorStore';
+
+export function useDebugger() {
+  const [errors, setErrors] = useState<CapturedError[]>([]);
+  const [selectedErrorId, setSelectedErrorId] = useState<string | undefined>();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    
+    const unsubscribeErrors = errorService.subscribe((error) => {
+      setErrors((prev) => {
+        const updated = [...prev, error];
+        return updated.length > 50 ? updated.slice(-50) : updated;
+      });
+    });
+
+    const unsubscribeStore = errorStore.subscribe((state) => {
+      setErrors(state.errors);
+      setSelectedErrorId(state.selectedErrorId);
+      setIsOpen(state.isOpen);
+    });
+
+    setErrors(errorService.getErrors());
+
+    return () => {
+      unsubscribeErrors();
+      unsubscribeStore();
+    };
+  }, []);
+
+  const selectedError = errors.find((e) => e.id === selectedErrorId);
+
+  return {
+    errors,
+    selectedError,
+    selectedErrorId,
+    isOpen,
+    isMounted,
+    setSelectedErrorId: (id?: string) => errorStore.setSelectedError(id),
+    toggleOpen: () => errorStore.toggleOpen(),
+    setOpen: (open: boolean) => errorStore.setOpen(open),
+    clearErrors: () => {
+      errorService.clearErrors();
+      errorStore.clearErrors();
+    },
+    stats: errorService.getErrorStats(),
+  };
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'DebugBubble.tsx',
+      path: 'src/components/DebugBubble.tsx',
+      content: `'use client'
+
+import React from 'react';
+import { useDebugger } from '../hooks/useDebugger';
+
+export const DebugBubble = () => {
+  const { stats, toggleOpen, isOpen, isMounted } = useDebugger();
+
+  if (!isMounted || (stats.total === 0 && !isOpen)) {
+    return null;
+  }
+
+  const hasErrors = stats.errors > 0;
+  const bgColor = hasErrors
+    ? 'bg-red-500 hover:bg-red-600'
+    : stats.warnings > 0
+      ? 'bg-yellow-500 hover:bg-yellow-600'
+      : 'bg-blue-500 hover:bg-blue-600';
+
+  return (
+    <button
+      onClick={toggleOpen}
+      className={\`fixed bottom-6 right-6 w-14 h-14 \${bgColor} text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-50 font-bold text-sm\`}
+      aria-label="Open debug panel"
+      title={\`Errors: \${stats.errors}, Warnings: \${stats.warnings}, Logs: \${stats.logs}\`}
+    >
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-lg">🐛</span>
+        <span className="text-xs">\${stats.total}</span>
+      </div>
+    </button>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ErrorDetails.tsx',
+      path: 'src/components/ErrorDetails.tsx',
+      content: `'use client'
+
+import React from 'react';
+import { CapturedError } from '../types/error';
+import { copyToClipboard } from '../services/errorFormatter';
+
+interface ErrorDetailsProps {
+  error: CapturedError | undefined;
+}
+
+export const ErrorDetails = ({ error }: ErrorDetailsProps) => {
+  const [copied, setCopied] = React.useState(false);
+
+  if (!error) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <p>Select an error to view details</p>
+      </div>
+    );
+  }
+
+  const handleCopy = async () => {
+    if (error.formattedForAI) {
+      try {
+        await copyToClipboard(error.formattedForAI);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
+  };
+
+  const typeColors: Record<string, string> = {
+    error: 'text-red-600 bg-red-50 dark:bg-red-900/20',
+    warn: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20',
+    log: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20',
+    info: 'text-green-600 bg-green-50 dark:bg-green-900/20',
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className={\`px-2 py-1 rounded text-sm font-semibold \${typeColors[error.type]}\`}>
+              {error.type.toUpperCase()}
+            </span>
+            <span className="text-gray-500 text-xs">
+              {new Date(error.timestamp).toLocaleTimeString()}
+            </span>
+          </div>
+          <h3 className="font-mono text-sm font-bold break-words">{error.message}</h3>
+        </div>
+
+        {error.stack && (
+          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded font-mono text-xs overflow-x-auto">
+            <p className="text-gray-600 dark:text-gray-400 mb-2">Stack Trace:</p>
+            <pre className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+              {error.stack}
+            </pre>
+          </div>
+        )}
+
+        <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs space-y-1">
+          <p className="text-gray-600 dark:text-gray-400 font-semibold mb-2">Context:</p>
+          <p className="text-gray-700 dark:text-gray-300 break-all">
+            <span className="text-gray-500">URL:</span> {error.context.url}
+          </p>
+          <p className="text-gray-700 dark:text-gray-300 break-all">
+            <span className="text-gray-500">Source:</span> {error.source}
+          </p>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+        <button
+          onClick={handleCopy}
+          className={\`w-full px-4 py-2 rounded font-semibold transition-colors \${
+            copied
+              ? 'bg-green-500 text-white'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }\`}
+        >
+          {copied ? '✓ Copied to Clipboard!' : 'Copy for AI'}
+        </button>
+      </div>
+    </div>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ErrorHistory.tsx',
+      path: 'src/components/ErrorHistory.tsx',
+      content: `'use client'
+
+import React from 'react';
+import { CapturedError } from '../types/error';
+
+interface ErrorHistoryProps {
+  errors: CapturedError[];
+  selectedId?: string;
+  onSelectError: (id: string) => void;
+}
+
+export const ErrorHistory = ({ errors, selectedId, onSelectError }: ErrorHistoryProps) => {
+  const typeIcons: Record<string, string> = {
+    error: '❌',
+    warn: '⚠️',
+    log: '📝',
+    info: 'ℹ️',
+  };
+
+  const typeColors: Record<string, string> = {
+    error: 'border-l-4 border-red-500',
+    warn: 'border-l-4 border-yellow-500',
+    log: 'border-l-4 border-blue-500',
+    info: 'border-l-4 border-green-500',
+  };
+
+  if (errors.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500 p-4 text-center">
+        <p>No errors captured yet. Errors will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-y-auto h-full">
+      {[...errors].reverse().map((error) => (
+        <button
+          key={error.id}
+          onClick={() => onSelectError(error.id)}
+          className={\`w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 transition-colors \${
+            selectedId === error.id ? 'bg-blue-100 dark:bg-blue-900/30' : ''
+          } \${typeColors[error.type]}\`}
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <span className="text-lg flex-shrink-0">{typeIcons[error.type]}</span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">
+                {error.message.substring(0, 50)}
+                {error.message.length > 50 ? '...' : ''}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {new Date(error.timestamp).toLocaleTimeString()}
+              </p>
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ErrorModal.tsx',
+      path: 'src/components/ErrorModal.tsx',
+      content: `'use client'
+
+import React from 'react';
+import { useDebugger } from '../hooks/useDebugger';
+import { ErrorHistory } from './ErrorHistory';
+import { ErrorDetails } from './ErrorDetails';
+
+export const ErrorModal = () => {
+  const { errors, selectedError, selectedErrorId, isOpen, setSelectedErrorId, setOpen, clearErrors, isMounted } = useDebugger();
+
+  if (!isMounted || !isOpen || errors.length === 0) {
+    return null;
+  }
+
+  React.useEffect(() => {
+    if (!selectedErrorId && errors.length > 0) {
+      setSelectedErrorId(errors[errors.length - 1].id);
+    }
+  }, [errors, selectedErrorId, setSelectedErrorId]);
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/50 dark:bg-black/70" onClick={() => setOpen(false)}>
+      <div
+        className="fixed bottom-0 right-0 h-[600px] w-full sm:w-[600px] bg-white dark:bg-gray-900 shadow-2xl rounded-t-lg sm:rounded-lg flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🐛</span>
+            <h2 className="font-bold text-gray-900 dark:text-white">Debug Panel</h2>
+            <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded">
+              {errors.length} error{errors.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearErrors}
+              className="px-3 py-1 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="px-2 py-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-1 min-h-0">
+          <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-hidden">
+            <ErrorHistory
+              errors={errors}
+              selectedId={selectedErrorId}
+              onSelectError={setSelectedErrorId}
+            />
+          </div>
+
+          <div className="flex-1 bg-white dark:bg-gray-900 overflow-hidden">
+            <ErrorDetails error={selectedError} />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400">
+          <p>Tip: Select an error and click "Copy for AI" to paste the full error report in ChatGPT</p>
+        </div>
+      </div>
+    </div>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+  ];
 
   private static readonly EXPO_TEMPLATE_FILES: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[] = [
     {
