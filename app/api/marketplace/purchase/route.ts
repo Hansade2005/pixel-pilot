@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           message: 'Template access granted',
-          payment_required: false,
+          access_granted: true,
         })
       }
 
