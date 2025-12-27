@@ -5516,8 +5516,8 @@ interface ThemeContextType {
 // Create context with undefined default value
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Theme provider component
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+// Theme provider component (logic only - no JSX)
+export function ThemeProviderLogic() {
   // Initialize theme state with localStorage or default to 'system'
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -5577,13 +5577,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
-  const contextValue = { theme, setTheme, resolvedTheme };
-
-  return (
-    <ThemeContext.Provider value={contextValue}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return { theme, setTheme, resolvedTheme };
 }
 
 // Custom hook for using theme context

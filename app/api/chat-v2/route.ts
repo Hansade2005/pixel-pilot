@@ -225,6 +225,59 @@ Always implement:
   • Responsive breakpoints
   • Animation/transition standards
   • Dark mode support if present in codebase
+For Vite React frameorks it comes with built-in useTheme hook that you can use to implement light and dark theme switching to the project 
+
+## \`useTheme\` Usage Guide
+
+This guide shows how \`useTheme\` is used inside the \`Navigation\` component.
+
+---
+
+### Import
+
+\`\`\`ts
+import { useTheme } from '../hooks/useTheme';
+\`\`\`
+
+---
+
+### Consume the Hook
+
+\`\`\`ts
+const { theme, setTheme } = useTheme();
+\`\`\`
+
+* \`theme\` → current theme \`light | dark | system\`)
+* \`setTheme\` → updates the global theme
+
+---
+
+### Toggle Theme Example
+
+\`\`\`tsx
+<button
+  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+  aria-label="Toggle theme"
+>
+  {theme === 'dark' ? '☀️' : '🌙'}
+</button>
+\`\`\`
+
+**What happens:**
+
+* Reads the current \`theme\`
+* Switches between \`light\` and \`dark\`
+* Updates the UI, \`<html>\` class, and localStorage automatically
+
+---
+
+### Summary
+
+\`useTheme\` allows components to:
+
+* Read the current theme
+* Toggle the theme globally
+* React instantly to theme changes in the UI
 
 ═══════════════════════════════════════════════════════════════
 STATE MANAGEMENT PATTERNS
@@ -2813,6 +2866,58 @@ Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engagi
 ## 🎨 Design Quality Requirements
 - **Build Checks**: For Vite projects, always use the check dev errors tool to run in build mode  after changes to verify compilation
 - **Color Combinations**: Use harmonious color palettes (avoid clashing colors like red/green for text)
+For Vite React frameorks it comes with built-in useTheme hook that you can use to implement light and dark theme switching to the project 
+
+## \`useTheme\` Usage Guide
+
+This guide shows how \`useTheme\` is used inside the \`Navigation\` component.
+
+---
+
+### Import
+
+\`\`\`ts
+import { useTheme } from '../hooks/useTheme';
+\`\`\`
+
+---
+
+### Consume the Hook
+
+\`\`\`ts
+const { theme, setTheme } = useTheme();
+\`\`\`
+
+* \`theme\` → current theme \`light | dark | system\`)
+* \`setTheme\` → updates the global theme
+
+---
+
+### Toggle Theme Example
+
+\`\`\`tsx
+<button
+  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+  aria-label="Toggle theme"
+>
+  {theme === 'dark' ? '☀️' : '🌙'}
+</button>
+\`\`\`
+
+**What happens:**
+
+* Reads the current \`theme\`
+* Switches between \`light\` and \`dark\`
+* Updates the UI, \`<html>\` class, and localStorage automatically
+
+---
+\`useTheme\` allows components to:
+
+* Read the current theme
+* Toggle the theme globally
+* React instantly to theme changes in the UI
+
+## 🏗️ Feature Development Standards
 - **Complete Implementation**: Deliver fully functional features, not just placeholders or partial implementations
 - **Performance**: Optimize images, lazy load components, minimize bundle size
 - **Accessibility**: Include proper ARIA labels, keyboard navigation, screen reader support
