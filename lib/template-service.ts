@@ -468,11 +468,14 @@ export default {
       content: `import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import { ThemeProvider } from './components/ThemeProvider'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </React.StrictMode>,
 )`,
       fileType: 'typescript',
@@ -483,18 +486,27 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     {
       name: 'App.tsx',
       path: 'src/App.tsx',
-      content: `function App() {
+      content: `import React from 'react';
+import { ThemeToggle } from './components/ThemeToggle';
+
+function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <header className="bg-card border border-border rounded-lg p-6 mb-6 shadow-sm">
-          <h1 className="text-4xl font-bold text-foreground mb-2">
-            Hello World, it's You 🌍
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Welcome to your enhanced React + Vite app. Let's build something amazing together!
-          </p>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-2">
+                Hello World, it's You 🌍
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Welcome to your enhanced React + Vite app. Let's build something amazing together!
+              </p>
+            </div>
+            {/* Theme Toggle */}
+            <ThemeToggle />
+          </div>
         </header>
 
         {/* Features Grid */}
@@ -6367,6 +6379,65 @@ This setup provides a complete, production-ready authentication system for your 
 **Built with ❤️ by the pipilot.dev team**`,
       fileType: 'markdown',
       type: 'markdown',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ThemeProvider.tsx',
+      path: 'src/components/ThemeProvider.tsx',
+      content: `import { useState, useEffect, useMemo } from 'react';
+import { ThemeContext, ThemeProviderLogic } from '../hooks/useTheme';
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { theme, setTheme, resolvedTheme } = ThemeProviderLogic();
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    theme,
+    setTheme,
+    resolvedTheme
+  }), [theme, setTheme, resolvedTheme]);
+
+  return (
+    <ThemeContext.Provider value={contextValue}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'ThemeToggle.tsx',
+      path: 'src/components/ThemeToggle.tsx',
+      content: `import React from 'react';
+import { useTheme } from '../hooks/useTheme';
+
+export const ThemeToggle = () => {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <button
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      aria-label="Toggle theme"
+    >
+      {theme === 'dark' ? (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      )}
+    </button>
+  );
+};`,
+      fileType: 'typescript',
+      type: 'typescript',
       size: 0,
       isDirectory: false
     },
