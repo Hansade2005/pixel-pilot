@@ -6638,7 +6638,7 @@ class ErrorService {
     this.errorIds.clear();
   }
 
-  public getErrorStats() {
+  public getStats() {
     return {
       total: this.errors.length,
       errors: this.errors.filter((e) => e.type === 'error').length,
@@ -6858,7 +6858,7 @@ export function useDebugger() {
       errorService.clearErrors();
       errorStore.clearErrors();
     },
-    stats: errorService.getErrorStats(),
+    stats: errorService.getStats(),
   };
 }`,
       fileType: 'typescript',
@@ -13005,7 +13005,7 @@ class ErrorService {
     this.errorIds.clear();
   }
 
-  public getErrorStats() {
+  public getStats() {
     return {
       total: this.errors.length,
       errors: this.errors.filter((e) => e.type === 'error').length,
@@ -13231,7 +13231,7 @@ export function useDebugger() {
       errorService.clearErrors();
       errorStore.clearErrors();
     },
-    stats: errorService.getErrorStats(),
+    stats: errorService.getStats(),
   };
 }`,
       fileType: 'typescript',
