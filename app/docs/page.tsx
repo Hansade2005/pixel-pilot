@@ -143,7 +143,23 @@ export default function DocsPage() {
     return `${minutes} min`
   }
 
-  const createSlug = (title: string) => {
+  const navigateToSection = (direction: 'prev' | 'next'): void => {
+    if (!docsData || !selectedSection) return
+
+    const currentIndex = docsData.sections.findIndex(section => section.title === selectedSection.title)
+    if (currentIndex === -1) return
+
+    let newIndex: number
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : docsData.sections.length - 1
+    } else {
+      newIndex = currentIndex < docsData.sections.length - 1 ? currentIndex + 1 : 0
+    }
+
+    setSelectedSection(docsData.sections[newIndex])
+  }
+
+  const createSlug = (title: string): string => {
     return title.toLowerCase().replace(/[^\\w\\s-]/g, '').replace(/\\s+/g, '-').replace(/--+/g, '-')
   }
 
@@ -339,10 +355,18 @@ export default function DocsPage() {
             <div className="mt-12 pt-8 border-t border-gray-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800">
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-700 text-white hover:bg-gray-800"
+                    onClick={() => navigateToSection('prev')}
+                  >
                     Previous
                   </Button>
-                  <Button variant="outline" className="border-gray-700 text-white hover:bg-gray-800">
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-700 text-white hover:bg-gray-800"
+                    onClick={() => navigateToSection('next')}
+                  >
                     Next
                   </Button>
                 </div>
