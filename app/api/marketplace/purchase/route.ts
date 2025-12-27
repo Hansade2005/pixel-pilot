@@ -181,10 +181,5 @@ async function grantTemplateAccess(
   if (purchaseError) throw purchaseError
 
   // Increment usage count
-  await supabase
-    .from('template_metadata')
-    .update({
-      total_downloads: supabase.raw('total_downloads + 1'),
-    })
-    .eq('template_id', templateId)
+  await supabase.rpc('increment_template_downloads', { template_id: templateId })
 }
