@@ -36,3 +36,4 @@ test-*.html
 gha-creds-*.json
 /lib/mcp
 /pipilotnpm/
+/pitchdeck/
