@@ -179,7 +179,7 @@ const Dashboard: React.FC = () => {
     { time: '5 min ago', action: 'Added note: "Quantum Computing Fundamentals"', type: 'note' },
     { time: '8 min ago', action: 'Generated insight: "Pattern recognition improves with data volume"', type: 'insight' },
     { time: '12 min ago', action: 'Searched for: "artificial intelligence ethics"', type: 'search' },
-    { time: '15 min ago', action: 'Updated mind map: "Technology Trends 2024"', type: 'mindmap' }
+    { time: '15 min ago', action: 'Updated mind map: "Technology Trends 2025"', type: 'mindmap' }
   ]
 
   const quickActions = [
@@ -319,7 +319,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onNoteSelect }) => {
       title: 'Machine Learning Fundamentals',
       category: 'technology',
       tags: ['AI', 'ML', 'Data Science'],
-      lastModified: '2024-01-15',
+      lastModified: '2025-01-15',
       content: 'Core concepts of machine learning algorithms...',
       connections: 12
     },
@@ -328,7 +328,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onNoteSelect }) => {
       title: 'Quantum Computing Overview',
       category: 'science',
       tags: ['Physics', 'Computing', 'Future Tech'],
-      lastModified: '2024-01-14',
+      lastModified: '2025-01-14',
       content: 'Introduction to quantum computing principles...',
       connections: 8
     },
@@ -337,7 +337,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onNoteSelect }) => {
       title: 'Startup Growth Strategies',
       category: 'business',
       tags: ['Entrepreneurship', 'Growth', 'Strategy'],
-      lastModified: '2024-01-13',
+      lastModified: '2025-01-13',
       content: 'Effective strategies for scaling startups...',
       connections: 15
     }
@@ -626,7 +626,7 @@ const SearchInterface: React.FC = () => {
       category: 'technology',
       tags: ['AI', 'ML', 'Data Science'],
       relevance: 95,
-      lastModified: '2024-01-15'
+      lastModified: '2025-01-15'
     },
     {
       id: 2,
@@ -635,7 +635,7 @@ const SearchInterface: React.FC = () => {
       category: 'technology',
       tags: ['AI', 'Neural Networks', 'Deep Learning'],
       relevance: 87,
-      lastModified: '2024-01-14'
+      lastModified: '2025-01-14'
     },
     {
       id: 3,
@@ -644,7 +644,7 @@ const SearchInterface: React.FC = () => {
       category: 'technology',
       tags: ['Data Science', 'Best Practices', 'Analytics'],
       relevance: 82,
-      lastModified: '2024-01-13'
+      lastModified: '2025-01-13'
     }
   ]
 

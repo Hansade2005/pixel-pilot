@@ -375,8 +375,8 @@ Response:
       "rate_limit_per_minute": 60,
       "rate_limit_per_day": 1000,
       "is_active": true,
-      "last_used_at": "2024-01-01T00:00:00Z",
-      "created_at": "2024-01-01T00:00:00Z"
+      "last_used_at": "2025-01-01T00:00:00Z",
+      "created_at": "2025-01-01T00:00:00Z"
     }
   ]
 }
@@ -575,8 +575,8 @@ console.log(`Remaining balance: $${wallet.balance}`);
 import { getUsageStats } from '@/lib/ai-api/billing-manager';
 
 const stats = await getUsageStats(userId, {
-  startDate: new Date('2024-01-01'),
-  endDate: new Date('2024-01-31'),
+  startDate: new Date('2025-01-01'),
+  endDate: new Date('2025-01-31'),
   model: 'pipilot-1-chat',
 });
 

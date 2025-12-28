@@ -59,7 +59,7 @@ A monthly newsletter template featuring:
 {{LOGO_URL}} - URL to PiPilot logo (e.g., https://your-domain.com/logo.svg)
 {{USER_NAME}} - Recipient's name
 {{USER_EMAIL}} - Recipient's email address
-{{CURRENT_YEAR}} - Current year (e.g., 2024)
+{{CURRENT_YEAR}} - Current year (e.g., 2025)
 {{WEBSITE_URL}} - Main website URL
 {{BLOG_URL}} - Blog URL
 {{SUPPORT_URL}} - Support page URL
@@ -114,7 +114,7 @@ A monthly newsletter template featuring:
 
 #### Newsletter Specific
 ```
-{{MONTH_YEAR}} - Current month and year (e.g., December 2024)
+{{MONTH_YEAR}} - Current month and year (e.g., December 2025)
 {{MONTHLY_THEME}} - Newsletter theme for the month
 {{THEME_DESCRIPTION}} - Description of the monthly theme
 {{NEWSLETTER_INTRO}} - Newsletter introduction

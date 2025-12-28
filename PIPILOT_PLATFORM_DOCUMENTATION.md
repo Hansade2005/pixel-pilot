@@ -4,7 +4,7 @@
 
 PiPilot is a revolutionary AI-powered app development platform that enables users to create web applications through natural language conversations. Built with Next.js, TypeScript, Tailwind CSS, and Supabase, PiPilot represents a complete ecosystem for modern web development, featuring advanced AI capabilities, proprietary database systems, deployment automation, and comprehensive tooling.
 
-**Development Timeline**: July 26, 2024 - December 2024 (6 months of intensive development)
+**Development Timeline**: July 26, 2025 - December 2025 (6 months of intensive development)
 
 ---
 
@@ -485,7 +485,7 @@ const products = await pipilot.fetchTableRecords<Product>('170');
 ## 📈 Impact & Achievements
 
 ### Development Metrics
-- **6 Months**: Intensive development from July 26 - December 2024
+- **6 Months**: Intensive development from July 26 - December 2025
 - **50+ AI Tools**: Comprehensive development automation
 - **Multi-Platform**: Web, mobile, and desktop support
 - **Enterprise Ready**: Production-grade architecture

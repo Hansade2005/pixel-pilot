@@ -44,7 +44,7 @@ Blog: https://pipilot.dev/blog
 Community: https://pipilot.dev/community
 Support: https://pipilot.dev/support
 
-© 2024 PiPilot. All rights reserved.
+© 2025 PiPilot. All rights reserved.
 Building the future of app development with AI
 hello@pipilot.dev
 

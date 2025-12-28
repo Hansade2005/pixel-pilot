@@ -401,4 +401,4 @@ Handles Stripe webhook events (internal endpoint).
 ---
 
 **Last Updated:** January 2025
-**Stripe API Version:** 2024-11-20.acacia
+**Stripe API Version:** 2025-11-20.acacia

@@ -132,7 +132,7 @@ export function Footer() {
           <a href="#" className="text-gray-300 hover:text-white">GitHub</a>
           <a href="#" className="text-gray-300 hover:text-white">LinkedIn</a>
         </div>
-        <p className="text-gray-400">&copy; 2024 AppName. All rights reserved.</p>
+        <p className="text-gray-400">&copy; 2025 AppName. All rights reserved.</p>
       </div>
     </footer>
   );
@@ -148,7 +148,7 @@ export function Footer() {
       <a href="#" style="color: rgb(209 213 219); text-decoration: none;">GitHub</a>
       <a href="#" style="color: rgb(209 213 219); text-decoration: none;">LinkedIn</a>
     </div>
-    <p style="color: rgb(156 163 175);">&copy; 2024 AppName. All rights reserved.</p>
+    <p style="color: rgb(156 163 175);">&copy; 2025 AppName. All rights reserved.</p>
   </div>
 </footer>`,
       message: "AI: Created Footer with social links and branding."
@@ -211,7 +211,7 @@ export default function App() {
         <a href="#" style="color: rgb(209 213 219); text-decoration: none;">GitHub</a>
         <a href="#" style="color: rgb(209 213 219); text-decoration: none;">LinkedIn</a>
       </div>
-      <p style="color: rgb(156 163 175);">&copy; 2024 AppName. All rights reserved.</p>
+      <p style="color: rgb(156 163 175);">&copy; 2025 AppName. All rights reserved.</p>
     </div>
   </footer>
 </div>`,

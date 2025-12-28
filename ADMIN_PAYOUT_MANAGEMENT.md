@@ -97,8 +97,8 @@ GET /api/admin/marketplace/payouts?status=pending&page=1&limit=20
       "creator_email": "creator@example.com",
       "amount": 250.00,
       "status": "pending",
-      "created_at": "2024-01-15T10:30:00Z",
-      "updated_at": "2024-01-15T10:30:00Z",
+      "created_at": "2025-01-15T10:30:00Z",
+      "updated_at": "2025-01-15T10:30:00Z",
       "completed_at": null,
       "stripe_transfer_id": null
     }
@@ -144,7 +144,7 @@ Content-Type: application/json
   "payout": {
     "id": "payout_uuid",
     "status": "processing",
-    "updated_at": "2024-01-15T11:00:00Z"
+    "updated_at": "2025-01-15T11:00:00Z"
   }
 }
 ```

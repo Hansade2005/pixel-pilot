@@ -55,7 +55,7 @@ export class TemplateManager {
         "@visx/visx": "^3.3.0",
         "socket.io-client": "^4.7.5",
       },
-      createdAt: new Date('2024-01-15')
+      createdAt: new Date('2025-01-15')
     },
     {
       id: 'characterforge-imagix',
@@ -67,7 +67,7 @@ export class TemplateManager {
       remixes: 7421,
       thumbnailUrl: 'https://api.a0.dev/assets/image?text=AI character creation platform, 3D character models, customization tools, fantasy art generator, character builder interface, magical effects&aspect=1:1&seed=456',
       files: characterForgeImagixFiles,
-      createdAt: new Date('2024-02-20')
+      createdAt: new Date('2025-02-20')
     },
     {
       id: 'forklift-navigator',
@@ -86,7 +86,7 @@ export class TemplateManager {
         "socket.io-client": "^4.7.5",
         "react-flow": "^11.10.1",
       },
-      createdAt: new Date('2024-03-10')
+      createdAt: new Date('2025-03-10')
     },
     {
       id: 'market-mosaic-online',
@@ -104,7 +104,7 @@ export class TemplateManager {
         "@visx/visx": "^3.3.0",
         "react-pdf": "^8.0.2",
       },
-      createdAt: new Date('2024-04-05')
+      createdAt: new Date('2025-04-05')
     },
     {
       id: 'psk-services',
@@ -239,7 +239,7 @@ export class TemplateManager {
         "spotify-web-api-js": "^1.5.2",
         "react-h5-audio-player": "^3.8.6"
       },
-      createdAt: new Date('2024-10-15')
+      createdAt: new Date('2025-10-15')
     }
   ]
 

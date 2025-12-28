@@ -598,7 +598,7 @@ const Footer: React.FC = () => {
 
         <div className="border-t border-white/10 mt-8 pt-8 text-center">
           <p className="text-gray-400">
-            © 2024 Landing Simulator Sorcery. All rights reserved. | Privacy Policy | Terms of Service
+            © 2025 Landing Simulator Sorcery. All rights reserved. | Privacy Policy | Terms of Service
           </p>
         </div>
       </div>

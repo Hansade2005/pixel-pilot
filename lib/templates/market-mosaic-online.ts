@@ -405,11 +405,11 @@ import { FileText, Download, Calendar, Filter } from 'lucide-react'
 
 const Reports: React.FC = () => {
   const reports = [
-    { name: 'Monthly Sales Report', type: 'Sales', date: '2024-01-01', size: '2.4 MB' },
-    { name: 'User Analytics Report', type: 'Analytics', date: '2024-01-01', size: '1.8 MB' },
-    { name: 'Financial Summary', type: 'Finance', date: '2024-01-01', size: '3.1 MB' },
-    { name: 'Customer Insights', type: 'Customers', date: '2024-01-01', size: '2.7 MB' },
-    { name: 'Performance Metrics', type: 'Performance', date: '2024-01-01', size: '1.5 MB' },
+    { name: 'Monthly Sales Report', type: 'Sales', date: '2025-01-01', size: '2.4 MB' },
+    { name: 'User Analytics Report', type: 'Analytics', date: '2025-01-01', size: '1.8 MB' },
+    { name: 'Financial Summary', type: 'Finance', date: '2025-01-01', size: '3.1 MB' },
+    { name: 'Customer Insights', type: 'Customers', date: '2025-01-01', size: '2.7 MB' },
+    { name: 'Performance Metrics', type: 'Performance', date: '2025-01-01', size: '1.5 MB' },
   ]
 
   return (

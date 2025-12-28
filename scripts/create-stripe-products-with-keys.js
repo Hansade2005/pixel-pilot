@@ -5,7 +5,7 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'sk_live_51S5AIW3G7U0M1
 
 // Initialize Stripe with user's key
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2025-12-18.acacia',
 })
 
 // Product definition for PiPilot Pro

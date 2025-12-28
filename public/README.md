@@ -901,7 +901,7 @@ const exact = pipilot.searchDocs('PiPilot', {
         query: "authentication",
         mode: "advanced",
         type: "all",
-        searchTimestamp: "2024-01-15T10:30:00.000Z",
+        searchTimestamp: "2025-01-15T10:30:00.000Z",
         contentLength: 1250,
         previewLength: 300
       }
@@ -1076,7 +1076,7 @@ async function removeApiKey(keyId) {
     id: "key_123456",
     name: "Mobile App Access",
     key: "pk_live_abcdef1234567890", // The actual API key to use
-    created_at: "2024-01-15T10:30:00.000Z"
+    created_at: "2025-01-15T10:30:00.000Z"
   },
   message: "API key \"Mobile App Access\" created successfully"
 }
@@ -1090,8 +1090,8 @@ async function removeApiKey(keyId) {
     {
       id: "key_123456",
       name: "Mobile App Access",
-      created_at: "2024-01-15T10:30:00.000Z",
-      last_used_at: "2024-01-15T12:45:00.000Z"
+      created_at: "2025-01-15T10:30:00.000Z",
+      last_used_at: "2025-01-15T12:45:00.000Z"
     }
   ],
   total: 1,

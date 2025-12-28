@@ -145,11 +145,11 @@ const Dashboard = () => {
   ]
 
   const recentTransactions = [
-    { id: 1, description: 'Grocery Shopping', amount: -85.50, date: '2024-01-15', category: 'Food' },
-    { id: 2, description: 'Salary Deposit', amount: 3500.00, date: '2024-01-15', category: 'Income' },
-    { id: 3, description: 'Netflix Subscription', amount: -15.99, date: '2024-01-14', category: 'Entertainment' },
-    { id: 4, description: 'Gas Station', amount: -45.20, date: '2024-01-14', category: 'Transportation' },
-    { id: 5, description: 'Coffee Shop', amount: -12.50, date: '2024-01-13', category: 'Food' }
+    { id: 1, description: 'Grocery Shopping', amount: -85.50, date: '2025-01-15', category: 'Food' },
+    { id: 2, description: 'Salary Deposit', amount: 3500.00, date: '2025-01-15', category: 'Income' },
+    { id: 3, description: 'Netflix Subscription', amount: -15.99, date: '2025-01-14', category: 'Entertainment' },
+    { id: 4, description: 'Gas Station', amount: -45.20, date: '2025-01-14', category: 'Transportation' },
+    { id: 5, description: 'Coffee Shop', amount: -12.50, date: '2025-01-13', category: 'Food' }
   ]
 
   return (
@@ -237,14 +237,14 @@ const Transactions = () => {
   const [selectedCategory, setSelectedCategory] = useState('All')
 
   const transactions = [
-    { id: 1, description: 'Grocery Shopping', amount: -85.50, date: '2024-01-15', category: 'Food', type: 'Expense' },
-    { id: 2, description: 'Salary Deposit', amount: 3500.00, date: '2024-01-15', category: 'Income', type: 'Income' },
-    { id: 3, description: 'Netflix Subscription', amount: -15.99, date: '2024-01-14', category: 'Entertainment', type: 'Expense' },
-    { id: 4, description: 'Gas Station', amount: -45.20, date: '2024-01-14', category: 'Transportation', type: 'Expense' },
-    { id: 5, description: 'Coffee Shop', amount: -12.50, date: '2024-01-13', category: 'Food', type: 'Expense' },
-    { id: 6, description: 'Freelance Payment', amount: 750.00, date: '2024-01-12', category: 'Income', type: 'Income' },
-    { id: 7, description: 'Electricity Bill', amount: -120.00, date: '2024-01-12', category: 'Utilities', type: 'Expense' },
-    { id: 8, description: 'Online Course', amount: -49.99, date: '2024-01-11', category: 'Education', type: 'Expense' }
+    { id: 1, description: 'Grocery Shopping', amount: -85.50, date: '2025-01-15', category: 'Food', type: 'Expense' },
+    { id: 2, description: 'Salary Deposit', amount: 3500.00, date: '2025-01-15', category: 'Income', type: 'Income' },
+    { id: 3, description: 'Netflix Subscription', amount: -15.99, date: '2025-01-14', category: 'Entertainment', type: 'Expense' },
+    { id: 4, description: 'Gas Station', amount: -45.20, date: '2025-01-14', category: 'Transportation', type: 'Expense' },
+    { id: 5, description: 'Coffee Shop', amount: -12.50, date: '2025-01-13', category: 'Food', type: 'Expense' },
+    { id: 6, description: 'Freelance Payment', amount: 750.00, date: '2025-01-12', category: 'Income', type: 'Income' },
+    { id: 7, description: 'Electricity Bill', amount: -120.00, date: '2025-01-12', category: 'Utilities', type: 'Expense' },
+    { id: 8, description: 'Online Course', amount: -49.99, date: '2025-01-11', category: 'Education', type: 'Expense' }
   ]
 
   const categories = ['All', 'Food', 'Transportation', 'Entertainment', 'Utilities', 'Education', 'Income']
@@ -489,7 +489,7 @@ const Goals = () => {
       name: 'Emergency Fund',
       target: 10000,
       current: 6500,
-      deadline: '2024-12-31',
+      deadline: '2025-12-31',
       category: 'Savings'
     },
     {
@@ -497,7 +497,7 @@ const Goals = () => {
       name: 'Vacation to Europe',
       target: 5000,
       current: 2800,
-      deadline: '2024-06-30',
+      deadline: '2025-06-30',
       category: 'Travel'
     },
     {
@@ -505,7 +505,7 @@ const Goals = () => {
       name: 'New Laptop',
       target: 2000,
       current: 1200,
-      deadline: '2024-08-15',
+      deadline: '2025-08-15',
       category: 'Electronics'
     },
     {
