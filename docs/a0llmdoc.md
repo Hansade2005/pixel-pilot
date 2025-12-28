@@ -1,365 +1,582 @@
-# a0.dev APIs — Reference & Integration Guide
+# 🚀 a0.dev LLM API Usage Guide
 
-This README documents the a0.dev APIs I know and practical guidance for using them in JavaScript/TypeScript projects — especially Expo React Native apps. It covers the LLM API, the Image Generation API, streaming patterns, fallback behavior, example helper functions, and integration tips (STT/TTS and Expo caveats).
+This comprehensive guide teaches you how to use the a0.dev Large Language Model (LLM) API effectively, including how to send messages, handle responses, and implement streaming for real-time interactions.
 
----
+## 📋 Table of Contents
 
-## Table of contents
+- [Quick Start](#quick-start)
+- [API Overview](#api-overview)
+- [Authentication](#authentication)
+- [Message Format](#message-format)
+- [Making API Calls](#making-api-calls)
+- [Response Structure](#response-structure)
+- [Streaming vs Non-Streaming](#streaming-vs-non-streaming)
+- [Error Handling](#error-handling)
+- [Best Practices](#best-practices)
+- [Complete Examples](#complete-examples)
+- [Troubleshooting](#troubleshooting)
 
-- Overview
-- Endpoints
-  - LLM API (POST /ai/llm)
-  - Image Generation API (GET /assets/image)
-- LLM: Request & Response shapes
-- LLM: Non-streaming usage examples
-- LLM: Streaming usage pattern + fallback
-- Example helper: callA0LLM (streaming + fallback)
-- Image Generation: usage examples
-- Integration tips for Expo / React Native
-  - Streaming support caveats
-  - STT & TTS integration patterns
-  - Permissions and native modules
-- Security & production recommendations
-- Troubleshooting & common errors
-- Example integration snippets
-- FAQ and notes
+## 🚀 Quick Start
 
----
+```javascript
+// Basic non-streaming call
+const messages = [
+  { role: 'system', content: 'You are a helpful assistant.' },
+  { role: 'user', content: 'Hello, how are you?' }
+];
 
-## Overview
-
-Two core a0.dev APIs covered here:
-
-1. LLM API — `POST https://api.a0.dev/ai/llm`
-   - Send conversation-style messages to the model and receive completions. Supports 
-streaming and non-streaming usage patterns.
-
-response format  API response always wraps the completion in JSON {"completion": "..."}
-2. Image Generation API — `GET https://api.a0.dev/assets/image`
-   - Generate images on demand given a text prompt and optional parameters.
-
-Note: This doc collects the API patterns I've used/seen and working integration patterns for React Native/Expo. Always check the official a0.dev docs for the latest fields and behavior.
-
----
-
-## Endpoints
-
-### LLM API
-
-- URL: `https://api.a0.dev/ai/llm`
-- Method: POST
-- Content-Type: `application/json`
-- Body: JSON (typically `{ messages: [...] }` plus extra options depending on need)
-- Auth: In many a0 setups, calls do not require an Authorization header. The examples below intentionally use only `Content-Type: application/json` unless you have a special server-side or proxied token requirement.
-
-Typical message shape (Chat-style):
-
-{
-  "role": "system" | "user" | "assistant",
-  "content": string
-}
-
-Example body payload:
-
-{
-  "messages": [
-    { "role": "system", "content": "You are a friendly assistant." },
-    { "role": "user", "content": "Hello, can you help me plan a dinner?" }
-  ],
-  "temperature": 0.3
-}
-
-Response (non-streaming typical shape):
-
-{
-  "completion": "Sure — here's a quick plan...",
-  "metadata": { /* optional */ }
-}
-
-> The exact response keys can vary; many clients will find `completion` or a top-level `message` field. Be prepared to inspect the returned JSON and adapt to small schema variations.
-
-
-### Image Generation API
-
-- URL: `GET https://api.a0.dev/assets/image`
-- Method: GET
-- Query parameters (commonly used):
-  - `text`: (required) prompt describing the image
-  - `aspect`: optional, e.g. `1:1`, `16:9`
-  - `seed`: optional
-
-Example GET URL:
-
-https://api.a0.dev/assets/image?text=portrait%20of%20a%20friendly%20robot&aspect=1:1
-
-Response:
-- Usually returns an image as binary (image/jpeg or image/png) or a JSON payload with an image URL depending on the deployment. If you get binary, request from the app as a blob and convert to a local URI for display.
-
----
-
-## LLM: Non-streaming usage examples
-
-Basic fetch example (non-streaming):
-
-```js
-const bodyPayload = { messages };
-const res = await fetch('https://api.a0.dev/ai/llm', {
+const response = await fetch('https://api.a0.dev/ai/llm', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(bodyPayload),
+  body: JSON.stringify({ messages })
 });
 
-if (!res.ok) {
-  const text = await res.text();
-  throw new Error(`LLM non-streaming call failed: ${res.status} ${text}`);
-}
-
-const json = await res.json();
-const completion = json.completion ?? json.message ?? JSON.stringify(json);
-return completion;
+const result = await response.json();
+console.log(result.completion); // "Hello! I'm doing well, thank you for asking..."
 ```
 
-This is the most compatible approach for runtimes without fetch-stream support (many RN runtimes).
+## 📖 API Overview
 
----
+The a0.dev LLM API provides access to powerful language models through a simple REST interface. Key features:
 
-## LLM: Streaming usage pattern + fallback
+- **Endpoint**: `POST https://api.a0.dev/ai/llm`
+- **Content-Type**: `application/json`
+- **No Authentication Required** (for most setups)
+- **Supports Streaming** for real-time responses
+- **Chat-style conversations** using role-based messages
 
-A common and powerful pattern is to attempt streaming first (so you can display partial tokens and speak incrementally), and if streaming fails (no stream support or non-200 response), fallback to a full non-streaming call.
+## 🔐 Authentication
 
-Pseudocode pattern:
+Unlike many APIs, the a0.dev LLM API typically doesn't require authentication headers. Simply include the `Content-Type: application/json` header:
 
-1. POST JSON to `https://api.a0.dev/ai/llm` with Content-Type header.
-2. If response is streaming (resp.body.getReader available), read chunks with a TextDecoder and call an `onToken` callback for each token or line.
-3. If an exception occurs, or streaming is not supported, call the non-streaming path and return the full completion.
+```javascript
+const headers = {
+  'Content-Type': 'application/json'
+  // No Authorization header needed!
+};
+```
 
-Important: some RN environments (Expo-managed) may not support fetch streaming. When streaming isn't available, use the non-streaming fallback.
 
-Streaming example (browser / runtimes with streaming support):
 
-```js
-async function tryStreaming(messages, { onToken }) {
-  const bodyPayload = { messages };
-  const res = await fetch('https://api.a0.dev/ai/llm', {
+## 💬 Message Format
+
+Messages use a chat-style format with three roles:
+
+```javascript
+interface Message {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+```
+
+### Message Roles
+
+- **`system`**: Sets the AI's behavior and personality
+- **`user`**: Represents human input/questions
+- **`assistant`**: Contains previous AI responses (for conversation continuity)
+
+### Example Messages Array
+
+```javascript
+const messages = [
+  {
+    role: 'system',
+    content: 'You are a friendly coding assistant who explains concepts clearly.'
+  },
+  {
+    role: 'user',
+    content: 'How do I create a React component?'
+  },
+  {
+    role: 'assistant',
+    content: 'To create a React component, you can use either a function or class component...'
+  },
+  {
+    role: 'user',
+    content: 'Can you show me an example?'
+  }
+];
+```
+
+## 📤 Making API Calls
+
+### Basic Request Structure
+
+```javascript
+const requestBody = {
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Explain JavaScript closures.' }
+  ],
+  temperature: 0.7,     // Optional: Controls randomness (0.0-1.0)
+  max_tokens: 1000      // Optional: Maximum response length
+};
+```
+
+### Complete API Call
+
+```javascript
+async function callLLM(messages, options = {}) {
+  const { temperature = 0.7, maxTokens } = options;
+
+  const body = {
+    messages,
+    temperature,
+    ...(maxTokens && { max_tokens: maxTokens })
+  };
+
+  const response = await fetch('https://api.a0.dev/ai/llm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(bodyPayload),
+    body: JSON.stringify(body)
   });
 
-  if (!res.ok || !res.body) {
-    // fallback to non-streaming
-    return nonStreamingCall(messages);
+  if (!response.ok) {
+    throw new Error(`API call failed: ${response.status}`);
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let done = false;
-  let accumulated = '';
-
-  while (!done) {
-    const { value, done: chunkDone } = await reader.read();
-    done = chunkDone;
-    if (value) {
-      const chunkText = decoder.decode(value, { stream: true });
-      // parser: break by newline or data: lines
-      onToken(chunkText);
-      accumulated += chunkText;
-    }
-  }
-
-  // Optionally return the canonical full completion by parsing accumulated or
-  // calling the non-streaming endpoint again.
-  return accumulated;
+  return await response.json();
 }
 ```
 
-Fallback (non-streaming) should be implemented exactly as the non-streaming example above.
+## 📥 Response Structure
 
----
+**All responses are wrapped in JSON with the completion in a `completion` field:**
 
-## Example helper: callA0LLM (pattern used in this project)
-
-A robust helper function should:
-- Accept `messages` and optional `stream` and `onToken` callbacks.
-- Attempt streaming if requested and runtime supports it.
-- If streaming fails or is unavailable, call the non-streaming endpoint and return the full text.
-- Always use `Content-Type: application/json` and, per the environment you told me about, do not send Authorization header unless specifically required by your deployment.
-
-Example pseudo-implementation summary (JS/TS):
-
-1. Build `bodyPayload` from `messages` and extras.
-2. If opts.stream:
-   - POST to endpoint
-   - if res.body && res.ok, read chunks and call opts.onToken for each token
-   - if any failure: call nonStreamingCall(messages, extras)
-3. Otherwise call nonStreamingCall(messages, extras)
-
-Non-streaming call implementation is the basic `fetch` example above and returns `json.completion` or the fallback.
-
----
-
-## Image Generation: usage examples
-
-Simple fetch to retrieve an image URL or data:
-
-```js
-// If API returns JSON with image URL
-const url = `https://api.a0.dev/assets/image?text=${encodeURIComponent(prompt)}&aspect=1:1`;
-const res = await fetch(url);
-if (!res.ok) throw new Error('Image generation failed');
-// If JSON with url
-// const json = await res.json();
-// const imageUrl = json.url;
-
-// If binary image
-const blob = await res.blob();
-// Convert to local URL for React Native Image component
-const localUri = URL.createObjectURL(blob);
-```
-
-In Expo: fetching binary images directly into an Image component can be handled by passing the remote URL to <Image source={{ uri: url }} /> when a URL is supplied by the endpoint.
-
----
-
-## Integration tips for Expo / React Native
-
-1. Streaming caveats
-   - Many React Native runtimes historically lacked `Response.body.getReader()`/streaming support. If you're in an environment without streaming, your streaming attempt will fail — implement a non-streaming fallback.
-   - In Expo-managed apps, streaming support may depend on the underlying JS engine (Hermes) and SDK version. Test streaming on your target runtime.
-
-2. STT & TTS (voice assistant patterns)
-   - STT (Speech-to-Text):
-     - On web: use the Web Speech API (SpeechRecognition / webkitSpeechRecognition) for continuous interim results.
-     - On native: `@react-native-voice/voice` is a common choice for realtime transcription. This package may require native prebuild/dev client with Expo.
-   - TTS (Text-to-Speech):
-     - `expo-speech` is an easy cross-platform choice in Expo-managed apps.
-   - Turn-taking pattern:
-     - While assistant is speaking, stop or pause STT to avoid self-capture.
-     - Resume listening after speech finishes.
-     - If you stream tokens, buffer them into chunks and trigger TTS for chunks when you detect sentence boundaries or natural pauses.
-
-3. Microphone permissions
-   - Request microphone permissions on mount:
-     - `Permissions` / `Audio.requestPermissionsAsync()` depending on SDK.
-     - Always show clear UX if access is denied and provide a fallback input box.
-
-4. Network & latency
-   - For best UX, stream tokens and start incremental TTS as soon as you have meaningful token chunks (punctuation or end-of-phrase heuristics help).
-   - If you can't stream, ensure the assistant provides a short greeting immediately (non-streaming call) before entering listen mode.
-
----
-
-## Security & production recommendations
-
-- Even if the a0.dev endpoint does not require an Authorization header in your setup, consider whether you want clients calling the API directly or via your backend.
-  - Pros of client direct: low latency, simpler architecture.
-  - Cons: you must trust the endpoint is safe to expose; if any keys or billing controls are needed in the future, you may need to switch to a proxy.
-- Rate limiting: use server-side controls or local client backoff to avoid hitting service limits.
-- Sensitive data: avoid sending PII in logs or telemetry. If you store conversation history, encrypt at rest or use platform-provided secure storage.
-
----
-
-## Troubleshooting & common errors
-
-- `fetch` streaming not supported (in RN): fallback to non-streaming call.
-- Unexpected response shape: inspect `await res.text()` to see raw response — some deployments return different keys.
-- Long pauses or truncated streaming: check runtime streaming support and network proxy behavior (some proxies buffer responses and break streaming).
-
----
-
-## Example integration snippets
-
-1) Incremental TTS buffer strategy (pseudo):
-
-```js
-let buffer = '';
-function onToken(token) {
-  buffer += token;
-  // speak when buffer ends with sentence punctuation or is long
-  if (/[.!?]\s*$/.test(buffer) || buffer.length > 200) {
-    speak(buffer); // use expo-speech
-    buffer = '';
-  }
+```json
+{
+  "completion": "The actual AI response text goes here..."
 }
 ```
 
-2) callA0LLM wrapper (simplified):
+### Response Format Details
 
-```js
-async function nonStreamingCall(messages) {
-  const bodyPayload = { messages };
-  const res = await fetch('https://api.a0.dev/ai/llm', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(bodyPayload),
-  });
-  if (!res.ok) throw new Error('LLM non-streaming failed');
-  const json = await res.json();
-  return json.completion ?? json.message ?? '';
+```javascript
+// Example API response
+{
+  "completion": "JavaScript closures are functions that have access to variables from their outer scope..."
 }
 
-async function callA0LLM(messages, { stream = false, onToken } = {}) {
-  if (!stream) return nonStreamingCall(messages);
+// Sometimes you might see:
+{
+  "message": "Alternative response format..."
+}
 
+// Handle both formats safely:
+const response = await callLLM(messages);
+const completion = response.completion ?? response.message ?? '';
+```
+
+### Extracting the Completion
+
+```javascript
+// Always use safe extraction
+const json = await response.json();
+const completion = json.completion ?? json.message ?? 'No response';
+
+// Or for more robust handling:
+function extractCompletion(response) {
+  if (typeof response === 'string') return response;
+  if (response.completion) return response.completion;
+  if (response.message) return response.message;
+  return JSON.stringify(response); // Fallback
+}
+```
+
+## 🌊 Streaming vs Non-Streaming
+
+### Non-Streaming (Default)
+
+```javascript
+// Simple, returns full response at once
+const response = await fetch('https://api.a0.dev/ai/llm', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ messages })
+});
+
+const result = await response.json();
+console.log(result.completion);
+```
+
+### Streaming (Real-time)
+
+```javascript
+// Process response as it arrives
+const response = await fetch('https://api.a0.dev/ai/llm', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ messages })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  const chunk = decoder.decode(value, { stream: true });
+
+  // Parse JSON and extract completion
   try {
-    const bodyPayload = { messages };
-    const res = await fetch('https://api.a0.dev/ai/llm', {
+    const chunkData = JSON.parse(chunk);
+    const token = chunkData.completion ?? chunkData.message ?? chunk;
+
+    // Process token (display, speak, etc.)
+    processToken(token);
+  } catch (error) {
+    // Handle parsing errors
+    console.warn('Failed to parse chunk:', chunk);
+  }
+}
+```
+
+## 🚨 Error Handling
+
+### Network and API Errors
+
+```javascript
+async function safeLLMCall(messages) {
+  try {
+    const response = await fetch('https://api.a0.dev/ai/llm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bodyPayload),
+      body: JSON.stringify({ messages })
     });
 
-    if (!res.ok || !res.body) {
-      // fallback
-      return nonStreamingCall(messages);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error ${response.status}: ${errorText}`);
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let done = false;
-    let accumulated = '';
+    const result = await response.json();
+    return extractCompletion(result);
 
-    while (!done) {
-      const { value, done: chunkDone } = await reader.read();
-      done = chunkDone;
-      if (value) {
-        const chunkText = decoder.decode(value, { stream: true });
-        accumulated += chunkText;
-        if (typeof onToken === 'function') onToken(chunkText);
+  } catch (error) {
+    console.error('LLM call failed:', error);
+
+    // Fallback behavior
+    if (error.name === 'TypeError') {
+      throw new Error('Network error - check your connection');
+    }
+
+    throw error;
+  }
+}
+```
+
+### Streaming Error Handling
+
+```javascript
+async function streamingLLMCall(messages, onToken, onError) {
+  try {
+    const response = await fetch('https://api.a0.dev/ai/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body for streaming');
+    }
+
+    // Streaming logic here...
+
+  } catch (error) {
+    console.error('Streaming failed:', error);
+
+    // Fallback to non-streaming
+    try {
+      return await safeLLMCall(messages);
+    } catch (fallbackError) {
+      onError?.(fallbackError);
+      throw fallbackError;
+    }
+  }
+}
+```
+
+## ✨ Best Practices
+
+### 1. Message Management
+
+```javascript
+// Keep conversations focused
+const messages = [
+  { role: 'system', content: 'You are a React expert.' },
+  // Only include recent relevant messages
+  // Limit to last 10-20 messages for performance
+];
+
+// Add user input
+messages.push({ role: 'user', content: userInput });
+```
+
+### 2. Temperature Settings
+
+```javascript
+const configs = {
+  creative: { temperature: 0.9 },    // Brainstorming, stories
+  balanced: { temperature: 0.7 },    // General chat
+  precise: { temperature: 0.3 },     // Code, facts, instructions
+  strict: { temperature: 0.1 }       // Math, analysis
+};
+```
+
+### 3. Token Limits
+
+```javascript
+// Control response length
+const response = await callLLM(messages, {
+  maxTokens: 500,  // Shorter responses
+  temperature: 0.7
+});
+```
+
+### 4. Error Recovery
+
+```javascript
+async function robustLLMCall(messages, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await callLLM(messages);
+    } catch (error) {
+      if (attempt === retries) throw error;
+
+      // Exponential backoff
+      await new Promise(resolve =>
+        setTimeout(resolve, Math.pow(2, attempt) * 1000)
+      );
+    }
+  }
+}
+```
+
+## 📚 Complete Examples
+
+### Chatbot with Conversation History
+
+```javascript
+class Chatbot {
+  constructor(systemPrompt = 'You are a helpful assistant.') {
+    this.messages = [{ role: 'system', content: systemPrompt }];
+  }
+
+  async sendMessage(userInput) {
+    // Add user message
+    this.messages.push({ role: 'user', content: userInput });
+
+    try {
+      const response = await callLLM(this.messages);
+      const completion = extractCompletion(response);
+
+      // Add AI response to history
+      this.messages.push({ role: 'assistant', content: completion });
+
+      return completion;
+    } catch (error) {
+      throw new Error(`Chat failed: ${error.message}`);
+    }
+  }
+
+  clearHistory() {
+    // Keep only system message
+    this.messages = [this.messages[0]];
+  }
+}
+```
+
+### Streaming Chat Interface
+
+```javascript
+function createStreamingChat(onToken, onComplete) {
+  let fullResponse = '';
+
+  return async function sendMessage(messages) {
+    fullResponse = '';
+
+    const response = await fetch('https://api.a0.dev/ai/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+
+      try {
+        const chunkData = JSON.parse(chunk);
+        const token = chunkData.completion ?? chunkData.message ?? chunk;
+
+        fullResponse += token;
+        onToken(token);
+      } catch (error) {
+        console.warn('Parse error:', error);
       }
     }
 
-    // Return accumulated stream text (or call nonStreamingCall for canonical)
-    return accumulated;
-  } catch (err) {
-    // fallback
-    return nonStreamingCall(messages);
+    onComplete(fullResponse);
+    return fullResponse;
+  };
+}
+```
+
+### React Hook for LLM Calls
+
+```javascript
+import { useState, useCallback } from 'react';
+
+function useLLM() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const call = useCallback(async (messages, options = {}) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('https://api.a0.dev/ai/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages,
+          temperature: options.temperature ?? 0.7,
+          ...(options.maxTokens && { max_tokens: options.maxTokens })
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return extractCompletion(result);
+
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { call, loading, error };
+}
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**1. "Failed to fetch" errors**
+```javascript
+// Check network connectivity
+// Verify the API endpoint URL
+// Try with a simple curl command first
+curl -X POST https://api.a0.dev/ai/llm \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Hello"}]}'
+```
+
+**2. Empty responses**
+```javascript
+// Check message format
+// Ensure messages array is not empty
+// Verify role values are valid
+console.log('Messages:', JSON.stringify(messages, null, 2));
+```
+
+**3. Streaming not working**
+```javascript
+// Check if your environment supports fetch streams
+// Some Node.js versions or React Native environments don't support streaming
+// Implement fallback to non-streaming
+
+const supportsStreaming = typeof Response !== 'undefined' &&
+  typeof ReadableStream !== 'undefined';
+
+if (!supportsStreaming) {
+  console.log('Streaming not supported, using non-streaming fallback');
+}
+```
+
+**4. JSON parsing errors**
+```javascript
+// Log raw response first
+const text = await response.text();
+console.log('Raw response:', text);
+
+try {
+  const json = JSON.parse(text);
+  // Process json...
+} catch (error) {
+  console.error('Invalid JSON:', error);
+}
+```
+
+### Debug Helper
+
+```javascript
+async function debugLLMCall(messages) {
+  console.log('📤 Sending messages:', messages);
+
+  try {
+    const response = await fetch('https://api.a0.dev/ai/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    });
+
+    console.log('📥 Response status:', response.status);
+    console.log('📥 Response headers:', Object.fromEntries(response.headers));
+
+    const text = await response.text();
+    console.log('📥 Raw response:', text);
+
+    if (response.ok) {
+      const json = JSON.parse(text);
+      console.log('📥 Parsed response:', json);
+      return json;
+    } else {
+      throw new Error(`HTTP ${response.status}: ${text}`);
+    }
+
+  } catch (error) {
+    console.error('❌ Error:', error);
+    throw error;
   }
 }
 ```
 
+## 🎯 Key Takeaways
+
+1. **Response Structure**: Always expect `{"completion": "..."}` format
+2. **Safe Extraction**: Use `response.completion ?? response.message ?? fallback`
+3. **Streaming**: Parse each chunk as JSON and extract completion field
+4. **Error Handling**: Implement fallbacks and retry logic
+5. **Message Format**: Use proper role-based message structure
+6. **Limits**: Keep conversations focused and within token limits
+
+## 📞 Support
+
+If you encounter issues:
+
+
+1. Verify your message format with the debug helper above
+2. Test with simple examples first
+3. Check network connectivity and CORS policies
+
 ---
 
-## FAQ & notes
-
-Q: Does the a0.dev LLM require an API key?
-A: In the setup you described, calls were made without Authorization headers and therefore no API key was required. If your deployment requires a key in the future, add it as an Authorization header or proxy requests through your server.
-
-Q: Is streaming always available?
-A: No — streaming depends on the runtime (browser & modern Node have good support). Many RN runtimes require Hermes or other setups to enable fetch streaming. Always implement a non-streaming fallback.
-
-Q: How should I handle long conversations?
-A: Keep a window of recent messages (e.g., last 10-20 messages) when sending context to the LLM to control token usage and latency. Persist important context separately if needed.
-
----
-
-## Final remarks
-
-This README is a practical guide for integrating the a0.dev LLM and image APIs into client apps (especially Expo/React Native). It shows common patterns: non-streaming fetches, a streaming-first approach with fallback, and incremental TTS integration for a natural voice conversation experience.
-
-If you want, I can now:
-- Add a concrete `callA0LLM` TypeScript implementation file directly to the codebase (with types and streaming parser tuned to the a0 streaming format you use).
-- Update the voice assistant hook in this project to use streaming + incremental TTS using the buffered strategy shown above.
-- Add example unit tests or a Postman collection.
-
-Tell me which of the follow-ups you'd like and I will implement it now.
+**Happy coding! 🎉** Remember: The a0.dev LLM API is designed to be simple and reliable. Start with basic calls and gradually add streaming and advanced features as needed.

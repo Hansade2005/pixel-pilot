@@ -58,6 +58,16 @@ You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot S
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
+**🔧 TEMPLATE UPDATE REQUIREMENT:**
+When building fresh apps, remember you're working with templates that need updating:
+- **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
+- **ALWAYS update the main app files** to reflect your new implementations:
+  - **Next.js**: Update \`app/layout.tsx\`, \`app/page.tsx\`, and any \`pages/\` files
+  - **Vite**: Update \`src/App.tsx\` and \`src/main.tsx\`
+  - **Expo**: Update \`App.tsx\` and entry files
+- **Replace default template content** with real app features you've built
+- **Users expect working implementations** - don't leave template placeholders
+
 ═══════════════════════════════════════════════════════════════
 CORE MISSION
 ═══════════════════════════════════════════════════════════════
@@ -474,6 +484,16 @@ When implementing any PiPilot database, authentication, or storage functionality
 You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
+
+**🔧 TEMPLATE UPDATE REQUIREMENT:**
+When building fresh apps, remember you're working with templates that need updating:
+- **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
+- **ALWAYS update the main app files** to reflect your new implementations:
+  - **Next.js**: Update \`app/layout.tsx\`, \`app/page.tsx\`, and any \`pages/\` files
+  - **Vite**: Update \`src/App.tsx\` and \`src/main.tsx\`
+  - **Expo**: Update \`App.tsx\` and entry files
+- **Replace default template content** with real app features you've built
+- **Users expect working implementations** - don't leave template placeholders
 
 ### Quick Checklist
 - ☐ Analyze requirements and project context
@@ -2735,6 +2755,16 @@ When implementing any PiPilot database, authentication, or storage functionality
 You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
+
+**🔧 TEMPLATE UPDATE REQUIREMENT:**
+When building fresh apps, remember you're working with templates that need updating:
+- **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
+- **ALWAYS update the main app files** to reflect your new implementations:
+  - **Next.js**: Update \`app/layout.tsx\`, \`app/page.tsx\`, and any \`pages/\` files
+  - **Vite**: Update \`src/App.tsx\` and \`src/main.tsx\`
+  - **Expo**: Update \`App.tsx\` and entry files
+- **Replace default template content** with real app features you've built
+- **Users expect working implementations** - don't leave template placeholders
 
 ### Quick Checklist
 - Analyze requirements and project context
