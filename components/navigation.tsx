@@ -39,7 +39,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Loader2,
-  Server
+  Server,
+  Code
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -244,6 +245,15 @@ export function Navigation() {
                       </div>
                     </DropdownMenuItem>
                   </Link>
+                  <a href="https://swe.pipilot.dev" target="_blank" rel="noopener noreferrer">
+                    <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                      <Code className="w-4 h-4 mr-2" />
+                      <div>
+                        <div className="font-medium">PiPilot SWE Agent</div>
+                        <div className="text-xs text-gray-400">AI-powered software engineering</div>
+                      </div>
+                    </DropdownMenuItem>
+                  </a>
                 </DropdownMenuContent>
               </DropdownMenu>
               

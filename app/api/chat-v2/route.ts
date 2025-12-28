@@ -54,7 +54,7 @@ When implementing any PiPilot database, authentication, or storage functionality
 - The user should NEVER manually set up or configure anything
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
-You MUST first use the \`web_extract\` tool to study the official PiPilot SDK documentation at https://pipilot.dev/README.md before proceeding. This ensures you understand the latest SDK capabilities and best practices.
+You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
@@ -471,7 +471,7 @@ When implementing any PiPilot database, authentication, or storage functionality
 - The user should NEVER manually set up or configure anything
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
-You MUST first use the \`web_extract\` tool to study the official PiPilot SDK documentation at https://pipilot.dev/README.md before proceeding. This ensures you understand the latest SDK capabilities and best practices.
+You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
@@ -2732,7 +2732,7 @@ When implementing any PiPilot database, authentication, or storage functionality
 - The user should NEVER manually set up or configure anything
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
-You MUST first use the \`web_extract\` tool to study the official PiPilot SDK documentation at https://pipilot.dev/README.md before proceeding. This ensures you understand the latest SDK capabilities and best practices.
+You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
@@ -9730,6 +9730,60 @@ Result must be Markdown formatted for proper display:
             return {
               success: false,
               error: `Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          }
+        }
+      }),
+
+      pipilot_get_docs: tool({
+        description: 'Fetch PiPilot documentation for database, authentication, and storage implementation. Returns comprehensive docs from the official PiPilot README.',
+        inputSchema: z.object({}),
+        execute: async ({}, { abortSignal, toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          if (abortSignal?.aborted) {
+            throw new Error('Operation cancelled')
+          }
+
+          try {
+            const response = await fetch('https://r.jina.ai/https://pipilot.dev/README.md', {
+              signal: abortSignal,
+              headers: {
+                'User-Agent': 'PiPilot-Docs-Fetcher/1.0'
+              }
+            });
+
+            if (!response.ok) {
+              throw new Error(`Failed to fetch docs: ${response.status} ${response.statusText}`);
+            }
+
+            const docs = await response.text();
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['pipilot_get_docs'] = (toolExecutionTimes['pipilot_get_docs'] || 0) + executionTime;
+
+            return {
+              success: true,
+              message: 'PiPilot documentation fetched successfully',
+              docs,
+              source: 'https://pipilot.dev/README.md',
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['pipilot_get_docs'] = (toolExecutionTimes['pipilot_get_docs'] || 0) + executionTime;
+
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[ERROR] pipilot_get_docs failed:', error);
+
+            return {
+              success: false,
+              error: `Failed to fetch PiPilot docs: ${errorMessage}`,
               toolCallId,
               executionTimeMs: executionTime,
               timeWarning: timeStatus.warningMessage
