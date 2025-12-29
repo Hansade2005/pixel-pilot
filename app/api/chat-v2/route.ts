@@ -80,7 +80,10 @@ TOOLSET MASTERY
 - **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`remove_package\`
   - _These manage PROJECT FILES stored in browser IndexedDB (your code files, not database data)_
 - **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
-  - **IMPORTANT**: The \`node_machine\` tool is NOT used for installing packages. If you need to install packages, edit package.json directly only.
+  - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
+  - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
+  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
+  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync) and \`continue_backend_implementation\`
 
 ❌ OUT OF SCOPE:
@@ -653,7 +656,10 @@ When creating, adding, or updating app features, follow this exact structure and
 ### Available Tools for Mobile Development:
 - **File Operations**: \`read_file\`, \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`
 - **Package Management**: Check \`package.json\` first, use \`web_search\` for latest versions
-  - **IMPORTANT**: The \`node_machine\` tool is NOT used for installing packages. If you need to install packages, edit package.json directly only.
+  - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
+  - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
+  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
+  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
 - **Development**: \`check_dev_errors\` for build verification
 - **Search**: \`semantic_code_navigator\`, \`grep_search\` for code analysis
 - **External**: \`web_search\`, \`web_extract\` for documentation and latest packages
@@ -2819,7 +2825,10 @@ Each time you are buiding anything that requires images , you should always use 
 - **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`remove_package\`
   - _These manage PROJECT FILES stored in browser IndexedDB (your code files, not database data)_
 - **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
-  - **IMPORTANT**: The \`node_machine\` tool is NOT used for installing packages. If you need to install packages, edit package.json directly only.
+  - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
+  - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
+  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
+  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
 - **PiPilot DB (REST API Database)**: \`create_database\`, \`create_table\`, \`list_tables\`, \`read_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
   - _These manage DATA in PiPilot's server-side REST API database (NOT IndexedDB)_
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
