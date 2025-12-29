@@ -55,6 +55,8 @@ When implementing any PiPilot database, authentication, or storage functionality
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
 You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
+- Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation
+- Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
@@ -486,6 +488,8 @@ When implementing any PiPilot database, authentication, or storage functionality
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
 You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
+- Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation
+- Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
 
 **SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
@@ -9781,9 +9785,11 @@ Result must be Markdown formatted for proper display:
       }),
 
       pipilot_get_docs: tool({
-        description: 'Fetch PiPilot documentation for database, authentication, and storage implementation. Returns comprehensive docs from the official PiPilot README.',
-        inputSchema: z.object({}),
-        execute: async ({}, { abortSignal, toolCallId }) => {
+        description: 'Fetch PiPilot documentation for database, authentication, and storage implementation. Supports different doc types: "auth" for authentication setup, "database" for database implementation.',
+        inputSchema: z.object({
+          docType: z.enum(['auth', 'database']).optional().describe('Type of documentation to fetch: "auth" for authentication docs, "database" for database docs')
+        }),
+        execute: async ({ docType = 'database' }, { abortSignal, toolCallId }) => {
           const toolStartTime = Date.now();
           const timeStatus = getTimeStatus();
 
@@ -9792,7 +9798,12 @@ Result must be Markdown formatted for proper display:
           }
 
           try {
-            const response = await fetch('https://r.jina.ai/https://pipilot.dev/README.md', {
+            // Determine the URL based on doc type
+            const baseUrl = docType === 'auth'
+              ? 'https://r.jina.ai/https://pipilot.dev/PIPilot-auth-setup.md'
+              : 'https://r.jina.ai/https://pipilot.dev/README.md';
+
+            const response = await fetch(baseUrl, {
               signal: abortSignal,
               headers: {
                 'User-Agent': 'PiPilot-Docs-Fetcher/1.0'
@@ -9809,9 +9820,10 @@ Result must be Markdown formatted for proper display:
 
             return {
               success: true,
-              message: 'PiPilot documentation fetched successfully',
+              message: `PiPilot ${docType} documentation fetched successfully`,
               docs,
-              source: 'https://pipilot.dev/README.md',
+              source: baseUrl.replace('https://r.jina.ai/', ''),
+              docType,
               toolCallId,
               executionTimeMs: executionTime,
               timeWarning: timeStatus.warningMessage
@@ -9825,7 +9837,8 @@ Result must be Markdown formatted for proper display:
 
             return {
               success: false,
-              error: `Failed to fetch PiPilot docs: ${errorMessage}`,
+              error: `Failed to fetch PiPilot ${docType} docs: ${errorMessage}`,
+              docType,
               toolCallId,
               executionTimeMs: executionTime,
               timeWarning: timeStatus.warningMessage
