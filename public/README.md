@@ -2,11 +2,54 @@
 
 This document provides detailed usage snippets and exact response structures for the PiPilot SDK methods suitable for app implementations. Note: Some methods (delete table, query database, API key management) are excluded as they are intended for AI agent MCP server usage only.
 
+## ⚠️ IMPORTANT: Empty Records/Table Handling
+
+**When fetching records from a table with no data, the API returns an empty array, NOT an error.**
+
+### Empty Table Response
+When your table has no records yet, the API responds with:
+```json
+{
+  "records": [],
+  "pagination": {
+    "total": 0,
+    "limit": 100,
+    "offset": 0,
+    "has_more": false
+  }
+}
+```
+
+### Why This Design?
+- ✅ **Standard REST API behavior** - Empty arrays indicate "no results found"
+- ✅ **No false errors** - Developers won't see confusing error messages for empty tables
+- ✅ **Clear pagination info** - `total: 0` clearly indicates zero records
+- ✅ **Consistent structure** - Same response format whether table has 0 or 1000+ records
+
+### Common Developer Confusion Points
+- **Don't expect errors** for empty tables - this is normal behavior
+- **Check `records.length === 0`** to detect empty results, not error status codes
+- **Use `pagination.total`** to get the actual record count
+
+### Example: Handling Empty Tables in Your Code
+```javascript
+const result = await pipilot.fetchTableRecords('my-table-id');
+
+if (result.records.length === 0) {
+  console.log('Table is empty - no records found');
+  // Handle empty state in your UI
+} else {
+  console.log(`Found ${result.pagination.total} records`);
+  // Process the records
+}
+```
+
+---
+
 ## Installation
 
 ```bash
-npm install pipilot-sdk
-```
+add  pipilot-sdk  version 1.4.4  to package.json
 
 ## Initialization
 
