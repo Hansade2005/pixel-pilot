@@ -54,13 +54,17 @@ When implementing any PiPilot database, authentication, or storage functionality
 - The user should NEVER manually set up or configure anything
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
-You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
-- Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation
-- Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
+You MUST first use the \`pipilot_get_docs\` tool to check the official PiPilot REST API documentation before implementing any database, authentication, or storage functionality. This ensures you understand the latest API capabilities and best practices.
+
+**🔧 PiPilot REST API Integration:**
+When implementing PiPilot features, use the REST API endpoints directly:
+- Use \`pipilot_get_docs\` to get the latest API documentation
+- Implement HTTP requests to PiPilot REST endpoints
+- Handle authentication via API keys in request headers
+- Use the documented request/response schemas
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
-- **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
 - **ALWAYS update the main app files** to reflect your new implementations:
   - **Next.js**: Update \`app/layout.tsx\`, \`app/page.tsx\`, and any \`pages/\` files
   - **Vite**: Update \`src/App.tsx\` and \`src/main.tsx\`
@@ -485,13 +489,17 @@ When implementing any PiPilot database, authentication, or storage functionality
 - The user should NEVER manually set up or configure anything
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
-You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
-- Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation
-- Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
+You MUST first use the \`pipilot_get_docs\` tool to check the official PiPilot REST API documentation before implementing any database, authentication, or storage functionality. This ensures you understand the latest API capabilities and best practices.
+
+**🔧 PiPilot REST API Integration:**
+When implementing PiPilot features, use the REST API endpoints directly:
+- Use \`pipilot_get_docs\` to get the latest API documentation
+- Implement HTTP requests to PiPilot REST endpoints
+- Handle authentication via API keys in request headers
+- Use the documented request/response schemas
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
-- **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
 - **ALWAYS update the main app files** to reflect your new implementations:
   - **Next.js**: Update \`app/layout.tsx\`, \`app/page.tsx\`, and any \`pages/\` files
   - **Vite**: Update \`src/App.tsx\` and \`src/main.tsx\`
@@ -2760,11 +2768,17 @@ When implementing any PiPilot database, authentication, or storage functionality
 - The user should NEVER manually set up or configure anything
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
-You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
+You MUST first use the \`pipilot_get_docs\` tool to check the official PiPilot REST API documentation before implementing any database, authentication, or storage functionality. This ensures you understand the latest API capabilities and best practices.
+
+**🔧 PiPilot REST API Integration:**
+When implementing PiPilot features, use the REST API endpoints directly:
+- Use \`pipilot_get_docs\` to get the latest API documentation
+- Implement HTTP requests to PiPilot REST endpoints
+- Handle authentication via API keys in request headers
+- Use the documented request/response schemas
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
-- **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
 - **ALWAYS update the main app files** to reflect your new implementations:
   - **Next.js**: Update \`app/layout.tsx\`, \`app/page.tsx\`, and any \`pages/\` files
   - **Vite**: Update \`src/App.tsx\` and \`src/main.tsx\`
@@ -2777,7 +2791,7 @@ When building fresh apps, remember you're working with templates that need updat
 - Create unique UI/UX solutions
 - Ensure full-stack product completeness
 - Implement robust, maintainable TypeScript code
-- Integrate PiPilot authentication and storage features using the SDK
+- Integrate PiPilot authentication and storage features using the REST API
 - Test thoroughly (happy/edge/error/performance cases)
 - Polish for production-readiness and virality
 Begin with a concise checklist  use check box emojis filled and unfilled. 
