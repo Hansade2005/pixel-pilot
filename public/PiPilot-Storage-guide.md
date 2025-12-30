@@ -1,0 +1,133 @@
+# PiPilot Storage File Upload API Documentation
+
+## Overview
+The PiPilot storage system allows users to upload files to their databases via REST API. The system automatically initializes storage buckets when needed and supports both public and private file uploads.
+
+## API Endpoint
+```
+POST https://pipilot.dev/api/v1/databases/{databaseId}/storage/upload
+```
+
+## Authentication
+- **Header**: `Authorization: Bearer {API_KEY}`
+- **Content-Type**: `multipart/form-data` (set automatically by browser/client)
+
+## Request Parameters
+
+### Form Data Fields
+- `file` (File, required): The file to upload
+- `is_public` (string, optional): "true" or "false" (default: "false")
+- `metadata` (string, optional): JSON string with additional metadata
+
+### Example Request (JavaScript)
+```javascript
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+formData.append('is_public', 'true');
+formData.append('metadata', JSON.stringify({
+  category: 'profile-picture',
+  uploaded_by: 'user-123',
+  tags: ['avatar', 'user']
+}));
+
+const response = await fetch(`https://pipilot.dev/api/v1/databases/${DATABASE_ID}/storage/upload`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`,
+  },
+  body: formData
+});
+```
+
+## Response Structure
+
+### Success Response (Public File)
+```json
+{
+  "success": true,
+  "file": {
+    "id": "dfcd4739-c4a2-40df-9363-85840f69f2c3",
+    "name": "d95962cc-9468-4440-9d32-263a71ba9821.txt",
+    "original_name": "test-file.txt",
+    "size_bytes": 59,
+    "mime_type": "text/plain",
+    "url": "https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/pipilot-storage/db_69_studyconnect/d95962cc-9468-4440-9d32-263a71ba9821.txt",
+    "is_public": true,
+    "created_at": "2025-12-30T10:16:04.228187"
+  },
+  "message": "File uploaded successfully"
+}
+```
+
+### Success Response (Private File)
+```json
+{
+  "success": true,
+  "file": {
+    "id": "afed7e5f-2b37-497d-8fd7-806f60306642",
+    "name": "8b71b2c1-52a8-4bb7-b4c0-6603d3b45603.txt",
+    "original_name": "test-file.txt",
+    "size_bytes": 59,
+    "mime_type": "text/plain",
+    "is_public": false,
+    "created_at": "2025-12-30T10:16:05.295665"
+  },
+  "message": "File uploaded successfully"
+}
+```
+
+### Error Response
+```json
+{
+  "error": "No file provided"
+}
+```
+
+## Field Descriptions
+
+### File Object Fields
+- `id`: Unique identifier for the file in the database
+- `name`: UUID-based filename used in storage (for internal reference)
+- `original_name`: The original filename uploaded by the user
+- `size_bytes`: File size in bytes
+- `mime_type`: MIME type of the uploaded file
+- `url`: Direct access URL (only present for public files)
+- `is_public`: Boolean indicating if the file is publicly accessible
+- `created_at`: ISO timestamp of when the file was uploaded
+
+## Key Features
+
+### Automatic Storage Initialization
+- Storage buckets are automatically created for databases that don't have them
+- No manual setup required for database owners
+- Works for both UI and API access
+
+### Public vs Private Files
+- **Public files**: Get a direct `url` field for immediate access
+- **Private files**: No `url` field (require authentication to access via other endpoints)
+
+### Metadata Support
+- Optional JSON metadata can be attached to files
+- Stored with the file for organization and search purposes
+
+### File Size Limits
+- Maximum file size: 10MB per file
+- Bucket size limit: 500MB per database
+
+## Error Handling
+- `400 Bad Request`: No file provided, invalid metadata JSON
+- `401 Unauthorized`: Invalid or missing API key
+- `404 Not Found`: Database not found
+- `500 Internal Server Error`: Server-side upload failure
+
+## Rate Limiting
+- API key-based rate limiting applies to file uploads
+- Rate limit information included in 429 responses
+
+## Supported File Types
+All common file types are supported including:
+- Images (JPEG, PNG, GIF, WebP, SVG)
+- Documents (PDF, Word, Excel)
+- Text files
+- Audio/Video files
+- JSON and other data files
