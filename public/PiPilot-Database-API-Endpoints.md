@@ -835,6 +835,14 @@ export const TABLE_IDS = {
 const groups = await getRecords(TABLE_IDS.STUDY_GROUPS);
 ```
 
+---
+
+## 📚 Additional Resources
+
+- **PiPilot Dashboard**: https://pipilot.dev
+- **API Documentation**: https://pipilot.dev/docs
+- **Test Results**: See `test-pipilot-full-crud.js` for comprehensive testing
+- **StudyConnect Implementation**: See `src/lib/pipilot.ts` for production-ready code
 
 ---
 

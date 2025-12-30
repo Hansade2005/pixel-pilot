@@ -58,8 +58,6 @@ You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot S
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation
 - Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
 
-**SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
-
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
 - **Always install and use the latest SDK version 1.4.4 when setting up PiPilot pipilot-sdk version 1.4.4**
@@ -490,8 +488,6 @@ When implementing any PiPilot database, authentication, or storage functionality
 You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation
 - Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
-
-**SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
@@ -2765,8 +2761,6 @@ When implementing any PiPilot database, authentication, or storage functionality
 
 **📚 BEFORE IMPLEMENTING ANY PiPilot FEATURES:**
 You MUST first use the \`pipilot_get_docs\` tool to study the official PiPilot SDK documentation before proceeding. This ensures you understand the latest SDK capabilities and best practices.
-
-**SDK VERSION REQUIREMENT:** Always install and use the latest SDK version **1.4.4** when setting up PiPilot integration. Check package.json before making changes and use \`web_extract\` to verify the latest compatible version if needed.
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
