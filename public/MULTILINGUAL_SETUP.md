@@ -1,8 +1,8 @@
-# Multilingual Support Setup Guide - Auto Connect Platform
+# Multilingual Support Setup Guide - PiPilot Apps
 
-## Overview
+## How to implement multilanguage upport to any app. 
 
-The Auto Connect platform implements multilingual support using a **single global context file** (`LanguageContext.tsx`) that provides a simple, lightweight translation system without external dependencies like react-i18next.
+Below are instructions that will help you  implement multilingual support using a **single global context file** (`LanguageContext.tsx`) that provides a simple, lightweight translation system without external dependencies like react-i18next.
 
 ### Architecture
 
