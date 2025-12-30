@@ -1,8 +1,8 @@
 # Multilingual Support Setup Guide - PiPilot Apps
 
-## How to implement multilanguage upport to any app. 
+## How to implement multilanguage support to any app (Web & Mobile).
 
-Below are instructions that will help you  implement multilingual support using a **single global context file** (`LanguageContext.tsx`) that provides a simple, lightweight translation system without external dependencies like react-i18next.
+Below are instructions that will help you implement multilingual support using a **single global context file** (`LanguageContext.tsx`) that provides a simple, lightweight translation system without external dependencies like react-i18next.
 
 ### Architecture
 
@@ -10,11 +10,15 @@ Below are instructions that will help you  implement multilingual support using 
 src/contexts/LanguageContext.tsx (Single Global Context)
 ├── LanguageContextType interface
 ├── translations object (hardcoded English/French)
-├── LanguageProvider component
+├── LanguageProvider component (Web: localStorage, Mobile: AsyncStorage)
 └── useLanguage hook
 ```
 
-## Implementation Details
+## Supported Platforms
+
+- ✅ **Next.js/React Web Apps** - Uses localStorage for persistence
+- ✅ **Expo React Native Apps** - Uses AsyncStorage for persistence
+- ✅ **Vite React Apps** - Uses localStorage for persistence
 
 ### 1. Core Context Structure
 
@@ -67,17 +71,24 @@ const translations = {
 
 ### 3. Provider Component
 
+#### For Web Apps (Next.js, Vite, etc.)
+
 ```typescript
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // State with localStorage persistence
   const [language, setLanguage] = useState<'en' | 'fr'>(() => {
-    const saved = localStorage.getItem('language');
-    return (saved as 'en' | 'fr') || 'en';
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('language');
+      return (saved as 'en' | 'fr') || 'en';
+    }
+    return 'en';
   });
 
   // Persist language changes
   useEffect(() => {
-    localStorage.setItem('language', language);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('language', language);
+    }
   }, [language]);
 
   // Translation function
@@ -90,6 +101,67 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLanguage,
     t
   };
+
+  return (
+    <LanguageContext.Provider value={value}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+```
+
+#### For Expo React Native Apps
+
+```typescript
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  // State with AsyncStorage persistence
+  const [language, setLanguage] = useState<'en' | 'fr'>('en');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load saved language on mount
+  useEffect(() => {
+    const loadLanguage = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('language');
+        if (saved) {
+          setLanguage(saved as 'en' | 'fr');
+        }
+      } catch (error) {
+        console.error('Error loading language:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadLanguage();
+  }, []);
+
+  // Persist language changes
+  const handleSetLanguage = async (lang: 'en' | 'fr') => {
+    try {
+      await AsyncStorage.setItem('language', lang);
+      setLanguage(lang);
+    } catch (error) {
+      console.error('Error saving language:', error);
+    }
+  };
+
+  // Translation function
+  const t = (key: string): string => {
+    return translations[language][key as keyof typeof translations.en] || key;
+  };
+
+  const value = {
+    language,
+    setLanguage: handleSetLanguage,
+    t
+  };
+
+  if (isLoading) {
+    return null; // Or a loading component
+  }
 
   return (
     <LanguageContext.Provider value={value}>
@@ -117,9 +189,19 @@ export function useLanguage() {
 
 Create `src/contexts/LanguageContext.tsx` with the complete implementation above.
 
-### Step 2: Wrap App with Provider
+### Step 2: Install Dependencies (Expo Only)
 
-In `src/main.tsx` or `src/App.tsx`:
+For Expo projects, install AsyncStorage:
+
+```bash
+npx expo install @react-native-async-storage/async-storage
+```
+
+### Step 3: Wrap App with Provider
+
+#### For Web Apps (Next.js, Vite)
+
+In `src/main.tsx`, `src/App.tsx`, or `src/index.tsx`:
 
 ```typescript
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -133,7 +215,25 @@ function App() {
 }
 ```
 
-### Step 3: Use in Components
+#### For Expo React Native Apps
+
+In `App.tsx`:
+
+```typescript
+import { LanguageProvider } from './contexts/LanguageContext';
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      {/* Your app content */}
+    </LanguageProvider>
+  );
+}
+```
+
+### Step 4: Use in Components
+
+#### Web Components Example
 
 ```typescript
 import { useLanguage } from '../contexts/LanguageContext';
@@ -148,6 +248,33 @@ function MyComponent() {
         {t('switchLanguage')}
       </button>
     </div>
+  );
+}
+```
+
+#### React Native Components Example
+
+```typescript
+import { useLanguage } from '../contexts/LanguageContext';
+import { View, Text, TouchableOpacity } from 'react-native';
+
+function MyComponent() {
+  const { language, setLanguage, t } = useLanguage();
+
+  return (
+    <View>
+      <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
+        {t('nav.home')}
+      </Text>
+      <TouchableOpacity
+        onPress={() => setLanguage(language === 'en' ? 'fr' : 'en')}
+        style={{ padding: 10, backgroundColor: '#007AFF', borderRadius: 5 }}
+      >
+        <Text style={{ color: 'white' }}>
+          {t('switchLanguage')}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 ```
@@ -382,11 +509,41 @@ const debugTranslation = (key: string) => {
    - Advanced variable replacement
    - Date/number formatting per locale
 
+## Platform-Specific Considerations
+
+### Web Apps (Next.js, Vite, etc.)
+- Uses `localStorage` for persistence
+- Automatic hydration with SSR support
+- No additional dependencies required
+
+### Expo React Native Apps
+- Uses `@react-native-async-storage/async-storage` for persistence
+- Handles async storage operations
+- Includes loading state management
+- Requires `npx expo install @react-native-async-storage/async-storage`
+
+### Key Differences
+- **Storage**: localStorage (Web) vs AsyncStorage (Mobile)
+- **Initialization**: Synchronous (Web) vs Asynchronous (Mobile)
+- **SSR**: Web apps need `typeof window` checks
+- **Loading States**: Mobile apps need loading indicators during initialization
+
 ## Resources
 
+### Web Development
 - [React Context Documentation](https://react.dev/reference/react/createContext)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [localStorage API](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
+
+### React Native / Expo
+- [React Native Context](https://reactnative.dev/docs/context)
+- [Expo AsyncStorage](https://docs.expo.dev/versions/latest/sdk/async-storage/)
+- [React Native Internationalization](https://reactnative.dev/docs/i18n)
+
+### Multilingual Best Practices
+- [Unicode CLDR](https://cldr.unicode.org/) - Locale data repository
+- [BCP 47 Language Tags](https://tools.ietf.org/html/bcp47)
+- [W3C Internationalization](https://www.w3.org/International/)
 
 ---
 
