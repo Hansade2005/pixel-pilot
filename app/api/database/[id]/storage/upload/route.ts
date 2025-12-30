@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getDatabaseBucket, uploadFile } from '@/lib/storage';
+import { getDatabaseBucket, createDatabaseBucket, uploadFile } from '@/lib/storage';
 import { logFileUploaded } from '@/lib/activity-logger';
 
 /**
@@ -47,17 +47,15 @@ export async function POST(
       );
     }
 
-    // Get bucket
+    // Get or create bucket
     console.log('[UPLOAD] Getting bucket for database:', parseInt(id));
-    const bucket = await getDatabaseBucket(parseInt(id));
+    let bucket = await getDatabaseBucket(parseInt(id));
     console.log('[UPLOAD] Bucket result:', bucket);
 
     if (!bucket) {
-      console.error('[UPLOAD] Storage bucket not found for database:', id);
-      return NextResponse.json(
-        { error: 'Storage bucket not found. Please initialize storage first.' },
-        { status: 404 }
-      );
+      console.log('[UPLOAD] Creating bucket for database:', id);
+      bucket = await createDatabaseBucket(parseInt(id), database.name);
+      console.log('[UPLOAD] Created bucket:', bucket);
     }
 
     // Parse form data

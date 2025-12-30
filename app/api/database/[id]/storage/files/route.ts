@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getDatabaseBucket, listFiles } from '@/lib/storage';
+import { getDatabaseBucket, createDatabaseBucket, listFiles } from '@/lib/storage';
 
 /**
  * GET /api/database/[id]/storage/files
@@ -40,14 +40,11 @@ export async function GET(
       );
     }
 
-    // Get bucket
-    const bucket = await getDatabaseBucket(parseInt(id));
+    // Get or create bucket
+    let bucket = await getDatabaseBucket(parseInt(id));
 
     if (!bucket) {
-      return NextResponse.json(
-        { error: 'Storage bucket not found' },
-        { status: 404 }
-      );
+      bucket = await createDatabaseBucket(parseInt(id), database.name);
     }
 
     // Parse query parameters

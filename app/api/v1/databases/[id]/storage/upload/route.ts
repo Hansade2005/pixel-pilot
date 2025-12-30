@@ -8,7 +8,7 @@ import {
   logApiUsage,
   updateApiKeyLastUsed,
 } from '@/lib/api-keys';
-import { uploadFile, getDatabaseBucket } from '@/lib/storage';
+import { uploadFile, getDatabaseBucket, createDatabaseBucket } from '@/lib/storage';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -91,14 +91,26 @@ export async function POST(
   if (auth.error) return auth.error;
 
   try {
-    // Get bucket
-    const bucket = await getDatabaseBucket(parseInt(params.id));
+    // Get or create bucket
+    let bucket = await getDatabaseBucket(parseInt(params.id));
     
     if (!bucket) {
-      return NextResponse.json(
-        { error: 'Storage not initialized for this database' },
-        { status: 404 }
-      );
+      // Get database info to create bucket
+      const { data: database, error: dbError } = await supabaseAdmin
+        .from('databases')
+        .select('name')
+        .eq('id', parseInt(params.id))
+        .single();
+
+      if (dbError || !database) {
+        return NextResponse.json(
+          { error: 'Database not found' },
+          { status: 404 }
+        );
+      }
+
+      // Create bucket automatically
+      bucket = await createDatabaseBucket(parseInt(params.id), database.name);
     }
 
     // Parse form data
