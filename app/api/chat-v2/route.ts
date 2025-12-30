@@ -61,6 +61,7 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation  
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
+- Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
@@ -495,6 +496,7 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation  
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
+- Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
@@ -2773,6 +2775,7 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "database"\` for database implementation documentation
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation  
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
+- Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
@@ -9790,9 +9793,9 @@ Result must be Markdown formatted for proper display:
       }),
 
       pipilot_get_docs: tool({
-        description: 'Fetch PiPilot documentation for database, authentication, and storage implementation. Supports different doc types: "auth" for authentication setup, "database" for database implementation, "storage" for storage/file upload documentation.',
+        description: 'Fetch PiPilot documentation for database, authentication, storage, and multilingual implementation. Supports different doc types: "auth" for authentication setup, "database" for database implementation, "storage" for storage/file upload documentation, "multilingual_setup" for multilingual support setup.',
         inputSchema: z.object({
-          docType: z.enum(['auth', 'database', 'storage']).optional().describe('Type of documentation to fetch: "auth" for authentication docs, "database" for database docs, "storage" for storage/file upload docs')
+          docType: z.enum(['auth', 'database', 'storage', 'multilingual_setup']).optional().describe('Type of documentation to fetch: "auth" for authentication docs, "database" for database docs, "storage" for storage/file upload docs, "multilingual_setup" for multilingual support setup')
         }),
         execute: async ({ docType = 'database' }, { abortSignal, toolCallId }) => {
           const toolStartTime = Date.now();
@@ -9808,6 +9811,8 @@ Result must be Markdown formatted for proper display:
               ? 'https://r.jina.ai/https://pipilot.dev/PIPilot-auth-setup.md'
               : docType === 'storage'
               ? 'https://r.jina.ai/https://pipilot.dev/PiPilot-Storage-guide.md'
+              : docType === 'multilingual_setup'
+              ? 'https://r.jina.ai/https://pipilot.dev/MULTILINGUAL_SETUP.md'
               : 'https://r.jina.ai/https://pipilot.dev/README.md';
 
             const response = await fetch(baseUrl, {
