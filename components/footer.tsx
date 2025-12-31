@@ -63,6 +63,12 @@ export function Footer() {
               <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer">
                 <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
               </a>
+              <a href="https://dang.ai/" target="_blank">
+                <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Dang.ai" style={{width: '150px', height: '54px'}} width="150" height="54" />
+              </a>
+              <a target="_blank" href="https://softwarebolt.com">
+                <img src="https://softwarebolt.com/assets/images/badge.png" alt="Software Bolt" height="54" />
+              </a>
             </div>
             
             <div className="text-gray-400 text-sm">
