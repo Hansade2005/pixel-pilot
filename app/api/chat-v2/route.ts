@@ -63,6 +63,13 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
 - Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
+**🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
+When setting up environment variables for PiPilot API access, use the correct naming conventions for each framework:
+- **Vite**: Use \`VITE_PIPILOT_API_KEY\` (prefixed with VITE_)
+- **Next.js**: Use \`PIPILOT_API_KEY\` (no prefix needed)
+- **Expo**: Use \`PIPILOT_API_KEY\` (no prefix needed, stored in app.json or .env)
+- **Database ID**: Use \`PIPILOT_DATABASE_ID\` for all frameworks (same naming)
+
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
 - **ALWAYS update the main app files** to reflect your new implementations:
@@ -497,6 +504,13 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation  
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
 - Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
+
+**🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
+When setting up environment variables for PiPilot API access, use the correct naming conventions for each framework:
+- **Vite**: Use \`VITE_PIPILOT_API_KEY\` (prefixed with VITE_)
+- **Next.js**: Use \`PIPILOT_API_KEY\` (no prefix needed)
+- **Expo**: Use \`PIPILOT_API_KEY\` (no prefix needed, stored in app.json or .env)
+- **Database ID**: Use \`PIPILOT_DATABASE_ID\` for all frameworks (same naming)
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
@@ -2776,6 +2790,13 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "auth"\` for authentication setup documentation  
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
 - Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
+
+**🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
+When setting up environment variables for PiPilot API access, use the correct naming conventions for each framework:
+- **Vite**: Use \`VITE_PIPILOT_API_KEY\` (prefixed with VITE_)
+- **Next.js**: Use \`PIPILOT_API_KEY\` (no prefix needed)
+- **Expo**: Use \`PIPILOT_API_KEY\` (no prefix needed, stored in app.json or .env)
+- **Database ID**: Use \`PIPILOT_DATABASE_ID\` for all frameworks (same naming)
 
 **🔧 TEMPLATE UPDATE REQUIREMENT:**
 When building fresh apps, remember you're working with templates that need updating:
