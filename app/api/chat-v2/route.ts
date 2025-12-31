@@ -63,7 +63,10 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
 - Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
-**🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
+**� PiPilot API TIMESTAMP HANDLING:**
+According to PiPilot's API documentation, timestamps (created_at, updated_at) are stored at the record level, not in the data_json field. When working with records, access timestamps directly from the record object properties, not from within the JSON data structure.
+
+**�🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
 When setting up environment variables for PiPilot API access, use the correct naming conventions for each framework:
 - **Vite**: Use \`VITE_PIPILOT_API_KEY\` (prefixed with VITE_)
 - **Next.js**: Use \`PIPILOT_API_KEY\` (no prefix needed)
@@ -505,7 +508,10 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
 - Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
-**🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
+**� PiPilot API TIMESTAMP HANDLING:**
+According to PiPilot's API documentation, timestamps (created_at, updated_at) are stored at the record level, not in the data_json field. When working with records, access timestamps directly from the record object properties, not from within the JSON data structure.
+
+**�🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
 When setting up environment variables for PiPilot API access, use the correct naming conventions for each framework:
 - **Vite**: Use \`VITE_PIPILOT_API_KEY\` (prefixed with VITE_)
 - **Next.js**: Use \`PIPILOT_API_KEY\` (no prefix needed)
@@ -2791,7 +2797,10 @@ When implementing PiPilot features, use the REST API endpoints directly:
 - Use \`pipilot_get_docs\` with \`docType: "storage"\` for storage/file upload documentation
 - Use \`pipilot_get_docs\` with \`docType: "multilingual_setup"\` for multilingual support setup documentation
 
-**🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
+**� PiPilot API TIMESTAMP HANDLING:**
+According to PiPilot's API documentation, timestamps (created_at, updated_at) are stored at the record level, not in the data_json field. When working with records, access timestamps directly from the record object properties, not from within the JSON data structure.
+
+**�🔧 ENVIRONMENT VARIABLE NAMING CONVENTIONS:**
 When setting up environment variables for PiPilot API access, use the correct naming conventions for each framework:
 - **Vite**: Use \`VITE_PIPILOT_API_KEY\` (prefixed with VITE_)
 - **Next.js**: Use \`PIPILOT_API_KEY\` (no prefix needed)
