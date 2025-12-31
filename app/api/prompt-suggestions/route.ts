@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const timestamp = new Date().toISOString()
 
     // Get Codestral model for generating prompt suggestions
-    const codestralModel = getModel('codestral-latest')
+    const codestralModel = getModel('pixtral-12b-2409')
 
     // Generate prompt suggestions using Codestral with deduplication instructions
     const result = await generateText({
