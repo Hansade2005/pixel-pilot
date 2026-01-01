@@ -139,7 +139,7 @@ About PiPilot:
 PiPilot (pipilot.dev) is Canada's pioneering AI-powered development platform with comprehensive API infrastructure and partnership ecosystem.
 
 Technical Capabilities:
-- PIXEL FORGE AI: Advanced Mistral Pixtral + Codestral integration for enterprise-grade code generation
+- PIXEL FORGE AI: Advanced Mistral Pixtral + Grok Code Fast 1 & Claude Sonnet 4.5 integration for enterprise-grade code generation
 - Multi-Framework: Next.js (SSR/SSG), Vite+React (SPA), Expo (mobile) - single platform, multiple targets
 - PiPilot Database: Full database-as-a-service with REST API, TypeScript SDK, and MCP HTTP server
 - PiPilot MCP Server: Model Context Protocol integration for AI assistants (Claude, Cursor, VS Code, Windsurf)
