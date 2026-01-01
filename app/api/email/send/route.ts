@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-// Zoho SMTP Configuration
+// Zeptomail SMTP Configuration (Zoho's transactional email service)
 const SMTP_CONFIG = {
-  host: 'smtp.zoho.com',
-  port: 465,
-  secure: true, // true for 465, false for other ports
+  host: 'smtp.zeptomail.com',
+  port: 587,
+  secure: false, // true for 465, false for 587
   auth: {
-    user: 'hello@pipilot.dev',
-    pass: 'Bamenda@5'
+    user: 'emailapikey',
+    pass: 'wSsVR60krkLzB6Yrzzz8dbhryw4HUVulHBgo0VfyvyP8SKqU8cc8khDJAgfxSKMdFzY7FmFAobkgnx8F2mEHhtskw11TWSiF9mqRe1U4J3x17qnvhDzDWW9UlhKIKogLwAxpk2FpEMol+g=='
   }
 };
 
@@ -59,10 +59,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email options
     const mailOptions = {
-      from: {
-        name: 'PiPilot',
-        address: body.from || 'hello@pipilot.dev'
-      },
+      from: body.from || '"PiPilot" <hello@pipilot.dev>',
       to: body.to,
       subject: body.subject,
       html: body.html,
