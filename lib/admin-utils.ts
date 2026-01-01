@@ -117,6 +117,13 @@ export const ADMIN_MENU_ITEMS = [
     permission: ADMIN_PERMISSIONS.EMAIL_MANAGEMENT
   },
   {
+    id: 'leads-email',
+    label: 'Leads Cold Email',
+    icon: 'Sparkles',
+    href: '/admin/leads-email',
+    permission: ADMIN_PERMISSIONS.EMAIL_MANAGEMENT
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     icon: 'Bell',
