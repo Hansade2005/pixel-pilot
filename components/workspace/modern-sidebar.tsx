@@ -497,11 +497,35 @@ export function ModernSidebar({
     )
   }
 
+  // Mobile/Tablet Sidebar
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile/Tablet Sidebar Overlay */}
+        <div
+          className={`fixed inset-0 z-50 lg:hidden ${
+            isMobileOpen ? 'block' : 'hidden'
+          }`}
+        >
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={onMobileClose}
+          />
+
+          {/* Sidebar */}
+          <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-gray-800 z-50">
+            <SidebarContent />
+          </aside>
+        </div>
+      </>
+    )
+  }
+
   // Desktop Sidebar
-  return (
     <>
       <aside
-        className={`hidden md:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
+        className={`hidden lg:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
           shouldExpand ? 'w-64' : 'w-14'
         }`}
         onMouseEnter={() => setIsHovered(true)}
