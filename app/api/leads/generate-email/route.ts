@@ -401,14 +401,14 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
                     <p style="margin: 0 0 12px 0;">
                       <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">🤖</span>
                       <strong style="color: #111827;">PIXEL FORGE AI</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">Agentic vibe coding with Mistral</span>
+                      <span style="color: #6b7280; font-size: 14px;">Agentic vibe coding with Grok code Fast 1 & Claude Sonnet 4.5 </span>
                     </p>
                   </td>
                   <td width="50%" style="padding: 0 0 0 10px; vertical-align: top;">
                     <p style="margin: 0 0 12px 0;">
                       <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">⚡</span>
                       <strong style="color: #111827;">Multi-Framework</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">Next.js, React, Expo - one platform</span>
+                      <span style="color: #6b7280; font-size: 14px;">Next.js, Vite React, Expo - one platform</span>
                     </p>
                   </td>
                 </tr>
@@ -424,7 +424,7 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
                     <p style="margin: 0;">
                       <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">🔗</span>
                       <strong style="color: #111827;">Full Integration</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">GitHub, Vercel, Supabase, Stripe</span>
+                      <span style="color: #6b7280; font-size: 14px;">GitHub, Vercel, Netlify, Supabase, Stripe</span>
                     </p>
                   </td>
                 </tr>
