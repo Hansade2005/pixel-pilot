@@ -523,6 +523,7 @@ export function ModernSidebar({
   }
 
   // Desktop Sidebar
+  return (
     <>
       <aside
         className={`hidden lg:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
