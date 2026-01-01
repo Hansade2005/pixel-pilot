@@ -21,7 +21,7 @@ const getSegmentPrompt = (segment: string, lead: any) => {
   const firstName = lead.leadName.split(' ')[0]
   
   const prompts: Record<string, string> = {
-    investor: `Generate a professional cold email to an investor for PiPilot - AI-Powered App Builder.
+    investor: `Generate a professional cold email to an investor for PiPilot - Canada's First Agentic Vibe Coding Platform.
 
 Investor Details:
 - Name: ${lead.leadName}
@@ -30,18 +30,41 @@ Investor Details:
 - Source: ${lead.source || 'Research'}
 
 About PiPilot:
-PiPilot is an AI-powered app builder that lets anyone create full-stack web applications through natural conversation. Key features:
-- AI-first development platform (no coding required)
-- Visual editor with live preview
-- Instant deployment
-- Template marketplace for monetization
-- Active community of 1700+ qualified leads
+PiPilot (pipilot.dev) is Canada's pioneering Agentic Vibe Coding Platform - a revolutionary AI-powered development platform that transforms web application development through conversational AI and advanced visual editing.
+
+Key Technology:
+- PIXEL FORGE: Advanced AI architecture integrating Mistral Pixtral + Codestral models
+- Conversational AI Development: Transform natural language into functional code
+- Multi-Framework Support: Next.js (SSR/SSG), Vite+React (SPA), Expo (cross-platform mobile)
+- Visual Editing Revolution: Click-to-edit interface with real-time styling and component manipulation
+- PiPilot SWE Agent: Autonomous GitHub App for intelligent code generation via PR automation
+- PiPilot MCP Server: Model Context Protocol HTTP server enabling AI assistants to access database operations
+
+Integrations & Ecosystem:
+- GitHub (repository management, PR automation, SWE Agent)
+- Vercel & Netlify (one-click deployments with global CDN)
+- Supabase (PostgreSQL database with real-time capabilities, auth, storage)
+- Stripe (payment processing, subscriptions, marketplace payouts)
+- PiPilot Database: Full database-as-a-service with REST API, SDK, and MCP integration
+- 100+ Google Fonts, voice integration, theme switching
+
+Market Position:
+- Canada's first and leading alternative to Lovable.dev, Bolt.new, v0, Replit
+- Superior AI-powered "vibe coding" with production-ready code generation
+- Template marketplace with 70% creator revenue share
+- Enterprise-grade security: encrypted token storage, OAuth 2.0, bank-level encryption
 
 Key Investment Points:
-- Market opportunity: $13.2B no-code market growing at 23% CAGR
-- Traction: 1700+ qualified leads, active user base
-- Revenue model: SaaS subscriptions + 30% marketplace commission
-- Competitive advantage: AI-powered "vibe coding" with visual editing
+- Market opportunity: $13.2B no-code/low-code market growing at 23% CAGR
+- Strong traction: 1700+ qualified leads across investor, creator, partner, and user segments
+- Revenue streams: SaaS subscriptions + 30% marketplace commission + enterprise licensing
+- Competitive moat: PIXEL FORGE AI technology, multi-framework support, integrated ecosystem
+- Canadian innovation: Leading North American AI development platform
+
+Leadership:
+- Hans Ade, Founder & CEO (hanscadx8@gmail.com, hello@pipilot.dev)
+- Vision: Democratizing software development through agentic AI
+- Contact: +237679719353 / +1 (416) 407-1923
 
 Tone: Professional, data-driven, concise but compelling
 Length: 120-150 words
@@ -53,9 +76,9 @@ Generate ONLY a JSON response with this exact structure:
   "content": "Email body in plain text format with proper paragraphs"
 }
 
-Make it personal, avoid buzzwords, and include a clear call-to-action (15-min intro call or demo).`,
+Make it personal, avoid buzzwords, include specific metrics, and clear call-to-action (15-min intro call or demo).`,
 
-    creator: `Generate an inspiring cold email to a creator/educator for PiPilot - AI-Powered App Builder.
+    creator: `Generate an inspiring cold email to a creator/educator for PiPilot - Canada's First Agentic Vibe Coding Platform.
 
 Creator Details:
 - Name: ${lead.leadName}
@@ -63,23 +86,39 @@ Creator Details:
 - Platform: ${lead.source || 'Social media'}
 
 About PiPilot:
-PiPilot is an AI-powered app builder that turns ideas into working applications in minutes. Perfect for creators:
-- Build apps by describing what you want in plain English
-- No coding knowledge needed
-- Monetize on template marketplace (earn 70% from sales)
-- Share your creations with community
-- Free tier + exclusive early access available
+PiPilot (pipilot.dev) is Canada's pioneering AI-powered development platform that turns ideas into working applications through natural conversation. Perfect for creators and educators:
 
-Key Creator Benefits:
-- Turn content ideas into interactive apps
-- Create tools for your audience
-- Passive income through template sales
-- Educational content opportunities
-- Join community of fellow creators
+Creator-Focused Features:
+- Conversational AI: Build apps by describing what you want in plain English - no coding required
+- Voice Integration: Speech-to-text with real-time voice commands for hands-free development
+- Visual Editor: Click-to-edit interface with live preview - see changes instantly
+- Multi-Framework: Create web apps (Next.js, Vite+React) or mobile apps (Expo) from one platform
+- Template System: 100+ pre-built templates for blogs, portfolios, SaaS tools, e-commerce
+- AI Enhancement: Intelligent prompt refinement and component suggestions
+- 100+ Google Fonts + custom typography scaling for beautiful designs
+
+Monetization Opportunities:
+- Template Marketplace: Earn 70% revenue share from template sales (we take only 30%)
+- Creator Dashboard: Real-time analytics, sales tracking, earnings reports
+- Passive Income: Sell templates once, earn repeatedly as others purchase
+- Educational Content: Create tutorials, courses, and learning materials using the platform
+- Custom Integrations: Build tools for your audience with Stripe, Supabase, GitHub integrations
+
+Platform Advantages:
+- PIXEL FORGE AI: Advanced Mistral Pixtral + Codestral models for production-ready code
+- Instant Deployment: Vercel/Netlify integration - deploy globally in one click
+- Community: Join 1700+ creators, developers, and educators building together
+- Database Included: PiPilot Database with full SDK, REST API, and MCP server support
+- Enterprise Security: Bank-level encryption, OAuth 2.0, secure token storage
+
+Support from Leadership:
+- Hans Ade, Founder & CEO - personally committed to creator success
+- Direct support: hello@pipilot.dev or hanscadx8@gmail.com
+- Community-first approach with regular creator spotlights
 
 Tone: Friendly, inspiring, conversational but professional
 Length: 100-130 words
-Personalization: Reference their work/content from context if available
+Personalization: Reference their work/content/audience from context if available
 
 Generate ONLY a JSON response with this exact structure:
 {
@@ -87,9 +126,9 @@ Generate ONLY a JSON response with this exact structure:
   "content": "Email body in plain text format with proper paragraphs"
 }
 
-Make it personal, enthusiastic, and include a clear call-to-action (try free trial or join waitlist).`,
+Make it personal, enthusiastic, highlight earning potential and creative freedom, include clear call-to-action (start creating or explore marketplace).`,
 
-    partner: `Generate a partnership proposal email for PiPilot - AI-Powered App Builder.
+    partner: `Generate a partnership proposal email for PiPilot - Canada's First Agentic Vibe Coding Platform.
 
 Company/Contact Details:
 - Name: ${lead.leadName}
@@ -97,21 +136,54 @@ Company/Contact Details:
 - Context: ${lead.context || 'Potential partner'}
 
 About PiPilot:
-PiPilot is an AI-powered app development platform with partnership opportunities:
-- Integration partnerships (embed PiPilot in your platform)
-- Reseller/affiliate programs (generous commission structure)
-- Co-marketing opportunities (cross-promotion to engaged audiences)
-- API partnerships (white-label solutions)
+PiPilot (pipilot.dev) is Canada's pioneering AI-powered development platform with comprehensive API infrastructure and partnership ecosystem.
+
+Technical Capabilities:
+- PIXEL FORGE AI: Advanced Mistral Pixtral + Codestral integration for enterprise-grade code generation
+- Multi-Framework: Next.js (SSR/SSG), Vite+React (SPA), Expo (mobile) - single platform, multiple targets
+- PiPilot Database: Full database-as-a-service with REST API, TypeScript SDK, and MCP HTTP server
+- PiPilot MCP Server: Model Context Protocol integration for AI assistants (Claude, Cursor, VS Code, Windsurf)
+- SWE Agent: GitHub App for autonomous code generation via PR automation
+- Storage API: File upload/management with Supabase integration
+
+Integration Options:
+- **Platform Embedding**: White-label PiPilot editor in your product with custom branding
+- **API Integration**: REST API + TypeScript SDK for database operations, file management, AI generation
+- **GitHub Integration**: Repository management, PR automation, workflow triggers via SWE Agent
+- **Deployment Pipeline**: Vercel/Netlify webhook integration for automated deployments
+- **Database Connectivity**: Direct PostgreSQL access via Supabase with real-time subscriptions
+- **Authentication System**: OAuth 2.0, JWT tokens, multi-provider auth (GitHub, Google, email)
+
+Partnership Models:
+1. **Technology Integration**: Embed PiPilot AI into your development tools
+2. **Reseller/Affiliate**: 30% recurring commission on customer referrals
+3. **Co-Marketing**: Joint webinars, content, case studies with shared audience reach (1700+ engaged users)
+4. **White-Label**: Custom-branded AI development platform for your enterprise clients
+5. **API Partnership**: Integrate PiPilot Database/Storage into your SaaS platform
 
 Partnership Benefits:
-- Revenue share: Up to 30% recurring commission
-- Technical support: Full API access and documentation
-- Marketing support: Co-branded campaigns and content
-- Product integration: Seamless embedding options
+- Revenue Share: Up to 30% recurring commission on all generated revenue
+- Technical Support: Full API access, comprehensive docs, dedicated integration engineers
+- Marketing Support: Co-branded campaigns, joint press releases, community promotion
+- Product Integration: Seamless embedding with webhook callbacks and SSO
+- Early Access: Beta features, roadmap input, priority support
+- Success Team: Dedicated partnership manager for ongoing collaboration
 
-Tone: Professional, mutually beneficial, strategic
+Existing Ecosystem:
+- GitHub (repository operations, SWE Agent automation)
+- Vercel & Netlify (deployment pipelines)
+- Supabase (database, auth, storage)
+- Stripe (payment processing, marketplace)
+- Pusher (real-time messaging)
+
+Leadership:
+- Hans Ade, Founder & CEO - Open to strategic partnerships
+- Contact: hello@pipilot.dev, hanscadx8@gmail.com
+- Phone: +237679719353 / +1 (416) 407-1923
+
+Tone: Professional, mutually beneficial, strategic, technical
 Length: 130-160 words
-Personalization: Suggest specific integration/partnership based on their platform
+Personalization: Suggest specific integration based on their platform/technology stack
 
 Generate ONLY a JSON response with this exact structure:
 {
@@ -119,9 +191,9 @@ Generate ONLY a JSON response with this exact structure:
   "content": "Email body in plain text format with proper paragraphs"
 }
 
-Focus on mutual value, be specific about integration opportunities, and include clear next step (partnership call).`,
+Focus on technical synergies, mutual value creation, specific integration opportunities, and clear next step (partnership discovery call).`,
 
-    user: `Generate an engaging cold email to a potential user for PiPilot - AI-Powered App Builder.
+    user: `Generate an engaging cold email to a potential user for PiPilot - Canada's First Agentic Vibe Coding Platform.
 
 User Details:
 - Name: ${lead.leadName}
@@ -129,24 +201,65 @@ User Details:
 - Interest: ${lead.source || 'AI/development tools'}
 
 About PiPilot:
-PiPilot is an AI-powered app builder that makes development accessible to everyone:
-- Build full-stack apps with AI assistance
-- Live preview as you build
-- Supports React, Next.js, Node.js, databases, and more
-- Instant deployment to production
-- Free trial with credits to get started
-- Active community of builders
+PiPilot (pipilot.dev) is Canada's pioneering Agentic Vibe Coding Platform - a revolutionary AI development platform that transforms ideas into production-ready applications through natural conversation.
 
-Key Features:
-- Natural language → Working code
-- Visual editor for fine-tuning
-- Template library for quick starts
-- AI code generation and debugging
-- Collaboration tools
+Core Features:
+- **Conversational AI Development**: Describe what you want in plain English - PIXEL FORGE AI (Mistral Pixtral + Codestral) generates production-ready code
+- **Voice Integration**: Speech-to-text with noise-filtered audio input - code by talking
+- **Multi-Framework Support**: Build Next.js (full-stack), Vite+React (SPA), or Expo (mobile) apps from one platform
+- **Visual Editor Revolution**: Click any element to edit - real-time styling, component manipulation, live preview
+- **Template System**: 100+ pre-built templates for SaaS, e-commerce, blogs, portfolios, dashboards
+- **AI Code Generation**: Advanced code generation with context awareness, best practices, security integration
+
+Development Experience:
+- **Live Preview**: See changes instantly in browser with responsive testing
+- **File Management**: VS Code-like file explorer with syntax highlighting
+- **Advanced Typography**: 100+ Google Fonts with dynamic loading and accessibility compliance
+- **Theme Switching**: One-click theme application with CSS variable support
+- **Real-Time Collaboration**: Multiple users editing simultaneously with change synchronization
+- **Git Integration**: Automatic version control with commit history
+
+Integrations & Deployment:
+- **GitHub**: Repository cloning, PR management, issue tracking, SWE Agent automation
+- **Vercel/Netlify**: One-click deployment with global CDN, edge functions, preview URLs
+- **Supabase**: PostgreSQL database, real-time subscriptions, auth, file storage
+- **Stripe**: Payment processing, subscription management (for your apps)
+- **PiPilot Database**: Full database-as-a-service with REST API, TypeScript SDK, MCP server
+
+Advanced Capabilities:
+- **PiPilot SWE Agent**: Autonomous GitHub App - mention @pipilot-swe-agent in issues to generate code via PRs
+- **PiPilot MCP Server**: Connect AI assistants (Claude, Cursor, VS Code) to your database for natural language queries
+- **API Key Management**: Secure external database access with usage tracking
+- **Custom Hooks**: 10+ reusable React hooks for common patterns
+- **UI Components**: 25+ shadcn/ui components for stunning interfaces
+
+Security & Performance:
+- Enterprise-grade security with encrypted token storage and OAuth 2.0
+- Bank-level encryption for all data and communications
+- Automatic code optimization, tree-shaking, lazy loading
+- Performance monitoring with real-time metrics
+
+Pricing & Access:
+- Free trial with credits to explore all features
+- Pay-as-you-go credit system (starts at $0.25 per message)
+- Template marketplace access (buy/sell templates)
+- Active community of 1700+ builders
+- Comprehensive documentation and tutorials
+
+Why PiPilot vs. Alternatives:
+- Superior to Lovable.dev, Bolt.new, v0, Replit for Canadian market
+- PIXEL FORGE AI generates production-ready code (not prototypes)
+- Multi-framework support (not limited to one stack)
+- Integrated database, storage, auth (not just frontend)
+- Template monetization (earn while learning)
+
+Leadership:
+- Hans Ade, Founder & CEO - Built by developers for developers
+- Contact: hello@pipilot.dev, hanscadx8@gmail.com
 
 Tone: Enthusiastic, helpful, technical but approachable
 Length: 110-140 words
-Personalization: Reference their interests/projects from context
+Personalization: Reference their interests/projects/tech stack from context
 
 Generate ONLY a JSON response with this exact structure:
 {
@@ -154,7 +267,7 @@ Generate ONLY a JSON response with this exact structure:
   "content": "Email body in plain text format with proper paragraphs"
 }
 
-Highlight ease of use, share impressive capabilities, and include clear call-to-action (start free trial).`,
+Highlight ease of use, impressive capabilities, specific features relevant to their background, and clear call-to-action (start free trial or explore templates).`,
 
     other: `Generate a professional introductory email for PiPilot - AI-Powered App Builder.
 
@@ -264,10 +377,14 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
                 Hans Ade
               </p>
               <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">
-                Founder, PiPilot
+                Founder & CEO, PiPilot
               </p>
               <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 14px;">
-                <a href="mailto:hello@pipilot.dev" style="color: ${color.secondary}; text-decoration: none;">hello@pipilot.dev</a>
+                <a href="mailto:hello@pipilot.dev" style="color: ${color.secondary}; text-decoration: none;">hello@pipilot.dev</a> • 
+                <a href="mailto:hanscadx8@gmail.com" style="color: ${color.secondary}; text-decoration: none;">hanscadx8@gmail.com</a>
+              </p>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">
+                +1 (416) 407-1923 • +237 679 719 353
               </p>
             </td>
           </tr>
@@ -283,31 +400,31 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
                   <td width="50%" style="padding: 0 10px 0 0; vertical-align: top;">
                     <p style="margin: 0 0 12px 0;">
                       <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">🤖</span>
-                      <strong style="color: #111827;">AI-Powered</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">Build with natural language</span>
+                      <strong style="color: #111827;">PIXEL FORGE AI</strong><br>
+                      <span style="color: #6b7280; font-size: 14px;">Agentic vibe coding with Mistral</span>
                     </p>
                   </td>
                   <td width="50%" style="padding: 0 0 0 10px; vertical-align: top;">
                     <p style="margin: 0 0 12px 0;">
                       <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">⚡</span>
-                      <strong style="color: #111827;">Instant Deploy</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">Production-ready in minutes</span>
+                      <strong style="color: #111827;">Multi-Framework</strong><br>
+                      <span style="color: #6b7280; font-size: 14px;">Next.js, React, Expo - one platform</span>
                     </p>
                   </td>
                 </tr>
                 <tr>
                   <td width="50%" style="padding: 12px 10px 0 0; vertical-align: top;">
                     <p style="margin: 0;">
-                      <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">🎨</span>
-                      <strong style="color: #111827;">Visual Editor</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">Edit with live preview</span>
+                      <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">🗄️</span>
+                      <strong style="color: #111827;">PiPilot Database</strong><br>
+                      <span style="color: #6b7280; font-size: 14px;">Full DB + SDK + MCP server</span>
                     </p>
                   </td>
                   <td width="50%" style="padding: 12px 0 0 10px; vertical-align: top;">
                     <p style="margin: 0;">
-                      <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">💰</span>
-                      <strong style="color: #111827;">Marketplace</strong><br>
-                      <span style="color: #6b7280; font-size: 14px;">Monetize your templates</span>
+                      <span style="color: ${color.primary}; font-size: 20px; margin-right: 8px;">🔗</span>
+                      <strong style="color: #111827;">Full Integration</strong><br>
+                      <span style="color: #6b7280; font-size: 14px;">GitHub, Vercel, Supabase, Stripe</span>
                     </p>
                   </td>
                 </tr>
