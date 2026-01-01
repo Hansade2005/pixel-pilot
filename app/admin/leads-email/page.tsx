@@ -46,21 +46,33 @@ export default function LeadsEmailPage() {
   }, [])
 
   const checkAuth = async () => {
-    const supabase = createClient()
-    const isAdmin = await checkAdminAccess(supabase)
+    try {
+      const supabase = createClient()
+      const { data: { user }, error } = await supabase.auth.getUser()
 
-    if (!isAdmin) {
-      toast({
-        title: "Access denied",
-        description: "You must be an admin to access this page",
-        variant: "destructive"
-      })
-      router.push("/")
-      return
+      if (error || !user) {
+        router.push('/auth/login')
+        return
+      }
+
+      if (!checkAdminAccess(user)) {
+        toast({
+          title: "Access denied",
+          description: "You must be an admin to access this page",
+          variant: "destructive"
+        })
+        router.push("/")
+        return
+      }
+
+      await loadLeads()
+      await loadEmailTracking()
+    } catch (error) {
+      console.error('Error checking admin access:', error)
+      router.push('/workspace')
+    } finally {
+      setLoading(false)
     }
-
-    await loadLeads()
-    await loadEmailTracking()
   }
 
   const loadLeads = async () => {
