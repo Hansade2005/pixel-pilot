@@ -577,14 +577,14 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
             </button>
             <button
               onClick={(e) => handleCloneProject(project.id, e)}
-              className="absolute top-3 left-14 p-2 bg-blue-500/90 hover:bg-blue-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              className="absolute top-3 left-16 p-2 bg-blue-500/90 hover:bg-blue-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
               title="Clone project"
             >
               <Copy className="w-4 h-4" />
             </button>
             <button
               onClick={(e) => handlePublishTemplate(project.id, e)}
-              className="absolute top-3 left-[4.5rem] p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              className="absolute top-3 left-24 p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
               title="Publish as template"
             >
               <Upload className="w-4 h-4" />
