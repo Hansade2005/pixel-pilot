@@ -501,7 +501,7 @@ export function ModernSidebar({
   return (
     <>
       <aside
-        className={`hidden lg:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
+        className={`hidden md:flex bg-black flex-col border-r border-gray-800 transition-all duration-300 relative ${
           shouldExpand ? 'w-64' : 'w-14'
         }`}
         onMouseEnter={() => setIsHovered(true)}
