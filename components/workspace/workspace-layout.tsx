@@ -949,6 +949,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       {/* Desktop Layout */}
       {!isMobile && (
         <>
+          {/* Tablet Sidebar Toggle Button - shows on tablets just like mobile */}
+          <div className="fixed top-4 left-4 z-50 md:block lg:hidden">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0 bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title="Toggle sidebar"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </Button>
+          </div>
+
           {/* Always use ModernSidebar for desktop */}
           <ModernSidebar
             user={user}
