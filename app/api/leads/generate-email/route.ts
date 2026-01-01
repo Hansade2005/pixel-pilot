@@ -204,7 +204,7 @@ About PiPilot:
 PiPilot (pipilot.dev) is Canada's pioneering Agentic Vibe Coding Platform - a revolutionary AI development platform that transforms ideas into production-ready applications through natural conversation.
 
 Core Features:
-- **Conversational AI Development**: Describe what you want in plain English - PIXEL FORGE AI (Mistral Pixtral + Codestral) generates production-ready code
+- **Conversational AI Development**: Describe what you want in plain English - PIXEL FORGE AI (Mistral Pixtral + Grok Code Fast 1 & Claude Sonnet 4.5) generates production-ready code
 - **Voice Integration**: Speech-to-text with noise-filtered audio input - code by talking
 - **Multi-Framework Support**: Build Next.js (full-stack), Vite+React (SPA), or Expo (mobile) apps from one platform
 - **Visual Editor Revolution**: Click any element to edit - real-time styling, component manipulation, live preview
