@@ -722,6 +722,120 @@ export function StudyGroupsList() {
 
 ## 🎯 Best Practices
 
+### 🔧 Testing & Validation Requirements
+
+**⚠️ IMPORTANT**: When implementing any feature using PiPilot Database API, you **MUST** follow this validation workflow:
+
+#### 1. Implementation Complete → Create Test Script
+After implementing any PiPilot database functionality, immediately create a standalone JavaScript test script following this exact  exampla pattern  to test all the implemented methods:
+
+```javascript
+// Test script to fetch Pipilot database and table information
+async function testPipilotAPI() {
+  const API_KEY = ''; // Fill with your actual API key
+  const DATABASE_ID = '61'; // Your database ID
+
+  // Table IDs (update these based on your schema)
+  const USERS_TABLE_ID = '46';
+  const WIDGETS_TABLE_ID = '50';
+  const DATA_SOURCES_TABLE_ID = '51';
+
+  try {
+    console.log('Testing Pipilot API endpoints...\n');
+
+    // Test 1: Fetch records from your primary table
+    console.log('1. Fetching records...');
+    const recordsResponse = await fetch(`https://pipilot.dev/api/v1/databases/${DATABASE_ID}/tables/${USERS_TABLE_ID}/records`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (recordsResponse.ok) {
+      const recordsData = await recordsResponse.json();
+      console.log('✅ Records fetched successfully:', JSON.stringify(recordsData, null, 2));
+    } else {
+      console.log(`❌ Records fetch failed: ${recordsResponse.status} ${recordsResponse.statusText}`);
+    }
+
+    // Test 2: Insert a test record
+    console.log('\n2. Testing record insertion...');
+    const testData = {
+      // Add your test data fields here based on your table schema
+      name: 'Test Record',
+      created_at: new Date().toISOString()
+    };
+
+    const insertResponse = await fetch(`https://pipilot.dev/api/v1/databases/${DATABASE_ID}/tables/${USERS_TABLE_ID}/records`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data: testData })
+    });
+
+    if (insertResponse.ok) {
+      const insertData = await insertResponse.json();
+      console.log('✅ Record insertion successful:', JSON.stringify(insertData, null, 2));
+      
+      // Test 3: Fetch the inserted record to verify
+      const recordId = insertData.record.id;
+      console.log('\n3. Verifying inserted record...');
+      const verifyResponse = await fetch(`https://pipilot.dev/api/v1/databases/${DATABASE_ID}/tables/${USERS_TABLE_ID}/records/${recordId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (verifyResponse.ok) {
+        const verifyData = await verifyResponse.json();
+        console.log('✅ Record verification successful:', JSON.stringify(verifyData, null, 2));
+      }
+    } else {
+      const errorData = await insertResponse.json();
+      console.log(`❌ Record insertion failed: ${insertResponse.status} ${insertResponse.statusText}`, JSON.stringify(errorData, null, 2));
+    }
+
+  } catch (error) {
+    console.error('❌ Error testing Pipilot API:', error);
+  }
+}
+
+// Run the test
+testPipilotAPI();
+```
+
+#### 2. Run Test Using Node.js
+Execute the test script using Node Machine tool:
+
+```bash
+node test-your-feature.js
+```
+
+#### 3. Validation Checklist
+Before marking implementation complete, ensure:
+- ✅ Test script runs without errors
+- ✅ All CRUD operations work (Create, Read, Update, Delete)
+- ✅ Response structures match documentation
+- ✅ Error handling works properly
+- ✅ Data integrity is maintained
+- ✅ No authentication issues
+
+#### 4. Common Test Scenarios
+Include tests for:
+- **Basic CRUD**: Create → Read → Update → Delete
+- **Bulk operations**: Multiple record insertions
+- **Error cases**: Invalid data, missing fields, wrong table IDs
+- **Edge cases**: Large datasets, special characters, JSON fields
+- **File uploads**: If using storage API
+
+**Failure to create and run tests will result in implementation rejection.**
+
 ### 1. Data Access Pattern
 ```javascript
 // ✅ GOOD: Access data through data_json field
