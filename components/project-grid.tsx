@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Trash2, Upload, Share2 } from "lucide-react"
+import { ExternalLink, Trash2, Upload, Share2, Copy } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -71,6 +71,8 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [publishCategory, setPublishCategory] = useState('')
   const [templateType, setTemplateType] = useState<'free' | 'paid'>('free')
   const [templatePrice, setTemplatePrice] = useState('')
+  const [cloneProject, setCloneProject] = useState<Project | null>(null)
+  const [cloneName, setCloneName] = useState('')
 
   // Helper function to format user's name with possessive
   const getUserProjectsTitle = () => {
@@ -242,6 +244,71 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setPublishCategory('')
       setTemplateType('free')
       setTemplatePrice('')
+    }
+  }
+
+  const handleCloneProject = async (projectId: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const project = projects.find(p => p.id === projectId)
+    if (project) {
+      setCloneProject(project)
+      setCloneName(`${project.name} Copy`)
+    }
+  }
+
+  const confirmCloneProject = async () => {
+    if (!cloneProject || !cloneName.trim() || !user) return
+
+    try {
+      await storageManager.init()
+
+      // Create new project
+      const slug = cloneName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      const newProject = await storageManager.createWorkspace({
+        name: cloneName.trim(),
+        description: `Cloned from ${cloneProject.name}`,
+        slug,
+        userId: user.id,
+        isPublic: false,
+        isTemplate: false,
+        lastActivity: new Date().toISOString(),
+        deploymentStatus: 'not_deployed'
+      })
+
+      // Copy all files from original project
+      const originalFiles = await storageManager.getFiles(cloneProject.id)
+      for (const file of originalFiles) {
+        await storageManager.createFile({
+          workspaceId: newProject.id,
+          name: file.name,
+          path: file.path,
+          content: file.content,
+          fileType: file.fileType,
+          type: file.type,
+          size: file.size,
+          isDirectory: file.isDirectory
+        })
+      }
+
+      // Add the new project to the local state
+      // Convert Workspace to Project format
+      const newProjectData: Project = {
+        id: newProject.id,
+        name: newProject.name,
+        thumbnail: generateThumbnailUrl(newProject.name, newProject.description || 'Cloned project', newProject.id),
+        description: newProject.description || 'Cloned project',
+        category: 'Cloned',
+        createdAt: newProject.createdAt
+      }
+      setProjects(prev => [newProjectData, ...prev])
+
+      setCloneProject(null)
+      setCloneName('')
+    } catch (error) {
+      console.error('Error cloning project:', error)
+      alert('Failed to clone project. Please try again.')
     }
   }
 
@@ -509,8 +576,15 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
               <Trash2 className="w-4 h-4" />
             </button>
             <button
+              onClick={(e) => handleCloneProject(project.id, e)}
+              className="absolute top-3 left-14 p-2 bg-blue-500/90 hover:bg-blue-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              title="Clone project"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+            <button
               onClick={(e) => handlePublishTemplate(project.id, e)}
-              className="absolute top-3 left-14 p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
+              className="absolute top-3 left-[4.5rem] p-2 bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 z-10 shadow-lg hover:scale-110"
               title="Publish as template"
             >
               <Upload className="w-4 h-4" />
@@ -579,6 +653,54 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         onConfirm={confirmPublishTemplate}
         isPublishing={isPublishing}
       />
+
+      {/* Clone Project Dialog */}
+      <Dialog open={!!cloneProject} onOpenChange={(open) => {
+        if (!open) {
+          setCloneProject(null)
+          setCloneName('')
+        }
+      }}>
+        <DialogContent className="bg-gray-900 border-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-blue-400">Clone Project</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Create a copy of <span className="font-semibold text-white">"{cloneProject?.name}"</span> with all its files.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="clone-name" className="text-gray-200">New Project Name</Label>
+              <Input
+                id="clone-name"
+                value={cloneName}
+                onChange={(e) => setCloneName(e.target.value)}
+                placeholder="Enter name for cloned project"
+                className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCloneProject(null)
+                setCloneName('')
+              }}
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmCloneProject}
+              disabled={!cloneName.trim()}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Clone Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

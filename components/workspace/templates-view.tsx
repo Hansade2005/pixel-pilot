@@ -26,6 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 interface PublicTemplate {
   id: string
@@ -412,90 +418,100 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
       </div>
 
       {/* Filters & Search Section */}
-      <div className="bg-gray-800/50 border-b border-gray-700 sticky top-0 z-20 py-4 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto space-y-4">
-          {/* Currency Indicator */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-700/50 rounded-lg text-xs text-white/80 w-fit">
-            <span>
-              💵 Prices in <strong>CAD</strong> • 1 USD = ${exchangeRate.toFixed(2)} CAD
-            </span>
-          </div>
+      <Accordion type="single" collapsible className="bg-gray-800/50 border-b border-gray-700 sticky top-0 z-20">
+        <AccordionItem value="filters" className="border-none">
+          <AccordionTrigger className="px-4 sm:px-6 py-4 hover:no-underline">
+            <div className="flex items-center gap-2 text-white font-medium">
+              <Sparkles className="h-4 w-4" />
+              Search & Filter Templates
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 sm:px-6 pb-4">
+            <div className="space-y-4">
+              {/* Currency Indicator */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-700/50 rounded-lg text-xs text-white/80 w-fit">
+                <span>
+                  💵 Prices in <strong>CAD</strong> • 1 USD = ${exchangeRate.toFixed(2)} CAD
+                </span>
+              </div>
 
-          {/* Search Bar */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Search templates by name, description, or creator..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+              {/* Search Bar */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Search templates by name, description, or creator..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-          {/* Filter and Sort Controls */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Category Filter */}
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Dashboard">Dashboard</SelectItem>
-                <SelectItem value="E-Commerce">E-Commerce</SelectItem>
-                <SelectItem value="Portfolio">Portfolio</SelectItem>
-                <SelectItem value="AI">AI Tools</SelectItem>
-                <SelectItem value="SaaS">SaaS</SelectItem>
-                <SelectItem value="Business">Business</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Filter and Sort Controls */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Category Filter */}
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-700 border-gray-600">
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="Dashboard">Dashboard</SelectItem>
+                    <SelectItem value="E-Commerce">E-Commerce</SelectItem>
+                    <SelectItem value="Portfolio">Portfolio</SelectItem>
+                    <SelectItem value="AI">AI Tools</SelectItem>
+                    <SelectItem value="SaaS">SaaS</SelectItem>
+                    <SelectItem value="Business">Business</SelectItem>
+                  </SelectContent>
+                </Select>
 
-            {/* Sort Filter */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
-                <SelectItem value="trending">Trending</SelectItem>
-                <SelectItem value="newest">Newest</SelectItem>
-                <SelectItem value="price-low">Price: Low to High</SelectItem>
-                <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="top-rated">Top Rated</SelectItem>
-              </SelectContent>
-            </Select>
+                {/* Sort Filter */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-700 border-gray-600">
+                    <SelectItem value="trending">Trending</SelectItem>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="price-low">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high">Price: High to Low</SelectItem>
+                    <SelectItem value="top-rated">Top Rated</SelectItem>
+                  </SelectContent>
+                </Select>
 
-            {/* Price Range Min */}
-            <input
-              type="number"
-              placeholder="Min price"
-              value={minPrice}
-              onChange={(e) => setMinPrice(Number(e.target.value))}
-              className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+                {/* Price Range Min */}
+                <input
+                  type="number"
+                  placeholder="Min price"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(Number(e.target.value))}
+                  className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
 
-            {/* Price Range Max */}
-            <input
-              type="number"
-              placeholder="Max price"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+                {/* Price Range Max */}
+                <input
+                  type="number"
+                  placeholder="Max price"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-          {/* Paid Only Checkbox */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="paidOnly"
-              checked={showOnlyPaid}
-              onChange={(e) => setShowOnlyPaid(e.target.checked)}
-              className="rounded border-gray-600"
-            />
-            <label htmlFor="paidOnly" className="text-sm text-white/80">Show only paid templates</label>
-          </div>
-        </div>
-      </div>
+              {/* Paid Only Checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="paidOnly"
+                  checked={showOnlyPaid}
+                  onChange={(e) => setShowOnlyPaid(e.target.checked)}
+                  className="rounded border-gray-600"
+                />
+                <label htmlFor="paidOnly" className="text-sm text-white/80">Show only paid templates</label>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Templates Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
