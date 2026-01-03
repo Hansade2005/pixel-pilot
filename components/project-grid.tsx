@@ -74,6 +74,23 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [cloneProject, setCloneProject] = useState<Project | null>(null)
   const [cloneName, setCloneName] = useState('')
 
+  // Get current user on component mount
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const supabase = createClient()
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error) {
+        console.error('Error getting current user:', error)
+        return
+      }
+      
+      setUser(user)
+    }
+
+    getCurrentUser()
+  }, [])
+
   // Helper function to format user's name with possessive
   const getUserProjectsTitle = () => {
     if (userProfile?.full_name) {
@@ -144,7 +161,10 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   }
 
   const confirmPublishTemplate = async () => {
-    if (!projectToPublish || !user) return
+    if (!projectToPublish || !user) {
+      alert('You must be signed in to publish templates.')
+      return
+    }
     
     // Validate price for paid templates
     if (templateType === 'paid') {
