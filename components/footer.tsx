@@ -60,7 +60,31 @@ export function Footer() {
             </div>
             
             <div className="flex items-center overflow-hidden">
-              <div className="flex items-center animate-marquee whitespace-nowrap">
+              {/* Mobile: Single badge marquee */}
+              <div className="flex items-center animate-marquee-mobile md:hidden whitespace-nowrap">
+                <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-4">
+                  <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '200px', height: '43px'}} width="200" height="43" />
+                </a>
+                <a href="https://dang.ai/" target="_blank" className="mr-4">
+                  <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Dang.ai" style={{width: '120px', height: '43px'}} width="120" height="43" />
+                </a>
+                <a target="_blank" href="https://softwarebolt.com" className="mr-4">
+                  <img src="https://softwarebolt.com/assets/images/badge.png" alt="Software Bolt" style={{width: '120px', height: '43px'}} width="120" height="43" />
+                </a>
+                {/* Duplicate for seamless loop */}
+                <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-4">
+                  <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '200px', height: '43px'}} width="200" height="43" />
+                </a>
+                <a href="https://dang.ai/" target="_blank" className="mr-4">
+                  <img src="https://cdn.prod.website-files.com/63d8afd87da01fb58ea3fbcb/6487e2868c6c8f93b4828827_dang-badge.png" alt="Dang.ai" style={{width: '120px', height: '43px'}} width="120" height="43" />
+                </a>
+                <a target="_blank" href="https://softwarebolt.com" className="mr-4">
+                  <img src="https://softwarebolt.com/assets/images/badge.png" alt="Software Bolt" style={{width: '120px', height: '43px'}} width="120" height="43" />
+                </a>
+              </div>
+
+              {/* Desktop: Multiple badges marquee */}
+              <div className="hidden md:flex items-center animate-marquee whitespace-nowrap">
                 <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="mr-8">
                   <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
                 </a>
