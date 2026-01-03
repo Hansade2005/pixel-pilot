@@ -415,14 +415,10 @@ export default function LandingPage() {
             Create apps and websites by chatting with AI
           </p>
           
-          {/* Product Hunt Badge & Visual Editor Button */}
+          {/* Visual Editor Button */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
-              <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
-            </a>
-            
             {/* Visual Editor Vibe Card Button */}
-            <Link 
+            <Link
               href="/features/visual-editor"
               className="group relative flex items-center gap-3 px-5 py-3 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-500/30 hover:border-cyan-400/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20"
             >
@@ -438,7 +434,7 @@ export default function LandingPage() {
                 </span>
               </div>
               <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-              
+
               {/* Animated glow effect */}
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
             </Link>

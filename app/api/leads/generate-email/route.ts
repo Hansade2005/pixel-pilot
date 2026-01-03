@@ -333,7 +333,7 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
           <tr>
             <td style="background: linear-gradient(135deg, ${color.primary} 0%, ${color.secondary} 100%); padding: 40px 30px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 12px;">
-                <img src="https://pipilot.dev/logo.png" alt="PiPilot Logo" style="width: 32px; height: 32px; object-fit: contain;">
+                <img src="https://pipilot.dev/logo.png" alt="PiPilot Logo" style="width: 52px; height: 52px; object-fit: contain;">
                 PiPilot
               </h1>
               <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px; font-weight: 400;">

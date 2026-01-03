@@ -28,8 +28,6 @@ import {
   LogOut, 
   Briefcase, 
   Rocket,
-  Gift,
-  Image as ImageIcon,
   Bell,
   ChevronDown,
   Zap,
@@ -306,12 +304,6 @@ export function Navigation() {
                     </div>
                   )}
 
-                  <button className="text-white hover:text-gray-300 transition-colors">
-                    <Gift className="w-5 h-5" />
-                  </button>
-                  <button className="text-white hover:text-gray-300 transition-colors">
-                    <ImageIcon className="w-5 h-5" />
-                  </button>
                   <NotificationCenter />
                 </>
               )}
