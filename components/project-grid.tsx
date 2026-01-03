@@ -194,29 +194,30 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         console.log('📄 Template Publisher: Sample files:', files.slice(0, 5).map(f => ({ name: f.name, path: f.path, workspaceId: f.workspaceId, contentLength: f.content?.length })))
       }
 
-      // Check that all files have required properties
-      const invalidFiles = files.filter(file =>
-        !file.name ||
-        !file.path ||
-        file.content === null ||
-        file.content === undefined ||
-        typeof file.content !== 'string'
-      )
-      if (invalidFiles.length > 0) {
-        console.error('Invalid files found:', invalidFiles.map(f => ({
-          name: f.name,
-          path: f.path,
-          contentType: typeof f.content,
-          contentLength: f.content?.length,
-          hasFileType: !!f.fileType,
-          hasType: !!f.type
-        })))
-        alert('Cannot publish template: Some files have invalid content or missing properties.')
-        return
+      // Filter out large binary files that would make the JSON too big
+      const MAX_FILE_SIZE = 50 * 1024 // 50KB per file
+      const BINARY_EXTENSIONS = ['.woff', '.woff2', '.ttf', '.otf', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp', '.mp4', '.mp3', '.wav', '.pdf']
+
+      let filteredFiles = files.filter(file => {
+        const isBinary = BINARY_EXTENSIONS.some(ext => file.path.toLowerCase().endsWith(ext))
+        const isTooLarge = file.content.length > MAX_FILE_SIZE
+
+        if (isBinary || isTooLarge) {
+          console.warn(`Excluding file from template: ${file.path} (${isBinary ? 'binary' : 'large'} file, ${file.content.length} bytes)`)
+          return false
+        }
+        return true
+      })
+
+      console.log(`Filtered ${files.length - filteredFiles.length} large/binary files, keeping ${filteredFiles.length} files`)
+
+      // If we filtered too many files, warn the user
+      if (filteredFiles.length < files.length * 0.5) {
+        alert(`Warning: ${files.length - filteredFiles.length} large or binary files were excluded from the template. Only ${filteredFiles.length} files will be included.`)
       }
 
       // Prepare files for JSONB storage
-      const filesData = files.map(file => ({
+      const filesData = filteredFiles.map(file => ({
         name: file.name,
         content: file.content, // Already validated as string
         path: file.path,
@@ -235,16 +236,55 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         return
       }
 
-      console.log('Publishing template with files:', {
-        projectId: projectToPublish.id,
-        fileCount: files.length,
-        filesDataSample: filesData.slice(0, 2), // Log first 2 files for debugging
-        filesDataLength: serializedFilesData.length,
-        totalSize: new Blob([serializedFilesData]).size
-      })
+      // Check if the data is too large for Supabase (limit is around 1MB for REST API)
+      const dataSizeMB = serializedFilesData.length / (1024 * 1024)
+      if (dataSizeMB > 1) {
+        console.warn(`Template data is ${dataSizeMB.toFixed(2)}MB, which exceeds Supabase's 1MB limit for JSONB columns`)
+        alert(`Cannot publish template: File data is too large (${dataSizeMB.toFixed(2)}MB) even after filtering. Consider creating a smaller template with fewer files.`)
+        return
+      }
 
-      // Insert into public_templates table
-      const { data: templateData, error: templateError } = await supabase
+      // Create template data object
+      const templateJsonData = {
+        name: publishName,
+        description: publishDescription,
+        files: filesData,
+        metadata: {
+          totalFiles: filteredFiles.length,
+          createdAt: new Date().toISOString(),
+          version: '1.0'
+        }
+      }
+
+      // Convert to JSON string
+      const jsonContent = JSON.stringify(templateJsonData, null, 2)
+      const jsonBlob = new Blob([jsonContent], { type: 'application/json' })
+
+      // Create unique filename for the template
+      const templateFileName = `template-${projectToPublish.id}-${Date.now()}.json`
+
+      // Upload to Supabase Storage
+      console.log('Uploading template to Supabase Storage...')
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('templates')
+        .upload(templateFileName, jsonBlob, {
+          contentType: 'application/json',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError)
+        alert('Failed to upload template files to storage. Please try again.')
+        return
+      }
+
+      // Get the public URL for the uploaded file
+      const { data: { publicUrl } } = supabase.storage
+        .from('templates')
+        .getPublicUrl(templateFileName)
+
+      // Insert into public_templates table with storage URL
+      const { data: insertedTemplate, error: templateError } = await supabase
         .from('public_templates')
         .insert({
           user_id: user.id,
@@ -252,7 +292,12 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           description: publishDescription,
           thumbnail_url: projectToPublish.thumbnail,
           author_name: profile?.full_name || null,
-          files: filesData,
+          files: {
+            storageUrl: publicUrl,
+            fileCount: filteredFiles.length,
+            totalSize: jsonContent.length,
+            uploadedAt: new Date().toISOString()
+          }, // Store metadata instead of raw files
           usage_count: 0,
           preview_url: publishPreviewUrl || null
         })
@@ -266,7 +311,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       const { error: pricingError } = await supabase
         .from('template_pricing')
         .insert({
-          template_id: templateData.id,
+          template_id: insertedTemplate.id,
           price: price,
           currency: 'USD',
           pricing_type: templateType === 'paid' ? 'one-time' : 'freemium',
@@ -279,7 +324,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       const { error: metadataError } = await supabase
         .from('template_metadata')
         .insert({
-          template_id: templateData.id,
+          template_id: insertedTemplate.id,
           category: publishCategory || 'other',
           tags: [],
           total_sales: 0,
@@ -294,7 +339,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
       if (metadataError) throw metadataError
 
-      alert(`Template published successfully${templateType === 'paid' ? ` - Price: $${price.toFixed(2)}` : ' (Free)'}!`)
+      alert(`Template published successfully${templateType === 'paid' ? ` - Price: $${price.toFixed(2)}` : ' (Free)'}! Files stored at: ${publicUrl}`)
     } catch (error) {
       console.error('Error publishing template:', error)
       alert('Failed to publish template. Please try again.')

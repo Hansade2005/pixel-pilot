@@ -329,11 +329,28 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
         slug
       })
 
-      // Copy files from template to new project
+      // Get template files - check if stored in Supabase Storage
+      let templateFiles: any[] = []
+      
       if (workspace && template.files) {
-        const files = Array.isArray(template.files) ? template.files : []
+        if (template.files.storageUrl) {
+          // Download template data from Supabase Storage
+          console.log('Downloading template from storage:', template.files.storageUrl)
+          const response = await fetch(template.files.storageUrl)
+          if (!response.ok) {
+            throw new Error(`Failed to download template: ${response.statusText}`)
+          }
+          const templateData = await response.json()
+          templateFiles = templateData.files || []
+          console.log(`Downloaded ${templateFiles.length} files from storage`)
+        } else if (Array.isArray(template.files)) {
+          // Legacy format - files stored directly in database
+          templateFiles = template.files
+          console.log(`Using ${templateFiles.length} files from legacy database format`)
+        }
         
-        for (const file of files) {
+        // Create files in the new workspace
+        for (const file of templateFiles) {
           await storageManager.createFile({
             workspaceId: workspace.id,
             name: file.name,
