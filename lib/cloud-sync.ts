@@ -53,6 +53,28 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const backupFilename = `backup-${userId}-${timestamp}.json`
 
+    // CLEANUP: Delete old backup file before uploading new one
+    const { data: existingBackup } = await supabase
+      .from('user_backups')
+      .select('storage_url')
+      .eq('user_id', userId)
+      .single()
+
+    if (existingBackup?.storage_url) {
+      try {
+        // Extract filename from storage URL
+        const oldFileName = existingBackup.storage_url.split('/').pop()
+        if (oldFileName && oldFileName.startsWith('backup-')) {
+          console.log(`uploadBackupToCloud: Cleaning up old backup file: ${oldFileName}`)
+          await supabase.storage.from('backups').remove([oldFileName])
+          console.log('uploadBackupToCloud: Old backup file deleted successfully')
+        }
+      } catch (cleanupError) {
+        console.warn('uploadBackupToCloud: Failed to cleanup old backup file:', cleanupError)
+        // Continue with upload even if cleanup fails
+      }
+    }
+
     // Convert data to JSON blob
     const jsonString = JSON.stringify(data, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
