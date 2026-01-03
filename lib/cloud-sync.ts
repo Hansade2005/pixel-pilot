@@ -5,7 +5,7 @@ import { storageManager } from "@/lib/storage-manager"
 const supabase = createClient()
 
 /**
- * Upload current IndexedDB data to Supabase as a backup
+ * Upload current IndexedDB data to Supabase Storage as a backup
  */
 export async function uploadBackupToCloud(userId: string): Promise<boolean> {
   try {
@@ -27,15 +27,15 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
       // Check if there's existing cloud backup
       const { data: existingBackup, error: fetchError } = await supabase
         .from('user_backups')
-        .select('backup_data, created_at')
+        .select('backup_data, storage_url, created_at')
         .eq('user_id', userId)
         .single()
 
-      if (!fetchError && existingBackup?.backup_data) {
-        const cloudData = existingBackup.backup_data
-        const hasCloudData = Object.values(cloudData).some((tableData: any) =>
-          Array.isArray(tableData) && tableData.length > 0
-        )
+      if (!fetchError && (existingBackup?.backup_data || existingBackup?.storage_url)) {
+        const hasCloudData = existingBackup.storage_url ||
+          (existingBackup.backup_data && Object.values(existingBackup.backup_data).some((tableData: any) =>
+            Array.isArray(tableData) && tableData.length > 0
+          ))
 
         if (hasCloudData) {
           console.log('uploadBackupToCloud: Cloud has data but local is empty - likely storage was cleared. Skipping backup to prevent data loss.')
@@ -49,12 +49,45 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
       console.log('uploadBackupToCloud: Both local and cloud data appear empty, proceeding with backup')
     }
 
-    // Save to Supabase
+    // Create backup filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const backupFilename = `backup-${userId}-${timestamp}.json`
+
+    // Convert data to JSON blob
+    const jsonString = JSON.stringify(data, null, 2)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+
+    console.log(`uploadBackupToCloud: Uploading ${blob.size} bytes to storage`)
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('backups')
+      .upload(backupFilename, blob, {
+        contentType: 'application/json',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('uploadBackupToCloud: Storage upload error:', uploadError)
+      throw uploadError
+    }
+
+    // Get the public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from('backups')
+      .getPublicUrl(backupFilename)
+
+    if (!urlData?.publicUrl) {
+      throw new Error('Failed to get public URL for uploaded backup')
+    }
+
+    // Save metadata to database
     const { error } = await supabase
       .from('user_backups')
       .upsert({
         user_id: userId,
-        backup_data: data,
+        backup_data: null, // Clear old JSONB data
+        storage_url: urlData.publicUrl,
         created_at: new Date().toISOString()
       }, {
         onConflict: 'user_id'
@@ -74,6 +107,7 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
         onConflict: 'user_id'
       })
 
+    console.log(`uploadBackupToCloud: Successfully uploaded backup to ${urlData.publicUrl}`)
     return true
   } catch (error) {
     console.error("Error uploading backup to cloud:", error)
@@ -113,23 +147,31 @@ export async function smartBackupToCloud(userId: string): Promise<boolean> {
       // Check if there's existing cloud backup
       const { data: existingBackup, error: fetchError } = await supabase
         .from('user_backups')
-        .select('backup_data, created_at')
+        .select('backup_data, storage_url, created_at')
         .eq('user_id', userId)
         .single()
 
       if (fetchError) {
         console.log('smartBackupToCloud: Error fetching cloud backup:', fetchError)
-      } else if (existingBackup?.backup_data) {
-        const cloudData = existingBackup.backup_data
-        const cloudTableCounts = Object.entries(cloudData).map(([table, items]) => ({
-          table,
-          count: Array.isArray(items) ? items.length : 0
-        }))
-        console.log('smartBackupToCloud: Cloud data table counts:', cloudTableCounts)
+      } else if (existingBackup?.backup_data || existingBackup?.storage_url) {
+        let hasCloudData = false
 
-        const hasCloudData = Object.values(cloudData).some((tableData: any) =>
-          Array.isArray(tableData) && tableData.length > 0
-        )
+        if (existingBackup.storage_url) {
+          // For storage-based backups, we assume they have data (can't check without downloading)
+          console.log('smartBackupToCloud: Found storage-based cloud backup')
+          hasCloudData = true
+        } else if (existingBackup.backup_data) {
+          const cloudData = existingBackup.backup_data
+          const cloudTableCounts = Object.entries(cloudData).map(([table, items]) => ({
+            table,
+            count: Array.isArray(items) ? items.length : 0
+          }))
+          console.log('smartBackupToCloud: Cloud data table counts:', cloudTableCounts)
+
+          hasCloudData = Object.values(cloudData).some((tableData: any) =>
+            Array.isArray(tableData) && tableData.length > 0
+          )
+        }
 
         if (hasCloudData) {
           console.log('smartBackupToCloud: Found cloud data, automatically restoring instead of backing up empty local data')
@@ -163,7 +205,7 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     // Fetch the latest backup from Supabase
     const { data, error } = await supabase
       .from('user_backups')
-      .select('backup_data')
+      .select('backup_data, storage_url')
       .eq('user_id', userId)
       .single()
 
@@ -178,7 +220,37 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       return false
     }
 
-    console.log("restoreBackupFromCloud: Backup data found, initializing storage manager")
+    let backupData: any = null
+
+    // Handle new storage-based backups
+    if (data.storage_url) {
+      console.log("restoreBackupFromCloud: Found storage-based backup, downloading from:", data.storage_url)
+
+      try {
+        const response = await fetch(data.storage_url)
+        if (!response.ok) {
+          throw new Error(`Failed to download backup: ${response.status} ${response.statusText}`)
+        }
+
+        const jsonString = await response.text()
+        backupData = JSON.parse(jsonString)
+        console.log("restoreBackupFromCloud: Successfully downloaded and parsed backup from storage")
+      } catch (downloadError) {
+        console.error("restoreBackupFromCloud: Failed to download from storage:", downloadError)
+        throw downloadError
+      }
+    }
+    // Handle legacy JSONB backups
+    else if (data.backup_data) {
+      console.log("restoreBackupFromCloud: Found legacy JSONB backup")
+      backupData = data.backup_data
+    }
+    else {
+      console.log("restoreBackupFromCloud: No backup data available")
+      return false
+    }
+
+    console.log("restoreBackupFromCloud: Backup data keys:", Object.keys(backupData))
 
     // Initialize storage manager
     await storageManager.init()
@@ -188,9 +260,6 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
     await storageManager.clearAll()
 
     // Import backup data to IndexedDB
-    const backupData = data.backup_data
-    console.log("restoreBackupFromCloud: Backup data keys:", Object.keys(backupData))
-    
     // Import each table's data
     for (const [tableName, tableData] of Object.entries(backupData)) {
       if (Array.isArray(tableData) && tableData.length > 0) {
