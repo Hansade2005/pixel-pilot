@@ -7,7 +7,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { storageManager } from "@/lib/storage-manager"
+import { storageManager, Workspace } from "@/lib/storage-manager"
 import { timeAgo } from "@/lib/utils"
 import { PublishTemplateDialog } from "./workspace/publish-template-dialog"
 import {
@@ -167,17 +167,81 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         .eq('id', user.id)
         .single()
 
-      // Get project files
-      await storageManager.init()
-      const files = await storageManager.getFiles(projectToPublish.id)
+      // Get project files - use same pattern as file explorer
+      console.log(`📂 Template Publisher: Fetching files for project: ${projectToPublish.id} (${projectToPublish.name}) - Timestamp: ${new Date().toISOString()}`);
+
+      // Import and initialize storage manager (same as file explorer)
+      const { storageManager } = await import('@/lib/storage-manager');
+      await storageManager.init();
+
+      // Get files directly from IndexedDB (same as file explorer)
+      const files = await storageManager.getFiles(projectToPublish.id);
+      console.log(`✅ Template Publisher: Found ${files.length} files for project: ${projectToPublish.id}`);
+
+      // Verify all files belong to correct workspace (same validation as file explorer)
+      const incorrectFiles = files.filter(f => f.workspaceId !== projectToPublish.id);
+      if (incorrectFiles.length > 0) {
+        console.error(`🚨 CONTAMINATION DETECTED in Template Publisher: ${incorrectFiles.length} files belong to wrong workspace!`, incorrectFiles.map(f => ({ name: f.name, path: f.path, actualWorkspaceId: f.workspaceId, expectedWorkspaceId: projectToPublish.id })));
+      } else {
+        console.log(`✅ All ${files.length} files verified to belong to workspace: ${projectToPublish.id}`);
+      }
+
+      if (files.length === 0) {
+        console.log('⚠️ Template Publisher: No files found for project, cannot publish empty template')
+        alert('Cannot publish template: No files found in the project. Please add some files first.')
+        return
+      } else {
+        console.log('📄 Template Publisher: Sample files:', files.slice(0, 5).map(f => ({ name: f.name, path: f.path, workspaceId: f.workspaceId, contentLength: f.content?.length })))
+      }
+
+      // Check that all files have required properties
+      const invalidFiles = files.filter(file =>
+        !file.name ||
+        !file.path ||
+        file.content === null ||
+        file.content === undefined ||
+        typeof file.content !== 'string'
+      )
+      if (invalidFiles.length > 0) {
+        console.error('Invalid files found:', invalidFiles.map(f => ({
+          name: f.name,
+          path: f.path,
+          contentType: typeof f.content,
+          contentLength: f.content?.length,
+          hasFileType: !!f.fileType,
+          hasType: !!f.type
+        })))
+        alert('Cannot publish template: Some files have invalid content or missing properties.')
+        return
+      }
 
       // Prepare files for JSONB storage
       const filesData = files.map(file => ({
         name: file.name,
-        content: file.content,
+        content: file.content, // Already validated as string
         path: file.path,
-        type: file.type
+        type: file.fileType || file.type || 'unknown' // Use fileType first, fallback to type
       }))
+
+      // Validate that the JSON can be serialized
+      let serializedFilesData: string
+      try {
+        serializedFilesData = JSON.stringify(filesData)
+        // Test that it can be parsed back
+        JSON.parse(serializedFilesData)
+      } catch (jsonError) {
+        console.error('JSON serialization error:', jsonError, { filesData })
+        alert('Cannot publish template: File data cannot be properly serialized.')
+        return
+      }
+
+      console.log('Publishing template with files:', {
+        projectId: projectToPublish.id,
+        fileCount: files.length,
+        filesDataSample: filesData.slice(0, 2), // Log first 2 files for debugging
+        filesDataLength: serializedFilesData.length,
+        totalSize: new Blob([serializedFilesData]).size
+      })
 
       // Insert into public_templates table
       const { data: templateData, error: templateError } = await supabase
@@ -332,7 +396,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         // Convert workspaces to Project format
         let projectData: Project[] = workspaces
           .filter(workspace => !workspace.isTemplate) // Only show user projects, not templates
-          .map(workspace => {
+          .map((workspace: Workspace) => {
             const seed = workspace.id.slice(-3) // Use last 3 chars of ID as seed for consistency
             const thumbnailUrl = generateThumbnailUrl(
               workspace.name,
