@@ -73,7 +73,7 @@ Personalization: Reference their portfolio/interests from context if available
 Generate ONLY a JSON response with this exact structure:
 {
   "subject": "Brief subject line under 60 characters",
-  "content": "Email body in plain text format with proper paragraphs"
+  "content": "Email body in plain text format with proper paragraphs  do not addd greetings in the email body as the main template already has it. Just focus on the content itself and dont forget the attribution   Hans Ade, Founder & CEO  "
 }
 
 Make it personal, avoid buzzwords, include specific metrics, and clear call-to-action (15-min intro call or demo).`,
@@ -123,7 +123,7 @@ Personalization: Reference their work/content/audience from context if available
 Generate ONLY a JSON response with this exact structure:
 {
   "subject": "Creative subject line under 60 characters",
-  "content": "Email body in plain text format with proper paragraphs"
+  "content": "Email body in plain text format with proper paragraphs  do not addd greetings in the email body as the main template already has it. Just focus on the content itself and dont forget the attribution   Hans Ade, Founder & CEO  "
 }
 
 Make it personal, enthusiastic, highlight earning potential and creative freedom, include clear call-to-action (start creating or explore marketplace).`,
@@ -188,7 +188,7 @@ Personalization: Suggest specific integration based on their platform/technology
 Generate ONLY a JSON response with this exact structure:
 {
   "subject": "Partnership-focused subject line under 60 characters",
-  "content": "Email body in plain text format with proper paragraphs"
+  "content": "Email body in plain text format with proper paragraphs  do not addd greetings in the email body as the main template already has it. Just focus on the content itself and dont forget the attribution   Hans Ade, Founder & CEO  "
 }
 
 Focus on technical synergies, mutual value creation, specific integration opportunities, and clear next step (partnership discovery call).`,
@@ -264,7 +264,7 @@ Personalization: Reference their interests/projects/tech stack from context
 Generate ONLY a JSON response with this exact structure:
 {
   "subject": "Benefit-driven subject line under 60 characters",
-  "content": "Email body in plain text format with proper paragraphs"
+  "content": "Email body in plain text format with proper paragraphs  do not addd greetings in the email body as the main template already has it. Just focus on the content itself and dont forget the attribution   Hans Ade, Founder & CEO   "
 }
 
 Highlight ease of use, impressive capabilities, specific features relevant to their background, and clear call-to-action (start free trial or explore templates).`,
@@ -291,7 +291,7 @@ Length: 100-120 words
 Generate ONLY a JSON response with this exact structure:
 {
   "subject": "Clear subject line under 60 characters",
-  "content": "Email body in plain text format with proper paragraphs"
+  "content": "Email body in plain text format with proper paragraphs  do not addd greetings in the email body as the main template already has it. Just focus on the content itself and dont forget the attribution   Hans Ade, Founder & CEO   "
 }
 
 Keep it concise and include a clear call-to-action.`
@@ -332,8 +332,9 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
           <!-- Header with Logo -->
           <tr>
             <td style="background: linear-gradient(135deg, ${color.primary} 0%, ${color.secondary} 100%); padding: 40px 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">
-                ✨ PiPilot
+              <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 12px;">
+                <img src="https://pipilot.dev/logo.png" alt="PiPilot Logo" style="width: 32px; height: 32px; object-fit: contain;">
+                PiPilot
               </h1>
               <p style="margin: 8px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px; font-weight: 400;">
                 AI-Powered App Builder
@@ -447,7 +448,7 @@ const generateEmailHTML = (segment: string, content: string, leadName: string) =
                 © 2026 PiPilot. All rights reserved.
               </p>
               <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">
-                <a href="{{UNSUBSCRIBE_URL}}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a>
+                <a href="https://pipilot.dev/docs" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a>
               </p>
             </td>
           </tr>
