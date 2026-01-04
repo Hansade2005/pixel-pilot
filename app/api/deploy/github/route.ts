@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/rest'
 import { createClient } from '@/lib/supabase/server'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
+import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 const getUserEmail = async (octokit: Octokit) => {
   try {
@@ -147,6 +148,24 @@ export async function POST(req: Request) {
       mode = jsonData.mode
       existingRepo = jsonData.existingRepo
       commitMessage = jsonData.commitMessage
+
+      // Check if files are coming from storage (large payload)
+      if (jsonData.filesStorageUrl && jsonData.usingStorage) {
+        console.log('[GitHub Deploy] 📦 Downloading files from storage:', jsonData.filesStorageUrl)
+        const downloadedData = await downloadLargePayload(jsonData.filesStorageUrl)
+        if (!downloadedData) {
+          return Response.json({ error: 'Failed to download files from storage' }, { status: 500 })
+        }
+        files = downloadedData
+
+        // Schedule cleanup after deployment completes
+        const cleanupUrl = jsonData.filesStorageUrl
+        setTimeout(() => {
+          cleanupLargePayload(cleanupUrl).catch(err =>
+            console.warn('[GitHub Deploy] Failed to cleanup storage:', err)
+          )
+        }, 1000) // Small delay to ensure deployment is complete
+      }
     }
     
     // Get user from Supabase

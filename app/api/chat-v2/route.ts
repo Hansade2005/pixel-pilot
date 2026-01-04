@@ -12,6 +12,7 @@ import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
 import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
+import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
 export const config = {
@@ -2294,11 +2295,40 @@ export async function POST(req: Request) {
       extractedMetadata = extractedData.metadata
       console.log(`[Chat-V2] 📦 Extracted ${clientFiles.length} files from compressed data`)
     } else {
-      // Handle regular JSON data (backward compatibility)
+      // Handle regular JSON data (backward compatibility or storage URL)
       console.log('[Chat-V2] 📄 Received JSON data (backward compatibility mode)')
       body = await req.json()
-      clientFiles = body.files || []
-      clientFileTree = body.fileTree || []
+
+      // Check if this is a storage-based request (large payload)
+      const usingStorage = req.headers.get('x-using-storage') === 'true'
+      if (usingStorage && typeof body === 'string') {
+        // Body is a storage URL, download the actual data
+        console.log('[Chat-V2] 📦 Downloading payload from storage:', body)
+        const downloadedData = await downloadLargePayload(body)
+        if (!downloadedData) {
+          return new Response('Failed to download payload from storage', { status: 500 })
+        }
+
+        // Extract data from downloaded payload
+        const payload = downloadedData as any
+        clientFiles = payload.projectFiles || []
+        clientFileTree = payload.fileTree || []
+        extractedMetadata = payload.metadata || {}
+
+        // Schedule cleanup after processing completes
+        const cleanupUrl = body
+        setTimeout(() => {
+          cleanupLargePayload(cleanupUrl).catch(err =>
+            console.warn('[Chat-V2] Failed to cleanup storage:', err)
+          )
+        }, 1000) // Small delay to ensure processing is complete
+
+        console.log(`[Chat-V2] 📦 Extracted ${clientFiles.length} files from storage payload`)
+      } else {
+        // Regular JSON payload
+        clientFiles = body.files || []
+        clientFileTree = body.fileTree || []
+      }
     }
 
     // Continue with existing logic...

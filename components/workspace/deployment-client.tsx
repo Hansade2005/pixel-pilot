@@ -132,7 +132,7 @@ const NetlifyIcon = ({ className }: { className?: string }) => (
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
-import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { getDeploymentTokens, uploadLargePayload } from "@/lib/cloud-sync"
 import { useGitHubPush } from "@/hooks/use-github-push"
 import { compress } from 'lz4js'
 import { zipSync, strToU8 } from 'fflate'
@@ -1301,14 +1301,86 @@ EXAMPLES:
         githubToken: storedTokens.github
       })
 
+      // Check compressed data size and use storage for large payloads (> 1MB)
+      const compressedSize = compressedData.byteLength
+      const MAX_PAYLOAD_SIZE = 1024 * 1024 // 1MB limit
+      let requestBody: ArrayBuffer | string = compressedData
+      let contentType = 'application/octet-stream'
+      let usingStorage = false
+
+      if (compressedSize > MAX_PAYLOAD_SIZE) {
+        console.log(`[Deployment] 📦 Compressed payload size ${compressedSize} bytes exceeds 1MB limit, using storage upload`)
+
+        // Get current user for storage upload
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          throw new Error('User not authenticated for large payload upload')
+        }
+
+        // Prepare uncompressed data for storage (since API will need to decompress anyway)
+        const uncompressedData = {
+          projectFiles,
+          fileTree: [], // Empty for now, can be rebuilt on server
+          messages: [], // No messages for deployment
+          metadata: {
+            projectId: selectedProject.id,
+            repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+            repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
+            mode: githubForm.deploymentMode === 'new' ? 'create' : 
+                  githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
+            existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
+            commitMessage: githubForm.commitMessage || 'Update project files',
+            githubToken: storedTokens.github,
+            compressedSize
+          }
+        }
+
+        // Upload to storage
+        const storageUrl = await uploadLargePayload(
+          uncompressedData,
+          'github-deploy',
+          user.id,
+          {
+            projectId: selectedProject.id,
+            repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+            compressedSize,
+            deploymentMode: githubForm.deploymentMode
+          }
+        )
+
+        if (!storageUrl) {
+          throw new Error('Failed to upload large deployment payload to storage')
+        }
+
+        // Use storage URL as payload
+        requestBody = JSON.stringify({
+          projectId: selectedProject.id,
+          repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+          repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
+          mode: githubForm.deploymentMode === 'new' ? 'create' : 
+                githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
+          existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
+          commitMessage: githubForm.commitMessage || 'Update project files',
+          githubToken: storedTokens.github,
+          filesStorageUrl: storageUrl,
+          usingStorage: true
+        })
+        contentType = 'application/json'
+        usingStorage = true
+
+        console.log(`[Deployment] 📦 Files uploaded to storage, URL: ${storageUrl}`)
+      }
+
       // Deploy code to the repository
       const deployResponse = await fetch('/api/deploy/github', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/octet-stream',
-          'X-Compressed': 'true'
+          'Content-Type': contentType,
+          'X-Compressed': (!usingStorage).toString(),
+          'X-Using-Storage': usingStorage.toString()
         },
-        body: compressedData,
+        body: requestBody,
       })
 
       if (!deployResponse.ok) {

@@ -41,6 +41,7 @@ import { compress } from 'lz4js'
 import { createClient } from '@/lib/supabase/client'
 import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
+import { uploadLargePayload } from '@/lib/cloud-sync'
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -3018,17 +3019,68 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
       console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
 
+      // Check compressed data size and use storage for large payloads (> 1MB)
+      const compressedSize = compressedData.byteLength
+      const MAX_PAYLOAD_SIZE = 1024 * 1024 // 1MB limit
+      let requestBody: ArrayBuffer | string = compressedData
+      let contentType = 'application/octet-stream'
+      let usingStorage = false
+
+      if (compressedSize > MAX_PAYLOAD_SIZE) {
+        console.log(`[ChatPanelV2] 📦 Compressed payload size ${compressedSize} bytes exceeds 1MB limit, using storage upload`)
+
+        // Get current user for storage upload
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          throw new Error('User not authenticated')
+        }
+
+        // Prepare uncompressed data for storage (since API will need to decompress anyway)
+        const uncompressedData = {
+          projectFiles,
+          fileTree,
+          messages: messagesToSend,
+          metadata
+        }
+
+        // Upload to storage
+        const storageUrl = await uploadLargePayload(
+          uncompressedData,
+          'chat-files',
+          user.id,
+          {
+            projectId: project.id,
+            compressedSize,
+            model: modelToUse,
+            isInitialPrompt
+          }
+        )
+
+        if (!storageUrl) {
+          throw new Error('Failed to upload large chat payload to storage')
+        }
+
+        // Use storage URL as payload
+        requestBody = storageUrl
+        contentType = 'application/json'
+        usingStorage = true
+
+        console.log(`[ChatPanelV2] 📦 Files uploaded to storage, URL: ${storageUrl}`)
+      }
+
       const response = await fetch('/api/chat-v2', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/octet-stream',
+          'Content-Type': contentType,
           // Send minimal metadata in headers for binary requests
           'X-Model-Id': modelToUse,
           'X-Ai-Mode': aiMode,
           'X-Chat-Mode': isAskMode ? 'ask' : 'agent',
-          'X-Is-Initial-Prompt': isInitialPrompt.toString()
+          'X-Is-Initial-Prompt': isInitialPrompt.toString(),
+          'X-Using-Storage': usingStorage.toString()
         },
-        body: compressedData,
+        body: requestBody,
         signal: controller.signal
       })
 

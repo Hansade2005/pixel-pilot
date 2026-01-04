@@ -868,3 +868,141 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
     return null
   }
 }
+
+/**
+ * Upload large payload data to Supabase Storage and return the public URL
+ * Used for bypassing size limits in API requests (GitHub deploy, chat, etc.)
+ */
+export async function uploadLargePayload(
+  data: any,
+  payloadType: 'github-deploy' | 'chat-files' | 'template' | 'backup',
+  userId: string,
+  metadata?: Record<string, any>
+): Promise<string | null> {
+  try {
+    // Create unique filename with timestamp and type
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `${payloadType}-${userId}-${timestamp}.json`
+
+    // Convert data to JSON string and check size
+    const jsonString = JSON.stringify(data, null, 2)
+    const blob = new Blob([jsonString], { type: 'application/json' })
+
+    console.log(`uploadLargePayload: Uploading ${blob.size} bytes (${payloadType}) to storage`)
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('temp-payloads') // Use dedicated bucket for temporary payloads
+      .upload(filename, blob, {
+        contentType: 'application/json',
+        upsert: false
+      })
+
+    if (uploadError) {
+      console.error('uploadLargePayload: Storage upload error:', uploadError)
+      throw uploadError
+    }
+
+    // Get the public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from('temp-payloads')
+      .getPublicUrl(filename)
+
+    if (!urlData?.publicUrl) {
+      throw new Error('Failed to get public URL for uploaded payload')
+    }
+
+    // Store metadata in database for tracking and cleanup
+    const { error: dbError } = await supabase
+      .from('temp_payloads')
+      .insert({
+        user_id: userId,
+        payload_type: payloadType,
+        storage_url: urlData.publicUrl,
+        filename: filename,
+        size_bytes: blob.size,
+        metadata: metadata || {},
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+      })
+
+    if (dbError) {
+      console.warn('uploadLargePayload: Failed to store metadata:', dbError)
+      // Don't fail the upload if metadata storage fails
+    }
+
+    console.log(`uploadLargePayload: Successfully uploaded ${payloadType} payload to ${urlData.publicUrl}`)
+    return urlData.publicUrl
+  } catch (error) {
+    console.error("Error uploading large payload:", error)
+    return null
+  }
+}
+
+/**
+ * Download and parse payload from Supabase Storage URL
+ * Used by API routes to retrieve large payloads that were uploaded to bypass size limits
+ */
+export async function downloadLargePayload(storageUrl: string): Promise<any | null> {
+  try {
+    console.log(`downloadLargePayload: Downloading payload from ${storageUrl}`)
+
+    // Fetch the data from storage
+    const response = await fetch(storageUrl)
+    if (!response.ok) {
+      throw new Error(`Failed to download payload: ${response.status}`)
+    }
+
+    const jsonString = await response.text()
+    const data = JSON.parse(jsonString)
+
+    console.log(`downloadLargePayload: Successfully downloaded and parsed payload (${jsonString.length} bytes)`)
+    return data
+  } catch (error) {
+    console.error("Error downloading large payload:", error)
+    return null
+  }
+}
+
+/**
+ * Clean up temporary payload from storage after processing
+ * Should be called after the payload has been processed by the API
+ */
+export async function cleanupLargePayload(storageUrl: string): Promise<boolean> {
+  try {
+    // Extract filename from URL
+    const filename = storageUrl.split('/').pop()
+    if (!filename) {
+      console.warn('cleanupLargePayload: Could not extract filename from URL')
+      return false
+    }
+
+    console.log(`cleanupLargePayload: Cleaning up temporary payload: ${filename}`)
+
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('temp-payloads')
+      .remove([filename])
+
+    if (storageError) {
+      console.warn('cleanupLargePayload: Storage deletion error:', storageError)
+      // Don't fail if storage cleanup fails, but log it
+    }
+
+    // Delete metadata from database
+    const { error: dbError } = await supabase
+      .from('temp_payloads')
+      .delete()
+      .eq('storage_url', storageUrl)
+
+    if (dbError) {
+      console.warn('cleanupLargePayload: Database cleanup error:', dbError)
+    }
+
+    console.log(`cleanupLargePayload: Successfully cleaned up payload: ${filename}`)
+    return true
+  } catch (error) {
+    console.error("Error cleaning up large payload:", error)
+    return false
+  }
+}

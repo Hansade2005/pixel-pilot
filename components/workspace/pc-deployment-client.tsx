@@ -132,7 +132,7 @@ const NetlifyIcon = ({ className }: { className?: string }) => (
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
-import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { getDeploymentTokens, uploadLargePayload } from "@/lib/cloud-sync"
 import { useGitHubPush } from "@/hooks/use-github-push"
 // Plan limit checking functions
 async function checkPlanLimits(userId: string, operation: string, platform: string) {
@@ -1237,21 +1237,67 @@ EXAMPLES:
       // Load project files
       const projectFiles = await storageManager.getFiles(selectedProject.id)
 
+      // Check payload size and use storage for large payloads (> 1MB)
+      const payloadData = {
+        projectId: selectedProject.id,
+        githubToken: storedTokens.github,
+        repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+        repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
+        files: projectFiles,
+        mode: githubForm.deploymentMode === 'new' ? 'create' :
+              githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
+        existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
+        commitMessage: githubForm.commitMessage || 'Update project files',
+      }
+
+      const payloadSize = JSON.stringify(payloadData).length
+      const MAX_PAYLOAD_SIZE = 1024 * 1024 // 1MB limit
+      let requestBody: any = payloadData
+      let usingStorage = false
+
+      if (payloadSize > MAX_PAYLOAD_SIZE) {
+        console.log(`GitHub Deployment: Payload size ${payloadSize} bytes exceeds 1MB limit, using storage upload`)
+
+        // Get current user for storage upload
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          throw new Error('User not authenticated')
+        }
+
+        // Upload payload data to storage
+        const storageUrl = await uploadLargePayload(
+          payloadData,
+          'github-deploy',
+          user.id,
+          {
+            projectId: selectedProject.id,
+            repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+            deploymentMode: githubForm.deploymentMode
+          }
+        )
+
+        if (!storageUrl) {
+          throw new Error('Failed to upload large payload to storage')
+        }
+
+        // Replace files with storage URL in payload
+        requestBody = {
+          ...payloadData,
+          files: null, // Remove files from payload
+          filesStorageUrl: storageUrl, // Add storage URL
+          usingStorage: true
+        }
+        usingStorage = true
+
+        console.log(`GitHub Deployment: Files uploaded to storage, URL: ${storageUrl}`)
+      }
+
       // Deploy code to the repository
       const deployResponse = await fetch('/api/deploy/github', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: selectedProject.id,
-          githubToken: storedTokens.github,
-          repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
-          repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
-          files: projectFiles,
-          mode: githubForm.deploymentMode === 'new' ? 'create' : 
-                githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
-          existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
-          commitMessage: githubForm.commitMessage || 'Update project files',
-        })
+        body: JSON.stringify(requestBody)
       })
 
       if (!deployResponse.ok) {
