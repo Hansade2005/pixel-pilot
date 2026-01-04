@@ -76,6 +76,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editName, setEditName] = useState('');
     const [editDescription, setEditDescription] = useState('');
+    const [editThumbnailUrl, setEditThumbnailUrl] = useState('');
     const [editPreviewUrl, setEditPreviewUrl] = useState('');
     const [editTemplateId, setEditTemplateId] = useState<string | null>(null);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -557,6 +558,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                           setEditTemplateId(template.id);
                           setEditName(template.name);
                           setEditDescription(template.description || '');
+                          setEditThumbnailUrl(template.thumbnail_url || '');
                           setEditPreviewUrl(template.preview_url || '');
                           setIsEditModalOpen(true);
                         }}
@@ -723,12 +725,25 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         />
                       </div>
                       <div>
+                        <label className="block text-sm mb-1">Thumbnail URL</label>
+                        <input
+                          className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white"
+                          value={editThumbnailUrl}
+                          onChange={e => setEditThumbnailUrl(e.target.value)}
+                          disabled={isSavingEdit}
+                          placeholder="https://example.com/thumbnail.jpg"
+                          type="url"
+                        />
+                      </div>
+                      <div>
                         <label className="block text-sm mb-1">Preview URL</label>
                         <input
                           className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white"
                           value={editPreviewUrl}
                           onChange={e => setEditPreviewUrl(e.target.value)}
                           disabled={isSavingEdit}
+                          placeholder="https://your-demo-url.com"
+                          type="url"
                         />
                       </div>
                     </div>
@@ -751,6 +766,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                               .update({
                                 name: editName,
                                 description: editDescription,
+                                thumbnail_url: editThumbnailUrl,
                                 preview_url: editPreviewUrl
                               })
                               .eq('id', editTemplateId)

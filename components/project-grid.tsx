@@ -68,6 +68,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
   const [publishDescription, setPublishDescription] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishPreviewUrl, setPublishPreviewUrl] = useState('')
+  const [publishThumbnailUrl, setPublishThumbnailUrl] = useState('')
   const [publishCategory, setPublishCategory] = useState('')
   const [templateType, setTemplateType] = useState<'free' | 'paid'>('free')
   const [templatePrice, setTemplatePrice] = useState('')
@@ -128,6 +129,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
       setPublishName(project.name)
       setPublishDescription(project.description)
       setPublishPreviewUrl('')
+      setPublishThumbnailUrl('')
       setPublishCategory(project.category || 'other')
       setTemplateType('free')
       setTemplatePrice('')
@@ -303,6 +305,20 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         .from('templates')
         .getPublicUrl(templateFileName)
 
+      // Determine thumbnail URL: use custom if provided, otherwise auto-generate
+      let finalThumbnailUrl: string
+      if (publishThumbnailUrl.trim()) {
+        // Use custom thumbnail URL
+        finalThumbnailUrl = publishThumbnailUrl.trim()
+      } else {
+        // Auto-generate thumbnail using AI image API
+        finalThumbnailUrl = generateThumbnailUrl(
+          publishName,
+          publishDescription || 'Template project',
+          projectToPublish.id
+        )
+      }
+
       // Insert into public_templates table with storage URL
       const { data: insertedTemplate, error: templateError } = await supabase
         .from('public_templates')
@@ -310,7 +326,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
           user_id: user.id,
           name: publishName,
           description: publishDescription,
-          thumbnail_url: projectToPublish.thumbnail,
+          thumbnail_url: finalThumbnailUrl,
           author_name: profile?.full_name || null,
           files: {
             storageUrl: publicUrl,
@@ -359,7 +375,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
       if (metadataError) throw metadataError
 
-      alert(`Template published successfully${templateType === 'paid' ? ` - Price: $${price.toFixed(2)}` : ' (Free)'}! Files stored at: ${publicUrl}`)
+      alert(`Template published successfully${templateType === 'paid' ? ` - Price: $${price.toFixed(2)}` : ' (Free)'}!`)
     } catch (error) {
       console.error('Error publishing template:', error)
       alert('Failed to publish template. Please try again.')
@@ -770,12 +786,14 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
         name={publishName}
         description={publishDescription}
         previewUrl={publishPreviewUrl}
+        thumbnailUrl={publishThumbnailUrl}
         category={publishCategory}
         templateType={templateType}
         templatePrice={templatePrice}
         onNameChange={setPublishName}
         onDescriptionChange={setPublishDescription}
         onPreviewUrlChange={setPublishPreviewUrl}
+        onThumbnailUrlChange={setPublishThumbnailUrl}
         onCategoryChange={setPublishCategory}
         onTemplateTypeChange={setTemplateType}
         onTemplatePriceChange={setTemplatePrice}

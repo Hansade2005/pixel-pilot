@@ -35,12 +35,14 @@ interface PublishTemplateDialogProps {
   name: string
   description: string
   previewUrl: string
+  thumbnailUrl: string
   category: string
   templateType: 'free' | 'paid'
   templatePrice: string
   onNameChange: (value: string) => void
   onDescriptionChange: (value: string) => void
   onPreviewUrlChange: (value: string) => void
+  onThumbnailUrlChange: (value: string) => void
   onCategoryChange: (value: string) => void
   onTemplateTypeChange: (type: 'free' | 'paid') => void
   onTemplatePriceChange: (price: string) => void
@@ -55,12 +57,14 @@ export function PublishTemplateDialog({
   name,
   description,
   previewUrl,
+  thumbnailUrl,
   category,
   templateType,
   templatePrice,
   onNameChange,
   onDescriptionChange,
   onPreviewUrlChange,
+  onThumbnailUrlChange,
   onCategoryChange,
   onTemplateTypeChange,
   onTemplatePriceChange,
@@ -97,6 +101,20 @@ export function PublishTemplateDialog({
               className="bg-gray-800 border-gray-700 text-white h-32 resize-none overflow-y-auto"
               placeholder="Describe what makes this template useful..."
             />
+          </div>
+          <div>
+            <Label htmlFor="template-thumbnail-url" className="text-white">Thumbnail URL (optional)</Label>
+            <Input
+              id="template-thumbnail-url"
+              value={thumbnailUrl}
+              onChange={(e) => onThumbnailUrlChange(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="https://example.com/thumbnail.jpg (leave empty for auto-generated)"
+              type="url"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              If not provided, an AI-generated thumbnail will be created based on your template name and description
+            </p>
           </div>
           <div>
             <Label htmlFor="template-preview-url" className="text-white">Preview URL (optional)</Label>
