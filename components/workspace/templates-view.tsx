@@ -820,64 +820,6 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   </DialogContent>
                 </Dialog>
 
-                {/* Edit Template Modal */}
-                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[600px] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="text-2xl">Edit Template</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Update your template details
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedTemplate && (
-            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-semibold text-gray-400 mb-1 block">Template Name</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm"
-                    placeholder="Template name"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-400 mb-1 block">Description</label>
-                  <textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm min-h-20"
-                    placeholder="Template description"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-gray-400 mb-1 block">Preview URL</label>
-                  <input
-                    type="text"
-                    value={editPreviewUrl}
-                    onChange={(e) => setEditPreviewUrl(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm"
-                    placeholder="https://example.com/preview"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter className="flex-shrink-0 gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsEditModalOpen(false)}
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
                 {/* Template Info Modal */}
                 <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
         <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[600px] flex flex-col">
