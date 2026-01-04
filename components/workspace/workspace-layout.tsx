@@ -281,7 +281,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
-  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo'>('vite-react')
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
   const [isCreating, setIsCreating] = useState(false)
   const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
   const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")

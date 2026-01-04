@@ -11816,6 +11816,41 @@ yarn-error.*
   }
 
   /**
+   * Apply the default HTML + CSS + JavaScript template to a new workspace
+   */
+  static async applyHtmlTemplate(workspaceId: string): Promise<void> {
+    try {
+      console.log(`🎯 Applying HTML template to workspace: ${workspaceId}`)
+      console.log(`📁 Template files to create: ${this.HTML_TEMPLATE_FILES.length}`)
+
+      // Create all template files
+      for (const templateFile of this.HTML_TEMPLATE_FILES) {
+        console.log(`📝 Creating file: ${templateFile.path}`)
+        const createdFile = await storageManager.createFile({
+          workspaceId,
+          name: templateFile.name,
+          path: templateFile.path,
+          content: templateFile.content,
+          fileType: templateFile.fileType,
+          type: templateFile.type,
+          size: templateFile.content.length,
+          isDirectory: false
+        })
+        console.log(`✅ Created file: ${createdFile.name} with ID: ${createdFile.id}`)
+      }
+
+      // Verify files were created
+      const createdFiles = await storageManager.getFiles(workspaceId)
+      console.log(`🔍 Verification: Found ${createdFiles.length} files in workspace ${workspaceId}`)
+
+      console.log(`🎉 HTML template applied successfully to workspace: ${workspaceId}`)
+    } catch (error) {
+      console.error(`❌ Error applying HTML template to workspace ${workspaceId}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Create a new workspace with the specified template
    */
   static async createWorkspaceWithTemplate(
@@ -11844,6 +11879,9 @@ yarn-error.*
           break
         case 'expo':
           await this.applyExpoTemplate(workspace.id)
+          break
+        case 'html':
+          await this.applyHtmlTemplate(workspace.id)
           break
         case 'vite-react':
         default:
@@ -11892,9 +11930,611 @@ yarn-error.*
         category: 'Mobile',
         tags: ['expo', 'react-native', 'mobile', 'typescript', 'ios', 'android'],
         files: this.EXPO_TEMPLATE_FILES.length
+      },
+      {
+        id: 'html',
+        name: 'HTML + CSS + JavaScript',
+        description: 'A pure HTML, CSS, and JavaScript website that can be deployed to Vercel',
+        category: 'Static',
+        tags: ['html', 'css', 'javascript', 'static', 'vercel'],
+        files: this.HTML_TEMPLATE_FILES.length
       }
     ]
   }
+
+  // HTML + CSS + JavaScript template files
+  private static readonly HTML_TEMPLATE_FILES: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[] = [
+    {
+      name: 'package.json',
+      path: 'package.json',
+      content: `{
+  "name": "html-vercel-site",
+  "version": "1.0.0",
+  "description": "A pure HTML, CSS, and JavaScript website optimized for Vercel deployment",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python3 -m http.server 3000 || npx serve . -p 3000",
+    "build": "echo 'No build step required for static HTML site'",
+    "preview": "npx serve . -p 3000",
+    "deploy": "vercel --prod",
+    "vercel-deploy": "vercel"
+  },
+  "keywords": ["html", "css", "javascript", "vercel", "static-site"],
+  "author": "PiPilot AI",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}`,
+      fileType: 'json',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'index.html',
+      path: 'index.html',
+      content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My HTML Website</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Welcome to My Website</h1>
+        <nav>
+            <ul>
+                <li><a href="#home">Home</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="home">
+            <h2>Home Section</h2>
+            <p>This is a modern HTML website with <strong>clean URLs</strong> and automatic Vercel rewrites!</p>
+            <p>Try these clean URLs:</p>
+            <ul style="text-align: left; display: inline-block; background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <li><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">/contact</code> → Contact section</li>
+                <li><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">/about</code> → About section</li>
+                <li><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">/home</code> → Home section</li>
+            </ul>
+            <p>Or use the old .html extensions - they'll automatically redirect to clean URLs!</p>
+            <button id="clickMe">Click Me!</button>
+            <p id="message"></p>
+        </section>
+
+        <section id="about">
+            <h2>About This Template</h2>
+            <p>This is a <strong>Vercel-optimized HTML website</strong> with automatic rewrites and intelligent routing.</p>
+            <div class="features-grid">
+                <div class="feature">
+                    <h3>🚀 Auto-Deployment</h3>
+                    <p>Deploy instantly to Vercel with zero configuration</p>
+                </div>
+                <div class="feature">
+                    <h3>🔄 Smart Rewrites</h3>
+                    <p>All routes automatically serve the right content</p>
+                </div>
+                <div class="feature">
+                    <h3>📱 Responsive</h3>
+                    <p>Works perfectly on desktop, tablet, and mobile</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Fast Loading</h3>
+                    <p>Optimized assets with intelligent caching</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact">
+            <h2>Contact Section</h2>
+            <form id="contactForm">
+                <label for="name">Name:</label>
+                <input type="text" id="name" required>
+
+                <label for="email">Email:</label>
+                <input type="email" id="email" required>
+
+                <label for="message">Message:</label>
+                <textarea id="message" required></textarea>
+
+                <button type="submit">Send Message</button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 My HTML Website. <strong>Auto-deployed to Vercel</strong> with intelligent rewrites 🚀</p>
+        <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">
+            Built with PiPilot AI - Deploy anywhere, rewrite everything!
+        </p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>`,
+      fileType: 'html',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'styles.css',
+      path: 'styles.css',
+      content: `/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+/* Header styles */
+header {
+    background-color: #2c3e50;
+    color: white;
+    padding: 1rem 0;
+    text-align: center;
+}
+
+header h1 {
+    margin-bottom: 0.5rem;
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+nav ul li {
+    display: inline;
+    margin: 0 1rem;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+nav a:hover {
+    color: #3498db;
+}
+
+/* Main content styles */
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+section {
+    background-color: white;
+    margin-bottom: 2rem;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+section h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.5rem;
+}
+
+/* Button styles */
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+/* Form styles */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 500px;
+}
+
+label {
+    font-weight: bold;
+}
+
+input, textarea {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Features grid */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.feature {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.feature h3 {
+    color: #3498db;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.feature p {
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    main {
+        padding: 0 0.5rem;
+    }
+
+    section {
+        padding: 1rem;
+    }
+
+    nav ul li {
+        display: block;
+        margin: 0.5rem 0;
+    }
+}`,
+      fileType: 'css',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'script.js',
+      path: 'script.js',
+      content: `// Simple JavaScript for interactivity
+
+// Button click event
+document.getElementById('clickMe').addEventListener('click', function() {
+    const message = document.getElementById('message');
+    message.textContent = '🎉 This site uses Vercel rewrites! All routes automatically serve the right content. Deployed with PiPilot AI! 🚀';
+    message.style.color = '#3498db';
+    message.style.fontWeight = 'bold';
+    message.style.fontSize = '1.1rem';
+});
+
+// Form submission
+document.getElementById('contactForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const message = document.getElementById('message').value;
+
+    // Simple validation
+    if (name && email && message) {
+        alert(\`Thank you \${name}! Your message has been sent. (This is a demo - no actual email was sent)\`);
+        this.reset();
+    } else {
+        alert('Please fill in all fields.');
+    }
+});
+
+// Smooth scrolling for navigation links
+document.querySelectorAll('nav a').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href').substring(1);
+        const targetElement = document.getElementById(targetId);
+
+        if (targetElement) {
+            targetElement.scrollIntoView({
+                behavior: 'smooth'
+            });
+        }
+    });
+});
+
+// Add some dynamic content
+document.addEventListener('DOMContentLoaded', function() {
+    const currentYear = new Date().getFullYear();
+    document.querySelector('footer p').innerHTML = \`&copy; \${currentYear} My HTML Website. <strong>Auto-deployed to Vercel</strong> with intelligent rewrites 🚀\`;
+
+    // Clean URL routing - automatically show the right section based on URL path
+    const path = window.location.pathname;
+    const cleanPath = path.replace(/^\//, '').replace(/\.html$/, ''); // Remove leading slash and .html extension
+
+    if (cleanPath && cleanPath !== '' && cleanPath !== 'index') {
+        const targetElement = document.getElementById(cleanPath);
+        if (targetElement) {
+            // Update page title based on section
+            const sectionTitles = {
+                'contact': 'Contact Us',
+                'about': 'About Us',
+                'home': 'Welcome'
+            };
+            if (sectionTitles[cleanPath]) {
+                document.title = \`\${sectionTitles[cleanPath]} - My HTML Website\`;
+            }
+
+            // Smooth scroll to the section
+            setTimeout(() => {
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }, 100);
+        }
+    }
+});`,
+      fileType: 'javascript',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'README.md',
+      path: 'README.md',
+      content: `# HTML Website - Vercel Ready
+
+A modern, responsive HTML, CSS, and JavaScript website optimized for Vercel deployment with automatic rewrites.
+
+## 🚀 Features
+
+- **Responsive Design** - Works perfectly on all devices
+- **Modern CSS** - Flexbox, Grid, and smooth animations
+- **Interactive JavaScript** - Form handling and dynamic content
+- **Vercel Optimized** - Automatic rewrites and caching
+- **SEO Friendly** - Proper HTML structure and meta tags
+- **Security Headers** - Built-in security configurations
+
+## 📁 Project Structure
+
+\`\`\`
+├── index.html      # Main HTML page
+├── styles.css      # CSS styles with responsive design
+├── script.js       # Vanilla JavaScript for interactivity
+├── vercel.json     # Vercel deployment configuration
+├── package.json    # NPM scripts and dependencies
+└── README.md       # This file
+\`\`\`
+
+## 🛠️ Development
+
+### Local Development
+\`\`\`bash
+# Install dependencies (optional, only for local server)
+npm install
+
+# Start development server
+npm run dev
+# or
+python3 -m http.server 3000
+\`\`\`
+
+### Build (No build required for HTML sites)
+\`\`\`bash
+npm run build
+\`\`\`
+
+## 🚀 Deployment to Vercel
+
+### Automatic Deployment
+1. Push this code to GitHub/GitLab
+2. Connect your repository to Vercel
+3. Vercel will automatically detect and deploy your HTML site with full rewrite support
+
+### Manual Deployment
+\`\`\`bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+npm run deploy
+# or
+vercel --prod
+\`\`\`
+
+## 🔄 Vercel Rewrites & Clean URLs
+
+This template includes intelligent routing with **clean URL support**:
+
+- **Clean URLs**: \`/contact.html\` → \`/contact\` (automatic redirect)
+- **Static Assets**: JS, CSS, images are cached for 1 year
+- **API Routes**: \`/api/*\` routes are preserved for backend functionality
+- **SPA Routing**: All routes serve \`index.html\` with client-side navigation
+- **Security Headers**: XSS protection, content sniffing prevention, and more
+
+### Clean URL Examples:
+- \`yoursite.com/contact.html\` → \`yoursite.com/contact\`
+- \`yoursite.com/about.html\` → \`yoursite.com/about\`
+- \`yoursite.com/home.html\` → \`yoursite.com/home\`
+
+### Automatic Section Navigation:
+When users visit clean URLs, the page automatically:
+1. Updates the page title based on the section
+2. Smoothly scrolls to the relevant section
+3. Maintains browser history and bookmarkability
+
+### Rewrite Rules:
+- \`/api/*\` → Preserved for API calls
+- \`/*.js|*.css|*.png|*.jpg|*.svg\` → Cached static assets
+- \`/*\` → Serves \`index.html\` for client-side routing
+
+## 🎨 Customization
+
+### Styling
+Edit \`styles.css\` to customize the appearance. The design uses:
+- CSS Variables for easy theming
+- Flexbox and Grid for layouts
+- Smooth transitions and hover effects
+
+### Functionality
+Modify \`script.js\` to add new features:
+- Form validation
+- Dynamic content loading
+- Interactive elements
+- API integrations
+
+### Content
+Update \`index.html\` to change the content and structure.
+
+## 🌐 Browser Support
+
+- Chrome/Edge 88+
+- Firefox 85+
+- Safari 14+
+- Mobile browsers (iOS Safari, Chrome Mobile)
+
+## 📱 Responsive Breakpoints
+
+- Mobile: < 768px
+- Tablet: 768px - 1024px
+- Desktop: > 1024px
+
+## 🔒 Security Features
+
+- Content Security Policy headers
+- XSS protection
+- Frame options (no iframes)
+- Strict referrer policy
+
+---
+
+Built with ❤️ by PiPilot AI - Deploy anywhere, scale everywhere!`,
+      fileType: 'markdown',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'vercel.json',
+      path: 'vercel.json',
+      content: `{
+  "version": 2,
+  "name": "html-site",
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)",
+      "dest": "/$1.$2",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/contact.html",
+      "destination": "/contact",
+      "statusCode": 301
+    },
+    {
+      "source": "/about.html",
+      "destination": "/about",
+      "statusCode": 301
+    },
+    {
+      "source": "/home.html",
+      "destination": "/home",
+      "statusCode": 301
+    },
+    {
+      "source": "/(.*)\\.html",
+      "destination": "/$1",
+      "statusCode": 301
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}`,
+      fileType: 'json',
+      type: 'text',
+      size: 0,
+      isDirectory: false
+    }
+  ]
 }
 
 // Export the template service

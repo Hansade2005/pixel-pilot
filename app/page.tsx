@@ -31,7 +31,8 @@ import {
   Workflow,
   Figma,
   Wand2,
-  MousePointer2
+  MousePointer2,
+  Gamepad2
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -60,11 +61,13 @@ export default function LandingPage() {
   const [sortBy, setSortBy] = useState<string>('popular')
   const [filterBy, setFilterBy] = useState<string>('all')
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0)
+  const [currentButtonIndex, setCurrentButtonIndex] = useState(0)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [currentTemplatePage, setCurrentTemplatePage] = useState(1)
   const templatesPerPage = 8
 
   const badgeItems = [
+    { icon: <Gamepad2 className="w-4 h-4 text-emerald-400" />, text: "PiPilot Game Kit Now Available! 🎮" },
     { icon: <Wand2 className="w-4 h-4 text-cyan-400" />, text: "Visual Editor Now Live! 🎨" },
     { icon: <Database className="w-4 h-4 text-blue-400" />, text: "Introducing PiPilot DB 🎉" },
     { icon: <Building2 className="w-4 h-4 text-purple-400" />, text: "PiPilot Enterprise now live 🚀" },
@@ -72,6 +75,21 @@ export default function LandingPage() {
     { icon: <Server className="w-4 h-4 text-orange-400" />, text: "PiPilot DB MCP Server Now Live! 🚀" },
     { icon: <Workflow className="w-4 h-4 text-indigo-400" />, text: "Teams Workspace Coming soon 🎉" },
     { icon: <Figma className="w-4 h-4 text-pink-400" />, text: "Figma Import Coming soon 🚀" }
+  ]
+
+  const buttonItems = [
+    {
+      icon: <Wand2 className="w-4 h-4 text-white" />,
+      title: "Create apps and websites by chatting with AI",
+      subtitle: "Start Building",
+      action: "chat"
+    },
+    {
+      icon: <Gamepad2 className="w-4 h-4 text-white" />,
+      title: "PiPilot Game Kit",
+      subtitle: "Explore Templates",
+      action: "templates"
+    }
   ]
 
   useEffect(() => {
@@ -83,8 +101,41 @@ export default function LandingPage() {
       setCurrentBadgeIndex((prev) => (prev + 1) % badgeItems.length)
     }, 5000) // Change every 3 seconds
 
-    return () => clearInterval(badgeInterval)
+    // Button rotation effect
+    const buttonInterval = setInterval(() => {
+      setCurrentButtonIndex((prev) => (prev + 1) % buttonItems.length)
+    }, 8000) // Change every 8 seconds
+
+    return () => {
+      clearInterval(badgeInterval)
+      clearInterval(buttonInterval)
+    }
   }, [])
+
+  const handleDynamicButtonClick = () => {
+    const currentButton = buttonItems[currentButtonIndex]
+    
+    if (currentButton.action === 'templates') {
+      // Scroll to template library section
+      const templateSection = document.getElementById('template-library')
+      if (templateSection) {
+        templateSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        })
+      }
+    } else if (currentButton.action === 'chat') {
+      // Focus on chat input
+      const chatInput = document.querySelector('textarea[placeholder*="Describe your app"]') as HTMLTextAreaElement
+      if (chatInput) {
+        chatInput.focus()
+        chatInput.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'center'
+        })
+      }
+    }
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -412,18 +463,51 @@ export default function LandingPage() {
             <span className="pt-0.5 tracking-tight md:pt-0"> Amazing</span>
           </h1>
           <p className="mb-6 text-center text-lg leading-tight text-white/65 md:text-xl">
-            Create apps and websites by chatting with AI
+            Create fullstack apps and websites in minutes
           </p>
           
-          {/* Visual Editor Button */}
+          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            {/* Visual Editor Vibe Card Button */}
+            {/* Dynamic Action Button */}
+            <button
+              onClick={handleDynamicButtonClick}
+              className="group relative flex items-center gap-3 px-6 py-4 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-500/30 hover:border-cyan-400/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20 cursor-pointer"
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 shadow-lg">
+                <div 
+                  className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
+                  key={`icon-${currentButtonIndex}`}
+                >
+                  {buttonItems[currentButtonIndex].icon}
+                </div>
+              </div>
+              <div className="flex flex-col text-left">
+                <span 
+                  className="text-base font-semibold text-white group-hover:text-cyan-300 transition-colors inline-block transition-opacity duration-500 ease-in-out opacity-100"
+                  key={`title-${currentButtonIndex}`}
+                >
+                  {buttonItems[currentButtonIndex].title}
+                </span>
+                <span 
+                  className="text-sm text-white/60 inline-block transition-opacity duration-500 ease-in-out opacity-100"
+                  key={`subtitle-${currentButtonIndex}`}
+                >
+                  {buttonItems[currentButtonIndex].subtitle}
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+
+              {/* Animated glow effect */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
+            </button>
+
+            {/* Visual Editor Static Button */}
             <Link
               href="/features/visual-editor"
               className="group relative flex items-center gap-3 px-5 py-3 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-500/30 hover:border-cyan-400/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20"
             >
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 shadow-lg">
-                <Wand2 className="w-4 h-4 text-white" />
+                <MousePointer2 className="w-4 h-4 text-white" />
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">
@@ -453,7 +537,7 @@ export default function LandingPage() {
       </div>
 
       {/* From Pixel Community Section */}
-      <section className="relative z-10 py-24 bg-gray-900/30">
+      <section id="template-library" className="relative z-10 py-24 bg-gray-900/30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-12">

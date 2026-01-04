@@ -79,7 +79,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const audioChunksRef = useRef<Blob[]>([])
 
   // Template selection state
-  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo'>('vite-react')
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
+  const [hasUserSelectedTemplate, setHasUserSelectedTemplate] = useState(false)
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
@@ -755,6 +756,48 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
+  // Smart template selection based on prompt content
+  const detectFrameworkFromPrompt = (promptText: string): 'vite-react' | 'nextjs' | 'expo' | 'html' => {
+    const lowerPrompt = promptText.toLowerCase()
+
+    // Framework detection patterns (ordered by specificity - most specific first)
+    const frameworkPatterns = [
+      // Next.js patterns (most specific first)
+      { regex: /\bnext\.?js\b|\bnext\s+js\b|\bnextjs\b|\bnext\b(?!\s+(native|react))/i, template: 'nextjs' as const },
+      { regex: /\bnext\s+(app|pages)\b|\bapp\s+router\b|\bpages\s+router\b/i, template: 'nextjs' as const },
+      { regex: /\bvercel\b|\bnext\s+deploy|\bserver\s+side\s+rendering\b|\bssr\b/i, template: 'nextjs' as const },
+      { regex: /\bapi\s+routes\b|\bnext\s+api\b|\bmiddleware\b/i, template: 'nextjs' as const },
+
+      // Expo/React Native patterns
+      { regex: /\bexpo\b|\breact\s+native\b|\brn\b|\bexpo\s+cli\b/i, template: 'expo' as const },
+      { regex: /\bexpo\s+(router|sdk|go)\b|\bexpo\s+dev\s+client\b/i, template: 'expo' as const },
+      { regex: /\bmobile\s+app\b|\bphone\s+app\b|\bandroid\b|\bios\b|\bapk\b|\bipa\b/i, template: 'expo' as const },
+      { regex: /\btab\s+navigation\b|\bstack\s+navigation\b|\bdrawer\b/i, template: 'expo' as const },
+
+      // HTML patterns (pure static sites)
+      { regex: /\bpure\s+html\b|\bhtml\s+only\b|\bstatic\s+site\b|\bvanilla\s+js\b/i, template: 'html' as const },
+      { regex: /\bhtml\b|\bcss\b|\bjavascript\b|\bno\s+framework\b|\bno\s+build\b/i, template: 'html' as const },
+
+      // Vite patterns (catch-all for web apps - less specific)
+      { regex: /\bvite\b|\bvue\b|\bsvelte\b|\bvanilla\b|\bweb\s+app\b|\bwebsite\b/i, template: 'vite-react' as const },
+      { regex: /\bweb\s+app\b|\bwebsite\b|\bfrontend\b|\bspa\b|\bpwa\b/i, template: 'vite-react' as const },
+      { regex: /\bportfolio\b|\blanding\s+page\b|\bdashboard\b|\badmin\s+panel\b/i, template: 'vite-react' as const },
+      { regex: /\bclient\s+side\b|\bbrowser\b|\bdom\b|\bwebpack\b/i, template: 'vite-react' as const },
+    ]
+
+    // Check patterns in order of specificity
+    for (const { regex, template } of frameworkPatterns) {
+      if (regex.test(lowerPrompt)) {
+        console.log(`🎯 Framework detected: "${template}" from pattern: ${regex}`)
+        return template
+      }
+    }
+
+    // Default to vite-react for general web development
+    console.log('🎯 No specific framework detected, defaulting to vite-react')
+    return 'vite-react'
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -784,6 +827,21 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         return
       }
 
+      // Smart template selection based on prompt (excluding GitHub/GitLab imports)
+      // Only auto-detect if user hasn't manually selected a template
+      let detectedTemplate = selectedTemplate
+      if (!hasUserSelectedTemplate) {
+        detectedTemplate = detectFrameworkFromPrompt(prompt)
+        if (detectedTemplate !== selectedTemplate) {
+          console.log(`🎯 Smart template selection: Detected "${detectedTemplate}" from prompt, auto-selecting for new user`)
+          setSelectedTemplate(detectedTemplate)
+          toast.info(`🎯 Auto-selected ${detectedTemplate === 'nextjs' ? 'Next.js' : detectedTemplate === 'expo' ? 'Expo' : detectedTemplate === 'html' ? 'HTML' : 'Vite React'} template based on your prompt`)
+        }
+      } else {
+        console.log(`👤 User manually selected template: "${selectedTemplate}", skipping auto-detection`)
+        detectedTemplate = selectedTemplate
+      }
+
       console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
       
       // Generate project name and description using Pixtral
@@ -795,7 +853,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         body: JSON.stringify({
           prompt: prompt,
           userId: user.id,
-          template: selectedTemplate,
+          template: detectedTemplate, // Use detected template instead of selectedTemplate
         }),
       })
 
@@ -877,13 +935,19 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             throw githubError
           }
         } else {
-          // Apply template files based on selection
+          // Apply template files based on detected framework
           const { TemplateService } = await import('@/lib/template-service')
-          if (selectedTemplate === 'nextjs') {
+          if (detectedTemplate === 'nextjs') {
+            console.log('🎯 Applying Next.js template')
             await TemplateService.applyNextJSTemplate(workspace.id)
-          } else if (selectedTemplate === 'expo') {
+          } else if (detectedTemplate === 'expo') {
+            console.log('🎯 Applying Expo template')
             await TemplateService.applyExpoTemplate(workspace.id)
+          } else if (detectedTemplate === 'html') {
+            console.log('🎯 Applying HTML template')
+            await TemplateService.applyHtmlTemplate(workspace.id)
           } else {
+            console.log('🎯 Applying Vite React template')
             await TemplateService.applyViteReactTemplate(workspace.id)
           }
         }
@@ -1193,7 +1257,10 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 {/* Template Selector */}
                 <Select
                   value={selectedTemplate}
-                  onValueChange={(value: 'vite-react' | 'nextjs' | 'expo') => setSelectedTemplate(value)}
+                  onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => {
+                    setSelectedTemplate(value)
+                    setHasUserSelectedTemplate(true)
+                  }}
                   disabled={isGenerating}
                 >
                   <SelectTrigger className="w-[100px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
@@ -1216,6 +1283,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                       <div className="flex items-center gap-2">
                         <span className="text-lg">📱</span>
                         <span>Expo</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="html" className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🌐</span>
+                        <span>HTML</span>
                       </div>
                     </SelectItem>
                   </SelectContent>

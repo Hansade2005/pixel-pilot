@@ -24,7 +24,6 @@ const FILTERED_FOLDERS = new Set([
   '_tests',
   '_tests_',
   'node_modules',
-  '.git',
   '.next',
   'dist',
   'build',

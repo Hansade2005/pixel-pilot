@@ -532,6 +532,83 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
   }
 }
 
+// Function to upload HTML project files to Supabase storage
+async function uploadHtmlProjectToSupabase(files: any[], projectSlug: string, supabase: any, isProduction: boolean = false) {
+  try {
+    console.log('[HTML Hosting] Starting upload of HTML project files...')
+
+    // Filter out unwanted files (same logic as filterUnwantedFiles)
+    const allowedExtensions = ['.html', '.css', '.js', '.json', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.ico', '.woff', '.woff2', '.ttf', '.eot']
+    const userFiles = files.filter((file: any) => {
+      const fileName = file.name || file.path.split('/').pop() || ''
+      const hasAllowedExtension = allowedExtensions.some(ext => fileName.toLowerCase().endsWith(ext))
+      const isNotUnwanted = !fileName.startsWith('.') && !fileName.includes('node_modules') && !fileName.includes('.git')
+      // Exclude build/deployment config files that aren't needed for static hosting
+      const isNotConfig = !['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'vercel.json', 'netlify.toml', '.gitignore'].includes(fileName)
+      return hasAllowedExtension && isNotUnwanted && isNotConfig
+    })
+
+    console.log(`[HTML Hosting] Found ${userFiles.length} files to upload`)
+
+    // Log the files that will be uploaded
+    userFiles.forEach((file: any) => {
+      const relativePath = file.path.startsWith('/') ? file.path.substring(1) : file.path
+      console.log(`[HTML Hosting] Will upload: ${relativePath} → sites/${projectSlug}/${relativePath}`)
+    })
+
+    // Upload each file to Supabase storage
+    for (const file of userFiles) {
+      const relativePath = file.path.startsWith('/') ? file.path.substring(1) : file.path
+
+      try {
+        // Process HTML files to add SEO metadata and PiPilot badge
+        let processedContent = file.content
+        if (relativePath.endsWith('.html')) {
+          console.log(`[HTML Hosting] Processing HTML file ${relativePath} with SEO enhancement...`)
+
+          // Add comprehensive SEO metadata
+          processedContent = await addSEOMetadata(processedContent, projectSlug)
+
+          // Only inject badge for preview sites (not production)
+          if (!isProduction) {
+            processedContent = injectPiPilotBadge(processedContent)
+            console.log(`[HTML Hosting] Badge injected for preview site: ${relativePath}`)
+          } else {
+            console.log(`[HTML Hosting] Skipping badge injection for production site: ${relativePath}`)
+          }
+
+          console.log(`[HTML Hosting] SEO enhanced for ${relativePath}`)
+        }
+
+        // Determine content type
+        const contentType = getContentType(file.name || relativePath.split('/').pop() || '')
+
+        // Upload to Supabase storage preserving directory structure
+        const { data, error } = await supabase.storage
+          .from('documents')
+          .upload(`sites/${projectSlug}/${relativePath}`, processedContent, {
+            contentType,
+            upsert: true
+          })
+
+        if (error) {
+          console.error(`[HTML Hosting] Error uploading ${relativePath}:`, error)
+        } else {
+          console.log(`[HTML Hosting] Uploaded ${relativePath}`)
+        }
+      } catch (fileError) {
+        console.error(`[HTML Hosting] Error processing ${relativePath}:`, fileError)
+      }
+    }
+
+    console.log('[HTML Hosting] Upload completed')
+    return true
+  } catch (error) {
+    console.error('[HTML Hosting] Upload failed:', error)
+    return false
+  }
+}
+
 // Helper function to determine content type
 function getContentType(fileName: string): string {
   const lower = fileName.toLowerCase()
@@ -1010,7 +1087,7 @@ async function handleStreamingPreview(req: Request) {
                       is_active: true,
                       auto_delete: autoDelete,
                       deployed_at: new Date().toISOString(),
-                      metadata: { framework: 'vite', deployed_from: 'pixelpilot' }
+                      metadata: { framework: 'html', deployed_from: 'pixelpilot' }
                     });
                   
                   send({ type: "log", message: `Created ${siteType} site record` });
@@ -1051,6 +1128,122 @@ async function handleStreamingPreview(req: Request) {
               hostedOriginalClose()
             }
             
+            // Exit the function early for hosted projects
+            controller.close()
+            return
+          }
+
+          // Check for HTML projects (has index.html but no Vite/Next.js/Expo configs)
+          const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+          const hasNoBuildConfigs = !files.some((f: any) =>
+            f.path === 'vite.config.js' ||
+            f.path === 'vite.config.ts' ||
+            f.path === 'vite.config.mjs' ||
+            f.path === 'next.config.js' ||
+            f.path === 'next.config.mjs' ||
+            f.path === 'app.json' ||
+            f.path === 'nuxt.config.js' ||
+            f.path === 'nuxt.config.ts'
+          )
+
+          if (hasIndexHtml && hasNoBuildConfigs) {
+            // HTML project - upload static files directly to Supabase storage
+            send({ type: "log", message: "Detected HTML project, will host static files on Supabase" })
+
+            // Upload HTML project files to Supabase using the final slug
+            const uploadSuccess = await uploadHtmlProjectToSupabase(files, finalSlug, externalSupabase, isProduction)
+
+            if (!uploadSuccess) {
+              send({ type: "error", message: "Failed to upload HTML files to hosting" })
+              throw new Error('Failed to upload HTML files to hosting')
+            }
+
+            // Return hosted URL with final slug
+            const hostedUrl = `https://${finalSlug}.pipilot.dev/`
+
+            send({ type: "log", message: `HTML project hosted at: ${hostedUrl}` })
+
+            // Create or update site record in the sites table
+            if (authUserId) {
+              try {
+                const siteType = isProduction ? 'production' : 'preview';
+                const autoDelete = !isProduction;
+
+                const { data: existingSite } = await externalSupabase
+                  .from('sites')
+                  .select('*')
+                  .eq('project_id', projectId)
+                  .eq('site_type', siteType)
+                  .eq('user_id', authUserId)
+                  .maybeSingle();
+
+                if (existingSite) {
+                  await externalSupabase
+                    .from('sites')
+                    .update({
+                      url: hostedUrl,
+                      project_slug: finalSlug,
+                      custom_domain_id: customDomainId || null,
+                      last_updated: new Date().toISOString(),
+                      is_active: true
+                    })
+                    .eq('id', existingSite.id);
+
+                  send({ type: "log", message: `Updated ${siteType} site record` });
+                } else {
+                  await externalSupabase
+                    .from('sites')
+                    .insert({
+                      user_id: authUserId,
+                      project_id: projectId,
+                      project_slug: finalSlug,
+                      site_type: siteType,
+                      url: hostedUrl,
+                      custom_domain_id: customDomainId || null,
+                      is_active: true,
+                      auto_delete: autoDelete,
+                      deployed_at: new Date().toISOString(),
+                      metadata: { framework: 'html', deployed_from: 'pixelpilot' }
+                    });
+
+                  send({ type: "log", message: `Created ${siteType} site record` });
+                }
+
+                if (customDomainId) {
+                  await externalSupabase
+                    .from('custom_domains')
+                    .update({ site_id: existingSite?.id })
+                    .eq('id', customDomainId);
+                }
+              } catch (siteError) {
+                send({ type: "error", message: `Site record error: ${siteError}` });
+              }
+            }
+
+            send({
+              type: "ready",
+              message: "HTML project hosted successfully",
+              sandboxId: sandbox.id,
+              url: hostedUrl,
+              finalSlug: finalSlug,
+              originalSlug: originalSlug,
+              processId: null,
+              hosted: true,
+              isProduction: isProduction
+            })
+
+            // Keep-alive heartbeat for hosted projects too
+            const hostedHeartbeat = setInterval(() => {
+              send({ type: "heartbeat", message: "alive" })
+            }, 30000)
+
+            const hostedOriginalClose = controller.close.bind(controller)
+            controller.close = () => {
+              isClosed = true
+              clearInterval(hostedHeartbeat)
+              hostedOriginalClose()
+            }
+
             // Exit the function early for hosted projects
             controller.close()
             return

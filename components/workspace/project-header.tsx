@@ -67,7 +67,7 @@ export function ProjectHeader({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
-  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo'>('vite-react')
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs' | 'expo' | 'html'>('vite-react')
   const [isCreating, setIsCreating] = useState(false)
   const [gitHubConnected, setGitHubConnected] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
