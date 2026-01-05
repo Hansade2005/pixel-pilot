@@ -153,7 +153,7 @@ export function SupabaseConnectionManager({
       }
 
       // Connect the PixelPilot project to the Supabase project
-      const success = await connectPixelPilotToSupabaseProject(userId, pixelpilotProjectId, {
+      const result = await connectPixelPilotToSupabaseProject(userId, pixelpilotProjectId, {
         supabaseProjectId: supabaseProject.id,
         supabaseProjectName: supabaseProject.name,
         supabaseProjectUrl: apiResult.projectUrl,
@@ -161,8 +161,73 @@ export function SupabaseConnectionManager({
         supabaseServiceRoleKey: apiResult.serviceRoleKey
       })
 
-      if (!success) {
-        throw new Error('Failed to connect project')
+      if (!result.success) {
+        if (result.conflict) {
+          // Show toast with action buttons
+          toast({
+            title: "Project Already Connected",
+            description: (
+              <div className="space-y-3">
+                <p>This Supabase project is already connected to another PixelPilot project.</p>
+                <p className="text-xs text-muted-foreground font-mono">Existing connection: {result.conflict.existingProjectId}</p>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={async () => {
+                      setIsConnecting(true)
+                      const forceResult = await connectPixelPilotToSupabaseProject(
+                        userId,
+                        pixelpilotProjectId,
+                        {
+                          supabaseProjectId: supabaseProject.id,
+                          supabaseProjectName: supabaseProject.name,
+                          supabaseProjectUrl: apiResult.projectUrl,
+                          supabaseAnonKey: apiResult.anonKey,
+                          supabaseServiceRoleKey: apiResult.serviceRoleKey
+                        },
+                        true
+                      )
+                      
+                      if (forceResult.success) {
+                        setCurrentConnection({
+                          supabaseProjectId: supabaseProject.id,
+                          supabaseProjectName: supabaseProject.name,
+                          supabaseProjectUrl: apiResult.projectUrl,
+                          supabaseAnonKey: apiResult.anonKey,
+                          supabaseServiceRoleKey: apiResult.serviceRoleKey,
+                          connectedAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString()
+                        })
+                        setShowProjectSelector(false)
+                        toast({
+                          title: "Connected Successfully",
+                          description: `Disconnected from old project and connected to ${supabaseProject.name}`,
+                        })
+                      }
+                      setIsConnecting(false)
+                    }}
+                  >
+                    Connect & Disconnect Old
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      toast({ title: "Cancelled", description: "Connection cancelled" })
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ),
+            duration: 10000,
+          })
+          setIsConnecting(false)
+          return
+        }
+        throw new Error(result.error || 'Failed to connect project')
       }
 
       // Update local state

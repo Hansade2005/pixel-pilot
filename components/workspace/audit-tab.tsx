@@ -60,7 +60,7 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                             </div>
 
                             <Tabs value={activeAuditTab} onValueChange={(value) => setActiveAuditTab(value as "docs" | "review" | "quality")}>
-                                <TabsList className="grid w-full grid-cols-1 mb-4">
+                                <TabsList className="grid w-full grid-cols-1 mb-6">
                                     <TabsTrigger value="docs" className="flex items-center gap-2 justify-start">
                                         <FileText className="h-4 w-4" />
                                         <span>Documentation</span>
@@ -75,7 +75,7 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                     </TabsTrigger>
                                 </TabsList>
 
-                                <TabsContent value="docs" className="m-0">
+                                <TabsContent value="docs" className="m-0 mt-2">
                                     <DocsTab
                                         user={user}
                                         selectedProject={selectedProject}
@@ -86,7 +86,7 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                         onSelectDoc={setSelectedDocPath}
                                     />
                                 </TabsContent>
-                                <TabsContent value="review" className="m-0">
+                                <TabsContent value="review" className="m-0 mt-2">
                                     <ReviewTab
                                         user={user}
                                         selectedProject={selectedProject}
@@ -97,7 +97,7 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                         onSelectReview={setSelectedReviewPath}
                                     />
                                 </TabsContent>
-                                <TabsContent value="quality" className="m-0">
+                                <TabsContent value="quality" className="m-0 mt-2">
                                     <QualityTab
                                         user={user}
                                         selectedProject={selectedProject}

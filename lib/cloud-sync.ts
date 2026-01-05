@@ -633,9 +633,29 @@ export async function connectPixelPilotToSupabaseProject(
     supabaseProjectUrl?: string,
     supabaseAnonKey?: string,
     supabaseServiceRoleKey?: string
-  }
-): Promise<boolean> {
+  },
+  forceConnect: boolean = false
+): Promise<{ success: boolean; conflict?: { existingProjectId: string }; error?: string }> {
   try {
+    // Check if this Supabase project is already connected to a different PixelPilot project
+    if (!forceConnect) {
+      const { data: existingConnection } = await supabase
+        .from('supabase_projects')
+        .select('pixelpilot_project_id')
+        .eq('user_id', userId)
+        .eq('supabase_project_id', supabaseProjectDetails.supabaseProjectId)
+        .single()
+
+      if (existingConnection && existingConnection.pixelpilot_project_id !== pixelpilotProjectId) {
+        return {
+          success: false,
+          conflict: {
+            existingProjectId: existingConnection.pixelpilot_project_id
+          }
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('supabase_projects')
       .upsert({
@@ -648,15 +668,16 @@ export async function connectPixelPilotToSupabaseProject(
         supabase_service_role_key: supabaseProjectDetails.supabaseServiceRoleKey,
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'pixelpilot_project_id'
+        onConflict: 'user_id,supabase_project_id',
+        ignoreDuplicates: false
       })
 
     if (error) throw error
 
-    return true
-  } catch (error) {
+    return { success: true }
+  } catch (error: any) {
     console.error("Error connecting PixelPilot project to Supabase project:", error)
-    return false
+    return { success: false, error: error.message || 'Unknown error' }
   }
 }
 
