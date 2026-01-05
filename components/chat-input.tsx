@@ -59,7 +59,13 @@ interface PromptSuggestion {
 }
 
 export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) {
-  const [prompt, setPrompt] = useState("")
+  // Initialize prompt from localStorage if available
+  const [prompt, setPrompt] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('chat-input-prompt') || ''
+    }
+    return ''
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -112,6 +118,17 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
     checkUser()
   }, [supabase.auth])
+
+  // Save prompt to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (prompt.trim()) {
+        localStorage.setItem('chat-input-prompt', prompt)
+      } else {
+        localStorage.removeItem('chat-input-prompt')
+      }
+    }
+  }, [prompt])
 
   // Check if Web Speech API is supported
   const isWebSpeechSupported = typeof window !== 'undefined' && 

@@ -980,7 +980,12 @@ export function ChatPanelV2({
   const [databaseId, setDatabaseId] = useState<number | null>(project?.databaseId || null)
 
   // Local state for input (not using useChat's input)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('chat-panel-input') || ''
+    }
+    return ''
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
@@ -2181,6 +2186,17 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
+  // Save input to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (input.trim()) {
+        localStorage.setItem('chat-panel-input', input)
+      } else {
+        localStorage.removeItem('chat-panel-input')
+      }
+    }
+  }, [input])
+
   const loadProjectFiles = async () => {
     try {
       if (!fileLookupServiceRef.current || !project?.id) return
@@ -2725,18 +2741,26 @@ export function ChatPanelV2({
       setIsContinuationInProgress(false)
 
       // Find the last message (which should be the assistant's partial response)
-      // Since state updates are async, we use the messages state which contains the latest updates from the stream loop
       const lastMessage = messages[messages.length - 1]
 
-      if (lastMessage && lastMessage.role === 'assistant') {
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content.trim()) {
         console.log('[ChatPanelV2] Saving partial message due to user stop:', lastMessage.id)
 
         // Save the partial message to the database
         await saveMessageToIndexedDB(lastMessage)
 
+        // Reload messages to show the saved partial message in the UI
+        await loadMessages()
+
         toast({
           title: "Stopped",
           description: "Generation stopped and partial response saved."
+        })
+      } else {
+        console.log('[ChatPanelV2] No partial content to save')
+        toast({
+          title: "Stopped",
+          description: "Generation stopped."
         })
       }
     }
