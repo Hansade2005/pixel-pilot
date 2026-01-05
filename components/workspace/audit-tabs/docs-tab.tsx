@@ -17,6 +17,8 @@ interface DocsTabProps {
     isSidebar?: boolean
     onToggleExplorer?: () => void
     showExplorer?: boolean
+    selectedDocPath?: string
+    onSelectDoc?: (path: string) => void
 }
 
 interface DocFile {
@@ -26,12 +28,20 @@ interface DocFile {
     lastModified?: string
 }
 
-export function DocsTab({ user, selectedProject, isSidebar = false, onToggleExplorer, showExplorer }: DocsTabProps) {
+export function DocsTab({ user, selectedProject, isSidebar = false, onToggleExplorer, showExplorer, selectedDocPath = "", onSelectDoc }: DocsTabProps) {
     const { toast } = useToast()
-    const [selectedDoc, setSelectedDoc] = useState<string>("")
+    const [selectedDoc, setSelectedDoc] = useState<string>(selectedDocPath)
     const [docContent, setDocContent] = useState<string>("")
     const [availableDocs, setAvailableDocs] = useState<DocFile[]>([])
     const [isLoading, setIsLoading] = useState(false)
+
+    // Sync with parent selected path
+    useEffect(() => {
+        if (selectedDocPath) {
+            setSelectedDoc(selectedDocPath)
+            loadDocContent(selectedDocPath)
+        }
+    }, [selectedDocPath])
 
     // Default documentation files to check
     const defaultDocs: DocFile[] = [
@@ -148,6 +158,9 @@ export function DocsTab({ user, selectedProject, isSidebar = false, onToggleExpl
 
     const handleDocSelect = (filePath: string) => {
         setSelectedDoc(filePath)
+        if (onSelectDoc) {
+            onSelectDoc(filePath)
+        }
         loadDocContent(filePath)
     }
 
@@ -176,24 +189,26 @@ export function DocsTab({ user, selectedProject, isSidebar = false, onToggleExpl
     // Sidebar mode - show file list only
     if (isSidebar) {
         return (
-            <div className="space-y-2">
-                <div className="space-y-1">
+            <div className="space-y-3 h-full flex flex-col">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                     {availableDocs.map((doc) => (
                         <button
                             key={doc.path}
                             onClick={() => handleDocSelect(doc.path)}
                             className={cn(
-                                "w-full text-left p-2 rounded-md hover:bg-accent transition-colors",
-                                selectedDoc === doc.path && "bg-accent"
+                                "w-full text-left p-3 rounded-lg hover:bg-accent/80 transition-all duration-200 border border-transparent hover:border-border group",
+                                selectedDoc === doc.path && "bg-accent border-border shadow-sm"
                             )}
                         >
-                            <div className="flex items-center gap-2">
-                                {getTypeIcon(doc.type)}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{doc.name}</p>
-                                    <p className="text-xs text-muted-foreground truncate">{doc.path}</p>
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 text-muted-foreground group-hover:text-foreground transition-colors">
+                                    {getTypeIcon(doc.type)}
                                 </div>
-                                <Badge variant="secondary" className={cn("text-xs", getTypeColor(doc.type))}>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate text-foreground group-hover:text-foreground/90">{doc.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate mt-0.5 group-hover:text-muted-foreground/80">{doc.path}</p>
+                                </div>
+                                <Badge variant="secondary" className={cn("text-xs flex-shrink-0", getTypeColor(doc.type))}>
                                     {doc.type}
                                 </Badge>
                             </div>
@@ -201,20 +216,21 @@ export function DocsTab({ user, selectedProject, isSidebar = false, onToggleExpl
                     ))}
 
                     {availableDocs.length === 0 && !isLoading && (
-                        <div className="text-center py-4">
-                            <p className="text-sm text-muted-foreground">No documentation found</p>
-                            <p className="text-xs text-muted-foreground">Documentation will be generated automatically</p>
+                        <div className="text-center py-8 px-4">
+                            <FileText className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                            <p className="text-sm font-medium text-muted-foreground">No documentation found</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">Documentation will be generated automatically</p>
                         </div>
                     )}
 
                     {isLoading && (
-                        <div className="flex items-center justify-center py-4">
-                            <RefreshCw className="h-4 w-4 animate-spin" />
+                        <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                     )}
                 </div>
 
-                <div className="pt-2 border-t">
+                <div className="pt-3 border-t space-y-2">
                     <Button
                         onClick={loadAvailableDocs}
                         variant="outline"

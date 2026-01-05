@@ -18,6 +18,8 @@ interface QualityTabProps {
     isSidebar?: boolean
     onToggleExplorer?: () => void
     showExplorer?: boolean
+    selectedQualityPath?: string
+    onSelectQuality?: (path: string) => void
 }
 
 interface QualityFile {
@@ -27,13 +29,21 @@ interface QualityFile {
     lastModified?: string
 }
 
-export function QualityTab({ user, selectedProject, isSidebar = false, onToggleExplorer, showExplorer }: QualityTabProps) {
+export function QualityTab({ user, selectedProject, isSidebar = false, onToggleExplorer, showExplorer, selectedQualityPath = "", onSelectQuality }: QualityTabProps) {
     // Initialize state variables
     const { toast } = useToast()
-    const [selectedQuality, setSelectedQuality] = useState<string>("")
+    const [selectedQuality, setSelectedQuality] = useState<string>(selectedQualityPath)
     const [qualityContent, setQualityContent] = useState<string>("")
     const [availableQuality, setAvailableQuality] = useState<QualityFile[]>([])
     const [isLoading, setIsLoading] = useState(false)
+
+    // Sync with parent selected path
+    useEffect(() => {
+        if (selectedQualityPath) {
+            setSelectedQuality(selectedQualityPath)
+            loadQualityContent(selectedQualityPath)
+        }
+    }, [selectedQualityPath])
 
     useEffect(() => {
         if (selectedProject) {
@@ -144,6 +154,9 @@ export function QualityTab({ user, selectedProject, isSidebar = false, onToggleE
 
     const handleQualitySelect = (filePath: string) => {
         setSelectedQuality(filePath)
+        if (onSelectQuality) {
+            onSelectQuality(filePath)
+        }
         loadQualityContent(filePath)
     }
 
@@ -170,24 +183,26 @@ export function QualityTab({ user, selectedProject, isSidebar = false, onToggleE
     // Sidebar mode - show file list only
     if (isSidebar) {
         return (
-            <div className="space-y-2">
-                <div className="space-y-1">
+            <div className="space-y-3 h-full flex flex-col">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                     {availableQuality.map((qualityFile) => (
                         <button
                             key={qualityFile.path}
                             onClick={() => handleQualitySelect(qualityFile.path)}
                             className={cn(
-                                "w-full text-left p-2 rounded-md hover:bg-accent transition-colors",
-                                selectedQuality === qualityFile.path && "bg-accent"
+                                "w-full text-left p-3 rounded-lg hover:bg-accent/80 transition-all duration-200 border border-transparent hover:border-border group",
+                                selectedQuality === qualityFile.path && "bg-accent border-border shadow-sm"
                             )}
                         >
-                            <div className="flex items-center gap-2">
-                                {getTypeIcon(qualityFile.type)}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{qualityFile.name}</p>
-                                    <p className="text-xs text-muted-foreground truncate">{qualityFile.path}</p>
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 text-muted-foreground group-hover:text-foreground transition-colors">
+                                    {getTypeIcon(qualityFile.type)}
                                 </div>
-                                <Badge variant="secondary" className={cn("text-xs", getTypeColor(qualityFile.type))}>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate text-foreground group-hover:text-foreground/90">{qualityFile.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate mt-0.5 group-hover:text-muted-foreground/80">{qualityFile.path}</p>
+                                </div>
+                                <Badge variant="secondary" className={cn("text-xs flex-shrink-0", getTypeColor(qualityFile.type))}>
                                     {qualityFile.type}
                                 </Badge>
                             </div>
@@ -195,15 +210,16 @@ export function QualityTab({ user, selectedProject, isSidebar = false, onToggleE
                     ))}
 
                     {availableQuality.length === 0 && !isLoading && (
-                        <div className="text-center py-4">
-                            <p className="text-sm text-muted-foreground">No quality reports found</p>
-                            <p className="text-xs text-muted-foreground">Quality reports will be generated automatically</p>
+                        <div className="text-center py-8 px-4">
+                            <TrendingUp className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                            <p className="text-sm font-medium text-muted-foreground">No quality reports found</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">Quality analyses will be generated automatically</p>
                         </div>
                     )}
 
                     {isLoading && (
-                        <div className="flex items-center justify-center py-4">
-                            <RefreshCw className="h-4 w-4 animate-spin" />
+                        <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                     )}
                 </div>

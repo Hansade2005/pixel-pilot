@@ -20,6 +20,9 @@ interface AuditTabProps {
 export function AuditTab({ user, selectedProject }: AuditTabProps) {
     const [activeAuditTab, setActiveAuditTab] = useState<"docs" | "review" | "quality">("docs")
     const [showFileExplorer, setShowFileExplorer] = useState(true)
+    const [selectedDocPath, setSelectedDocPath] = useState<string>("")
+    const [selectedReviewPath, setSelectedReviewPath] = useState<string>("")
+    const [selectedQualityPath, setSelectedQualityPath] = useState<string>("")
     const isMobile = useIsMobile()
 
     return (
@@ -79,6 +82,8 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                         isSidebar={true}
                                         onToggleExplorer={() => setShowFileExplorer(!showFileExplorer)}
                                         showExplorer={showFileExplorer}
+                                        selectedDocPath={selectedDocPath}
+                                        onSelectDoc={setSelectedDocPath}
                                     />
                                 </TabsContent>
                                 <TabsContent value="review" className="m-0">
@@ -88,6 +93,8 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                         isSidebar={true}
                                         onToggleExplorer={() => setShowFileExplorer(!showFileExplorer)}
                                         showExplorer={showFileExplorer}
+                                        selectedReviewPath={selectedReviewPath}
+                                        onSelectReview={setSelectedReviewPath}
                                     />
                                 </TabsContent>
                                 <TabsContent value="quality" className="m-0">
@@ -97,6 +104,8 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                         isSidebar={true}
                                         onToggleExplorer={() => setShowFileExplorer(!showFileExplorer)}
                                         showExplorer={showFileExplorer}
+                                        selectedQualityPath={selectedQualityPath}
+                                        onSelectQuality={setSelectedQualityPath}
                                     />
                                 </TabsContent>
                             </Tabs>
@@ -140,6 +149,8 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                 isSidebar={false}
                                 onToggleExplorer={() => setShowFileExplorer(!showFileExplorer)}
                                 showExplorer={showFileExplorer}
+                                selectedDocPath={selectedDocPath}
+                                onSelectDoc={setSelectedDocPath}
                             />
                         </TabsContent>
                         <TabsContent value="review" className="h-full m-0">
@@ -149,6 +160,8 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                 isSidebar={false}
                                 onToggleExplorer={() => setShowFileExplorer(!showFileExplorer)}
                                 showExplorer={showFileExplorer}
+                                selectedReviewPath={selectedReviewPath}
+                                onSelectReview={setSelectedReviewPath}
                             />
                         </TabsContent>
                         <TabsContent value="quality" className="h-full m-0">
@@ -158,6 +171,8 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                                 isSidebar={false}
                                 onToggleExplorer={() => setShowFileExplorer(!showFileExplorer)}
                                 showExplorer={showFileExplorer}
+                                selectedQualityPath={selectedQualityPath}
+                                onSelectQuality={setSelectedQualityPath}
                             />
                         </TabsContent>
                     </Tabs>
