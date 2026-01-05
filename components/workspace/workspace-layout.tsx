@@ -24,7 +24,8 @@ import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play,DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
+import { AuditTab } from "./audit-tab"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play,DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -67,7 +68,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
@@ -82,7 +83,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -1102,6 +1103,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             >
                               <Cloud className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant={activeTab === "audit" ? "secondary" : "ghost"}
+                              size="sm"
+                              onClick={() => setActiveTab("audit")}
+                              title="Code Audit & Quality"
+                            >
+                              <Shield className="h-4 w-4" />
+                            </Button>
                           </div>
 
 
@@ -1185,6 +1194,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
                       <CloudTab user={user} selectedProject={selectedProject} /> 
+                    ) : activeTab === "audit" ? (
+                      /* Audit Tab */
+                      <AuditTab user={user} selectedProject={selectedProject} />
                     ) : (
                       /* Database Tab - fallback */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
@@ -1653,6 +1665,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <CloudTab user={user} selectedProject={selectedProject} />
                   </div>
                 </TabsContent>
+
+                <TabsContent value="audit" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <AuditTab user={user} selectedProject={selectedProject} />
+                  </div>
+                </TabsContent>
               </Tabs>
             )}
           </div>
@@ -1660,7 +1678,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           {/* Fixed Mobile Bottom Tab Navigation - only show when project is selected */}
           {selectedProject && (
             <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-              <div className="grid grid-cols-4 h-12">
+              <div className="grid grid-cols-5 h-12">
                 <button
                   onClick={() => setMobileTab("chat")}
                   className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
@@ -1696,6 +1714,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 >
                   <Eye className="h-4 w-4" />
                   <span className="text-xs">Preview</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("audit")}
+                  className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
+                    mobileTab === "audit" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="text-xs">Audit</span>
                 </button>
               </div>
             </div>

@@ -9919,6 +9919,271 @@ Result must be Markdown formatted for proper display:
         }
       }),
 
+      // AUDIT TOOLS: Auto documentation, code review, and quality analysis
+      auto_documentation: tool({
+        description: 'Create or update documentation files (README.md, API docs, inline comments) when new features, APIs, or functionality is implemented. Only generates/updates documentation when there are actual changes to document. Use this tool proactively when implementing new features to ensure developers can contribute effectively.',
+        inputSchema: z.object({
+          action: z.enum(['create', 'update']).describe('Whether to create new documentation or update existing documentation'),
+          docType: z.enum(['readme', 'api', 'feature', 'contributing', 'changelog']).describe('Type of documentation to create/update'),
+          filePath: z.string().optional().describe('Specific file path for the documentation (e.g., "docs/api.md", "README.md"). If not provided, will use standard locations'),
+          content: z.string().describe('The markdown content to write to the documentation file'),
+          title: z.string().optional().describe('Title for the documentation section being added/updated')
+        }),
+        execute: async ({ action, docType, filePath, content, title }, { toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          try {
+            // Determine the file path based on docType if not provided
+            let targetPath = filePath;
+            if (!targetPath) {
+              switch (docType) {
+                case 'readme':
+                  targetPath = 'README.md';
+                  break;
+                case 'api':
+                  targetPath = 'docs/api.md';
+                  break;
+                case 'feature':
+                  targetPath = 'docs/features.md';
+                  break;
+                case 'contributing':
+                  targetPath = 'docs/contributing.md';
+                  break;
+                case 'changelog':
+                  targetPath = 'CHANGELOG.md';
+                  break;
+                default:
+                  targetPath = `docs/${docType}.md`;
+              }
+            }
+
+            // Use the powerful constructor to create/update the documentation file
+            return await constructToolResult('auto_documentation', {
+              action,
+              docType,
+              filePath: targetPath,
+              content,
+              title
+            }, projectId, toolCallId);
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            console.error('[ERROR] Auto documentation failed:', error);
+            return {
+              success: false,
+              error: `Auto documentation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              action,
+              docType,
+              filePath,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          }
+        }
+      }),
+
+      code_review: tool({
+        description: 'Create or update code review documentation when security vulnerabilities, performance issues, or maintainability problems are identified. Generates actionable improvement suggestions in markdown format for developers.',
+        inputSchema: z.object({
+          action: z.enum(['create', 'update']).describe('Whether to create new review documentation or update existing review docs'),
+          reviewType: z.enum(['security', 'performance', 'maintainability', 'all']).describe('Type of issues found during review'),
+          severity: z.enum(['low', 'medium', 'high', 'critical']).describe('Severity level of the issues found'),
+          issues: z.array(z.object({
+            file: z.string(),
+            line: z.number(),
+            issue: z.string(),
+            suggestion: z.string(),
+            severity: z.enum(['low', 'medium', 'high', 'critical'])
+          })).describe('Array of issues found with file, line, issue description, and improvement suggestions'),
+          summary: z.string().describe('Overall summary of the code review findings')
+        }),
+        execute: async ({ action, reviewType, severity, issues, summary }, { toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          try {
+            // Generate markdown content for the review
+            const reviewContent = `# Code Review Report - ${reviewType.toUpperCase()}
+
+**Review Date:** ${new Date().toISOString().split('T')[0]}
+**Review Type:** ${reviewType}
+**Overall Severity:** ${severity.toUpperCase()}
+
+## Summary
+${summary}
+
+## Issues Found (${issues.length})
+
+${issues.map((issue, index) => `### ${index + 1}. ${issue.issue}
+- **File:** \`${issue.file}:${issue.line}\`
+- **Severity:** ${issue.severity.toUpperCase()}
+- **Suggestion:** ${issue.suggestion}
+`).join('\n')}
+
+## Recommendations
+${issues.length > 0 ? issues.map(issue => `- ${issue.suggestion}`).join('\n') : 'No critical issues found. Code looks good!'}
+
+---
+*Generated by AI Code Review Tool*
+`;
+
+            const filePath = `docs/reviews/${reviewType}-review-${new Date().toISOString().split('T')[0]}.md`;
+
+            // Use the powerful constructor to create/update the review documentation
+            return await constructToolResult('code_review', {
+              action,
+              reviewType,
+              severity,
+              issues,
+              summary,
+              filePath,
+              content: reviewContent
+            }, projectId, toolCallId);
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            console.error('[ERROR] Code review documentation failed:', error);
+            return {
+              success: false,
+              error: `Code review documentation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              reviewType,
+              severity,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          }
+        }
+      }),
+
+      code_quality_analysis: tool({
+        description: 'Create or update code quality analysis documentation with detailed metrics, complexity scores, maintainability analysis, and improvement recommendations in markdown format.',
+        inputSchema: z.object({
+          action: z.enum(['create', 'update']).describe('Whether to create new quality analysis or update existing analysis'),
+          metrics: z.object({
+            overall: z.object({
+              score: z.number(),
+              grade: z.string(),
+              status: z.string()
+            }),
+            complexity: z.object({
+              score: z.number(),
+              averageComplexity: z.number(),
+              complexFunctions: z.number()
+            }),
+            maintainability: z.object({
+              score: z.number(),
+              issues: z.number(),
+              suggestions: z.array(z.string())
+            }),
+            coverage: z.object({
+              score: z.number(),
+              linesCovered: z.number(),
+              totalLines: z.number(),
+              percentage: z.number()
+            }),
+            standards: z.object({
+              score: z.number(),
+              lintErrors: z.number(),
+              lintWarnings: z.number(),
+              styleIssues: z.number()
+            })
+          }).describe('Quality metrics data to document'),
+          fileAnalysis: z.array(z.object({
+            name: z.string(),
+            score: z.number(),
+            issues: z.number(),
+            complexity: z.number()
+          })).optional().describe('Per-file quality analysis data')
+        }),
+        execute: async ({ action, metrics, fileAnalysis }, { toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          try {
+            // Generate comprehensive markdown quality report
+            const qualityContent = `# Code Quality Analysis Report
+
+**Analysis Date:** ${new Date().toISOString().split('T')[0]}
+**Overall Score:** ${metrics.overall.score}/100 (${metrics.overall.grade})
+
+## Executive Summary
+**Status:** ${metrics.overall.status.toUpperCase()}
+**Grade:** ${metrics.overall.grade}
+
+## Quality Metrics
+
+### 🔄 Complexity Analysis
+- **Score:** ${metrics.complexity.score}/100
+- **Average Complexity:** ${metrics.complexity.averageComplexity}
+- **Complex Functions:** ${metrics.complexity.complexFunctions}
+
+### 🛠️ Maintainability
+- **Score:** ${metrics.maintainability.score}/100
+- **Issues Found:** ${metrics.maintainability.issues}
+- **Suggestions:** ${metrics.maintainability.suggestions.length}
+
+### 📊 Test Coverage
+- **Score:** ${metrics.coverage.score}/100
+- **Coverage:** ${metrics.coverage.percentage.toFixed(1)}%
+- **Lines Covered:** ${metrics.coverage.linesCovered}/${metrics.coverage.totalLines}
+
+### 📏 Coding Standards
+- **Score:** ${metrics.standards.score}/100
+- **Lint Errors:** ${metrics.standards.lintErrors}
+- **Lint Warnings:** ${metrics.standards.lintWarnings}
+- **Style Issues:** ${metrics.standards.styleIssues}
+
+## Improvement Recommendations
+
+${metrics.maintainability.suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n')}
+
+${fileAnalysis && fileAnalysis.length > 0 ? `
+## File Analysis
+
+| File | Score | Issues | Complexity |
+|------|-------|--------|------------|
+${fileAnalysis.map(file => `| \`${file.name}\` | ${file.score}/100 | ${file.issues} | ${file.complexity} |`).join('\n')}
+
+## Files Needing Attention
+
+${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: Score ${file.score}/100 (${file.issues} issues, complexity ${file.complexity})`).join('\n')}
+` : ''}
+
+## Next Steps
+1. Address high-priority issues identified above
+2. Implement suggested improvements
+3. Re-run analysis to track progress
+4. Consider adding more comprehensive test coverage
+
+---
+*Generated by AI Quality Analysis Tool*
+`;
+
+            const filePath = `docs/quality/quality-analysis-${new Date().toISOString().split('T')[0]}.md`;
+
+            // Use the powerful constructor to create/update the quality analysis documentation
+            return await constructToolResult('code_quality_analysis', {
+              action,
+              metrics,
+              fileAnalysis,
+              filePath,
+              content: qualityContent
+            }, projectId, toolCallId);
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            console.error('[ERROR] Code quality analysis documentation failed:', error);
+            return {
+              success: false,
+              error: `Code quality analysis documentation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          }
+        }
+      }),
+
     }
 
     // Filter tools based on chat mode and UI initial prompt detection
