@@ -769,6 +769,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       // Expo/React Native - only when explicitly mentioned
       { regex: /\bexpo\b/i, template: 'expo' as const },
       { regex: /\breact\s+native\b/i, template: 'expo' as const },
+      { regex: /\bmobile\s+app\b/i, template: 'expo' as const },
 
       // HTML - only when explicitly mentioned
       { regex: /\bhtml\b/i, template: 'html' as const },
