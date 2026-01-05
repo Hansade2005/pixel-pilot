@@ -183,7 +183,7 @@ export function QualityTab({ user, selectedProject, isSidebar = false, onToggleE
     // Sidebar mode - show file list only
     if (isSidebar) {
         return (
-            <div className="space-y-3 h-full flex flex-col">
+            <div className="space-y-3 h-full flex flex-col pt-4">
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                     {availableQuality.map((qualityFile) => (
                         <button

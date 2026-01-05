@@ -124,11 +124,11 @@ export function AuditTab({ user, selectedProject }: AuditTabProps) {
                 {/* Main Content Area */}
                 <div className={cn(
                     "flex-1 overflow-y-auto",
-                    isMobile ? "pt-4" : ""
+                    isMobile ? "pt-4 pb-20" : ""
                 )}>
                     {/* File Explorer Toggle Button - Only show when explorer is closed */}
                     {!showFileExplorer && (
-                        <div className="absolute top-4 left-4 z-10">
+                        <div className="sticky top-4 left-4 z-10 self-start mb-4">
                             <Button
                                 variant="ghost"
                                 size="icon"
