@@ -757,45 +757,35 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   }
 
   // Smart template selection based on prompt content
-  const detectFrameworkFromPrompt = (promptText: string): 'vite-react' | 'nextjs' | 'expo' | 'html' => {
+  const detectFrameworkFromPrompt = (promptText: string): 'vite-react' | 'nextjs' | 'expo' | 'html' | null => {
     const lowerPrompt = promptText.toLowerCase()
 
-    // Framework detection patterns (ordered by specificity - most specific first)
+    // Framework detection patterns - ONLY match explicit framework mentions
     const frameworkPatterns = [
-      // Next.js patterns (most specific first)
-      { regex: /\bnext\.?js\b|\bnext\s+js\b|\bnextjs\b|\bnext\b(?!\s+(native|react))/i, template: 'nextjs' as const },
-      { regex: /\bnext\s+(app|pages)\b|\bapp\s+router\b|\bpages\s+router\b/i, template: 'nextjs' as const },
-      { regex: /\bvercel\b|\bnext\s+deploy|\bserver\s+side\s+rendering\b|\bssr\b/i, template: 'nextjs' as const },
-      { regex: /\bapi\s+routes\b|\bnext\s+api\b|\bmiddleware\b/i, template: 'nextjs' as const },
+      // Next.js - only when explicitly mentioned
+      { regex: /\bnext\.?js\b/i, template: 'nextjs' as const },
+      { regex: /\bnextjs\b/i, template: 'nextjs' as const },
 
-      // Expo/React Native patterns
-      { regex: /\bexpo\b|\breact\s+native\b|\brn\b|\bexpo\s+cli\b/i, template: 'expo' as const },
-      { regex: /\bexpo\s+(router|sdk|go)\b|\bexpo\s+dev\s+client\b/i, template: 'expo' as const },
-      { regex: /\bmobile\s+app\b|\bphone\s+app\b|\bandroid\b|\bios\b|\bapk\b|\bipa\b/i, template: 'expo' as const },
-      { regex: /\btab\s+navigation\b|\bstack\s+navigation\b|\bdrawer\b/i, template: 'expo' as const },
+      // Expo/React Native - only when explicitly mentioned
+      { regex: /\bexpo\b/i, template: 'expo' as const },
+      { regex: /\breact\s+native\b/i, template: 'expo' as const },
 
-      // HTML patterns (pure static sites)
-      { regex: /\bpure\s+html\b|\bhtml\s+only\b|\bstatic\s+site\b|\bvanilla\s+js\b/i, template: 'html' as const },
-      { regex: /\bhtml\b|\bcss\b|\bjavascript\b|\bno\s+framework\b|\bno\s+build\b/i, template: 'html' as const },
-
-      // Vite patterns (catch-all for web apps - less specific)
-      { regex: /\bvite\b|\bvue\b|\bsvelte\b|\bvanilla\b|\bweb\s+app\b|\bwebsite\b/i, template: 'vite-react' as const },
-      { regex: /\bweb\s+app\b|\bwebsite\b|\bfrontend\b|\bspa\b|\bpwa\b/i, template: 'vite-react' as const },
-      { regex: /\bportfolio\b|\blanding\s+page\b|\bdashboard\b|\badmin\s+panel\b/i, template: 'vite-react' as const },
-      { regex: /\bclient\s+side\b|\bbrowser\b|\bdom\b|\bwebpack\b/i, template: 'vite-react' as const },
+      // HTML - only when explicitly mentioned
+      { regex: /\bhtml\b/i, template: 'html' as const },
+      { regex: /\bvanilla\s+js\b/i, template: 'html' as const },
     ]
 
-    // Check patterns in order of specificity
+    // Check patterns - only return if explicit framework is mentioned
     for (const { regex, template } of frameworkPatterns) {
       if (regex.test(lowerPrompt)) {
-        console.log(`🎯 Framework detected: "${template}" from pattern: ${regex}`)
+        console.log(`🎯 Framework explicitly detected: "${template}" from pattern: ${regex}`)
         return template
       }
     }
 
-    // Default to vite-react for general web development
-    console.log('🎯 No specific framework detected, defaulting to vite-react')
-    return 'vite-react'
+    // No explicit framework mentioned - return null to not auto-select
+    console.log('🎯 No explicit framework mentioned, no auto-selection')
+    return null
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -831,11 +821,15 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       // Only auto-detect if user hasn't manually selected a template
       let detectedTemplate = selectedTemplate
       if (!hasUserSelectedTemplate) {
-        detectedTemplate = detectFrameworkFromPrompt(prompt)
-        if (detectedTemplate !== selectedTemplate) {
-          console.log(`🎯 Smart template selection: Detected "${detectedTemplate}" from prompt, auto-selecting for new user`)
+        const frameworkDetection = detectFrameworkFromPrompt(prompt)
+        if (frameworkDetection !== null) {
+          detectedTemplate = frameworkDetection
+          console.log(`🎯 Smart template selection: Explicitly detected "${detectedTemplate}" from prompt, auto-selecting`)
           setSelectedTemplate(detectedTemplate)
           toast.info(`🎯 Auto-selected ${detectedTemplate === 'nextjs' ? 'Next.js' : detectedTemplate === 'expo' ? 'Expo' : detectedTemplate === 'html' ? 'HTML' : 'Vite React'} template based on your prompt`)
+        } else {
+          console.log('🎯 No explicit framework detected, using current selection')
+          detectedTemplate = selectedTemplate
         }
       } else {
         console.log(`👤 User manually selected template: "${selectedTemplate}", skipping auto-detection`)
