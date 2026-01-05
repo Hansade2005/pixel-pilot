@@ -1025,6 +1025,12 @@ export function ChatPanelV2({
   const [error, setError] = useState<Error | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
 
+  // Streaming progress state - accessible by handleStop
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
+  const [streamingContent, setStreamingContent] = useState<string>('')
+  const [streamingReasoning, setStreamingReasoning] = useState<string>('')
+  const [streamingToolCalls, setStreamingToolCalls] = useState<any[]>([])
+
   // Message actions state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingMessageContent, setEditingMessageContent] = useState('')
@@ -1192,6 +1198,12 @@ export function ChatPanelV2({
 
       await saveMessageToIndexedDB(finalAssistantMessage)
       console.log(`[ChatPanelV2] Complete assistant message saved to database: ${assistantMessageId}, duration: ${elapsedSeconds}s`)
+      
+      // Clear streaming state after successful save
+      setStreamingMessageId(null)
+      setStreamingContent('')
+      setStreamingReasoning('')
+      setStreamingToolCalls([])
 
       // Dispatch event to switch to preview tab and trigger auto-preview creation
       // This creates the illusion of "hot reload" after AI code generation
@@ -2740,14 +2752,45 @@ export function ChatPanelV2({
       setIsLoading(false)
       setIsContinuationInProgress(false)
 
-      // Find the last message (which should be the assistant's partial response)
-      const lastMessage = messages[messages.length - 1]
+      // Use accumulated streaming progress from component state
+      const hasPartialContent = streamingContent.trim() || streamingReasoning.trim() || streamingToolCalls.length > 0
 
-      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content.trim()) {
-        console.log('[ChatPanelV2] Saving partial message due to user stop:', lastMessage.id)
+      if (streamingMessageId && hasPartialContent) {
+        console.log('[ChatPanelV2] Saving partial message due to user stop:', {
+          messageId: streamingMessageId,
+          contentLength: streamingContent.length,
+          reasoningLength: streamingReasoning.length,
+          toolCallsCount: streamingToolCalls.length
+        })
+
+        // Get start time from the message in state
+        const messageInState = messages.find(m => m.id === streamingMessageId)
+        const startTime = messageInState?.metadata?.startTime
+        const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
+
+        // Create the partial message with all accumulated data
+        const partialMessage = {
+          id: streamingMessageId,
+          role: 'assistant',
+          content: streamingContent || (streamingToolCalls.length > 0 ? 'Task in progress...' : ''),
+          createdAt: new Date().toISOString(),
+          metadata: {
+            reasoning: streamingReasoning,
+            toolInvocations: streamingToolCalls,
+            hasToolCalls: streamingToolCalls.length > 0,
+            durationSeconds: elapsedSeconds,
+            isPartial: true // Mark as partial for debugging
+          }
+        }
 
         // Save the partial message to the database
-        await saveMessageToIndexedDB(lastMessage)
+        await saveMessageToIndexedDB(partialMessage)
+
+        // Clear streaming state
+        setStreamingMessageId(null)
+        setStreamingContent('')
+        setStreamingReasoning('')
+        setStreamingToolCalls([])
 
         // Reload messages to show the saved partial message in the UI
         await loadMessages()
@@ -2758,6 +2801,13 @@ export function ChatPanelV2({
         })
       } else {
         console.log('[ChatPanelV2] No partial content to save')
+        
+        // Clear streaming state anyway
+        setStreamingMessageId(null)
+        setStreamingContent('')
+        setStreamingReasoning('')
+        setStreamingToolCalls([])
+        
         toast({
           title: "Stopped",
           description: "Generation stopped."
@@ -2945,6 +2995,12 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       }
     }
     setMessages(prev => [...prev, assistantMessage])
+
+    // Initialize streaming state for this message
+    setStreamingMessageId(assistantMessageId)
+    setStreamingContent('')
+    setStreamingReasoning('')
+    setStreamingToolCalls([])
 
     console.log(`[ChatPanelV2] 🕐 Created assistant message with start time:`, {
       id: assistantMessageId,
@@ -3176,6 +3232,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               // Text delta - accumulate the text
               if (parsed.text) {
                 accumulatedContent += parsed.text
+                setStreamingContent(accumulatedContent) // Store in component state
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
                     ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
@@ -3186,6 +3243,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               // Reasoning delta - accumulate reasoning separately
               if (parsed.text) {
                 accumulatedReasoning += parsed.text
+                setStreamingReasoning(accumulatedReasoning) // Store in component state
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
                     ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
@@ -3237,6 +3295,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               }
 
               localToolCalls.push(toolCallEntry)
+              
+              // Store in component state for handleStop access
+              setStreamingToolCalls([...localToolCalls])
 
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
@@ -3355,6 +3416,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               if (localTool) {
                 localTool.status = resultStatus
               }
+              
+              // Update streaming state for handleStop access
+              setStreamingToolCalls([...localToolCalls])
 
               // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
@@ -3417,14 +3481,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        // Request was aborted, remove the placeholder assistant message
-        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-        // Clean up tool calls for aborted message
-        setActiveToolCalls(prev => {
-          const newMap = new Map(prev)
-          newMap.delete(assistantMessageId)
-          return newMap
-        })
+        // Request was aborted - don't remove message, handleStop already saved it
+        console.log('[ChatPanelV2] Request aborted by user, partial message saved by handleStop')
       } else {
         setError(error)
         // Remove the placeholder assistant message on error
@@ -3435,6 +3493,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           newMap.delete(assistantMessageId)
           return newMap
         })
+        // Clear streaming state on error
+        setStreamingMessageId(null)
+        setStreamingContent('')
+        setStreamingReasoning('')
+        setStreamingToolCalls([])
       }
     } finally {
       // Only turn off loading if continuation is not in progress
