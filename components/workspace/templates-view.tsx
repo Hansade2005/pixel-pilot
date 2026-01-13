@@ -403,10 +403,10 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-900">
+    <div className="h-full overflow-y-auto bg-[#030305]">
       {/* Header Section */}
-      <div className="relative bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60"></div>
+      <div className="relative bg-gradient-to-br from-purple-900/30 via-[#030305] to-cyan-900/30 py-12 px-4 sm:px-6 lg:px-8 border-b border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-black/30"></div>
         
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="flex items-center justify-between flex-wrap gap-4">
@@ -425,7 +425,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                 params.set('view', 'template-earnings')
                 window.location.href = `/workspace?${params.toString()}`
               }}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold gap-2 whitespace-nowrap"
+              className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/50 backdrop-blur-md text-white font-semibold gap-2 whitespace-nowrap transition-all"
             >
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">My Earnings</span>
@@ -436,7 +436,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
       </div>
 
       {/* Filters & Search Section */}
-      <Accordion type="single" collapsible className="bg-gray-800/50 border-b border-gray-700 sticky top-0 z-20">
+      <Accordion type="single" collapsible className="bg-[#0d1117]/80 border-b border-white/5 sticky top-0 z-20 backdrop-blur-md">
         <AccordionItem value="filters" className="border-none">
           <AccordionTrigger className="px-4 sm:px-6 py-4 hover:no-underline">
             <div className="flex items-center gap-2 text-white font-medium">
@@ -447,7 +447,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
           <AccordionContent className="px-4 sm:px-6 pb-4">
             <div className="space-y-4">
               {/* Currency Indicator */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-700/50 rounded-lg text-xs text-white/80 w-fit">
+              <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-purple-500/30 rounded-lg text-xs text-purple-200 w-fit backdrop-blur-sm">
                 <span>
                   💵 Prices in <strong>CAD</strong> • 1 USD = ${exchangeRate.toFixed(2)} CAD
                 </span>
@@ -460,7 +460,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   placeholder="Search templates by name, description, or creator..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-4 py-2 rounded-lg bg-[#0d1117] border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
                 />
               </div>
 
@@ -468,10 +468,10 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* Category Filter */}
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                  <SelectTrigger className="bg-[#0d1117] border-white/10 text-white hover:border-purple-500/50 transition-all">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-700 border-gray-600">
+                  <SelectContent className="bg-[#0d1117] border-white/10">
                     <SelectItem value="all">All Categories</SelectItem>
                     <SelectItem value="Dashboard">Dashboard</SelectItem>
                     <SelectItem value="E-Commerce">E-Commerce</SelectItem>
@@ -484,10 +484,10 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
 
                 {/* Sort Filter */}
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                  <SelectTrigger className="bg-[#0d1117] border-white/10 text-white hover:border-purple-500/50 transition-all">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-700 border-gray-600">
+                  <SelectContent className="bg-[#0d1117] border-white/10">
                     <SelectItem value="trending">Trending</SelectItem>
                     <SelectItem value="newest">Newest</SelectItem>
                     <SelectItem value="price-low">Price: Low to High</SelectItem>
@@ -502,7 +502,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   placeholder="Min price"
                   value={minPrice}
                   onChange={(e) => setMinPrice(Number(e.target.value))}
-                  className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 rounded-lg bg-[#0d1117] border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
                 />
 
                 {/* Price Range Max */}
@@ -511,7 +511,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                   placeholder="Max price"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 rounded-lg bg-[#0d1117] border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
                 />
               </div>
 
@@ -547,7 +547,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
               const pricing = templatePricing.get(template.id)
               const reviews = templateReviews.get(template.id) || []
               return (
-                <Card key={template.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 overflow-hidden group relative">
+                <Card key={template.id} className="bg-[#0d1117] border-white/10 hover:border-purple-500/30 transition-all duration-300 overflow-hidden group relative hover:shadow-lg hover:shadow-purple-500/10">
                   {/* Edit/Delete Icon Buttons (top left) */}
                   {isOwner && (
                     <div className="absolute top-3 left-3 flex gap-2 z-10">
@@ -595,7 +595,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                     </div>
                   )}
 
-                  <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-pink-900/50">
+                  <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-purple-900/20 via-[#030305] to-cyan-900/20">
                     {template.thumbnail_url ? (
                       <Image
                         src={template.thumbnail_url}
@@ -630,12 +630,12 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                     </div>
                   </div>
 
-                  <CardContent className="p-5 bg-gradient-to-b from-white/5 to-transparent">
+                  <CardContent className="p-5 bg-gradient-to-b from-white/5 to-[#0d1117]">
                     <h3 className="text-white font-bold text-lg mb-1 line-clamp-1">
                       {template.name}
                     </h3>
                     {metadata?.category && (
-                      <Badge variant="outline" className="mb-2 text-xs">{metadata.category}</Badge>
+                      <Badge variant="outline" className="mb-2 text-xs border-purple-500/30 text-purple-300">{metadata.category}</Badge>
                     )}
                     <p className="text-white/60 text-sm line-clamp-2 mb-3">
                       {template.description || 'No description provided'}
@@ -655,7 +655,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                     <div className="flex flex-col gap-2">
                       <Button
                         onClick={() => handlePurchase(template)}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        className="w-full bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-700 hover:to-cyan-700 text-white transition-all shadow-lg shadow-purple-500/20"
                         size="sm"
                       >
                         <ShoppingCart className="h-4 w-4 mr-1" />
@@ -664,7 +664,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                       {template.preview_url ? (
                         <Button
                           asChild
-                          className="w-full bg-green-600 hover:bg-green-700"
+                          className="w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white transition-all"
                           size="sm"
                         >
                           <a href={template.preview_url} target="_blank" rel="noopener noreferrer">
@@ -674,7 +674,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         </Button>
                       ) : (
                         <Button
-                          className="w-full bg-green-600 hover:bg-green-700 opacity-50 cursor-not-allowed"
+                          className="w-full bg-white/5 border border-white/10 text-white/50 cursor-not-allowed"
                           size="sm"
                           disabled
                         >
@@ -686,7 +686,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         onClick={() => handleViewInfo(template)}
                         variant="outline"
                         size="sm"
-                        className="w-full border-white/20 text-white hover:bg-white/10"
+                        className="w-full border-white/20 text-black bg-white hover:bg-white/10 hover:border-white/30 hover:text-white"
                       >
                         <Info className="h-4 w-4 mr-1" />
                         Details
@@ -974,7 +974,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
             <Button
               variant="outline"
               onClick={() => setShowAuthRequired(false)}
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              className="border-gray-600 text-black hover:transition-all duration-300 cursor-pointer"
             >
               Continue Browsing
             </Button>

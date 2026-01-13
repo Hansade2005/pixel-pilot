@@ -20,17 +20,6 @@ const generatePromptSuggestionsSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    // Authenticate user
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return Response.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
     // Parse and validate request body
     const body = await request.json()
     const { count = 30 } = generatePromptSuggestionsSchema.parse(body)

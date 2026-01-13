@@ -1014,7 +1014,7 @@ async function handleStreamingPreview(req: Request) {
           
           if (hasViteConfig || packageJson?.scripts?.preview) {
             // Vite project - build and host on Supabase storage
-            send({ type: "log", message: "Detected Vite project, will build and host on Supabase" })
+            send({ type: "log", message: "Detected Vite project, will build and host on pipilot" })
             
             // Build the project first
             const buildCommand = `${packageManager} run build`

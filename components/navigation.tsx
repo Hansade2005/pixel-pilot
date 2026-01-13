@@ -380,22 +380,10 @@ export function Navigation() {
                              </Link>
                            </>
                          )}
-                         <Link href="/workspace/management">
-                           <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
-                             <Settings className="w-4 h-4 mr-2" />
-                             Projects
-                           </DropdownMenuItem>
-                         </Link>
                          <Link href="/database">
                            <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                              <Database className="w-4 h-4 mr-2" />
                              Database
-                           </DropdownMenuItem>
-                         </Link>
-                         <Link href="/sites/manage">
-                           <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
-                             <Server className="w-4 h-4 mr-2" />
-                             Sites
                            </DropdownMenuItem>
                          </Link>
                          <Link href="/workspace/deployment">
@@ -417,12 +405,12 @@ export function Navigation() {
                   ) : (
                     <div className="flex items-center space-x-4">
                       <Link href="/auth/login">
-                        <Button variant="ghost" className="text-white hover:text-gray-300">
+                        <Button variant="ghost" className="text-white hover:transition-all duration-300 cursor-pointer">
                           Log in
                         </Button>
                       </Link>
                       <Link href="/auth/signup">
-                        <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                        <Button className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3  font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
                           Get started
                         </Button>
                       </Link>
@@ -535,6 +523,18 @@ export function Navigation() {
                               </Link>
                             </>
                           )}
+                          <Link href="/database">
+                            <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                              <Database className="w-4 h-4 mr-2" />
+                              Database
+                            </DropdownMenuItem>
+                          </Link>
+                          <Link href="/workspace/deployment">
+                            <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                              <Rocket className="w-4 h-4 mr-2" />
+                              Deploy
+                            </DropdownMenuItem>
+                          </Link>
                           <DropdownMenuSeparator className="bg-gray-700" />
                           <DropdownMenuItem
                             className="text-white hover:bg-gray-700"
@@ -550,12 +550,12 @@ export function Navigation() {
                     /* Mobile Non-logged-in Layout */
                     <div className="flex items-center space-x-4">
                       <Link href="/auth/login">
-                        <Button variant="ghost" className="text-white hover:text-gray-300">
+                        <Button variant="ghost" className="text-white hover:transition-all duration-300 cursor-pointer">
                           Log in
                         </Button>
                       </Link>
                       <Link href="/auth/signup">
-                        <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                        <Button className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3  font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
                           Get started
                         </Button>
                       </Link>

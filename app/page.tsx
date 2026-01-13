@@ -429,6 +429,13 @@ export default function LandingPage() {
       
       {/* Noise Texture Overlay */}
       <div className="absolute inset-0 noise-texture" />
+      
+      {/* Background Grid Overlay */}
+      <div className="fixed inset-0 pointer-events-none z-0 bg-grid opacity-20" />
+      
+      {/* Decorative Glows */}
+      <div className="decorative-glow-purple" />
+      <div className="decorative-glow-cyan" />
 
       {/* Navigation */}
       <Navigation />
@@ -441,17 +448,33 @@ export default function LandingPage() {
         <div className="text-center mb-16">
            {/* Dynamic Badge */}
         <div className="mb-6 animate-fade-in">
-          <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
-            <div className="flex items-center gap-2">
-              {badgeItems[currentBadgeIndex].icon}
-              <span
-                className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
-                key={currentBadgeIndex}
-              >
-                {badgeItems[currentBadgeIndex].text}
-              </span>
-            </div>
-          </Badge>
+          {currentBadgeIndex === 1 ? (
+            <Link href="/features/visual-editor">
+              <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
+                <div className="flex items-center gap-2">
+                  {badgeItems[currentBadgeIndex].icon}
+                  <span
+                    className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
+                    key={currentBadgeIndex}
+                  >
+                    {badgeItems[currentBadgeIndex].text}
+                  </span>
+                </div>
+              </Badge>
+            </Link>
+          ) : (
+            <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
+              <div className="flex items-center gap-2">
+                {badgeItems[currentBadgeIndex].icon}
+                <span
+                  className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
+                  key={currentBadgeIndex}
+                >
+                  {badgeItems[currentBadgeIndex].text}
+                </span>
+              </div>
+            </Badge>
+          )}
         </div>
           <h1 className="mb-2 flex items-center justify-center gap-1 text-xl font-medium leading-none text-white sm:text-2xl md:mb-2.5 md:gap-0 md:text-5xl">
             <span className="pt-0.5 tracking-tight md:pt-0">Build something</span>
@@ -462,67 +485,9 @@ export default function LandingPage() {
             </div>
             <span className="pt-0.5 tracking-tight md:pt-0"> Amazing</span>
           </h1>
-          <p className="mb-6 text-center text-lg leading-tight text-white/65 md:text-xl">
+          <p className="mb-12 text-center text-lg leading-tight text-white/65 md:text-xl">
             Create fullstack apps and websites in minutes
           </p>
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            {/* Dynamic Action Button */}
-            <button
-              onClick={handleDynamicButtonClick}
-              className="group relative flex items-center gap-3 px-6 py-4 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-500/30 hover:border-cyan-400/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20 cursor-pointer"
-            >
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 shadow-lg">
-                <div 
-                  className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
-                  key={`icon-${currentButtonIndex}`}
-                >
-                  {buttonItems[currentButtonIndex].icon}
-                </div>
-              </div>
-              <div className="flex flex-col text-left">
-                <span 
-                  className="text-base font-semibold text-white group-hover:text-cyan-300 transition-colors inline-block transition-opacity duration-500 ease-in-out opacity-100"
-                  key={`title-${currentButtonIndex}`}
-                >
-                  {buttonItems[currentButtonIndex].title}
-                </span>
-                <span 
-                  className="text-sm text-white/60 inline-block transition-opacity duration-500 ease-in-out opacity-100"
-                  key={`subtitle-${currentButtonIndex}`}
-                >
-                  {buttonItems[currentButtonIndex].subtitle}
-                </span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-
-              {/* Animated glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
-            </button>
-
-            {/* Visual Editor Static Button */}
-            <Link
-              href="/features/visual-editor"
-              className="group relative flex items-center gap-3 px-5 py-3 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-500/30 hover:border-cyan-400/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20"
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 shadow-lg">
-                <MousePointer2 className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                  Visual Editor
-                </span>
-                <span className="text-xs text-white/60">
-                  Now Live 🎨
-                </span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-
-              {/* Animated glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
-            </Link>
-          </div>
         </div>
 
         {/* Chat Input Section */}
