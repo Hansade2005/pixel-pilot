@@ -29,7 +29,9 @@ export function ModelSelector({
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
 
   // Set default selected model based on plan
-  const defaultSelectedModel: string = (userPlan === 'pro' || userPlan === 'creator') ? 'xai/grok-code-fast-1' : 'mistral/devstral-2'
+  // Premium plans: creator/collaborate/scale (or legacy: pro/teams/enterprise)
+  const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
+  const defaultSelectedModel: string = isPremium ? 'xai/grok-code-fast-1' : 'mistral/devstral-2'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   const currentModel = getModelById(effectiveSelectedModel)
@@ -74,14 +76,15 @@ export function ModelSelector({
       'mistral/devstral-small-2',
       'meituan/longcat-flash-chat'
     ];
-  } else if ((userPlan === 'pro' || userPlan === 'creator') && effectiveStatus === 'active') {
+  } else if (isPremium && effectiveStatus === 'active') {
+    // All premium plans get full access: creator/collaborate/scale (and legacy: pro/teams/enterprise)
     allowedModels = [
-      // Free models (pro users get access to everything)
+      // Free models (premium users get access to everything)
       'mistral/devstral-2',
       'kwaipilot/kat-coder-pro-v1',
       'mistral/devstral-small-2',
       'meituan/longcat-flash-chat',
-      // Pro models
+      // Premium models
       'auto',
       'xai/grok-code-fast-1',
       'nvidia/nemotron-nano-12b-v2-vl',
@@ -92,7 +95,7 @@ export function ModelSelector({
       'anthropic/claude-sonnet-4.5'
     ];
   } else {
-    // Fallback for pro inactive or other cases
+    // Fallback for inactive subscriptions or other cases
     allowedModels = userLimits.allowedModels || ['auto']
   }
 
@@ -143,7 +146,7 @@ export function ModelSelector({
                       <div className="flex items-center justify-between w-full">
                         <span>{displayNameMap.get(model.id) || model.name}</span>
                         {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
-                        {allowed && ((userPlan === 'pro' || userPlan === 'creator') && effectiveStatus === 'active') && (
+                        {allowed && isPremium && effectiveStatus === 'active' && (
                           <Crown className="h-3 w-3 text-yellow-500 ml-2" />
                         )}
                       </div>
@@ -197,7 +200,7 @@ export function ModelSelector({
                       </div>
                       <div className="flex items-center gap-2">
                         {!allowed && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        {allowed && ((userPlan === 'pro' || userPlan === 'creator') && effectiveStatus === 'active') && (
+                        {allowed && isPremium && effectiveStatus === 'active' && (
                           <Crown className="h-4 w-4 text-yellow-500" />
                         )}
                       </div>

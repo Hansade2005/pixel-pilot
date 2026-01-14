@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-
-// Helper function to check admin access
-function checkAdminAccess(user: any): boolean {
-  // Check if user has admin role or specific email
-  return user?.email?.endsWith('@yourdomain.com') ||
-         user?.user_metadata?.role === 'admin' ||
-         user?.email === 'admin@pipilot.dev'
-}
+import { checkAdminAccess } from "@/lib/admin-utils"
 
 export async function GET(request: NextRequest) {
   try {

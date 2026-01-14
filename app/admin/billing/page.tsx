@@ -119,13 +119,10 @@ export default function AdminBillingPage() {
 
   const loadSubscriptions = async () => {
     try {
-      // Fetch subscriptions with user profile data - use left join to not filter out users
+      // Fetch subscriptions - we'll manually join with profiles
       const { data: userSettings, error: settingsError } = await supabase
         .from('user_settings')
-        .select(`
-          *,
-          profiles(email, full_name)
-        `)
+        .select('*')
         .neq('subscription_plan', 'free')
         .order('created_at', { ascending: false })
 
@@ -134,26 +131,52 @@ export default function AdminBillingPage() {
         return
       }
 
-      console.log('Loaded subscriptions:', userSettings?.length || 0)
+      console.log('Loaded user settings:', userSettings?.length || 0)
+
+      if (!userSettings || userSettings.length === 0) {
+        setSubscriptions([])
+        return
+      }
+
+      // Fetch profiles for these users
+      const userIds = userSettings.map(s => s.user_id)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds)
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError)
+      }
+
+      console.log('Loaded profiles:', profiles?.length || 0)
+
+      // Create a map for quick lookup
+      const profilesMap = new Map(
+        profiles?.map(p => [p.id, p]) || []
+      )
 
       // Transform data to match our interface
-      const transformedData = userSettings?.map(setting => ({
-        id: setting.id,
-        user_id: setting.user_id,
-        user_email: setting.profiles?.email || 'No email',
-        user_name: setting.profiles?.full_name || null,
-        subscription_plan: setting.subscription_plan,
-        subscription_status: setting.subscription_status || 'active',
-        stripe_customer_id: setting.stripe_customer_id,
-        stripe_subscription_id: setting.stripe_subscription_id,
-        deployments_this_month: setting.deployments_this_month || 0,
-        github_pushes_this_month: setting.github_pushes_this_month || 0,
-        subscription_start_date: setting.subscription_start_date,
-        subscription_end_date: setting.subscription_end_date,
-        last_payment_date: setting.last_payment_date,
-        cancel_at_period_end: setting.cancel_at_period_end || false,
-        created_at: setting.created_at
-      })) || []
+      const transformedData = userSettings.map(setting => {
+        const profile = profilesMap.get(setting.user_id)
+        return {
+          id: setting.id,
+          user_id: setting.user_id,
+          user_email: profile?.email || 'No email',
+          user_name: profile?.full_name || null,
+          subscription_plan: setting.subscription_plan,
+          subscription_status: setting.subscription_status || 'active',
+          stripe_customer_id: setting.stripe_customer_id,
+          stripe_subscription_id: setting.stripe_subscription_id,
+          deployments_this_month: setting.deployments_this_month || 0,
+          github_pushes_this_month: setting.github_pushes_this_month || 0,
+          subscription_start_date: setting.subscription_start_date,
+          subscription_end_date: setting.subscription_end_date,
+          last_payment_date: setting.last_payment_date,
+          cancel_at_period_end: setting.cancel_at_period_end || false,
+          created_at: setting.created_at
+        }
+      })
 
       console.log('Transformed subscriptions:', transformedData.length)
       setSubscriptions(transformedData)

@@ -18,47 +18,48 @@ export async function GET(request: NextRequest) {
     // Get recent activities from various tables
     const [
       { data: recentUsers, error: usersError },
-      { data: recentPayments, error: paymentsError },
-      { data: recentDeployments, error: deploymentsError },
-      { data: recentNotifications, error: notificationsError }
+      { data: recentPayments, error: paymentsError }
     ] = await Promise.all([
       // Recent user registrations
       supabase
         .from('profiles')
         .select('id, email, full_name, created_at')
         .order('created_at', { ascending: false })
-        .limit(3),
+        .limit(5),
 
       // Recent subscription changes (from user_settings)
       supabase
         .from('user_settings')
-        .select('user_id, subscription_status, subscription_plan, updated_at, profiles(email, full_name)')
+        .select('user_id, subscription_status, subscription_plan, updated_at')
+        .neq('subscription_plan', 'free')
         .eq('subscription_status', 'active')
         .order('updated_at', { ascending: false })
-        .limit(2),
-
-      // Recent deployments (from usage_records)
-      supabase
-        .from('usage_records')
-        .select('user_id, operation, created_at, profiles(email, full_name)')
-        .eq('operation', 'deployment')
-        .order('created_at', { ascending: false })
-        .limit(2),
-
-      // Recent admin notifications
-      supabase
-        .from('admin_notifications')
-        .select('id, title, type, created_at, profiles!admin_notifications_sent_by_fkey(email, full_name)')
-        .order('created_at', { ascending: false })
-        .limit(2)
+        .limit(5)
     ])
 
-    if (usersError || paymentsError || deploymentsError || notificationsError) {
+    if (usersError || paymentsError) {
       console.error('Error fetching recent activities:', {
-        usersError, paymentsError, deploymentsError, notificationsError
+        usersError, paymentsError
       })
       return NextResponse.json({ error: "Failed to fetch activities" }, { status: 500 })
     }
+
+    // Fetch profiles for subscription users
+    const paymentUserIds = recentPayments?.map(p => p.user_id) || []
+    let paymentProfiles: any[] = []
+    
+    if (paymentUserIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', paymentUserIds)
+      
+      if (!profilesError && profiles) {
+        paymentProfiles = profiles
+      }
+    }
+
+    const profilesMap = new Map(paymentProfiles.map(p => [p.id, p]))
 
     // Combine and format activities
     const activities: Array<{
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // Add subscription upgrades
     recentPayments?.forEach(payment => {
-      const profile = Array.isArray(payment.profiles) ? payment.profiles[0] : payment.profiles;
+      const profile = profilesMap.get(payment.user_id)
       activities.push({
         id: `sub-${payment.user_id}-${payment.updated_at}`,
         type: 'subscription',
@@ -92,31 +93,6 @@ export async function GET(request: NextRequest) {
         description: `${profile?.full_name || profile?.email || 'User'} upgraded to ${payment.subscription_plan}`,
         timestamp: payment.updated_at,
         color: 'blue'
-      })
-    })
-
-    // Add deployments
-    recentDeployments?.forEach(deployment => {
-      const profile = Array.isArray(deployment.profiles) ? deployment.profiles[0] : deployment.profiles;
-      activities.push({
-        id: `deploy-${deployment.user_id}-${deployment.created_at}`,
-        type: 'deployment',
-        title: 'Site deployment',
-        description: `${profile?.full_name || profile?.email || 'User'} deployed a site`,
-        timestamp: deployment.created_at,
-        color: 'purple'
-      })
-    })
-
-    // Add notifications
-    recentNotifications?.forEach(notification => {
-      activities.push({
-        id: `notif-${notification.id}`,
-        type: 'notification',
-        title: notification.title,
-        description: `Admin notification: ${notification.type}`,
-        timestamp: notification.created_at,
-        color: 'yellow'
       })
     })
 
