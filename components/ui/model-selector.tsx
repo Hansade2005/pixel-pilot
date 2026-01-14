@@ -29,7 +29,7 @@ export function ModelSelector({
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
 
   // Set default selected model based on plan
-  const defaultSelectedModel: string = userPlan === 'pro' ? 'xai/grok-code-fast-1' : 'mistral/devstral-2'
+  const defaultSelectedModel: string = (userPlan === 'pro' || userPlan === 'creator') ? 'xai/grok-code-fast-1' : 'mistral/devstral-2'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   const currentModel = getModelById(effectiveSelectedModel)
@@ -74,7 +74,7 @@ export function ModelSelector({
       'mistral/devstral-small-2',
       'meituan/longcat-flash-chat'
     ];
-  } else if (userPlan === 'pro' && effectiveStatus === 'active') {
+  } else if ((userPlan === 'pro' || userPlan === 'creator') && effectiveStatus === 'active') {
     allowedModels = [
       // Free models (pro users get access to everything)
       'mistral/devstral-2',
@@ -143,7 +143,7 @@ export function ModelSelector({
                       <div className="flex items-center justify-between w-full">
                         <span>{displayNameMap.get(model.id) || model.name}</span>
                         {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
-                        {allowed && (userPlan === 'pro' && effectiveStatus === 'active') && (
+                        {allowed && ((userPlan === 'pro' || userPlan === 'creator') && effectiveStatus === 'active') && (
                           <Crown className="h-3 w-3 text-yellow-500 ml-2" />
                         )}
                       </div>
@@ -197,7 +197,7 @@ export function ModelSelector({
                       </div>
                       <div className="flex items-center gap-2">
                         {!allowed && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        {allowed && (userPlan === 'pro' && effectiveStatus === 'active') && (
+                        {allowed && ((userPlan === 'pro' || userPlan === 'creator') && effectiveStatus === 'active') && (
                           <Crown className="h-4 w-4 text-yellow-500" />
                         )}
                       </div>

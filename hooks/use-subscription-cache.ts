@@ -228,9 +228,11 @@ export function useSubscriptionCache(userId?: string) {
   return {
     subscription,
     loading,
-    plan: subscription?.plan || 'free', // Plan names: 'free', 'pro', 'teams', 'enterprise' (from user_settings)
+    plan: subscription?.plan || 'free', // Plan names from user_settings: 'free', 'pro', 'teams', 'enterprise' (legacy), or 'creator', 'collaborate', 'scale' (new)
     status: subscription?.status || 'active',
-    isPro: subscription?.plan === 'pro', // Pro = Creator plan ($15/mo, 50 credits)
+    isPro: subscription?.plan === 'pro' || subscription?.plan === 'creator', // Pro/Creator plan ($15/mo, 50 credits)
+    isTeams: subscription?.plan === 'teams' || subscription?.plan === 'collaborate', // Teams/Collaborate plan ($25/mo, 75 credits)
+    isEnterprise: subscription?.plan === 'enterprise' || subscription?.plan === 'scale', // Enterprise/Scale plan ($60/mo, 150 credits)
     githubPushesThisMonth: subscription?.githubPushesThisMonth || 0,
     deploymentsThisMonth: subscription?.deploymentsThisMonth || 0
   }

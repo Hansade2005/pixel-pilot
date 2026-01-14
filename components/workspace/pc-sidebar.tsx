@@ -388,8 +388,9 @@ export function PcSidebar({
                 <div className="flex items-center gap-2">
                   <Crown className="h-4 w-4 text-purple-500" />
                   <span className="text-sm font-medium">
-                    {subscription.plan === 'pro' ? 'Pro Plan' :
-                     subscription.plan === 'enterprise' ? 'Enterprise Plan' :
+                    {(subscription.plan === 'pro' || subscription.plan === 'creator') ? 'Creator Plan' :
+                     (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? 'Collaborate Plan' :
+                     (subscription.plan === 'enterprise' || subscription.plan === 'scale') ? 'Scale Plan' :
                      'Free Plan'}
                   </span>
                 </div>
@@ -415,7 +416,7 @@ export function PcSidebar({
                   <div className="flex items-center gap-2">
                     <Globe className="h-3 w-3 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">
-                      Deployments: {subscription.deploymentsThisMonth || 0} / {subscription.plan === 'pro' ? 10 : 5}
+                      Deployments: {subscription.deploymentsThisMonth || 0} / Unlimited
                     </span>
                   </div>
                 </div>
@@ -435,19 +436,25 @@ export function PcSidebar({
                 {/* Plan Features */}
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    {subscription.plan === 'pro' ? 'Full Access' :
-                     subscription.plan === 'enterprise' ? 'Enterprise Features' :
+                    {(subscription.plan === 'pro' || subscription.plan === 'creator') ? 'Full Access' :
+                     (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? 'Team Features' :
+                     (subscription.plan === 'enterprise' || subscription.plan === 'scale') ? 'Enterprise Features' :
                      'Limited Access'}
                   </span>
-                  {subscription.plan === 'pro' ? (
+                  {(subscription.plan === 'pro' || subscription.plan === 'creator') ? (
                     <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
                       <Crown className="h-3 w-3" />
-                      <span className="text-xs">Pro</span>
+                      <span className="text-xs">Creator</span>
                     </div>
-                  ) : subscription.plan === 'enterprise' ? (
+                  ) : (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? (
                     <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                       <Shield className="h-3 w-3" />
-                      <span className="text-xs">Enterprise</span>
+                      <span className="text-xs">Collaborate</span>
+                    </div>
+                  ) : (subscription.plan === 'enterprise' || subscription.plan === 'scale') ? (
+                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      <Shield className="h-3 w-3" />
+                      <span className="text-xs">Scale</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">

@@ -1111,6 +1111,37 @@ function AccountSettingsPageContent() {
     }
   }
 
+  const handleManageBilling = async () => {
+    try {
+      setSubscriptionLoading(true)
+
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create billing portal session')
+      }
+
+      // Redirect to Stripe billing portal
+      window.location.href = data.url
+    } catch (error: any) {
+      console.error('Error creating billing portal session:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to open billing portal. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setSubscriptionLoading(false)
+    }
+  }
+
   // Disconnect from a provider
   const handleDisconnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase' | 'stripe') => {
     if (!user?.id) {
@@ -1738,6 +1769,29 @@ function AccountSettingsPageContent() {
                               {subscription.status}
                             </Badge>
                           </div>
+
+                          {/* Manage Billing Button */}
+                          {subscription.plan !== 'free' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-8 text-xs mt-3 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-950"
+                              onClick={handleManageBilling}
+                              disabled={subscriptionLoading}
+                            >
+                              {subscriptionLoading ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                  Loading...
+                                </>
+                              ) : (
+                                <>
+                                  <Receipt className="h-3 w-3 mr-1.5" />
+                                  Manage Billing
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </>
                       ) : (
                         <div className="text-center py-4">

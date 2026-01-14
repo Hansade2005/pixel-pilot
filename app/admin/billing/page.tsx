@@ -119,28 +119,31 @@ export default function AdminBillingPage() {
 
   const loadSubscriptions = async () => {
     try {
-      // Fetch subscriptions with user profile data
+      // Fetch subscriptions with user profile data - use left join to not filter out users
       const { data: userSettings, error: settingsError } = await supabase
         .from('user_settings')
         .select(`
           *,
-          profiles!inner(email, full_name)
+          profiles(email, full_name)
         `)
         .neq('subscription_plan', 'free')
+        .order('created_at', { ascending: false })
 
       if (settingsError) {
         console.error('Error fetching subscriptions:', settingsError)
         return
       }
 
+      console.log('Loaded subscriptions:', userSettings?.length || 0)
+
       // Transform data to match our interface
       const transformedData = userSettings?.map(setting => ({
         id: setting.id,
         user_id: setting.user_id,
-        user_email: setting.profiles?.email || '',
+        user_email: setting.profiles?.email || 'No email',
         user_name: setting.profiles?.full_name || null,
         subscription_plan: setting.subscription_plan,
-        subscription_status: setting.subscription_status,
+        subscription_status: setting.subscription_status || 'active',
         stripe_customer_id: setting.stripe_customer_id,
         stripe_subscription_id: setting.stripe_subscription_id,
         deployments_this_month: setting.deployments_this_month || 0,
@@ -148,10 +151,11 @@ export default function AdminBillingPage() {
         subscription_start_date: setting.subscription_start_date,
         subscription_end_date: setting.subscription_end_date,
         last_payment_date: setting.last_payment_date,
-        cancel_at_period_end: setting.cancel_at_period_end,
+        cancel_at_period_end: setting.cancel_at_period_end || false,
         created_at: setting.created_at
       })) || []
 
+      console.log('Transformed subscriptions:', transformedData.length)
       setSubscriptions(transformedData)
     } catch (error) {
       console.error('Error loading subscriptions:', error)
@@ -254,7 +258,7 @@ export default function AdminBillingPage() {
       case 'pro':
         return <Badge className="bg-purple-100 text-purple-800">$15/month</Badge>
       case 'teams':
-        return <Badge className="bg-blue-100 text-blue-800">$30/month</Badge>
+        return <Badge className="bg-blue-100 text-blue-800">$25/month</Badge>
       case 'enterprise':
         return <Badge className="bg-orange-100 text-orange-800">$60/month</Badge>
       default:
@@ -265,10 +269,10 @@ export default function AdminBillingPage() {
   const calculateRevenue = () => {
     return subscriptions.reduce((total, sub) => {
       if (sub.subscription_status === 'active' || sub.subscription_status === 'trialing') {
-        // Actual pricing: Pro=$15, Teams=$25, Enterprise=$60
-        const monthlyRate = sub.subscription_plan === 'pro' ? 15 :
-                           sub.subscription_plan === 'teams' ? 25 :
-                           sub.subscription_plan === 'enterprise' ? 60 : 0
+        // Actual pricing: Creator(pro)=$15, Collaborate(teams)=$25, Scale(enterprise)=$60
+        const monthlyRate = (sub.subscription_plan === 'pro' || sub.subscription_plan === 'creator') ? 15 :
+                           (sub.subscription_plan === 'teams' || sub.subscription_plan === 'collaborate') ? 25 :
+                           (sub.subscription_plan === 'enterprise' || sub.subscription_plan === 'scale') ? 60 : 0
         return total + monthlyRate
       }
       return total
@@ -535,7 +539,7 @@ export default function AdminBillingPage() {
                           <TableCell>
                             <div className="text-sm">
                               <div className="text-xs text-slate-600 dark:text-slate-400">
-                                Deployments: {subscription.deployments_this_month}/{subscription.subscription_plan === 'pro' ? 10 : 5}
+                                Deployments: {subscription.deployments_this_month}/Unlimited
                               </div>
                               <div className="text-xs text-slate-600 dark:text-slate-400">
                                 GitHub: {subscription.github_pushes_this_month}/2
@@ -653,7 +657,7 @@ export default function AdminBillingPage() {
                     <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Conversion Success</span>
                   </div>
                   <p className="text-xs text-purple-800 dark:text-purple-200">
-                    Teams plan showing strong adoption with {subscriptions.filter(s => s.subscription_plan === 'teams').length} active subscriptions.
+                    Collaborate plan showing strong adoption with {subscriptions.filter(s => s.subscription_plan === 'teams' || s.subscription_plan === 'collaborate').length} active subscriptions.
                   </p>
                 </div>
 
@@ -765,9 +769,9 @@ export default function AdminBillingPage() {
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        {selectedSubscription.subscription_plan === 'pro' ? 15 :
-                         selectedSubscription.subscription_plan === 'teams' ? 25 :
-                         selectedSubscription.subscription_plan === 'enterprise' ? 60 : 0}
+                        {selectedSubscription.subscription_plan === 'pro' || selectedSubscription.subscription_plan === 'creator' ? 15 :
+                         selectedSubscription.subscription_plan === 'teams' || selectedSubscription.subscription_plan === 'collaborate' ? 25 :
+                         selectedSubscription.subscription_plan === 'enterprise' || selectedSubscription.subscription_plan === 'scale' ? 60 : 0}
                       </div>
                       <p className="text-xs text-muted-foreground">Monthly Rate</p>
                     </CardContent>

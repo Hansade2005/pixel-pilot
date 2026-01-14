@@ -72,25 +72,45 @@ export async function GET(request: NextRequest) {
     // Check if subscription system is enabled
     const subscriptionEnabled = await isSubscriptionSystemEnabled()
 
-    // Calculate revenue (simplified - in real app you'd track actual payments)
+    // Calculate revenue based on subscription counts and plan pricing
     let totalRevenue = 0
     let monthlyRevenue = 0
 
     if (subscriptionEnabled) {
+      // Get all paid subscriptions (non-free plans)
       const paidUsers = subscriptions?.filter(sub =>
         sub.subscription_plan !== 'free' &&
+        sub.subscription_plan != null &&
         (sub.subscription_status === 'active' || sub.subscription_status === 'trialing')
       ) || []
 
+      console.log('Paid subscriptions found:', paidUsers.length)
+
+      // Count subscriptions by plan (handle both legacy and new names)
+      const planCounts = {
+        creator: 0,    // $15/mo (legacy: pro)
+        collaborate: 0, // $25/mo (legacy: teams)
+        scale: 0       // $60/mo (legacy: enterprise)
+      }
+
       paidUsers.forEach(user => {
-        // Map user_settings plan names to actual pricing
-        // pro = creator ($15/mo), teams = collaborate ($25/mo), enterprise = scale ($60/mo)
-        const planMultiplier = user.subscription_plan === 'pro' ? 15 :
-                              user.subscription_plan === 'teams' ? 25 :
-                              user.subscription_plan === 'enterprise' ? 60 : 0
-        totalRevenue += planMultiplier
-        monthlyRevenue += planMultiplier
+        const plan = user.subscription_plan
+        // Handle both new names (creator/collaborate/scale) and legacy names (pro/teams/enterprise)
+        if (plan === 'creator' || plan === 'pro') planCounts.creator++
+        else if (plan === 'collaborate' || plan === 'teams') planCounts.collaborate++
+        else if (plan === 'scale' || plan === 'enterprise') planCounts.scale++
       })
+
+      console.log('Plan counts:', planCounts)
+
+      // Calculate monthly revenue: plan count × price
+      // creator = $15/mo, collaborate = $25/mo, scale = $60/mo
+      monthlyRevenue = (planCounts.creator * 15) + (planCounts.collaborate * 25) + (planCounts.scale * 60)
+      
+      // For total revenue, we can multiply by estimated months or use monthly for now
+      totalRevenue = monthlyRevenue // In production, you'd track this from Stripe
+
+      console.log('Calculated revenue:', { monthlyRevenue, totalRevenue })
     } else {
       // In free mode, revenue is $0
       totalRevenue = 0

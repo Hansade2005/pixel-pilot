@@ -284,8 +284,9 @@ export function Navigation() {
                     <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
                       <Crown className="w-4 h-4 text-purple-400" />
                       <span className="text-sm font-medium text-white">
-                        {subscription.plan === 'pro' ? 'Pro' :
-                         subscription.plan === 'enterprise' ? 'Enterprise' :
+                        {(subscription.plan === 'pro' || subscription.plan === 'creator') ? 'Creator' :
+                         (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? 'Collaborate' :
+                         (subscription.plan === 'enterprise' || subscription.plan === 'scale') ? 'Scale' :
                          'Free'}
                       </span>
                     </div>
@@ -459,8 +460,9 @@ export function Navigation() {
                                 <div className="flex items-center space-x-2">
                                   <Crown className="w-4 h-4 text-purple-400" />
                                   <span className="text-sm font-medium text-white">
-                                    {subscription.plan === 'pro' ? 'Pro Plan' :
-                                     subscription.plan === 'enterprise' ? 'Enterprise Plan' :
+                                    {(subscription.plan === 'pro' || subscription.plan === 'creator') ? 'Creator Plan' :
+                                     (subscription.plan === 'teams' || subscription.plan === 'collaborate') ? 'Collaborate Plan' :
+                                     (subscription.plan === 'enterprise' || subscription.plan === 'scale') ? 'Scale Plan' :
                                      'Free Plan'}
                                   </span>
                                 </div>

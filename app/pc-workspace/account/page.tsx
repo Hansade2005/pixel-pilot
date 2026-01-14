@@ -1089,6 +1089,37 @@ function AccountSettingsPageContent() {
     }
   }
 
+  const handleManageBilling = async () => {
+    try {
+      setSubscriptionLoading(true)
+
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create billing portal session')
+      }
+
+      // Redirect to Stripe billing portal
+      window.location.href = data.url
+    } catch (error: any) {
+      console.error('Error creating billing portal session:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to open billing portal. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setSubscriptionLoading(false)
+    }
+  }
+
   // Disconnect from a provider
   const handleDisconnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase' | 'stripe') => {
     if (!user?.id) {
@@ -1582,6 +1613,26 @@ function AccountSettingsPageContent() {
 
                       {/* Action Buttons */}
                       <div className="flex gap-2">
+                        {subscription.plan !== 'free' && (
+                          <Button
+                            variant="outline"
+                            onClick={handleManageBilling}
+                            disabled={subscriptionLoading}
+                            className="flex-1"
+                          >
+                            {subscriptionLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Loading...
+                              </>
+                            ) : (
+                              <>
+                                <Receipt className="h-4 w-4 mr-2" />
+                                Manage Billing
+                              </>
+                            )}
+                          </Button>
+                        )}
                         {subscription.plan !== 'enterprise' && (
                           <Button
                             variant="outline"

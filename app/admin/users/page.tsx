@@ -548,9 +548,9 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                    {users.filter(u => u.subscriptionPlan === 'pro').length}
+                    {users.filter(u => u.subscriptionPlan === 'pro' || u.subscriptionPlan === 'creator').length}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Pro Users</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Creator Plan Users</p>
                 </div>
               </div>
             </CardContent>
@@ -782,7 +782,7 @@ export default function AdminUsersPage() {
                     <TableCell>
                       <div className="text-sm">
                         <div className="text-xs text-muted-foreground">
-                          Deployments: {userData.deploymentsThisMonth}/{userData.subscriptionPlan === 'pro' ? 10 : 5}
+                          Deployments: {userData.deploymentsThisMonth}/Unlimited
                         </div>
                         <div className="text-xs text-muted-foreground">
                           GitHub: {userData.githubPushesThisMonth}/2
@@ -864,7 +864,7 @@ export default function AdminUsersPage() {
                             </DropdownMenuItem>
                           )}
 
-                          {userData.subscriptionPlan === 'pro' && (
+                          {(userData.subscriptionPlan === 'pro' || userData.subscriptionPlan === 'creator') && (
                             <DropdownMenuItem
                               onClick={async () => {
                                 if (confirm(`Downgrade ${userData.email} to Free plan?`)) {
@@ -1280,7 +1280,7 @@ export default function AdminUsersPage() {
                       </div>
                       <p className="text-2xl font-bold">{selectedUser.deploymentsThisMonth}</p>
                       <p className="text-xs text-muted-foreground">
-                        Limit: {selectedUser.subscriptionPlan === 'pro' ? 10 : 5}/month
+                        Limit: Unlimited/month
                       </p>
                     </CardContent>
                   </Card>
