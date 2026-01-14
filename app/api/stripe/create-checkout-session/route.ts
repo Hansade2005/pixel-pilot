@@ -80,8 +80,15 @@ export async function POST(request: NextRequest) {
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pricing?canceled=true`,
       metadata: {
         user_id: user.id,
-        plan_type: planType,
-        app_name: 'pixel-pilot',
+        plan_type: planType, // This should be 'creator', 'collaborate', or 'scale'
+        app_name: 'pipilot',
+      },
+      subscription_data: {
+        // Pass metadata to the subscription so webhooks can read it
+        metadata: {
+          user_id: user.id,
+          plan_type: planType,
+        }
       },
       allow_promotion_codes: true,
     })

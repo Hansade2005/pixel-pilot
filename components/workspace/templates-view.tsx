@@ -686,7 +686,7 @@ export function TemplatesView({ userId }: TemplatesViewProps) {
                         onClick={() => handleViewInfo(template)}
                         variant="outline"
                         size="sm"
-                        className="w-full border-white/20 text-black bg-white hover:bg-white/10 hover:border-white/30 hover:text-white"
+                        className="w-full border-white/20 text-white bg-white hover:bg-white/10 hover:border-white/30 hover:text-white"
                       >
                         <Info className="h-4 w-4 mr-1" />
                         Details

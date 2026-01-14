@@ -143,6 +143,7 @@ export async function PATCH(request: NextRequest) {
 
     switch (action) {
       case 'upgrade_to_pro':
+        // Update user_settings (uses 'pro')
         result = await supabase
           .from('user_settings')
           .upsert({
@@ -155,21 +156,40 @@ export async function PATCH(request: NextRequest) {
           }, {
             onConflict: 'user_id'
           })
+        
+        // Also update wallet (uses 'creator')
+        await supabase
+          .from('wallet')
+          .update({
+            current_plan: 'creator',
+            subscription_status: 'active'
+          })
+          .eq('user_id', userId)
         break
 
       case 'downgrade_to_free':
+        // Update user_settings
         result = await supabase
           .from('user_settings')
           .upsert({
             user_id: userId,
             subscription_plan: 'free',
-            subscription_status: 'active',
+            subscription_status: 'inactive',
             deployments_this_month: 0,
             github_pushes_this_month: 0,
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
           })
+        
+        // Also update wallet
+        await supabase
+          .from('wallet')
+          .update({
+            current_plan: 'free',
+            subscription_status: 'inactive'
+          })
+          .eq('user_id', userId)
         break
 
       case 'reset_usage':
@@ -190,15 +210,31 @@ export async function PATCH(request: NextRequest) {
           return NextResponse.json({ error: "Missing plan" }, { status: 400 })
         }
 
+        // Map wallet plan to user_settings plan
+        const walletPlan = data.plan as 'free' | 'creator' | 'collaborate' | 'scale'
+        const userSettingsPlan = walletPlan === 'creator' ? 'pro' :
+                                  walletPlan === 'collaborate' ? 'teams' :
+                                  walletPlan === 'scale' ? 'enterprise' : 'free'
+
+        // Update user_settings
         result = await supabase
           .from('user_settings')
           .upsert({
             user_id: userId,
-            subscription_plan: data.plan,
+            subscription_plan: userSettingsPlan,
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
           })
+        
+        // Update wallet
+        await supabase
+          .from('wallet')
+          .update({
+            current_plan: walletPlan,
+            updated_at: new Date()
+          })
+          .eq('user_id', userId)
         break
 
       case 'suspend_user':

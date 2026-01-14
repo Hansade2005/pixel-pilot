@@ -83,8 +83,10 @@ export async function GET(request: NextRequest) {
       ) || []
 
       paidUsers.forEach(user => {
-        const planMultiplier = user.subscription_plan === 'pro' ? 29 :
-                              user.subscription_plan === 'teams' ? 30 :
+        // Map user_settings plan names to actual pricing
+        // pro = creator ($15/mo), teams = collaborate ($25/mo), enterprise = scale ($60/mo)
+        const planMultiplier = user.subscription_plan === 'pro' ? 15 :
+                              user.subscription_plan === 'teams' ? 25 :
                               user.subscription_plan === 'enterprise' ? 60 : 0
         totalRevenue += planMultiplier
         monthlyRevenue += planMultiplier

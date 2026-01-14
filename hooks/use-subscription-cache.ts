@@ -228,9 +228,9 @@ export function useSubscriptionCache(userId?: string) {
   return {
     subscription,
     loading,
-    plan: subscription?.plan || 'free',
+    plan: subscription?.plan || 'free', // Plan names: 'free', 'pro', 'teams', 'enterprise' (from user_settings)
     status: subscription?.status || 'active',
-    isPro: subscription?.plan === 'pro',
+    isPro: subscription?.plan === 'pro', // Pro = Creator plan ($15/mo, 50 credits)
     githubPushesThisMonth: subscription?.githubPushesThisMonth || 0,
     deploymentsThisMonth: subscription?.deploymentsThisMonth || 0
   }

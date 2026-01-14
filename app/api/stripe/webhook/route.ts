@@ -3,6 +3,42 @@ import { createClient } from "@/lib/supabase/server"
 import { stripe } from "@/lib/stripe"
 import { headers } from "next/headers"
 import Stripe from "stripe"
+import { 
+  updateUserPlan, 
+  FREE_PLAN_MONTHLY_CREDITS,
+  CREATOR_PLAN_MONTHLY_CREDITS,
+  COLLABORATE_PLAN_MONTHLY_CREDITS,
+  SCALE_PLAN_MONTHLY_CREDITS
+} from "@/lib/billing/credit-manager"
+
+// Map Stripe price IDs to plan names
+const PRICE_TO_PLAN_MAP: Record<string, 'free' | 'creator' | 'collaborate' | 'scale'> = {
+  'price_1SZ9843G7U0M1bp1WcX6j6b1': 'free',
+  'price_1SZ98W3G7U0M1bp1u30VJE2V': 'creator',
+  'price_1SZTlN3G7U0M1bp1Us7dGSSg': 'creator', // yearly
+  'price_1SZ98n3G7U0M1bp1DipaxRvq': 'collaborate',
+  'price_1SZTmV3G7U0M1bp1GrNHBxUg': 'collaborate', // yearly
+  'price_1SZ98v3G7U0M1bp1YAD89Tx4': 'scale',
+  'price_1SZToP3G7U0M1bp1v0AWlXZ6': 'scale', // yearly
+}
+
+// Get plan name from subscription
+function getPlanFromSubscription(subscription: Stripe.Subscription): 'free' | 'creator' | 'collaborate' | 'scale' {
+  // First check metadata
+  const metadataPlan = subscription.metadata?.plan_type?.toLowerCase()
+  if (metadataPlan && ['free', 'creator', 'collaborate', 'scale'].includes(metadataPlan)) {
+    return metadataPlan as 'free' | 'creator' | 'collaborate' | 'scale'
+  }
+  
+  // Then check the price ID
+  const priceId = subscription.items.data[0]?.price?.id
+  if (priceId && PRICE_TO_PLAN_MAP[priceId]) {
+    return PRICE_TO_PLAN_MAP[priceId]
+  }
+  
+  // Default to creator if we can't determine
+  return 'creator'
+}
 
 // Helper function to get Stripe instance safely
 function getStripe() {
@@ -94,8 +130,8 @@ async function shouldUpdateSubscription(userId: string, eventId: string): Promis
   }
 }
 
-// Helper function to update user subscription
-async function updateUserSubscription(userId: string, subscriptionData: Stripe.Subscription, eventId: string) {
+// Helper function to update user subscription in BOTH user_settings AND wallet tables
+async function updateUserSubscription(userId: string, subscriptionData: Stripe.Subscription, eventId: string, isNewSubscription: boolean = false) {
   const supabase = await createClient()
 
   // Check if we should update (prevent duplicates)
@@ -105,15 +141,26 @@ async function updateUserSubscription(userId: string, subscriptionData: Stripe.S
     return // Skip update
   }
 
+  // Get the correct plan name
+  const planName = getPlanFromSubscription(subscriptionData)
+  const subscriptionStatus = subscriptionData.status === 'active' ? 'active' :
+                              subscriptionData.status === 'canceled' ? 'canceled' :
+                              subscriptionData.status === 'past_due' ? 'past_due' :
+                              subscriptionData.status === 'trialing' ? 'trialing' : 'inactive'
+
+  console.log(`🔄 Updating subscription for user ${userId}: plan=${planName}, status=${subscriptionStatus}`)
+
+  // Map to user_settings plan name (they use different naming convention)
+  const userSettingsPlan = planName === 'creator' ? 'pro' : 
+                            planName === 'collaborate' ? 'teams' : 
+                            planName === 'scale' ? 'enterprise' : 'free'
+
   const updateData = {
     user_id: userId,
     stripe_customer_id: subscriptionData.customer as string,
     stripe_subscription_id: subscriptionData.id,
-    subscription_plan: subscriptionData.metadata?.plan_type || 'pro',
-    subscription_status: subscriptionData.status === 'active' ? 'active' :
-                        subscriptionData.status === 'canceled' ? 'canceled' :
-                        subscriptionData.status === 'past_due' ? 'past_due' :
-                        subscriptionData.status === 'trialing' ? 'trialing' : 'inactive',
+    subscription_plan: userSettingsPlan,
+    subscription_status: subscriptionStatus === 'canceled' ? 'canceled' : subscriptionStatus,
     last_payment_date: new Date().toISOString(),
     cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
     // Reset usage counters on new billing cycle
@@ -122,6 +169,7 @@ async function updateUserSubscription(userId: string, subscriptionData: Stripe.S
     updated_at: new Date().toISOString(),
   }
 
+  // 1. Update user_settings table (for legacy compatibility)
   const { error } = await supabase
     .from('user_settings')
     .upsert(updateData, {
@@ -129,9 +177,34 @@ async function updateUserSubscription(userId: string, subscriptionData: Stripe.S
     })
 
   if (error) {
-    console.error('Error updating user subscription:', error)
+    console.error('Error updating user_settings:', error)
     await logWebhookEvent('subscription_update', eventId, 'failed', error.message, userId)
     throw error
+  }
+
+  // 2. CRITICAL: Update the wallet table with credits replenishment
+  // This is what the credit system actually uses!
+  if (isNewSubscription || subscriptionStatus === 'active') {
+    try {
+      const success = await updateUserPlan(
+        userId,
+        planName,
+        subscriptionStatus as 'active' | 'inactive' | 'cancelled' | 'past_due',
+        supabase,
+        subscriptionData.customer as string,
+        subscriptionData.id
+      )
+
+      if (success) {
+        console.log(`✅ Updated wallet for user ${userId}: plan=${planName}, credits replenished`)
+      } else {
+        console.error(`⚠️ Failed to update wallet for user ${userId}`)
+        // Don't throw - user_settings was updated, wallet update is secondary
+      }
+    } catch (walletError) {
+      console.error('Error updating wallet:', walletError)
+      // Log but don't fail the webhook - user_settings was updated
+    }
   }
 
   console.log(`✅ Updated subscription for user ${userId}: ${subscriptionData.status}`)
@@ -174,13 +247,33 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing user ID' }, { status: 400 })
           }
 
-          // Retrieve the subscription from Stripe
-          if (session.subscription) {
-            const stripeInstance = getStripe()
-            const subscription = await stripeInstance.subscriptions.retrieve(session.subscription as string)
+          const stripeInstance = getStripe()
+          let subscription: Stripe.Subscription | null = null
 
+          // Try to get subscription from session
+          if (session.subscription) {
+            subscription = await stripeInstance.subscriptions.retrieve(session.subscription as string)
+          } else {
+            // If no subscription in session, try to find it by customer ID
+            console.log('No subscription in session, looking up by customer ID:', session.customer)
+            const subscriptions = await stripeInstance.subscriptions.list({
+              customer: session.customer as string,
+              status: 'active',
+              limit: 1
+            })
+            if (subscriptions.data.length > 0) {
+              subscription = subscriptions.data[0]
+              console.log('Found subscription by customer lookup:', subscription.id)
+            }
+          }
+
+          if (subscription) {
             // Update user subscription in database with duplicate prevention
-            await updateUserSubscription(userId, subscription, event.id)
+            // isNewSubscription = true because this is checkout completion
+            await updateUserSubscription(userId, subscription, event.id, true)
+          } else {
+            console.error('No subscription found for checkout session:', session.id)
+            await logWebhookEvent(event.type, event.id, 'failed', 'No subscription found', userId)
           }
 
           await logWebhookEvent(event.type, event.id, 'success', undefined, userId)
@@ -205,7 +298,8 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (userSettings?.user_id) {
-            await updateUserSubscription(userSettings.user_id, subscription, event.id)
+            // Pass isNewSubscription = true for new subscriptions
+            await updateUserSubscription(userSettings.user_id, subscription, event.id, true)
           } else {
             console.error('User not found for customer:', subscription.customer)
             await logWebhookEvent(event.type, event.id, 'failed', 'User not found')
@@ -231,7 +325,8 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (userSettings?.user_id) {
-            await updateUserSubscription(userSettings.user_id, subscription, event.id)
+            // Pass isNewSubscription = false for updates (don't replenish credits again)
+            await updateUserSubscription(userSettings.user_id, subscription, event.id, false)
           } else {
             console.error('User not found for customer:', subscription.customer)
             await logWebhookEvent(event.type, event.id, 'failed', 'User not found')
@@ -291,10 +386,10 @@ export async function POST(request: NextRequest) {
         console.log('Payment succeeded for invoice:', invoice.id)
 
         try {
-          // Find user by customer ID and update last payment date
+          // Find user by customer ID
           const { data: userSettings } = await supabase
             .from('user_settings')
-            .select('user_id')
+            .select('user_id, subscription_plan')
             .eq('stripe_customer_id', invoice.customer)
             .single()
 
@@ -326,6 +421,68 @@ export async function POST(request: NextRequest) {
                 await logWebhookEvent(event.type, event.id, 'failed', error.message, userSettings.user_id)
               } else {
                 console.log(`✅ Reset usage counters for user ${userSettings.user_id} after successful payment`)
+                
+                // CRITICAL: Replenish monthly credits for recurring invoices
+                // Check if this is a subscription invoice (not one-time payment)
+                if (invoice.subscription) {
+                  try {
+                    const stripeInstance = getStripe()
+                    const subscription = await stripeInstance.subscriptions.retrieve(invoice.subscription as string)
+                    
+                    // Only replenish credits for active subscriptions on recurring invoices
+                    // (billing_reason: subscription_cycle indicates monthly renewal)
+                    if (subscription.status === 'active' && invoice.billing_reason === 'subscription_cycle') {
+                      const planName = getPlanFromSubscription(subscription)
+                      
+                      // Get current wallet to add credits (not replace)
+                      const { data: wallet } = await supabase
+                        .from('wallet')
+                        .select('current_plan, credits_balance')
+                        .eq('user_id', userSettings.user_id)
+                        .single()
+
+                      // Only replenish if user is on a paid plan
+                      if (wallet && wallet.current_plan !== 'free') {
+                        let monthlyCredits = 0
+                        switch (planName) {
+                          case 'creator': monthlyCredits = CREATOR_PLAN_MONTHLY_CREDITS; break
+                          case 'collaborate': monthlyCredits = COLLABORATE_PLAN_MONTHLY_CREDITS; break
+                          case 'scale': monthlyCredits = SCALE_PLAN_MONTHLY_CREDITS; break
+                        }
+
+                        if (monthlyCredits > 0) {
+                          await supabase
+                            .from('wallet')
+                            .update({
+                              credits_balance: wallet.credits_balance + monthlyCredits,
+                              credits_used_this_month: 0, // Reset monthly usage
+                            })
+                            .eq('user_id', userSettings.user_id)
+
+                          // Log transaction
+                          await supabase
+                            .from('transactions')
+                            .insert({
+                              user_id: userSettings.user_id,
+                              amount: monthlyCredits,
+                              type: 'subscription_grant',
+                              description: `Monthly credits renewal for ${planName} plan`,
+                              credits_before: wallet.credits_balance,
+                              credits_after: wallet.credits_balance + monthlyCredits,
+                              stripe_payment_id: invoice.payment_intent as string,
+                              stripe_subscription_id: invoice.subscription as string,
+                            })
+
+                          console.log(`✅ Replenished ${monthlyCredits} credits for user ${userSettings.user_id} (${planName} plan renewal)`)
+                        }
+                      }
+                    }
+                  } catch (creditError) {
+                    console.error('Error replenishing monthly credits:', creditError)
+                    // Don't fail webhook - payment was successful
+                  }
+                }
+                
                 await logWebhookEvent(event.type, event.id, 'success', undefined, userSettings.user_id)
               }
             } else {

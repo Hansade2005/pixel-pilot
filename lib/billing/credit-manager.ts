@@ -6,10 +6,10 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
-// Credit constants
+// Credit constants - MUST match values in lib/stripe-config.ts PRODUCT_CONFIGS
 export const CREDITS_PER_MESSAGE = 0.25
 export const FREE_PLAN_MONTHLY_CREDITS = 20
-export const CREATOR_PLAN_MONTHLY_CREDITS = 50
+export const CREATOR_PLAN_MONTHLY_CREDITS = 50 // $50 worth = 50 credits as per stripe-config
 export const COLLABORATE_PLAN_MONTHLY_CREDITS = 75
 export const SCALE_PLAN_MONTHLY_CREDITS = 150
 

@@ -265,8 +265,9 @@ export default function AdminBillingPage() {
   const calculateRevenue = () => {
     return subscriptions.reduce((total, sub) => {
       if (sub.subscription_status === 'active' || sub.subscription_status === 'trialing') {
+        // Actual pricing: Pro=$15, Teams=$25, Enterprise=$60
         const monthlyRate = sub.subscription_plan === 'pro' ? 15 :
-                           sub.subscription_plan === 'teams' ? 30 :
+                           sub.subscription_plan === 'teams' ? 25 :
                            sub.subscription_plan === 'enterprise' ? 60 : 0
         return total + monthlyRate
       }
@@ -764,8 +765,8 @@ export default function AdminBillingPage() {
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        {selectedSubscription.subscription_plan === 'pro' ? 29 :
-                         selectedSubscription.subscription_plan === 'teams' ? 30 :
+                        {selectedSubscription.subscription_plan === 'pro' ? 15 :
+                         selectedSubscription.subscription_plan === 'teams' ? 25 :
                          selectedSubscription.subscription_plan === 'enterprise' ? 60 : 0}
                       </div>
                       <p className="text-xs text-muted-foreground">Monthly Rate</p>
