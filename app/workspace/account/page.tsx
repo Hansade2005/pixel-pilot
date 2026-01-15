@@ -1115,21 +1115,35 @@ function AccountSettingsPageContent() {
     try {
       setSubscriptionLoading(true)
 
-      const response = await fetch('/api/stripe/create-portal-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+      // Check which payment provider the user has
+      const { data: userSettings } = await supabase
+        .from('user_settings')
+        .select('payment_provider')
+        .eq('user_id', user?.id)
+        .single()
 
-      const data = await response.json()
+      const paymentProvider = userSettings?.payment_provider || 'stripe'
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create billing portal session')
+      if (paymentProvider === 'polar') {
+        // Redirect to Polar customer portal
+        window.location.href = '/api/polar/portal'
+      } else {
+        // Redirect to Stripe billing portal
+        const response = await fetch('/api/stripe/create-portal-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create billing portal session')
+        }
+
+        window.location.href = data.url
       }
-
-      // Redirect to Stripe billing portal
-      window.location.href = data.url
     } catch (error: any) {
       console.error('Error creating billing portal session:', error)
       toast({

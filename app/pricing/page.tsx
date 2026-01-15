@@ -12,6 +12,8 @@ import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
 import { PRODUCT_CONFIGS, getPrice, getSavings, getExchangeRateForDisplay } from "@/lib/stripe-config"
 import { convertUsdToCad, formatPrice } from "@/lib/currency-converter"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { PaymentProviderSelector } from "@/components/pricing/payment-provider-selector"
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
@@ -22,6 +24,8 @@ export default function PricingPage() {
   const [creditBalance, setCreditBalance] = useState<number>(0)
   const [canPurchaseCredits, setCanPurchaseCredits] = useState<boolean>(false)
   const [exchangeRate, setExchangeRate] = useState<number>(1.35)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<"creator" | "collaborate" | "scale" | null>(null)
 
   const supabase = createClient()
 
@@ -128,32 +132,25 @@ export default function PricingPage() {
       return
     }
 
-    setLoadingPlan(planType)
-
-    try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          planType,
-          isAnnual,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session')
-      }
-
-      const { url } = await response.json()
-      window.location.href = url
-    } catch (error) {
-      console.error('Error creating checkout session:', error)
-      alert('Failed to start checkout. Please try again.')
-    } finally {
-      setLoadingPlan(null)
+    // Map plan types to our plan names
+    const planMap: Record<string, "creator" | "collaborate" | "scale"> = {
+      'pro': 'creator',
+      'teams': 'collaborate',
+      'enterprise': 'scale',
+      'creator': 'creator',
+      'collaborate': 'collaborate',
+      'scale': 'scale',
     }
+
+    const mappedPlan = planMap[planType]
+    if (!mappedPlan) {
+      console.error('Invalid plan type:', planType)
+      return
+    }
+
+    // Show payment provider selection dialog
+    setSelectedPlan(mappedPlan)
+    setShowPaymentDialog(true)
   }
 
   const handlePurchaseCredits = async (credits: number) => {
@@ -489,6 +486,21 @@ export default function PricingPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Payment Provider Selection Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Payment Method</DialogTitle>
+          </DialogHeader>
+          {selectedPlan && (
+            <PaymentProviderSelector 
+              plan={selectedPlan} 
+              onClose={() => setShowPaymentDialog(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
     </>
   )
