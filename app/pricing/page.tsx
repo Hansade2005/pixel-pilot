@@ -489,16 +489,18 @@ export default function PricingPage() {
 
       {/* Payment Provider Selection Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Choose Payment Method</DialogTitle>
           </DialogHeader>
-          {selectedPlan && (
-            <PaymentProviderSelector 
-              plan={selectedPlan} 
-              onClose={() => setShowPaymentDialog(false)}
-            />
-          )}
+          <div className="flex-1 overflow-y-auto">
+            {selectedPlan && (
+              <PaymentProviderSelector 
+                plan={selectedPlan} 
+                onClose={() => setShowPaymentDialog(false)}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

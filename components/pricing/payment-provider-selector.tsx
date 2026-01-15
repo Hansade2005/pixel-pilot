@@ -100,13 +100,13 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
   const pricing = billingInterval === "monthly" ? details.monthly : details.monthly
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       <div className="text-center">
-        <h3 className="text-2xl font-bold">{details.name}</h3>
+        <h3 className="text-xl font-bold">{details.name}</h3>
         
         {/* Billing Interval Selector */}
-        <Tabs value={billingInterval} onValueChange={(value: any) => setBillingInterval(value)} className="mt-4">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+        <Tabs value={billingInterval} onValueChange={(value: any) => setBillingInterval(value)} className="mt-3">
+          <TabsList className="grid w-full max-w-xs mx-auto grid-cols-2">
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
             <TabsTrigger value="yearly">
               Yearly
@@ -117,25 +117,25 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
 
         {billingInterval === "monthly" ? (
           <>
-            <p className="text-3xl font-bold text-primary mt-4">{pricing.price}/month</p>
-            <p className="text-sm text-muted-foreground mt-1">Billed monthly</p>
+            <p className="text-2xl font-bold text-primary mt-3">{pricing.price}/month</p>
+            <p className="text-xs text-muted-foreground mt-1">Billed monthly</p>
           </>
         ) : (
           <>
-            <p className="text-3xl font-bold text-primary mt-4">{pricing.yearlyTotal}/year</p>
-            <p className="text-sm text-green-600 mt-1">Save {pricing.savings} per year!</p>
+            <p className="text-2xl font-bold text-primary mt-3">{pricing.yearlyTotal}/year</p>
+            <p className="text-xs text-green-600 mt-1">Save {pricing.savings} per year!</p>
           </>
         )}
         
-        <p className="text-sm text-muted-foreground mt-2">{details.credits}</p>
+        <p className="text-xs text-muted-foreground mt-2">{details.credits}</p>
       </div>
 
-      <div className="space-y-4">
-        <Label className="text-base font-semibold">Choose Payment Provider</Label>
+      <div className="space-y-3">
+        <Label className="text-sm font-semibold">Choose Payment Provider</Label>
         
         <RadioGroup value={selectedProvider} onValueChange={(value: any) => setSelectedProvider(value)}>
           <Card className={`cursor-pointer transition-all ${selectedProvider === "stripe" ? "ring-2 ring-primary" : ""}`}>
-            <CardHeader className="p-4">
+            <CardHeader className="p-3">
               <div className="flex items-center space-x-4">
                 <RadioGroupItem value="stripe" id="stripe" />
                 <Label htmlFor="stripe" className="flex-1 cursor-pointer">
@@ -155,7 +155,7 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
           </Card>
 
           <Card className={`cursor-pointer transition-all ${selectedProvider === "polar" ? "ring-2 ring-primary" : ""}`}>
-            <CardHeader className="p-4">
+            <CardHeader className="p-3">
               <div className="flex items-center space-x-4">
                 <RadioGroupItem value="polar" id="polar" />
                 <Label htmlFor="polar" className="flex-1 cursor-pointer">
@@ -182,13 +182,13 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-2 sticky bottom-0 bg-background pt-3 pb-1">
         {onClose && (
-          <Button variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
+          <Button variant="outline" onClick={onClose} className="flex-1" disabled={loading} size="sm">
             Cancel
           </Button>
         )}
-        <Button onClick={handleSubscribe} className="flex-1" disabled={loading}>
+        <Button onClick={handleSubscribe} className="flex-1" disabled={loading} size="sm">
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

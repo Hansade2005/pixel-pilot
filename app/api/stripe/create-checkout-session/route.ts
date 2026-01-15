@@ -21,10 +21,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { planType, isAnnual = false } = await request.json()
+    const body = await request.json()
+    const planType = body.planType || body.plan
+    const isAnnual = body.isAnnual || false
 
     if (!planType) {
-      return NextResponse.json({ error: "Missing planType" }, { status: 400 })
+      return NextResponse.json({ error: "Missing planType or plan" }, { status: 400 })
     }
 
     // Get price ID from our configuration

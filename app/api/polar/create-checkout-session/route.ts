@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         product_id: productId,
         customer_email: user.email,
         success_url: POLAR_CONFIG.successUrl,
+        return_url: POLAR_CONFIG.returnUrl,
         metadata: {
           user_id: user.id,
           plan: plan,
