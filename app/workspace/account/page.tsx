@@ -83,6 +83,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { CreditTopUpSelector } from "@/components/billing/credit-topup-selector"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 
@@ -1352,51 +1353,10 @@ function AccountSettingsPageContent() {
   }
 
   const handleTopUp = async (amount: number) => {
-    try {
-      setProcessingTopUp(true)
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "You must be logged in to top up credits.",
-          variant: "destructive"
-        })
-        return
-      }
-
-      // Create Stripe checkout session for credit top-up
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: amount,
-          type: 'credit_topup',
-          userId: user.id,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (response.ok && result.url) {
-        // Redirect to Stripe Checkout
-        window.location.href = result.url
-      } else {
-        throw new Error(result.error || 'Failed to create checkout session')
-      }
-    } catch (error: any) {
-      console.error('Error creating top-up session:', error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to process top-up. Please try again.",
-        variant: "destructive"
-      })
-    } finally {
-      setProcessingTopUp(false)
-    }
+    // Payment provider selection is now handled by CreditTopUpSelector component
+    // This function is kept for compatibility but delegates to the component
+    setTopUpAmount(amount.toString())
+    setShowTopUpDialog(true)
   }
 
   const handleDownloadAllInvoices = () => {
@@ -2494,59 +2454,70 @@ function AccountSettingsPageContent() {
             <DialogTitle className="text-white">Buy Credits</DialogTitle>
             <DialogDescription className="text-gray-400">
               {currentPlan === 'free'
-                ? 'Upgrade to a paid plan to purchase credits. $1 = 1 credit.'
-                : `Purchase additional credits for your ${currentPlan} plan. $1 = 1 credit.`
+                ? 'Upgrade to a paid plan to purchase credits.'
+                : `Purchase additional credits for your ${currentPlan} plan.`
               }
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="text-white">Amount (USD)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                <Input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={topUpAmount}
-                  onChange={(e) => setTopUpAmount(e.target.value)}
-                  className="bg-gray-800/50 border-white/10 text-white pl-7"
-                  placeholder="10.00"
-                />
+          {currentPlan === 'free' ? (
+            <div className="py-4">
+              <p className="text-gray-400 text-center mb-4">
+                Credit purchases are only available for paid plans.
+              </p>
+              <Button
+                onClick={() => window.location.href = '/pricing'}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+              >
+                View Plans
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-white">Amount (USD)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={topUpAmount}
+                    onChange={(e) => setTopUpAmount(e.target.value)}
+                    className="bg-gray-800/50 border-white/10 text-white pl-7"
+                    placeholder="10.00"
+                  />
+                </div>
+                <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00 (1 credit = $1)</p>
               </div>
-              <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00</p>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {[10, 25, 50, 100].map(amount => (
-                <Button
-                  key={amount}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTopUpAmount(amount.toString())}
-                  className="border-white/10 text-white hover:bg-white/5"
-                >
-                  ${amount}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => handleTopUp(parseFloat(topUpAmount) || 0)}
-              disabled={processingTopUp || !topUpAmount || parseFloat(topUpAmount) < 1}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
-            >
-              {processingTopUp ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Proceed to Payment
-                </>
+              <div className="grid grid-cols-4 gap-2">
+                {[10, 25, 50, 100].map(amount => (
+                  <Button
+                    key={amount}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTopUpAmount(amount.toString())}
+                    className="border-white/10 text-white hover:bg-white/5"
+                  >
+                    ${amount}
+                  </Button>
+                ))}
+              </div>
+              {parseFloat(topUpAmount) > 0 && (
+                <div className="mt-4">
+                  <CreditTopUpSelector
+                    credits={parseFloat(topUpAmount)}
+                    onClose={() => setShowTopUpDialog(false)}
+                  />
+                </div>
               )}
+            </div>
+          )}
+          <DialogFooter className="sr-only">
+            <Button
+              onClick={() => setShowTopUpDialog(false)}
+              variant="outline"
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

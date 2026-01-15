@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { POLAR_CONFIG, getPlanFromPolarProductId, getPolarCredits } from "@/lib/polar-config"
+import { addCredits } from "@/lib/billing/credit-manager"
 
 /**
  * Polar Success Handler
@@ -47,6 +48,54 @@ export async function GET(request: NextRequest) {
 
     const checkout = await polarResponse.json()
 
+    // Check if this is a credit top-up or subscription
+    const purchaseType = checkout.metadata?.purchase_type
+    
+    if (purchaseType === 'credit_topup') {
+      // Handle credit top-up purchase
+      const creditsAmount = parseInt(checkout.metadata.credits || '0', 10)
+      
+      if (creditsAmount <= 0) {
+        return NextResponse.redirect(
+          new URL("/pricing?error=invalid_credits", request.url)
+        )
+      }
+
+      // Add credits to user's wallet using credit-manager
+      const creditAdded = await addCredits(
+        user.id,
+        creditsAmount,
+        'purchase',
+        `Polar credit top-up: ${creditsAmount} credits`,
+        supabase,
+        checkoutId
+      )
+
+      if (!creditAdded) {
+        console.error("Error adding credits for user:", user.id)
+        return NextResponse.redirect(
+          new URL("/pricing?error=credit_add_failed", request.url)
+        )
+      }
+
+      // Update polar customer ID if not set
+      await supabase
+        .from("user_settings")
+        .upsert({
+          user_id: user.id,
+          polar_customer_id: checkout.customer_id,
+          polar_checkout_id: checkoutId,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
+        })
+
+      return NextResponse.redirect(
+        new URL(`/workspace/account?success=credit_topup&credits=${creditsAmount}`, request.url)
+      )
+    }
+
+    // Handle subscription purchase
     // Get plan details from product ID
     const planDetails = getPlanFromPolarProductId(checkout.product_id)
     
@@ -104,10 +153,14 @@ export async function GET(request: NextRequest) {
     // Replenish credits based on plan
     const creditsToAdd = getPolarCredits(planName)
 
-    await supabase.rpc("add_credits", {
-      p_user_id: user.id,
-      p_amount: creditsToAdd,
-    })
+    await addCredits(
+      user.id,
+      creditsToAdd,
+      'subscription_grant',
+      `Polar subscription: ${planName} plan - ${interval} billing`,
+      supabase,
+      checkoutId
+    )
 
     // Redirect to success page
     return NextResponse.redirect(

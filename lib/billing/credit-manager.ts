@@ -1,13 +1,20 @@
 /**
  * ABE Credit Manager - Core credit operations
  * Handles credit deduction, validation, and balance checks
- * Rate: 0.25 credits per AI message request
+ * 
+ * Payment Systems Integrated:
+ * - Stripe: Primary payment system for subscriptions and credit top-ups
+ * - Polar: Backup payment system (1 credit = $1, Product ID: 09991226-466e-4983-b409-c986577a8599)
+ * 
+ * Credit Conversion Rate: 1 credit = $1 USD
+ * AI Message Rate: 0.25 credits per message request
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
 // Credit constants - MUST match values in lib/stripe-config.ts PRODUCT_CONFIGS
 export const CREDITS_PER_MESSAGE = 0.25
+export const CREDIT_TO_USD_RATE = 1 // 1 credit = $1
 export const FREE_PLAN_MONTHLY_CREDITS = 20
 export const CREATOR_PLAN_MONTHLY_CREDITS = 50 // $50 worth = 50 credits as per stripe-config
 export const COLLABORATE_PLAN_MONTHLY_CREDITS = 75

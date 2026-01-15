@@ -32,6 +32,12 @@ export const POLAR_CONFIG = {
     },
   },
   
+  // Credit Top-Up Product (1 credit = $1)
+  creditTopUp: {
+    productId: "09991226-466e-4983-b409-c986577a8599",
+    pricePerCredit: 100, // $1 per credit in cents
+  },
+  
   // Pricing (in cents)
   pricing: {
     creator: {
@@ -92,4 +98,18 @@ export function getPolarPrice(plan: PolarPlan, interval: BillingInterval = "mont
  */
 export function getPolarCredits(plan: PolarPlan): number {
   return POLAR_CONFIG.credits[plan]
+}
+
+/**
+ * Get price for credit purchase (1 credit = $1)
+ */
+export function getPolarCreditPrice(credits: number): number {
+  return credits * POLAR_CONFIG.creditTopUp.pricePerCredit
+}
+
+/**
+ * Get credit top-up product ID
+ */
+export function getPolarCreditProductId(): string {
+  return POLAR_CONFIG.creditTopUp.productId
 }

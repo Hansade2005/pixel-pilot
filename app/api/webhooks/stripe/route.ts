@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { headers } from 'next/headers'
 import { PRODUCT_CONFIGS, EXTRA_CREDITS_PRODUCT } from '@/lib/stripe-config'
+import { addCredits } from '@/lib/billing/credit-manager'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil'
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
         const planConfig = PRODUCT_CONFIGS[planId]
         const monthlyCredits = planConfig?.limits.credits || 20
 
-        // Update wallet with subscription info and grant monthly credits
+        // Update wallet with subscription info
         const { error } = await supabase
           .from('wallet')
           .upsert({
@@ -79,7 +80,6 @@ export async function POST(request: NextRequest) {
             stripe_subscription_id: subscription.id,
             current_plan: planId,
             subscription_status: mapStripeStatus(status),
-            credits_balance: creditsBefore + monthlyCredits, // Grant monthly credits
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
@@ -88,22 +88,15 @@ export async function POST(request: NextRequest) {
         if (error) {
           console.error('Error updating subscription:', error)
         } else {
-          // Log the credit grant transaction
-          await supabase
-            .from('transactions')
-            .insert({
-              user_id: userId,
-              amount: monthlyCredits,
-              type: 'subscription_grant',
-              description: `Monthly credit grant for ${planId} plan`,
-              credits_before: creditsBefore,
-              credits_after: creditsBefore + monthlyCredits,
-              stripe_subscription_id: subscription.id,
-              metadata: {
-                plan: planId,
-                subscription_status: status
-              }
-            })
+          // Grant monthly credits using credit-manager
+          await addCredits(
+            userId,
+            monthlyCredits,
+            'subscription_grant',
+            `Monthly credit grant for ${planId} plan`,
+            supabase,
+            subscription.id
+          )
 
           console.log(`Subscription ${subscription.id} ${event.type} for user ${userId}, granted ${monthlyCredits} credits`)
         }
@@ -160,36 +153,26 @@ export async function POST(request: NextRequest) {
 
             const creditsBefore = wallet?.credits_balance || 0
 
-            // Add monthly credits
-            const { error } = await supabase
+            // Update subscription status
+            await supabase
               .from('wallet')
               .update({
-                credits_balance: creditsBefore + monthlyCredits,
                 subscription_status: 'active',
                 updated_at: new Date().toISOString()
               })
               .eq('user_id', userId)
 
-            if (!error) {
-              // Log the renewal credit grant
-              await supabase
-                .from('transactions')
-                .insert({
-                  user_id: userId,
-                  amount: monthlyCredits,
-                  type: 'subscription_grant',
-                  description: `Monthly renewal credit grant for ${planId} plan`,
-                  credits_before: creditsBefore,
-                  credits_after: creditsBefore + monthlyCredits,
-                  stripe_subscription_id: subscriptionId,
-                  metadata: {
-                    invoice_id: invoice.id,
-                    plan: planId
-                  }
-                })
+            // Grant monthly credits using credit-manager
+            await addCredits(
+              userId,
+              monthlyCredits,
+              'subscription_grant',
+              `Monthly renewal credit grant for ${planId} plan`,
+              supabase,
+              subscriptionId
+            )
 
-              console.log(`Monthly credits granted for user ${userId}: +${monthlyCredits}`)
-            }
+            console.log(`Monthly credits granted for user ${userId}: +${monthlyCredits}`)
           }
         } else {
           // This might be a one-time payment (credit purchase)
@@ -289,7 +272,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper function to handle one-time credit purchases
-async function handleOneTimePayment(invoice: Stripe.Invoice, supabase: any) {
+async function handleOneTimePayment(invoice: any, supabase: any) {
   // Check if this is a credit purchase by looking at line items
   const lineItem = invoice.lines.data[0]
   if (!lineItem) return
@@ -303,44 +286,17 @@ async function handleOneTimePayment(invoice: Stripe.Invoice, supabase: any) {
     const amountPaid = invoice.amount_paid / 100 // Convert cents to dollars
     const creditsPurchased = Math.floor(amountPaid) // 1 credit per dollar
 
-    // Get current balance
-    const { data: wallet } = await supabase
-      .from('wallet')
-      .select('credits_balance')
-      .eq('user_id', userId)
-      .single()
+    // Add credits using credit-manager
+    await addCredits(
+      userId,
+      creditsPurchased,
+      'purchase',
+      `Purchased ${creditsPurchased} extra credits`,
+      supabase,
+      invoice.payment_intent as string
+    )
 
-    const creditsBefore = wallet?.credits_balance || 0
-
-    // Add credits to wallet
-    const { error } = await supabase
-      .from('wallet')
-      .update({
-        credits_balance: creditsBefore + creditsPurchased,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-
-    if (!error) {
-      // Log the purchase transaction
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: userId,
-          amount: creditsPurchased,
-          type: 'purchase',
-          description: `Purchased ${creditsPurchased} extra credits`,
-          credits_before: creditsBefore,
-          credits_after: creditsBefore + creditsPurchased,
-          stripe_payment_id: invoice.payment_intent as string,
-          metadata: {
-            invoice_id: invoice.id,
-            amount_paid: invoice.amount_paid
-          }
-        })
-
-      console.log(`Credits purchased for user ${userId}: +${creditsPurchased}`)
-    }
+    console.log(`Credits purchased for user ${userId}: +${creditsPurchased}`)
   }
 }
 
@@ -357,44 +313,17 @@ async function handleCreditPurchase(session: Stripe.Checkout.Session, supabase: 
     const quantity = lineItem.quantity || 1
     const creditsPurchased = quantity // Assuming quantity represents credits
 
-    // Get current balance
-    const { data: wallet } = await supabase
-      .from('wallet')
-      .select('credits_balance')
-      .eq('user_id', userId)
-      .single()
+    // Add credits using credit-manager
+    await addCredits(
+      userId,
+      creditsPurchased,
+      'purchase',
+      `Purchased ${creditsPurchased} extra credits via checkout`,
+      supabase,
+      session.payment_intent as string
+    )
 
-    const creditsBefore = wallet?.credits_balance || 0
-
-    // Add credits to wallet
-    const { error } = await supabase
-      .from('wallet')
-      .update({
-        credits_balance: creditsBefore + creditsPurchased,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-
-    if (!error) {
-      // Log the purchase transaction
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: userId,
-          amount: creditsPurchased,
-          type: 'purchase',
-          description: `Purchased ${creditsPurchased} extra credits via checkout`,
-          credits_before: creditsBefore,
-          credits_after: creditsBefore + creditsPurchased,
-          stripe_payment_id: session.payment_intent as string,
-          metadata: {
-            session_id: session.id,
-            quantity: quantity
-          }
-        })
-
-      console.log(`Credits purchased via checkout for user ${userId}: +${creditsPurchased}`)
-    }
+    console.log(`Credits purchased via checkout for user ${userId}: +${creditsPurchased}`)
   }
 }
 
