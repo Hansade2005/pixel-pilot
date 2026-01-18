@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import {
   Mail,
@@ -26,6 +27,10 @@ import {
   Loader2,
   User,
   Sparkles,
+  Eye,
+  Code,
+  Wand2,
+  RefreshCw
 } from "lucide-react"
 import {
   sendEmail,
@@ -66,8 +71,10 @@ export default function AdminEmailPage() {
   const [recipients, setRecipients] = useState<string[]>([])
   const [subject, setSubject] = useState('')
   const [content, setContent] = useState('')
+  const [html, setHtml] = useState('')
   const [emailType, setEmailType] = useState('notification')
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
+  const [activeTab, setActiveTab] = useState<"compose" | "preview">("compose")
 
   const { toast } = useToast()
   const router = useRouter()
@@ -159,16 +166,19 @@ export default function AdminEmailPage() {
     setRecipients([])
     setSubject('')
     setContent('')
+    setHtml('')
     setEmailType('notification')
     setSelectedTemplate(null)
     setShowAIGenerator(false)
+    setActiveTab("compose")
   }
 
-  const handleAIContentApply = (aiSubject: string, aiContent: string) => {
+  const handleAIContentApply = (aiSubject: string, aiContent: string, aiHtml?: string) => {
     if (aiSubject && !subject) {
       setSubject(aiSubject)
     }
     setContent(aiContent)
+    if (aiHtml) setHtml(aiHtml)
   }
 
   const applyTemplate = (template: EmailTemplate) => {
@@ -176,6 +186,7 @@ export default function AdminEmailPage() {
     setEmailType(template.type)
     setSubject(template.subject)
     setContent(template.content.replace(/\n/g, '<br>'))
+    setHtml(template.content.replace(/\n/g, '<br>'))
   }
 
   const sendEmails = async () => {
@@ -467,14 +478,143 @@ export default function AdminEmailPage() {
                     {showAIGenerator ? 'Hide' : 'AI'} Assistant
                   </Button>
                 </div>
-                <Textarea
-                  placeholder="Compose your message..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={12}
-                  className="resize-none border-0 shadow-none focus-visible:ring-0"
-                />
+
+                {/* Tabs for Compose and Preview */}
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="compose" className="flex items-center gap-2">
+                      <Code className="h-4 w-4" />
+                      Compose
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      Preview
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="compose" className="mt-4 space-y-4">
+                    {/* Plain Text Editor */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Message (Plain Text)</label>
+                      <Textarea
+                        placeholder="Compose your message..."
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        rows={12}
+                        className="resize-none"
+                      />
+                    </div>
+
+                    {/* HTML Editor */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">HTML Source (Optional)</label>
+                      <Textarea
+                        placeholder="HTML email code..."
+                        value={html}
+                        onChange={(e) => setHtml(e.target.value)}
+                        rows={8}
+                        className="resize-none font-mono text-xs"
+                        spellCheck={false}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="preview" className="mt-4 space-y-4">
+                    {/* Email Preview */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Email Preview</label>
+                      <div className="border rounded-lg p-4 bg-white dark:bg-gray-50 max-h-[400px] overflow-auto">
+                        {html ? (
+                          <div dangerouslySetInnerHTML={{ __html: html }} />
+                        ) : (
+                          <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                            {content}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Plain Text Fallback */}
+                    {html && content && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Plain Text Version</label>
+                        <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 max-h-[200px] overflow-auto">
+                          <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 font-mono text-sm">
+                            {content}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
+
+              {/* AI Generator */}
+              {showAIGenerator && (
+                <div className="px-4 pb-4 border-t">
+                  <div className="space-y-4 pt-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm font-medium">AI Email Assistant</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Prompt</label>
+                        <Textarea
+                          placeholder="Describe the email you want to generate..."
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          rows={3}
+                          className="resize-none"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleAIGenerate}
+                          disabled={isGenerating || !aiPrompt.trim()}
+                          size="sm"
+                          className="flex-1"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="h-4 w-4 mr-2" />
+                              Generate
+                            </>
+                          )}
+                        </Button>
+
+                        <Button
+                          onClick={handleAIContentApply}
+                          disabled={!aiContent && !aiHtml}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          Apply to Content
+                        </Button>
+                      </div>
+
+                      {aiContent && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Generated Content</label>
+                          <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800 max-h-[200px] overflow-auto">
+                            <div className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+                              {aiContent}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="bg-muted px-4 py-3 flex items-center justify-between border-t">
