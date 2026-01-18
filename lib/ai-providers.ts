@@ -2,6 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createMistral } from '@ai-sdk/mistral';
 import { createXai } from '@ai-sdk/xai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createAnthropic } from '@ai-sdk/anthropic';
 
 // Custom a0.dev provider implementation (no API key required)
 function createA0Dev(options: { apiKey?: string } = {}) {
@@ -158,6 +159,12 @@ const xaiProvider = createXai({
   apiKey: process.env.XAI_API_KEY || 'xai-your-api-key-here',
 });
 
+// Create Anthropic provider with Vercel AI Gateway
+const anthropicProvider = createAnthropic({
+  baseURL: 'https://ai-gateway.vercel.sh/v1',
+  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
+});
+
 const openrouterProvider = createOpenAICompatible({
   name: 'openrouter',
   baseURL: 'https://openrouter.ai/api/v1',
@@ -277,10 +284,13 @@ const modelProviders: Record<string, any> = {
   'minimax/minimax-m2': vercelGateway('minimax/minimax-m2'),
   'moonshotai/kimi-k2-thinking': vercelGateway('moonshotai/kimi-k2-thinking'),
   'mistral/devstral-small-2': vercelGateway('mistral/devstral-small-2'),
-  'anthropic/claude-haiku-4.5': vercelGateway('anthropic/claude-haiku-4.5'),
   'alibaba/qwen3-coder-plus': vercelGateway('alibaba/qwen3-coder-plus'),
-  'anthropic/claude-sonnet-4.5': vercelGateway('anthropic/claude-sonnet-4.5'),
   'meituan/longcat-flash-chat': vercelGateway('meituan/longcat-flash-chat'),
+
+  // Anthropic Models via Anthropic Provider (not OpenAI compatible)
+  'anthropic/claude-haiku-4.5': anthropicProvider('anthropic/claude-haiku-4.5'),
+  'anthropic/claude-sonnet-4.5': anthropicProvider('anthropic/claude-sonnet-4.5'),
+  'anthropic/claude-opus-4.5': anthropicProvider('anthropic/claude-opus-4.5'),
 };
 
 // Helper function to get a model by ID
@@ -299,6 +309,7 @@ export {
   openaiProvider as openai,
   mistralProvider as mistral,
   xaiProvider as xai,
+  anthropicProvider as anthropic,
   openrouterProvider as openrouter,
   codestral,
   createOpenAICompatible,

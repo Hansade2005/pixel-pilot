@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'xai/grok-code-fast-1';
+export const DEFAULT_CHAT_MODEL: string = 'anthropic/claude-sonnet-4.5';
 
 export interface ChatModel {
   id: string;
@@ -48,27 +48,9 @@ export const chatModels: Array<ChatModel> = [
     provider: 'vercel-gateway',
   },
   {
-    id: 'kwaipilot/kat-coder-pro-v1',
-    name: 'Kwaipilot Kat Coder Pro V1',
-    description: 'Kwaipilot Kat Coder Pro V1 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
     id: 'xai/grok-code-fast-1',
     name: 'xAI Grok Code Fast 1',
     description: 'xAI Grok Code Fast 1 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'nvidia/nemotron-nano-12b-v2-vl',
-    name: 'NVIDIA Nemotron Nano 12B V2 VL',
-    description: 'NVIDIA Nemotron Nano 12B V2 VL via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'minimax/minimax-m2',
-    name: 'MiniMax M2',
-    description: 'MiniMax M2 via Vercel AI Gateway',
     provider: 'vercel-gateway',
   },
   {
@@ -78,33 +60,69 @@ export const chatModels: Array<ChatModel> = [
     provider: 'vercel-gateway',
   },
   {
-    id: 'mistral/devstral-small-2',
-    name: 'Mistral Devstral Small 2',
-    description: 'Mistral Devstral Small 2 via Vercel AI Gateway',
+    id: 'google/gemini-2.5-flash',
+    name: 'Google Gemini 2.5 Flash',
+    description: 'Google Gemini 2.5 Flash via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'google/gemini-2.5-pro',
+    name: 'Google Gemini 2.5 Pro',
+    description: 'Google Gemini 2.5 Pro via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'xai/glm-4.7',
+    name: 'xAI GLM 4.7',
+    description: 'xAI GLM 4.7 via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'minimax/minimax-m2.1',
+    name: 'MiniMax M2.1',
+    description: 'MiniMax M2.1 via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'alibaba/qwen3-max',
+    name: 'Alibaba Qwen3 Max',
+    description: 'Alibaba Qwen3 Max via Vercel AI Gateway',
     provider: 'vercel-gateway',
   },
   {
     id: 'anthropic/claude-haiku-4.5',
     name: 'Anthropic Claude Haiku 4.5',
-    description: 'Anthropic Claude Haiku 4.5 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'alibaba/qwen3-coder-plus',
-    name: 'Alibaba Qwen3 Coder Plus',
-    description: 'Alibaba Qwen3 Coder Plus via Vercel AI Gateway',
-    provider: 'vercel-gateway',
+    description: 'Anthropic Claude Haiku 4.5 via Vercel AI Gateway with Reasoning',
+    provider: 'anthropic',
   },
   {
     id: 'anthropic/claude-sonnet-4.5',
     name: 'Anthropic Claude Sonnet 4.5',
-    description: 'Anthropic Claude Sonnet 4.5 via Vercel AI Gateway',
+    description: 'Anthropic Claude Sonnet 4.5 via Vercel AI Gateway with Reasoning',
+    provider: 'anthropic',
+  },
+  {
+    id: 'anthropic/claude-opus-4.5',
+    name: 'Anthropic Claude Opus 4.5',
+    description: 'Anthropic Claude Opus 4.5 via Vercel AI Gateway with Reasoning',
+    provider: 'anthropic',
+  },
+  {
+    id: 'openai/gpt-5.1-thinking',
+    name: 'OpenAI GPT-5.1 Thinking',
+    description: 'OpenAI GPT-5.1 Thinking via Vercel AI Gateway',
     provider: 'vercel-gateway',
   },
   {
-    id: 'meituan/longcat-flash-chat',
-    name: 'Meituan LongCat Flash Chat',
-    description: 'Meituan LongCat Flash Chat via Vercel AI Gateway',
+    id: 'openai/gpt-5.2-codex',
+    name: 'OpenAI GPT-5.2 Codex',
+    description: 'OpenAI GPT-5.2 Codex via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'openai/o3',
+    name: 'OpenAI O3',
+    description: 'OpenAI O3 via Vercel AI Gateway',
     provider: 'vercel-gateway',
   },
 ];

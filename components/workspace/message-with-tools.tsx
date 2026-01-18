@@ -135,7 +135,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
   const hasTools = toolInvocations && toolInvocations.length > 0
 
   // Get reasoning and response content
-  const reasoningContent = (message as any).reasoning || ''
+  // Support both 'reasoning' and 'reasoningText' for compatibility with different providers
+  const reasoningContent = (message as any).reasoning || (message as any).reasoningText || ''
   const responseContent = (message as any).content || ''
   
   const hasReasoning = reasoningContent.trim().length > 0

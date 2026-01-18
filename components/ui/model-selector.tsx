@@ -31,7 +31,7 @@ export function ModelSelector({
   // Set default selected model based on plan
   // Premium plans: creator/collaborate/scale (or legacy: pro/teams/enterprise)
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
-  const defaultSelectedModel: string = isPremium ? 'xai/grok-code-fast-1' : 'mistral/devstral-2'
+  const defaultSelectedModel: string = isPremium ? 'anthropic/claude-sonnet-4.5' : 'mistral/devstral-2'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   const currentModel = getModelById(effectiveSelectedModel)
@@ -41,16 +41,19 @@ export function ModelSelector({
     ['auto', 'PiPilot Auto'],
     // Vercel AI Gateway Models
     ['mistral/devstral-2', 'PiPilot Mistral Devstral 2'],
-    ['kwaipilot/kat-coder-pro-v1', 'PiPilot Kwaipilot Kat Coder Pro V1'],
     ['xai/grok-code-fast-1', 'PiPilot xAI Grok Code Fast 1'],
-    ['nvidia/nemotron-nano-12b-v2-vl', 'PiPilot NVIDIA Nemotron Nano 12B'],
-    ['minimax/minimax-m2', 'PiPilot MiniMax M2'],
     ['moonshotai/kimi-k2-thinking', 'PiPilot MoonshotAI Kimi K2 Thinking'],
-    ['mistral/devstral-small-2', 'PiPilot Mistral Devstral Small 2'],
+    ['google/gemini-2.5-flash', 'PiPilot Google Gemini 2.5 Flash'],
+    ['google/gemini-2.5-pro', 'PiPilot Google Gemini 2.5 Pro'],
+    ['xai/glm-4.7', 'PiPilot xAI GLM 4.7'],
+    ['minimax/minimax-m2.1', 'PiPilot MiniMax M2.1'],
+    ['alibaba/qwen3-max', 'PiPilot Alibaba Qwen3 Max'],
     ['anthropic/claude-haiku-4.5', 'PiPilot Anthropic Claude Haiku 4.5'],
-    ['alibaba/qwen3-coder-plus', 'PiPilot Alibaba Qwen3 Coder Plus'],
     ['anthropic/claude-sonnet-4.5', 'PiPilot Anthropic Claude Sonnet 4.5'],
-    ['meituan/longcat-flash-chat', 'PiPilot Meituan LongCat Flash Chat'],
+    ['anthropic/claude-opus-4.5', 'PiPilot Anthropic Claude Opus 4.5'],
+    ['openai/gpt-5.1-thinking', 'PiPilot OpenAI GPT-5.1 Thinking'],
+    ['openai/gpt-5.2-codex', 'PiPilot OpenAI GPT-5.2 Codex'],
+    ['openai/o3', 'PiPilot OpenAI O3'],
   ])
 
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -72,27 +75,29 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'mistral/devstral-2',
-      'kwaipilot/kat-coder-pro-v1',
-      'mistral/devstral-small-2',
-      'meituan/longcat-flash-chat'
+      'google/gemini-2.5-flash',
+      'anthropic/claude-sonnet-4.5'
     ];
   } else if (isPremium && effectiveStatus === 'active') {
     // All premium plans get full access: creator/collaborate/scale (and legacy: pro/teams/enterprise)
     allowedModels = [
       // Free models (premium users get access to everything)
       'mistral/devstral-2',
-      'kwaipilot/kat-coder-pro-v1',
-      'mistral/devstral-small-2',
-      'meituan/longcat-flash-chat',
+      'xai/grok-code-fast-1',
+      'google/gemini-2.5-flash',
       // Premium models
       'auto',
-      'xai/grok-code-fast-1',
-      'nvidia/nemotron-nano-12b-v2-vl',
-      'minimax/minimax-m2',
       'moonshotai/kimi-k2-thinking',
+      'google/gemini-2.5-pro',
+      'xai/glm-4.7',
+      'minimax/minimax-m2.1',
+      'alibaba/qwen3-max',
       'anthropic/claude-haiku-4.5',
-      'alibaba/qwen3-coder-plus',
-      'anthropic/claude-sonnet-4.5'
+      'anthropic/claude-sonnet-4.5',
+      'anthropic/claude-opus-4.5',
+      'openai/gpt-5.1-thinking',
+      'openai/gpt-5.2-codex',
+      'openai/o3'
     ];
   } else {
     // Fallback for inactive subscriptions or other cases

@@ -717,9 +717,7 @@ When creating, adding, or updating app features, follow this exact structure and
 - 🏆 App Store-ready with all native features working
 - 🚀 Viral features and delightful UX that users love
 
-Remember: You're creating mobile magic! Every feature should set new benchmarks for mobile app excellence. Build legendary things! 🚀📱✨
-
-${projectContext}`
+Remember: You're creating mobile magic! Every feature should set new benchmarks for mobile app excellence. Build legendary things! 🚀📱✨`
 }
 
 // Add timeout utility function at the top level
@@ -3182,9 +3180,7 @@ const { theme, setTheme } = useTheme();
 - 👍 Featured on Product Hunt, viral traction
 _Remember: You’re not just coding—you’re creating digital magic! Every feature, pixel, and product should set new benchmarks. Build legendary things! 🚀✨🎉_
 
-${projectContext}
-
-${conversationSummaryContext || ''}`
+`
 
     // Check for UI prototyping mode and use specialized system prompt
     const uiSystemPrompt = getUISystemPrompt(isInitialPrompt, modelId, projectContext)
@@ -10224,15 +10220,30 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       'deepseek-chat-v3.1', 'kwaipilot/kat-coder-pro:free', 'qwen/qwen-turbo'
     ];
 
+    // Anthropic models that support reasoning and prompt caching
+    const anthropicModels = [
+      'anthropic/claude-opus-4.5',
+      'anthropic/claude-sonnet-4.5',
+      'anthropic/claude-haiku-4.5'
+    ];
+
+    const isAnthropicModel = anthropicModels.includes(modelId);
+
     const messagesWithSystem = [
       {
         role: 'system',
         content: systemPrompt,
-        // Apply cache control for OpenRouter models and Anthropic models through OpenRouter
+        // Apply cache control for OpenRouter models and Anthropic models
         ...(openRouterModels.includes(modelId) ? {
           providerOptions: {
             openrouter: {
               cache_control: { type: 'ephemeral' }
+            }
+          }
+        } : isAnthropicModel ? {
+          providerOptions: {
+            anthropic: {
+              cacheControl: { type: 'ephemeral' }
             }
           }
         } : {})
@@ -10240,14 +10251,45 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       ...processedMessages
     ];
 
+    // Prepare provider options for Anthropic models (reasoning + context management)
+    const anthropicProviderOptions = isAnthropicModel ? {
+      anthropic: {
+        // Enable reasoning with budget
+        thinking: { type: 'enabled', budgetTokens: 12000 },
+        // Context management for efficient token usage
+        contextManagement: {
+          edits: [
+            {
+              type: 'clear_tool_uses_20250919',
+              trigger: { type: 'input_tokens', value: 10000 },
+              keep: { type: 'tool_uses', value: 5 },
+              clearAtLeast: { type: 'input_tokens', value: 1000 },
+              clearToolInputs: true,
+              excludeTools: ['create_database', 'request_supabase_connection'],
+            },
+            {
+              type: 'clear_thinking_20251015',
+              keep: { type: 'thinking_turns', value: 2 },
+            },
+          ],
+        },
+      }
+    } as any : undefined;
+
     const result = await streamText({
       model,
       temperature: 0.7,
       messages: messagesWithSystem, // Use messages with system prompt and cache control
       tools: toolsToUse,
       stopWhen: stepCountIs(60),
-      onFinish: ({ response }) => {
+      ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
+      onFinish: ({ response }: any) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
+        
+        // Log Anthropic metadata if available
+        if (isAnthropicModel && response?.providerMetadata?.anthropic) {
+          console.log('[Chat-V2] Anthropic metadata:', response.providerMetadata.anthropic)
+        }
       }
     })
 

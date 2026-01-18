@@ -1946,12 +1946,29 @@ export function ChatPanelV2({
             // Handle continuation stream parts - append to original message
             if (parsed.type === 'text-delta') {
               if (parsed.text) {
-                continuationAccumulatedContent += parsed.text
-                setMessages(prev => prev.map(msg =>
-                  msg.id === originalAssistantMessageId
-                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
-                    : msg
-                ))
+                // CRITICAL FIX: Filter out tool result JSON that shouldn't be displayed
+                // Some models output tool results as text instead of keeping them internal
+                const textToAdd = parsed.text
+                
+                // Check if this text looks like a tool result JSON
+                const trimmedText = textToAdd.trim()
+                const looksLikeToolResult = (
+                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) && 
+                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || 
+                   trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
+                )
+                
+                // Skip text that appears to be a raw tool result JSON
+                if (!looksLikeToolResult) {
+                  continuationAccumulatedContent += textToAdd
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === originalAssistantMessageId
+                      ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                      : msg
+                  ))
+                } else {
+                  console.log('[ChatPanelV2][Continuation][Filter] Filtered out tool result JSON from text content:', trimmedText.substring(0, 100))
+                }
               }
             } else if (parsed.type === 'reasoning-delta') {
               if (parsed.text) {
@@ -3231,13 +3248,30 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             if (parsed.type === 'text-delta') {
               // Text delta - accumulate the text
               if (parsed.text) {
-                accumulatedContent += parsed.text
-                setStreamingContent(accumulatedContent) // Store in component state
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
-                    : msg
-                ))
+                // CRITICAL FIX: Filter out tool result JSON that shouldn't be displayed
+                // Some models output tool results as text instead of keeping them internal
+                const textToAdd = parsed.text
+                
+                // Check if this text looks like a tool result JSON
+                const trimmedText = textToAdd.trim()
+                const looksLikeToolResult = (
+                  (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) && 
+                  (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') || 
+                   trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
+                )
+                
+                // Skip text that appears to be a raw tool result JSON
+                if (!looksLikeToolResult) {
+                  accumulatedContent += textToAdd
+                  setStreamingContent(accumulatedContent) // Store in component state
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                      : msg
+                  ))
+                } else {
+                  console.log('[ChatPanelV2][Filter] Filtered out tool result JSON from text content:', trimmedText.substring(0, 100))
+                }
               }
             } else if (parsed.type === 'reasoning-delta') {
               // Reasoning delta - accumulate reasoning separately
