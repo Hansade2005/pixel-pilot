@@ -35,6 +35,7 @@ import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
 import { ModelSelector } from "@/components/ui/model-selector"
+import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
 import { useGitHubPush } from "@/hooks/use-github-push"
@@ -88,6 +89,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
   const [projectFiles, setProjectFiles] = useState<File[]>([])
+
+  // Chat session management
+  const [currentChatSessionId, setCurrentChatSessionId] = useState<string | null>(null)
+  const [chatSessionKey, setChatSessionKey] = useState<number>(0) // Force chat panel refresh on session change
   
   // Tagged component from visual editor for chat context
   const [taggedComponent, setTaggedComponent] = useState<{
@@ -994,6 +999,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   setHasProcessedInitialPrompt(false) // Allow re-processing if user re-enters prompt
                 }
               }}
+              currentChatSessionId={currentChatSessionId}
+              onChatSessionChange={(sessionId) => {
+                setCurrentChatSessionId(sessionId)
+                setChatSessionKey(prev => prev + 1)
+              }}
+              onNewChatSession={() => {
+                setChatSessionKey(prev => prev + 1)
+              }}
               onProjectCreated={async (newProject) => {
                 // Refresh projects when a new one is created
                 try {
@@ -1059,6 +1072,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
                     <ChatPanelV2
+                      key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
@@ -1468,9 +1482,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </div>
             </div>
             
-            {/* Model Selector without label for mobile space optimization - only when project selected */}
+            {/* Model Selector and Chat Session Selector for mobile */}
             {selectedProject && (
-              <div className="flex-1 max-w-48 mx-2 flex items-center">
+              <div className="flex-1 max-w-56 mx-2 flex items-center gap-1">
                 <ModelSelector
                   selectedModel={selectedModel}
                   onModelChange={setSelectedModel}
@@ -1478,6 +1492,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   subscriptionStatus={subscriptionStatus}
                   compact={true}
                   className="flex-1"
+                />
+                <ChatSessionSelector
+                  workspaceId={selectedProject.id}
+                  userId={user.id}
+                  currentSessionId={currentChatSessionId}
+                  onSessionChange={(sessionId) => {
+                    setCurrentChatSessionId(sessionId)
+                    setChatSessionKey(prev => prev + 1)
+                  }}
+                  onNewSession={() => {
+                    setChatSessionKey(prev => prev + 1)
+                  }}
+                  compact={true}
                 />
               </div>
             )}
@@ -1600,8 +1627,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <ChatPanelV2 
-                      project={selectedProject} 
+                    <ChatPanelV2
+                      key={`chat-mobile-${selectedProject.id}-${chatSessionKey}`}
+                      project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
                       onClearChat={handleClearChat}

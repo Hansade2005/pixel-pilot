@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import React, { useState, useEffect } from 'react'
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { ModelSelector } from "@/components/ui/model-selector"
+import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { useGitHubPush } from "@/hooks/use-github-push"
 import {
   Dialog,
@@ -41,6 +42,10 @@ interface ProjectHeaderProps {
   initialName?: string
   initialDescription?: string
   onDialogOpenChange?: (open: boolean) => void
+  // Chat session props
+  currentChatSessionId?: string | null
+  onChatSessionChange?: (sessionId: string) => void
+  onNewChatSession?: () => void
 }
 
 export function ProjectHeader({
@@ -58,7 +63,10 @@ export function ProjectHeader({
   openDialog,
   initialName,
   initialDescription,
-  onDialogOpenChange
+  onDialogOpenChange,
+  currentChatSessionId,
+  onChatSessionChange,
+  onNewChatSession,
 }: ProjectHeaderProps) {
   const { toast } = useToast()
   const [copied, setCopied] = useState(false)
@@ -354,6 +362,18 @@ export function ProjectHeader({
               compact={true}
             />
           </div>
+        )}
+
+        {/* Chat Session Selector */}
+        {project && user && (
+          <ChatSessionSelector
+            workspaceId={project.id}
+            userId={user.id}
+            currentSessionId={currentChatSessionId}
+            onSessionChange={onChatSessionChange}
+            onNewSession={onNewChatSession}
+            compact={true}
+          />
         )}
       </div>
 

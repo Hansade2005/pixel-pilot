@@ -333,6 +333,7 @@ export interface StorageInterface {
   getChatSessions(userId: string): Promise<ChatSession[]>;
   getChatSession(id: string): Promise<ChatSession | null>;
   updateChatSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | null>;
+  deleteChatSession(id: string): Promise<boolean>;
   createMessage(message: Omit<Message, 'id' | 'createdAt'>): Promise<Message>;
   getMessages(chatSessionId: string): Promise<Message[]>;
   deleteMessage(chatSessionId: string, messageId: string): Promise<boolean>;
@@ -565,6 +566,16 @@ class InMemoryStorage implements StorageInterface {
     }
     this.chatSessions.set(id, updatedChatSession)
     return updatedChatSession
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    if (!this.chatSessions.has(id)) return false
+    // Delete all messages associated with this session
+    const messagesToDelete = Array.from(this.messages.values())
+      .filter(msg => msg.chatSessionId === id)
+    messagesToDelete.forEach(msg => this.messages.delete(msg.id))
+    this.chatSessions.delete(id)
+    return true
   }
 
   // Message methods
@@ -1719,6 +1730,25 @@ class IndexedDBStorage implements StorageInterface {
       const request = store.put(updatedChatSession)
 
       request.onsuccess = () => resolve(updatedChatSession)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    // First, delete all messages associated with this session
+    const messages = await this.getMessages(id)
+    for (const message of messages) {
+      await this.deleteMessage(id, message.id)
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['chatSessions'], 'readwrite')
+      const store = transaction.objectStore('chatSessions')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
     })
   }
@@ -3352,6 +3382,11 @@ class StorageManager {
   async updateChatSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
     await this.init()
     return this.storage!.updateChatSession(id, updates)
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteChatSession(id)
   }
 
   // Message methods
