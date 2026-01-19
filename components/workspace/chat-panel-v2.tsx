@@ -3056,7 +3056,7 @@ export function ChatPanelV2({
       })
     },
     onSettings: () => {
-      window.open('/workspace/management', '_blank')
+      window.open('/workspace/account', '_blank')
     },
     onHelp: () => {
       toast({
