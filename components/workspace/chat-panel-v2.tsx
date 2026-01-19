@@ -3967,25 +3967,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   : "bg-transparent border-0"
               )}>
                 <div className="p-4 break-words overflow-wrap-anywhere">
-                  {/* Enhanced Tool Activity Panel - Show before message content */}
-                  {(() => {
-                    const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
-                    const regularToolCalls = toolCalls?.filter(tc =>
-                      tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation'
-                    )
-                    if (regularToolCalls && regularToolCalls.length > 0) {
-                      console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${regularToolCalls.length} operations for message ${message.id}`)
-                    }
-                    return regularToolCalls && regularToolCalls.length > 0 ? (
-                      <ToolActivityPanel
-                        toolCalls={regularToolCalls}
-                        isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
-                      />
-                    ) : null
-                  })()}
-
                   {/* Special Rendering: Supabase Connection Card */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
@@ -4059,6 +4040,25 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
                     onContinueToBackend={onContinueToBackend}
                   />
+
+                  {/* Enhanced Tool Activity Panel - Show below message content */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
+                    const regularToolCalls = toolCalls?.filter(tc =>
+                      tc.toolName !== 'request_supabase_connection' &&
+                      tc.toolName !== 'continue_backend_implementation'
+                    )
+                    if (regularToolCalls && regularToolCalls.length > 0) {
+                      console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${regularToolCalls.length} operations for message ${message.id}`)
+                    }
+                    return regularToolCalls && regularToolCalls.length > 0 ? (
+                      <ToolActivityPanel
+                        toolCalls={regularToolCalls}
+                        isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
+                      />
+                    ) : null
+                  })()}
                 </div>
                 {/* AI Message Actions - Only show if message has content */}
                 {message.content && message.content.trim().length > 0 && (

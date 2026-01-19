@@ -31,7 +31,7 @@ export function ModelSelector({
   // Set default selected model based on plan
   // Premium plans: creator/collaborate/scale (or legacy: pro/teams/enterprise)
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
-  const defaultSelectedModel: string = isPremium ? 'anthropic/claude-sonnet-4.5' : 'mistral/devstral-2'
+  const defaultSelectedModel: string = isPremium ? 'anthropic/claude-sonnet-4.5' : 'xai/grok-code-fast-1'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   const currentModel = getModelById(effectiveSelectedModel)
@@ -74,6 +74,7 @@ export function ModelSelector({
   let allowedModels: string[]
   if (userPlan === 'free') {
     allowedModels = [
+      'xai/grok-code-fast-1',
       'mistral/devstral-2',
       'google/gemini-2.5-flash',
       'anthropic/claude-sonnet-4.5'

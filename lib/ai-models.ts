@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'anthropic/claude-sonnet-4.5';
+export const DEFAULT_CHAT_MODEL: string = 'xai/grok-code-fast-1';
 
 export interface ChatModel {
   id: string;
