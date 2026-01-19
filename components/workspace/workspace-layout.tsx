@@ -1072,6 +1072,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
                     <ChatPanelV2
+                      key={`chat-${selectedProject.id}-${chatSessionKey}`}
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
@@ -1626,8 +1627,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <ChatPanelV2 
-                      project={selectedProject} 
+                    <ChatPanelV2
+                      key={`chat-mobile-${selectedProject.id}-${chatSessionKey}`}
+                      project={selectedProject}
                       isMobile={true}
                       selectedModel={selectedModel}
                       onClearChat={handleClearChat}

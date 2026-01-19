@@ -2368,6 +2368,8 @@ export function ChatPanelV2({
 
       if (activeSession) {
         console.log(`[ChatPanelV2] Found active chat session: ${activeSession.id}`)
+        // Update the current session ID state
+        setCurrentChatSessionId(activeSession.id)
 
         // Load messages for this session
         const storedMessages = await storageManager.getMessages(activeSession.id)
