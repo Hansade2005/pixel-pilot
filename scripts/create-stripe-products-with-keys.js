@@ -1,7 +1,14 @@
 const Stripe = require('stripe')
 
-// Use the user's provided Stripe secret key
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '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'
+// Stripe secret key must be provided via environment variable
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+
+if (!stripeSecretKey) {
+  console.error('❌ Error: STRIPE_SECRET_KEY environment variable is required')
+  console.error('   Set it before running this script:')
+  console.error('   STRIPE_SECRET_KEY=sk_live_xxx node scripts/create-stripe-products-with-keys.js')
+  process.exit(1)
+}
 
 // Initialize Stripe with user's key
 const stripe = new Stripe(stripeSecretKey, {
@@ -80,9 +87,9 @@ async function createStripeProducts() {
     console.log(`NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY=${monthlyPrice.id}`)
     console.log(`NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY=${yearlyPrice.id}`)
     console.log('')
-    console.log('# Your Stripe keys (already configured)')
-    console.log(`STRIPE_SECRET_KEY=${stripeSecretKey}`)
-    console.log('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51S5AIW3G7U0M1bp1lsnKvB8AX86PtV5lVwyn1grfAvVmdDx8miCY4WbMEXLS9UoCq7wLyMUiW9MlFZSlVl17zVmL00AQXvW8Oe')
+    console.log('# Your Stripe keys')
+    console.log('STRIPE_SECRET_KEY=<your-stripe-secret-key>')
+    console.log('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=<your-stripe-publishable-key>')
     console.log('')
     console.log('✅ Ready to test your subscription system!')
 
@@ -91,7 +98,6 @@ async function createStripeProducts() {
 
     if (error.message.includes('Invalid API Key')) {
       console.error('\n🔑 Tip: Make sure your STRIPE_SECRET_KEY environment variable is set correctly')
-      console.error('   You can also replace the key directly in this script if needed')
     }
 
     process.exit(1)
