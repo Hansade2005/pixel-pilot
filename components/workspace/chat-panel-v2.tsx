@@ -3056,7 +3056,13 @@ export function ChatPanelV2({
       })
     },
     onSettings: () => {
-      window.open('/workspace/account', '_blank')
+      if (project?.name) {
+        // Convert project name to slug (lowercase, replace spaces with hyphens)
+        const slug = project.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        window.open(`/workspace/projects/${slug}`, '_blank')
+      } else {
+        toast({ title: 'No project', description: 'Select a project first' })
+      }
     },
     onHelp: () => {
       toast({
