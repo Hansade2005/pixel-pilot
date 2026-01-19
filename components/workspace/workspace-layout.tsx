@@ -1472,7 +1472,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               
               <div className="flex flex-col min-w-0">
                 <h1 className="text-sm font-semibold truncate">
-                  {selectedProject?.name ? (selectedProject.name.length > 12 ? `${selectedProject.name.substring(0, 12)}...` : selectedProject.name) : 'New Space'}
+                  {selectedProject?.name ? (selectedProject.name.length > 7 ? `${selectedProject.name.substring(0, 7)}...` : selectedProject.name) : 'New Space'}
                 </h1>
                 {selectedFile && (
                   <p className="text-xs text-muted-foreground truncate">

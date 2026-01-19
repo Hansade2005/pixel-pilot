@@ -2855,49 +2855,213 @@ export function ChatPanelV2({
     }
   }
 
-  // Slash commands configuration
+  // Helper function to send a command as a chat message
+  const sendCommandAsMessage = (prompt: string) => {
+    setInput(prompt)
+    // Use setTimeout to allow state to update, then trigger submit
+    setTimeout(() => {
+      const form = document.querySelector('form') as HTMLFormElement
+      if (form) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      }
+    }, 50)
+  }
+
+  // Create new chat session
+  const createNewChatSession = async () => {
+    if (!project?.id || !project?.userId) return
+
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Deactivate current session
+      if (currentChatSessionId) {
+        await storageManager.updateChatSession(currentChatSessionId, { isActive: false })
+      }
+
+      // Create new session
+      const sessions = await storageManager.getChatSessions(project.userId)
+      const workspaceSessions = sessions.filter((s: any) => s.workspaceId === project.id)
+
+      const newSession = await storageManager.createChatSession({
+        workspaceId: project.id,
+        userId: project.userId,
+        title: `Chat ${workspaceSessions.length + 1}`,
+        isActive: true,
+      })
+
+      setCurrentChatSessionId(newSession.id)
+      setMessages([])
+      setInput('')
+
+      toast({ title: 'New Chat', description: 'Started a new conversation' })
+    } catch (error) {
+      console.error('[ChatPanelV2] Error creating new session:', error)
+      toast({ title: 'Error', description: 'Failed to create new chat', variant: 'destructive' })
+    }
+  }
+
+  // Export chat as markdown
+  const exportChatAsMarkdown = () => {
+    if (messages.length === 0) {
+      toast({ title: 'Nothing to export', description: 'No messages in this chat' })
+      return
+    }
+
+    const markdown = messages.map(msg => {
+      const role = msg.role === 'user' ? '**You:**' : '**Assistant:**'
+      return `${role}\n\n${msg.content}\n\n---\n`
+    }).join('\n')
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-export-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast({ title: 'Exported', description: 'Chat exported as markdown file' })
+  }
+
+  // Regenerate last response
+  const regenerateLastResponse = async () => {
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')
+    if (!lastUserMessage) {
+      toast({ title: 'Nothing to regenerate', description: 'No user message found' })
+      return
+    }
+
+    // Remove the last assistant message if exists
+    const lastAssistantIndex = messages.map(m => m.role).lastIndexOf('assistant')
+    if (lastAssistantIndex > -1) {
+      setMessages(prev => prev.slice(0, lastAssistantIndex))
+    }
+
+    // Resend the last user message
+    setInput(lastUserMessage.content)
+    setTimeout(() => {
+      const form = document.querySelector('form') as HTMLFormElement
+      if (form) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      }
+    }, 50)
+  }
+
+  // Slash commands configuration - fully functional
   const slashCommandHandlers = getDefaultSlashCommands({
     onFix: () => {
-      setInput('/fix ')
-      textareaRef.current?.focus()
+      sendCommandAsMessage('Fix the last error or issue in the code. Check for any bugs, type errors, or problems and resolve them.')
     },
     onExplain: () => {
-      setInput('/explain ')
-      textareaRef.current?.focus()
+      sendCommandAsMessage('Explain the code or concept we were just discussing. Break it down in simple terms.')
     },
     onRefactor: () => {
-      setInput('/refactor ')
-      textareaRef.current?.focus()
+      sendCommandAsMessage('Refactor the current code with best practices. Improve code quality, readability, and maintainability.')
     },
     onTest: () => {
-      setInput('/test ')
+      sendCommandAsMessage('Generate comprehensive tests for the current file or component. Include unit tests and edge cases.')
+    },
+    onOptimize: () => {
+      sendCommandAsMessage('Optimize the code for better performance. Identify bottlenecks and suggest improvements.')
+    },
+    onSearch: () => {
+      setInput('Search the codebase for: ')
       textareaRef.current?.focus()
+      // Position cursor after the text
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.value.length
+          textareaRef.current.selectionEnd = textareaRef.current.value.length
+        }
+      }, 10)
+    },
+    onDeploy: () => {
+      if (project?.id) {
+        window.location.href = `/workspace/deployment?project=${project.id}`
+      } else {
+        toast({ title: 'No project', description: 'Select a project first' })
+      }
     },
     onRollback: () => {
-      // Trigger rollback to last checkpoint
       const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop()
       if (lastAssistantMessage) {
         handleRevertToCheckpoint(lastAssistantMessage.id)
+      } else {
+        toast({ title: 'Nothing to rollback', description: 'No assistant messages found' })
+      }
+    },
+    onBranch: () => {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage) {
+        handleCreateBranch(lastMessage.id, `Branch ${new Date().toLocaleTimeString()}`, 'Created from slash command')
+      } else {
+        toast({ title: 'No messages', description: 'Add some messages first to branch' })
       }
     },
     onNewChat: () => {
-      // Clear messages and start fresh
-      setMessages([])
-      setInput('')
-      toast({ title: 'New Chat', description: 'Started a new conversation' })
+      createNewChatSession()
     },
-    onClearChat: () => {
-      setMessages([])
-      setInput('')
-      toast({ title: 'Chat Cleared', description: 'All messages have been cleared' })
+    onClearChat: async () => {
+      if (!project?.id || !project?.userId || !currentChatSessionId) {
+        setMessages([])
+        setInput('')
+        toast({ title: 'Chat Cleared', description: 'Messages cleared' })
+        return
+      }
+
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+
+        // Delete all messages in current session
+        const sessionMessages = await storageManager.getMessages(currentChatSessionId)
+        for (const msg of sessionMessages) {
+          await storageManager.deleteMessage(currentChatSessionId, msg.id)
+        }
+
+        setMessages([])
+        setInput('')
+        toast({ title: 'Chat Cleared', description: 'All messages deleted' })
+      } catch (error) {
+        console.error('[ChatPanelV2] Error clearing chat:', error)
+        setMessages([])
+        setInput('')
+        toast({ title: 'Chat Cleared', description: 'Messages cleared locally' })
+      }
+    },
+    onExportChat: () => {
+      exportChatAsMarkdown()
+    },
+    onImportContext: () => {
+      setInput('I want to add this context to our conversation: ')
+      textareaRef.current?.focus()
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.value.length
+          textareaRef.current.selectionEnd = textareaRef.current.value.length
+        }
+      }, 10)
+    },
+    onRegenerate: () => {
+      regenerateLastResponse()
     },
     onMemory: () => {
-      toast({ title: 'Memory', description: 'Memory panel is visible in the chat sidebar' })
+      toast({
+        title: 'AI Memory',
+        description: `This chat has ${messages.length} messages. Session ID: ${currentChatSessionId?.slice(0, 8) || 'none'}...`
+      })
+    },
+    onSettings: () => {
+      window.open('/workspace/management', '_blank')
     },
     onHelp: () => {
       toast({
-        title: 'Available Commands',
-        description: '/fix, /explain, /refactor, /test, /rollback, /new, /clear, /memory, /help'
+        title: 'Slash Commands',
+        description: 'Type / to see all available commands. Use ↑↓ to navigate, Enter to select.'
       })
     },
   })
@@ -2936,50 +3100,85 @@ export function ChatPanelV2({
     setShowVoicePanel(false)
   }
 
-  // Handle conversation branching
+  // Handle conversation branching - creates a new chat session with messages up to the branch point
   const handleCreateBranch = async (messageId: string, name: string, description?: string) => {
-    const newBranch: ConversationBranch = {
-      id: `branch-${Date.now()}`,
-      name,
-      description,
-      parentMessageId: messageId,
-      createdAt: new Date().toISOString(),
-      messageCount: messages.length,
-      isActive: true,
-      tags: []
+    if (!project?.id || !project?.userId) {
+      toast({ title: 'Error', description: 'Project not loaded', variant: 'destructive' })
+      return
     }
 
-    // Deactivate other branches
-    setConversationBranches(prev => [
-      ...prev.map(b => ({ ...b, isActive: false })),
-      newBranch
-    ])
-    setCurrentBranchId(newBranch.id)
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
 
-    toast({ title: 'Branch Created', description: `Created branch "${name}"` })
+      // Find the index of the message to branch from
+      const messageIndex = messages.findIndex(m => m.id === messageId)
+      if (messageIndex === -1) {
+        toast({ title: 'Error', description: 'Message not found', variant: 'destructive' })
+        return
+      }
+
+      // Get messages up to and including the branch point
+      const messagesToCopy = messages.slice(0, messageIndex + 1)
+
+      // Deactivate current session
+      if (currentChatSessionId) {
+        await storageManager.updateChatSession(currentChatSessionId, { isActive: false })
+      }
+
+      // Create new chat session
+      const newSession = await storageManager.createChatSession({
+        workspaceId: project.id,
+        userId: project.userId,
+        title: name || `Branch from message`,
+        isActive: true,
+      })
+
+      // Copy messages to the new session
+      for (const msg of messagesToCopy) {
+        await storageManager.createMessage({
+          chatSessionId: newSession.id,
+          role: msg.role,
+          content: msg.content,
+          metadata: msg.metadata || {},
+          tokensUsed: msg.metadata?.tokensUsed || 0,
+        })
+      }
+
+      // Update session message count
+      await storageManager.updateChatSession(newSession.id, {
+        messageCount: messagesToCopy.length,
+        lastMessageAt: new Date().toISOString(),
+      })
+
+      // Update local state
+      setCurrentChatSessionId(newSession.id)
+      setMessages(messagesToCopy)
+
+      toast({
+        title: 'Branch Created',
+        description: `Created "${name}" with ${messagesToCopy.length} messages`
+      })
+
+    } catch (error) {
+      console.error('[ChatPanelV2] Error creating branch:', error)
+      toast({ title: 'Error', description: 'Failed to create branch', variant: 'destructive' })
+    }
   }
 
+  // These are now handled by the chat session selector
   const handleSwitchBranch = (branchId: string) => {
-    setConversationBranches(prev => prev.map(b => ({
-      ...b,
-      isActive: b.id === branchId
-    })))
-    setCurrentBranchId(branchId)
-    toast({ title: 'Branch Switched', description: 'Switched to selected branch' })
+    // Handled by ChatSessionSelector in workspace-layout
+    toast({ title: 'Info', description: 'Use the chat session dropdown to switch' })
   }
 
   const handleDeleteBranch = (branchId: string) => {
-    setConversationBranches(prev => prev.filter(b => b.id !== branchId))
-    if (currentBranchId === branchId) {
-      setCurrentBranchId(null)
-    }
-    toast({ title: 'Branch Deleted', description: 'Branch has been removed' })
+    // Handled by ChatSessionSelector in workspace-layout
+    toast({ title: 'Info', description: 'Use the chat session dropdown to delete' })
   }
 
   const handleRenameBranch = (branchId: string, newName: string) => {
-    setConversationBranches(prev => prev.map(b =>
-      b.id === branchId ? { ...b, name: newName } : b
-    ))
+    // Handled by ChatSessionSelector in workspace-layout
   }
 
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
