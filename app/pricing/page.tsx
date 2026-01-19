@@ -271,16 +271,53 @@ export default function PricingPage() {
                 <Heart className="w-3 h-3 text-white fill-current" />
               </div>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              Professional AI Development Made Simple
+            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 animate-fade-in">
+              Ship Faster. Build Smarter. Scale Further.
             </h1>
-            <p className="text-xl text-white/80 max-w-3xl mx-auto">
-              Transform ideas into production apps with AI. From concept to deployment in minutes.
+            <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
+              Join thousands of developers building production-ready apps with AI. 
+              <span className="block mt-2 text-purple-300 font-semibold">From prototype to deployment in minutes, not months.</span>
             </p>
+            
+            {/* Social Proof */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                <span className="font-medium">4.9/5 rating</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-400" />
+                <span className="font-medium">10,000+ developers</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-green-400" />
+                <span className="font-medium">50,000+ apps deployed</span>
+              </div>
+            </div>
             
             {/* Currency Indicator */}
             <div className="mt-4 flex items-center justify-center gap-2 text-sm text-white/60">
               <span>💵 Prices in CAD • 1 USD = ${exchangeRate.toFixed(2)} CAD</span>
+            </div>
+          </div>
+
+          {/* Value Proposition Banner */}
+          <div className="mb-12 max-w-4xl mx-auto">
+            <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-2xl p-6 backdrop-blur-sm transform transition-all duration-300 hover:scale-105">
+              <div className="grid md:grid-cols-3 gap-6 text-center">
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold text-white">10x</div>
+                  <div className="text-sm text-white/80">Faster Development</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold text-white">90%</div>
+                  <div className="text-sm text-white/80">Less Code to Write</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold text-white">$0</div>
+                  <div className="text-sm text-white/80">Setup Costs</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -296,7 +333,7 @@ export default function PricingPage() {
               <span className={`text-sm ${isAnnual ? 'text-white' : 'text-gray-400'}`}>Annual</span>
               {isAnnual && (
                 <Badge className="bg-green-600 text-white text-xs">
-                  Save 20%
+                  Save Big!
                 </Badge>
               )}
             </div>
@@ -305,11 +342,11 @@ export default function PricingPage() {
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
             {pricingTiers.map((tier, index) => (
-              <Card key={index} className={`bg-gray-800/50 border-gray-700/50 backdrop-blur-sm relative ${tier.isPopular ? 'ring-2 ring-purple-500' : ''}`}>
+              <Card key={index} className={`bg-gradient-to-br from-gray-800/60 to-gray-900/60 border-gray-700/50 backdrop-blur-sm relative transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20 ${tier.isPopular ? 'ring-2 ring-purple-500 shadow-lg shadow-purple-500/30 scale-105' : 'hover:border-purple-500/50'} animate-slide-up`} style={{animationDelay: `${index * 100}ms`}}>
                 {tier.isPopular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-purple-600 text-white px-3 py-1">
-                      Popular
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
+                    <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-1.5 shadow-lg animate-pulse">
+                      ⭐ Most Popular
                     </Badge>
                   </div>
                 )}
@@ -322,12 +359,12 @@ export default function PricingPage() {
                 <CardContent className="space-y-6">
                   <div>
                     <div className="flex items-baseline space-x-2">
-                      <span className="text-3xl font-bold text-white">{tier.price}</span>
+                      <span className="text-4xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">{tier.price}</span>
                       {tier.priceAmount && (
-                        <span className="text-3xl font-bold text-white">{tier.priceAmount}</span>
+                        <span className="text-4xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">{tier.priceAmount}</span>
                       )}
                       {tier.period && (
-                        <span className="text-gray-400">{tier.period}</span>
+                        <span className="text-gray-400 text-sm">{tier.period}</span>
                       )}
                     </div>
 
@@ -343,8 +380,8 @@ export default function PricingPage() {
 
                     {/* Show savings badge when on yearly */}
                     {tier.savings && isAnnual && (
-                      <div className="mt-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white">
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg animate-bounce-slow">
                           {tier.savings}
                         </span>
                       </div>
@@ -356,7 +393,7 @@ export default function PricingPage() {
                   </div>
 
                   <Button 
-                    className={`w-full ${tier.buttonVariant === 'default' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                    className={`w-full font-semibold transition-all duration-300 ${tier.buttonVariant === 'default' ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-purple-500/50 transform hover:-translate-y-0.5' : 'border-2 border-gray-600 hover:border-purple-500 hover:bg-purple-500/10'} ${tier.isPopular ? 'ring-2 ring-purple-400 ring-offset-2 ring-offset-gray-900' : ''}`}
                     disabled={
                       loadingPlan === tier.planType ||
                       tier.buttonText === "Current Plan"

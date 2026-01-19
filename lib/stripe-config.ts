@@ -113,13 +113,13 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     },
     prices: {
       monthly: {
-        amount: 15,
+        amount: 22,
         stripePriceId: 'price_1Sr6F03G7U0M1bp10fMgtCRD'
       },
       yearly: {
-        amount: 144,
+        amount: 220,
         stripePriceId: 'price_1Sr6Ha3G7U0M1bp1mUSdYWHL',
-        savings: '20%'
+        savings: '🎁 Get 2 months FREE'
       }
     }
   },
@@ -154,13 +154,13 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     },
     prices: {
       monthly: {
-        amount: 25,
+        amount: 70,
         stripePriceId: 'price_1Sr6Nh3G7U0M1bp1cYUiaelN'
       },
       yearly: {
-        amount: 240,
+        amount: 672,
         stripePriceId: 'price_1Sr6P63G7U0M1bp1fNtth5X2',
-        savings: '20%'
+        savings: '🔥 Save 20% annually'
       }
     }
   },
@@ -197,13 +197,13 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     },
     prices: {
       monthly: {
-        amount: 60,
+        amount: 27.50,
         stripePriceId: 'price_1Sr6Rm3G7U0M1bp1JhQvRGUG'
       },
       yearly: {
-        amount: 576,
+        amount: 275,
         stripePriceId: 'price_1Sr6T83G7U0M1bp1gr0WUIap',
-        savings: '20%'
+        savings: '🎁 Get 2 months FREE'
       }
     }
   }
