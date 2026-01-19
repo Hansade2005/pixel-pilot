@@ -1053,6 +1053,7 @@ export function ChatPanelV2({
   const [currentBranchId, setCurrentBranchId] = useState<string | null>(null)
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([])
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [currentChatSessionId, setCurrentChatSessionId] = useState<string | null>(null)
 
   // Load database ID from workspace if not provided
   // Try multiple methods for maximum accuracy
