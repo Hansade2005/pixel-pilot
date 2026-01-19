@@ -53,7 +53,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       'Visual editing with Design Mode',
       'GitHub sync',
       '1 app/project',
-      'Max 5 multi-step operations per request',
+      'Up to 50 multi-step operations per request',
       'Public/open-source unlimited'
     ],
     limits: {
@@ -90,7 +90,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       '1,500 monthly credits (~$5 API cost, ~150 messages)',
       'Token-based billing - only pay for actual usage',
       'Access to all premium AI models (Claude, GPT, Gemini)',
-      'Up to 15 multi-step tool operations per request',
+      'Up to 50 multi-step tool operations per request',
       '5x higher attachment size limits',
       'Import from Figma',
       'Custom domains',
@@ -131,7 +131,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       'All Creator features',
       '2,500 monthly credits (~$8 API cost, ~250 messages)',
       'Shared credit pool across unlimited users',
-      'Up to 20 multi-step tool operations per request',
+      'Up to 50 multi-step tool operations per request',
       'Centralized billing on Vercel',
       'Share chats and collaborate in real-time',
       'User roles & permissions',
@@ -171,7 +171,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Collaborate features',
       '6,000 monthly credits (~$20 API cost, ~600 messages)',
-      'Up to 25 multi-step tool operations per request',
+      'Up to 50 multi-step tool operations per request',
       'Priority AI model access',
       'Internal publish',
       'SSO integration',

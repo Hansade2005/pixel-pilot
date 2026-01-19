@@ -35,12 +35,8 @@ export const MAX_CREDITS_PER_REQUEST = {
   scale: 500       // Allows very high complexity
 }
 
-export const MAX_STEPS_PER_REQUEST = {
-  free: 5,         // Very limited multi-step tool calls
-  creator: 15,     // Moderate multi-step
-  collaborate: 20, // High multi-step
-  scale: 25        // Very high multi-step
-}
+// Universal step limit for all plans to prevent infinite loops while allowing complex operations
+export const MAX_STEPS_PER_REQUEST = 50
 
 export interface WalletBalance {
   userId: string
@@ -388,7 +384,7 @@ export async function checkRequestLimits(
   }
   
   const maxCredits = MAX_CREDITS_PER_REQUEST[wallet.currentPlan] || MAX_CREDITS_PER_REQUEST.free
-  const maxSteps = MAX_STEPS_PER_REQUEST[wallet.currentPlan] || MAX_STEPS_PER_REQUEST.free
+  const maxSteps = MAX_STEPS_PER_REQUEST
   
   if (estimatedCredits > maxCredits) {
     return { 

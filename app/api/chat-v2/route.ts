@@ -10276,10 +10276,9 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       }
     } as any : undefined;
 
-    // Apply plan-based step limits for cost control
-    const currentPlan = authContext.currentPlan as 'free' | 'creator' | 'collaborate' | 'scale'
-    const maxStepsAllowed = MAX_STEPS_PER_REQUEST[currentPlan] || MAX_STEPS_PER_REQUEST.free
-    console.log(`[Chat-V2] Max steps allowed for ${authContext.currentPlan} plan: ${maxStepsAllowed}`)
+    // Apply universal step limit to prevent infinite loops
+    const maxStepsAllowed = MAX_STEPS_PER_REQUEST
+    console.log(`[Chat-V2] Max steps allowed: ${maxStepsAllowed}`)
 
     const result = await streamText({
       model,
