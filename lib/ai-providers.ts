@@ -286,6 +286,16 @@ const modelProviders: Record<string, any> = {
   'mistral/devstral-small-2': vercelGateway('mistral/devstral-small-2'),
   'alibaba/qwen3-coder-plus': vercelGateway('alibaba/qwen3-coder-plus'),
   'meituan/longcat-flash-chat': vercelGateway('meituan/longcat-flash-chat'),
+  
+  // New Vercel AI Gateway Models
+  'google/gemini-2.5-flash': vercelGateway('google/gemini-2.5-flash'),
+  'google/gemini-2.5-pro': vercelGateway('google/gemini-2.5-pro'),
+  'xai/glm-4.7': vercelGateway('xai/glm-4.7'),
+  'minimax/minimax-m2.1': vercelGateway('minimax/minimax-m2.1'),
+  'alibaba/qwen3-max': vercelGateway('alibaba/qwen3-max'),
+  'openai/gpt-5.1-thinking': vercelGateway('openai/gpt-5.1-thinking'),
+  'openai/gpt-5.2-codex': vercelGateway('openai/gpt-5.2-codex'),
+  'openai/o3': vercelGateway('openai/o3'),
 
   // Anthropic Models via Anthropic Provider (not OpenAI compatible)
   'anthropic/claude-haiku-4.5': anthropicProvider('anthropic/claude-haiku-4.5'),
