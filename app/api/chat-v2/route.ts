@@ -11,7 +11,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, checkRequestLimits, MAX_STEPS_PER_REQUEST } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -2549,7 +2549,7 @@ export async function POST(req: Request) {
 
     authContext = authResult.context
     console.log(
-      `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits (${Math.floor(authContext.creditsBalance / CREDITS_PER_MESSAGE)} messages remaining)`
+      `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits`
     )
 
     // Initialize in-memory project storage for this session
@@ -10276,12 +10276,17 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       }
     } as any : undefined;
 
+    // Apply plan-based step limits for cost control
+    const currentPlan = authContext.currentPlan as 'free' | 'creator' | 'collaborate' | 'scale'
+    const maxStepsAllowed = MAX_STEPS_PER_REQUEST[currentPlan] || MAX_STEPS_PER_REQUEST.free
+    console.log(`[Chat-V2] Max steps allowed for ${authContext.currentPlan} plan: ${maxStepsAllowed}`)
+
     const result = await streamText({
       model,
       temperature: 0.7,
       messages: messagesWithSystem, // Use messages with system prompt and cache control
       tools: toolsToUse,
-      stopWhen: stepCountIs(60),
+      stopWhen: stepCountIs(maxStepsAllowed), // Stop when max steps reached
       ...(isAnthropicModel && anthropicProviderOptions ? { providerOptions: anthropicProviderOptions } : {}),
       onFinish: ({ response }: any) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
@@ -10424,32 +10429,50 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
             }
           } finally {
             // ============================================================================
-            // ABE BILLING - Deduct credits after successful response
+            // ABE BILLING - Token-based credit deduction with AI SDK usage
             // ============================================================================
-            console.log('[Chat-V2] 🔍 FINALLY BLOCK: Starting billing process...')
-            console.log('[Chat-V2] 🔍 FINALLY BLOCK: authContext exists:', !!authContext)
-            console.log('[Chat-V2] 🔍 FINALLY BLOCK: authContext.userId:', authContext?.userId)
+            console.log('[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...')
             
             const responseTime = Date.now() - startTime
             
-            // Process billing (deduct credits)
-            const billingResult = await processRequestBilling({
-              userId: authContext.userId,
-              model: modelId || DEFAULT_CHAT_MODEL,
-              requestType: 'chat',
-              endpoint: '/api/chat-v2',
-              responseTimeMs: responseTime,
-              status: 'success'
-            })
-            
-            console.log('[Chat-V2] 🔍 FINALLY BLOCK: billingResult:', billingResult)
-            
-            if (billingResult.success) {
-              console.log(
-                `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits. New balance: ${billingResult.newBalance} credits (${Math.floor((billingResult.newBalance || 0) / CREDITS_PER_MESSAGE)} messages remaining)`
+            try {
+              // Get total token usage from AI SDK (all steps combined)
+              const totalUsage = await result.usage
+              const stepsCount = (await result.steps).length
+              
+              console.log(`[Chat-V2] 📊 Token Usage: ${totalUsage.inputTokens || 0} input + ${totalUsage.outputTokens || 0} output (${stepsCount} steps)`)
+              
+              // Create server-side Supabase client for billing
+              const supabase = await createClient()
+              
+              // Deduct credits based on actual token usage
+              const billingResult = await deductCreditsFromUsage(
+                authContext.userId,
+                {
+                  promptTokens: totalUsage.inputTokens || 0,
+                  completionTokens: totalUsage.outputTokens || 0
+                },
+                {
+                  model: modelId || DEFAULT_CHAT_MODEL,
+                  requestType: 'chat',
+                  endpoint: '/api/chat-v2',
+                  steps: stepsCount,
+                  responseTimeMs: responseTime,
+                  status: 'success'
+                },
+                supabase
               )
-            } else {
-              console.error(`[Chat-V2] ⚠️ Failed to deduct credits:`, billingResult.error)
+              
+              if (billingResult.success) {
+                console.log(
+                  `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits (${(totalUsage.inputTokens || 0) + (totalUsage.outputTokens || 0)} tokens). New balance: ${billingResult.newBalance} credits`
+                )
+              } else {
+                console.error(`[Chat-V2] ⚠️ Failed to deduct credits:`, billingResult.error)
+              }
+            } catch (usageError) {
+              console.error('[Chat-V2] ⚠️ Error processing token-based billing:', usageError)
+              // Fallback: still close the stream
             }
             
             controller.close()

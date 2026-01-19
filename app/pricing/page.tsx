@@ -14,6 +14,7 @@ import { PRODUCT_CONFIGS, getPrice, getSavings, getExchangeRateForDisplay } from
 import { convertUsdToCad, formatPrice } from "@/lib/currency-converter"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { PaymentProviderSelector } from "@/components/pricing/payment-provider-selector"
+import { CreditTopUpSelector } from "@/components/billing/credit-topup-selector"
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
@@ -26,6 +27,8 @@ export default function PricingPage() {
   const [exchangeRate, setExchangeRate] = useState<number>(1.35)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<"creator" | "collaborate" | "scale" | null>(null)
+  const [showCreditDialog, setShowCreditDialog] = useState(false)
+  const [selectedCredits, setSelectedCredits] = useState<number>(0)
 
   const supabase = createClient()
 
@@ -164,32 +167,9 @@ export default function PricingPage() {
       return
     }
 
-    setLoadingPlan('credits')
-
-    try {
-      const response = await fetch('/api/stripe/purchase-credits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          credits,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create credit purchase session')
-      }
-
-      const { url } = await response.json()
-      window.location.href = url
-    } catch (error) {
-      console.error('Error creating credit purchase session:', error)
-      alert('Failed to start credit purchase. Please try again.')
-    } finally {
-      setLoadingPlan(null)
-    }
+    // Show credit purchase dialog with payment provider options
+    setSelectedCredits(credits)
+    setShowCreditDialog(true)
   }
 
   const faqData = [
@@ -199,7 +179,7 @@ export default function PricingPage() {
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes 20 credits (80 messages), basic AI models, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot and building small projects."
+      answer: "The free plan includes 200 credits (~20 messages), access to Mistral Devstral 2, Google Gemini 2.5 Flash, and Claude Sonnet 4.5, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot and building small projects."
     },
     {
       question: "What deployment platforms are available?",
@@ -211,11 +191,11 @@ export default function PricingPage() {
     },
     {
       question: "What are the credit and message limits?",
-      answer: "Free users get 20 credits (80 messages). Creator: 50 credits (200 messages). Collaborate: 75 credits (300 messages, shared). Scale: 150 credits (600 messages, shared). Paid users can purchase extra credits."
+      answer: "Free: 200 credits (~20 messages). Creator: 1,500 credits (~150 messages). Collaborate: 2,500 credits (~250 messages). Scale: 6,000 credits (~600 messages). Paid users can purchase extra credits."
     },
     {
       question: "What does 'credits' mean?",
-      answer: "Credits are used for AI requests. Each message costs 0.25 credits. Free users cannot buy extra credits and must upgrade when exhausted."
+      answer: "Credits are used for AI requests based on actual token usage (1 credit = $0.01). Costs vary by message complexity and model used (~10 credits average per message). Free users cannot buy extra credits and must upgrade when exhausted."
     },
     {
       question: "Who owns the projects and code?",
@@ -223,7 +203,7 @@ export default function PricingPage() {
     },
     {
       question: "How much does it cost to use?",
-      answer: "PiPilot offers a free tier with 80 messages. Creator is $15/month (200 messages), Collaborate $25/month (300 messages shared), Scale $60/month (600 messages shared). Annual plans save 20%."
+      answer: "PiPilot offers a free tier with 200 credits (~20 messages). Creator is $15/month (1,500 credits), Collaborate $25/month (2,500 credits), Scale $60/month (6,000 credits). Annual plans save 20%. Costs vary by message complexity."
     },
     {
       question: "Can I upgrade or downgrade my plan?",
@@ -420,18 +400,22 @@ export default function PricingPage() {
                 <div className="mt-4 p-4 bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50 inline-block">
                   <p className="text-white">
                     Current Balance: <span className="font-bold text-purple-400">{creditBalance} credits</span>
-                    <span className="text-gray-400 ml-2">({Math.floor(creditBalance / 0.25)} messages remaining)</span>
+                    <span className="text-gray-400 ml-2">(~{Math.floor(creditBalance / 10)} messages remaining)</span>
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                {[10, 25, 50].map((credits) => (
+                {[
+                  { credits: 1000, price: 10, messages: 100 },
+                  { credits: 2500, price: 25, messages: 250 },
+                  { credits: 5000, price: 50, messages: 500 }
+                ].map(({ credits, price, messages }) => (
                   <Card key={credits} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
                     <CardHeader className="text-center pb-4">
-                      <CardTitle className="text-white text-2xl">{credits} Credits</CardTitle>
+                      <CardTitle className="text-white text-2xl">{credits.toLocaleString()} Credits</CardTitle>
                       <CardDescription className="text-gray-300">
-                        ${credits} • {credits * 4} messages
+                        ${price} • ~{messages} messages
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="text-center">
@@ -501,6 +485,19 @@ export default function PricingPage() {
               />
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credit Purchase Dialog */}
+      <Dialog open={showCreditDialog} onOpenChange={setShowCreditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Purchase Credits</DialogTitle>
+          </DialogHeader>
+          <CreditTopUpSelector 
+            credits={selectedCredits} 
+            onClose={() => setShowCreditDialog(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

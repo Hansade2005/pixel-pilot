@@ -47,15 +47,18 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     description: 'Community Tier',
     features: [
       'Basic AI chat & code generation',
+      '200 monthly credits (~20 AI messages with multi-step tools)',
+      'Token-based billing (pay for what you use)',
       'Deploy to Vercel',
       'Visual editing with Design Mode',
       'GitHub sync',
       '1 app/project',
+      'Max 5 multi-step operations per request',
       'Public/open-source unlimited'
     ],
     limits: {
-      credits: 20,
-      messages: 80,
+      credits: 200,
+      messages: 9999, // No hard message limit, only credit-based
       deploymentPlatforms: ['vercel'],
       deploymentsPerMonth: 5,
       githubPushesPerMonth: 2,
@@ -63,7 +66,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       canUseNetlify: false,
       canUseGitHub: true,
       unlimitedPrompts: false,
-      allowedModels: ['auto', 'a0-dev-llm', 'grok-3-mini'],
+      allowedModels: ['mistral/devstral-2', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5'],
       canPurchaseCredits: false
     },
     prices: {
@@ -84,17 +87,20 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     description: 'Individual Tier',
     features: [
       'All Free features',
-      '$50 of included monthly credits',
+      '1,500 monthly credits (~$5 API cost, ~150 messages)',
+      'Token-based billing - only pay for actual usage',
+      'Access to all premium AI models (Claude, GPT, Gemini)',
+      'Up to 15 multi-step tool operations per request',
       '5x higher attachment size limits',
       'Import from Figma',
       'Custom domains',
       'Remove PiPilot badge',
       '10% revenue share on monetized apps',
-      'Unlimited credit purchases'
+      'Purchase extra credits anytime ($0.01/credit)'
     ],
     limits: {
-      credits: 50,
-      messages: 200,
+      credits: 1500,
+      messages: 9999,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 10,
       canUseVercel: true,
@@ -108,11 +114,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     prices: {
       monthly: {
         amount: 15,
-        stripePriceId: 'price_1SZ98W3G7U0M1bp1u30VJE2V'
+        stripePriceId: 'price_1Sr6F03G7U0M1bp10fMgtCRD'
       },
       yearly: {
         amount: 144,
-        stripePriceId: 'price_1SZTlN3G7U0M1bp1Us7dGSSg',
+        stripePriceId: 'price_1Sr6Ha3G7U0M1bp1mUSdYWHL',
         savings: '20%'
       }
     }
@@ -123,16 +129,18 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     description: 'Team Tier',
     features: [
       'All Creator features',
-      'Shared across unlimited users',
+      '2,500 monthly credits (~$8 API cost, ~250 messages)',
+      'Shared credit pool across unlimited users',
+      'Up to 20 multi-step tool operations per request',
       'Centralized billing on Vercel',
-      'Share chats and collaborate',
+      'Share chats and collaborate in real-time',
       'User roles & permissions',
-      '15% revenue share',
-      'Unlimited credit purchases (shared pool)'
+      '15% revenue share on apps',
+      'Purchase extra credits (shared pool)'
     ],
     limits: {
-      credits: 75,
-      messages: 300,
+      credits: 2500,
+      messages: 9999,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 20,
       canUseVercel: true,
@@ -147,11 +155,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     prices: {
       monthly: {
         amount: 25,
-        stripePriceId: 'price_1SZ98n3G7U0M1bp1DipaxRvq'
+        stripePriceId: 'price_1Sr6Nh3G7U0M1bp1cYUiaelN'
       },
       yearly: {
         amount: 240,
-        stripePriceId: 'price_1SZTmV3G7U0M1bp1GrNHBxUg',
+        stripePriceId: 'price_1Sr6P63G7U0M1bp1fNtth5X2',
         savings: '20%'
       }
     }
@@ -162,17 +170,20 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     description: 'Enterprise Tier',
     features: [
       'All Collaborate features',
+      '6,000 monthly credits (~$20 API cost, ~600 messages)',
+      'Up to 25 multi-step tool operations per request',
+      'Priority AI model access',
       'Internal publish',
-      'SSO',
-      'Personal projects',
+      'SSO integration',
+      'Personal projects workspace',
       'Opt out of data training',
-      'Design templates',
-      '20% revenue share',
-      'Unlimited credit purchases (shared pool)'
+      'Premium design templates',
+      '20% revenue share on apps',
+      'Purchase extra credits (shared pool)'
     ],
     limits: {
-      credits: 150,
-      messages: 600,
+      credits: 6000,
+      messages: 9999,
       deploymentPlatforms: ['vercel', 'netlify'],
       deploymentsPerMonth: 50,
       canUseVercel: true,
@@ -187,11 +198,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     prices: {
       monthly: {
         amount: 60,
-        stripePriceId: 'price_1SZ98v3G7U0M1bp1YAD89Tx4'
+        stripePriceId: 'price_1Sr6Rm3G7U0M1bp1JhQvRGUG'
       },
       yearly: {
         amount: 576,
-        stripePriceId: 'price_1SZToP3G7U0M1bp1v0AWlXZ6',
+        stripePriceId: 'price_1Sr6T83G7U0M1bp1gr0WUIap',
         savings: '20%'
       }
     }

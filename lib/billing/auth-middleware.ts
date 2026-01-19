@@ -6,7 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
-import { getWalletBalance, deductCredits, CREDITS_PER_MESSAGE } from './credit-manager'
+import { getWalletBalance, deductCredits, calculateCreditsFromTokens } from './credit-manager'
 
 export interface UserAuthContext {
   userId: string
@@ -64,8 +64,8 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
       }
     }
 
-    // Check if user has enough credits
-    if (wallet.creditsBalance < CREDITS_PER_MESSAGE) {
+    // Check if user has enough credits (minimum 1 credit required)
+    if (wallet.creditsBalance < 1) {
       const message =
         wallet.currentPlan === 'free'
           ? 'Insufficient credits. Please upgrade to a paid plan to continue.'
@@ -106,6 +106,8 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
 
 /**
  * Process request billing (deduct credits and log usage)
+ * DEPRECATED: Use deductCreditsFromUsage directly for token-based billing
+ * This is kept for backward compatibility
  */
 export async function processRequestBilling(params: {
   userId: string
@@ -114,6 +116,8 @@ export async function processRequestBilling(params: {
   endpoint?: string
   responseTimeMs?: number
   tokensUsed?: number
+  promptTokens?: number
+  completionTokens?: number
   status?: 'success' | 'error' | 'timeout'
   errorMessage?: string
 }): Promise<{
@@ -129,6 +133,8 @@ export async function processRequestBilling(params: {
     endpoint = '/api/chat-v2',
     responseTimeMs,
     tokensUsed,
+    promptTokens,
+    completionTokens,
     status = 'success',
     errorMessage
   } = params
@@ -138,15 +144,30 @@ export async function processRequestBilling(params: {
 
     // Only deduct credits for successful requests
     if (status === 'success') {
+      // Calculate credits based on token usage if available
+      let creditsToDeduct = 1 // Minimum fallback
+      
+      if (promptTokens !== undefined && completionTokens !== undefined) {
+        // Use token-based calculation
+        creditsToDeduct = calculateCreditsFromTokens(promptTokens, completionTokens, model)
+      } else if (tokensUsed) {
+        // Estimate from total tokens (assume 50/50 split)
+        const estimatedPrompt = Math.floor(tokensUsed / 2)
+        const estimatedCompletion = tokensUsed - estimatedPrompt
+        creditsToDeduct = calculateCreditsFromTokens(estimatedPrompt, estimatedCompletion, model)
+      }
+      
       const result = await deductCredits(
         userId,
-        CREDITS_PER_MESSAGE,
+        creditsToDeduct,
         {
           model,
           requestType,
           endpoint,
           responseTimeMs,
           tokensUsed,
+          promptTokens,
+          completionTokens,
           status,
           errorMessage
         },
@@ -213,7 +234,7 @@ export async function getUserCreditInfo(userId: string): Promise<{
       creditsUsedThisMonth: wallet.creditsUsedThisMonth,
       currentPlan: wallet.currentPlan,
       canPurchaseCredits: wallet.canPurchaseCredits,
-      estimatedRemainingMessages: Math.floor(wallet.creditsBalance / CREDITS_PER_MESSAGE)
+      estimatedRemainingMessages: Math.floor(wallet.creditsBalance / 10) // ~10 credits per message average
     }
   } catch (error) {
     console.error('[AuthMiddleware] Exception in getUserCreditInfo:', error)
@@ -239,7 +260,8 @@ export async function validateCredits(userId: string): Promise<{
       }
     }
 
-    if (wallet.creditsBalance < CREDITS_PER_MESSAGE) {
+    // Minimum 1 credit required (actual cost calculated after API call)
+    if (wallet.creditsBalance < 1) {
       const message =
         wallet.currentPlan === 'free'
           ? `Insufficient credits (${wallet.creditsBalance} remaining). Upgrade to a paid plan to purchase more.`

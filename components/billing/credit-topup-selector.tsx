@@ -21,9 +21,9 @@ export function CreditTopUpSelector({ credits, onClose }: CreditTopUpSelectorPro
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>("stripe")
   const [isProcessing, setIsProcessing] = useState(false)
 
-  // 1 credit = $1
+  // 1 credit = $0.01 USD
   const amount = credits
-  const priceUSD = credits
+  const priceUSD = credits * 0.01
 
   const handlePurchase = async () => {
     try {
@@ -76,7 +76,7 @@ export function CreditTopUpSelector({ credits, onClose }: CreditTopUpSelectorPro
       <CardHeader>
         <CardTitle>Purchase {credits} Credits</CardTitle>
         <CardDescription>
-          Choose your payment method (1 credit = $1)
+          Choose your payment method (1 credit = $0.01 USD)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -118,7 +118,7 @@ export function CreditTopUpSelector({ credits, onClose }: CreditTopUpSelectorPro
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Rate</span>
-            <span className="font-medium">$1 per credit</span>
+            <span className="font-medium">$0.01 per credit</span>
           </div>
           <div className="border-t pt-2 mt-2">
             <div className="flex justify-between font-semibold">

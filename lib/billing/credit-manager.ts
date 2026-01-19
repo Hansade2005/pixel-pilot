@@ -12,13 +12,35 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
-// Credit constants - MUST match values in lib/stripe-config.ts PRODUCT_CONFIGS
-export const CREDITS_PER_MESSAGE = 0.25
-export const CREDIT_TO_USD_RATE = 1 // 1 credit = $1
-export const FREE_PLAN_MONTHLY_CREDITS = 20
-export const CREATOR_PLAN_MONTHLY_CREDITS = 50 // $50 worth = 50 credits as per stripe-config
-export const COLLABORATE_PLAN_MONTHLY_CREDITS = 75
-export const SCALE_PLAN_MONTHLY_CREDITS = 150
+// Credit constants - Token-based pricing system
+// 1 credit = $0.01 (with 3x markup on API costs for profit margin)
+export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
+
+// Monthly credits per plan (adjusted for new token-based pricing)
+export const FREE_PLAN_MONTHLY_CREDITS = 200      // ~$0.66 API cost (~20 messages)
+export const CREATOR_PLAN_MONTHLY_CREDITS = 1500  // ~$5 API cost, you charge $15
+export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500  // ~$8 API cost, you charge $25
+export const SCALE_PLAN_MONTHLY_CREDITS = 6000    // ~$20 API cost, you charge $60
+
+// Claude Sonnet 4 API pricing (per token)
+const INPUT_COST_PER_TOKEN = 0.000003   // $3 per 1M input tokens
+const OUTPUT_COST_PER_TOKEN = 0.000015  // $15 per 1M output tokens
+const MARKUP_MULTIPLIER = 3  // 3x markup for profit margin
+
+// Request limits per plan (safety against expensive operations)
+export const MAX_CREDITS_PER_REQUEST = {
+  free: 50,        // Blocks very expensive operations
+  creator: 200,    // Allows moderate complexity
+  collaborate: 300, // Allows high complexity
+  scale: 500       // Allows very high complexity
+}
+
+export const MAX_STEPS_PER_REQUEST = {
+  free: 5,         // Very limited multi-step tool calls
+  creator: 15,     // Moderate multi-step
+  collaborate: 20, // High multi-step
+  scale: 25        // Very high multi-step
+}
 
 export interface WalletBalance {
   userId: string
@@ -45,10 +67,33 @@ export interface UsageLogEntry {
   requestType: string
   endpoint: string
   tokensUsed?: number
+  promptTokens?: number
+  completionTokens?: number
+  stepsCount?: number
   responseTimeMs?: number
   status: 'success' | 'error' | 'timeout'
   errorMessage?: string
   metadata?: Record<string, any>
+}
+
+/**
+ * Calculate credits from actual token usage (AI SDK integration)
+ * Returns credit cost based on real API usage with 3x markup
+ */
+export function calculateCreditsFromTokens(
+  promptTokens: number,
+  completionTokens: number,
+  model: string = 'claude-sonnet'
+): number {
+  // Calculate actual API cost in USD
+  const apiCost = (promptTokens * INPUT_COST_PER_TOKEN) + 
+                  (completionTokens * OUTPUT_COST_PER_TOKEN)
+  
+  // Convert to credits: API cost in dollars * 100 (to get cents) * 3x markup
+  const credits = Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
+  
+  // Minimum 1 credit per request to prevent free usage
+  return Math.max(1, credits)
 }
 
 /**
@@ -119,7 +164,7 @@ export async function getWalletBalance(
  */
 export async function hasEnoughCredits(
   userId: string,
-  creditsRequired: number = CREDITS_PER_MESSAGE,
+  creditsRequired: number,
   supabase: SupabaseClient
 ): Promise<boolean> {
   const wallet = await getWalletBalance(userId, supabase)
@@ -131,10 +176,11 @@ export async function hasEnoughCredits(
 
 /**
  * Deduct credits from user wallet
+ * @param creditsToDeduct - Number of credits to deduct (calculated from token usage)
  */
 export async function deductCredits(
   userId: string,
-  creditsToDeduct: number = CREDITS_PER_MESSAGE,
+  creditsToDeduct: number,
   metadata: Partial<UsageLogEntry> = {},
   supabase: SupabaseClient
 ): Promise<CreditDeductionResult> {
@@ -247,6 +293,9 @@ export async function logUsage(
         request_type: entry.requestType,
         endpoint: entry.endpoint,
         tokens_used: entry.tokensUsed,
+        prompt_tokens: entry.promptTokens,
+        completion_tokens: entry.completionTokens,
+        steps_count: entry.stepsCount,
         response_time_ms: entry.responseTimeMs,
         status: entry.status,
         error_message: entry.errorMessage,
@@ -263,6 +312,99 @@ export async function logUsage(
     console.error('[CreditManager] Exception in logUsage:', error)
     return false
   }
+}
+
+/**
+ * Deduct credits based on actual token usage from AI SDK
+ * Call this AFTER each AI request completes (generateText or streamText)
+ * 
+ * @example
+ * const result = await generateText({ model, messages, tools, maxSteps: 15 })
+ * await deductCreditsFromUsage(userId, result.usage, { model: 'claude-sonnet-4', requestType: 'chat', steps: result.steps.length }, supabase)
+ */
+export async function deductCreditsFromUsage(
+  userId: string,
+  usage: { promptTokens: number; completionTokens: number },
+  metadata: {
+    model: string
+    requestType: string
+    endpoint?: string
+    steps?: number  // Number of tool call steps from AI SDK
+    responseTimeMs?: number
+    status?: 'success' | 'error' | 'timeout'
+    errorMessage?: string
+  },
+  supabase: SupabaseClient
+): Promise<CreditDeductionResult> {
+  
+  // Calculate actual credits based on token usage with markup
+  const creditsToDeduct = calculateCreditsFromTokens(
+    usage.promptTokens,
+    usage.completionTokens,
+    metadata.model
+  )
+  
+  console.log(`[CreditManager] Calculated ${creditsToDeduct} credits from ${usage.promptTokens} input + ${usage.completionTokens} output tokens (${metadata.steps || 1} steps)`)
+  
+  // Use existing deductCredits function with enhanced metadata
+  return deductCredits(
+    userId,
+    creditsToDeduct,
+    {
+      model: metadata.model,
+      requestType: metadata.requestType,
+      endpoint: metadata.endpoint || '/api/chat-v2',
+      tokensUsed: usage.promptTokens + usage.completionTokens,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      stepsCount: metadata.steps || 1,
+      responseTimeMs: metadata.responseTimeMs,
+      status: metadata.status || 'success',
+      errorMessage: metadata.errorMessage,
+      metadata: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        steps: metadata.steps,
+        creditsCalculated: creditsToDeduct
+      }
+    },
+    supabase
+  )
+}
+
+/**
+ * Check if request is within plan limits (safety check before making AI call)
+ */
+export async function checkRequestLimits(
+  userId: string,
+  estimatedCredits: number,
+  requestedSteps: number,
+  supabase: SupabaseClient
+): Promise<{ allowed: boolean; reason?: string }> {
+  const wallet = await getWalletBalance(userId, supabase)
+  
+  if (!wallet) {
+    return { allowed: false, reason: 'Wallet not found' }
+  }
+  
+  const maxCredits = MAX_CREDITS_PER_REQUEST[wallet.currentPlan] || MAX_CREDITS_PER_REQUEST.free
+  const maxSteps = MAX_STEPS_PER_REQUEST[wallet.currentPlan] || MAX_STEPS_PER_REQUEST.free
+  
+  if (estimatedCredits > maxCredits) {
+    return { 
+      allowed: false, 
+      reason: `Request exceeds plan limit. Max ${maxCredits} credits per request for ${wallet.currentPlan} plan.` 
+    }
+  }
+  
+  if (requestedSteps > maxSteps) {
+    return { 
+      allowed: false, 
+      reason: `Too many steps requested. Max ${maxSteps} steps for ${wallet.currentPlan} plan.` 
+    }
+  }
+  
+  return { allowed: true }
 }
 
 /**
