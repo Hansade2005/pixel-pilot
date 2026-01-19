@@ -43,6 +43,15 @@ import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
 import { uploadLargePayload } from '@/lib/cloud-sync'
 
+// New feature components
+import { SlashCommands, useSlashCommands, getDefaultSlashCommands, type SlashCommand } from '@/components/ui/slash-commands'
+import { MemoryContextDisplay } from '@/components/ui/memory-context-display'
+import { VoiceInputPanel } from '@/components/ui/voice-input-panel'
+import { VisualDiffPreview, type FileChange } from '@/components/ui/visual-diff-preview'
+import { EnhancedToolPanel, type ToolExecution } from '@/components/ui/enhanced-tool-panel'
+import { ConversationBranchManager, BranchFromMessageButton, type ConversationBranch } from '@/components/ui/conversation-branch'
+import { StreamingMessage } from '@/components/ui/streaming-text'
+
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
   projectFiles: any[],
@@ -1034,6 +1043,16 @@ export function ChatPanelV2({
   // Message actions state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingMessageContent, setEditingMessageContent] = useState('')
+
+  // New feature states
+  const slashCommands = useSlashCommands()
+  const [showVoicePanel, setShowVoicePanel] = useState(false)
+  const [showDiffPreview, setShowDiffPreview] = useState(false)
+  const [pendingFileChanges, setPendingFileChanges] = useState<FileChange[]>([])
+  const [conversationBranches, setConversationBranches] = useState<ConversationBranch[]>([])
+  const [currentBranchId, setCurrentBranchId] = useState<string | null>(null)
+  const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([])
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   // Load database ID from workspace if not provided
   // Try multiple methods for maximum accuracy
@@ -2833,6 +2852,133 @@ export function ChatPanelV2({
     }
   }
 
+  // Slash commands configuration
+  const slashCommandHandlers = getDefaultSlashCommands({
+    onFix: () => {
+      setInput('/fix ')
+      textareaRef.current?.focus()
+    },
+    onExplain: () => {
+      setInput('/explain ')
+      textareaRef.current?.focus()
+    },
+    onRefactor: () => {
+      setInput('/refactor ')
+      textareaRef.current?.focus()
+    },
+    onTest: () => {
+      setInput('/test ')
+      textareaRef.current?.focus()
+    },
+    onRollback: () => {
+      // Trigger rollback to last checkpoint
+      const lastAssistantMessage = messages.filter(m => m.role === 'assistant').pop()
+      if (lastAssistantMessage) {
+        handleRevertToCheckpoint(lastAssistantMessage.id)
+      }
+    },
+    onNewChat: () => {
+      // Clear messages and start fresh
+      setMessages([])
+      setInput('')
+      toast({ title: 'New Chat', description: 'Started a new conversation' })
+    },
+    onClearChat: () => {
+      setMessages([])
+      setInput('')
+      toast({ title: 'Chat Cleared', description: 'All messages have been cleared' })
+    },
+    onMemory: () => {
+      toast({ title: 'Memory', description: 'Memory panel is visible in the chat sidebar' })
+    },
+    onHelp: () => {
+      toast({
+        title: 'Available Commands',
+        description: '/fix, /explain, /refactor, /test, /rollback, /new, /clear, /memory, /help'
+      })
+    },
+  })
+
+  // Handle slash command selection
+  const handleSlashCommandSelect = (command: SlashCommand) => {
+    command.action()
+    slashCommands.close()
+    // Remove the "/" from input if it was just for triggering
+    if (input === '/') {
+      setInput('')
+    }
+  }
+
+  // Handle input change with slash command detection
+  const handleInputChangeWithSlash = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value
+    setInput(value)
+
+    // Detect "/" at the start of input
+    if (value.startsWith('/')) {
+      const query = value.slice(1) // Remove "/"
+      const rect = textareaRef.current?.getBoundingClientRect()
+      if (rect) {
+        slashCommands.open({ top: rect.top, left: rect.left + 10 })
+        slashCommands.updateQuery(query)
+      }
+    } else {
+      slashCommands.close()
+    }
+  }
+
+  // Handle voice transcript completion
+  const handleVoiceTranscript = (transcript: string) => {
+    setInput(transcript)
+    setShowVoicePanel(false)
+  }
+
+  // Handle conversation branching
+  const handleCreateBranch = async (messageId: string, name: string, description?: string) => {
+    const newBranch: ConversationBranch = {
+      id: `branch-${Date.now()}`,
+      name,
+      description,
+      parentMessageId: messageId,
+      createdAt: new Date().toISOString(),
+      messageCount: messages.length,
+      isActive: true,
+      tags: []
+    }
+
+    // Deactivate other branches
+    setConversationBranches(prev => [
+      ...prev.map(b => ({ ...b, isActive: false })),
+      newBranch
+    ])
+    setCurrentBranchId(newBranch.id)
+
+    toast({ title: 'Branch Created', description: `Created branch "${name}"` })
+  }
+
+  const handleSwitchBranch = (branchId: string) => {
+    setConversationBranches(prev => prev.map(b => ({
+      ...b,
+      isActive: b.id === branchId
+    })))
+    setCurrentBranchId(branchId)
+    toast({ title: 'Branch Switched', description: 'Switched to selected branch' })
+  }
+
+  const handleDeleteBranch = (branchId: string) => {
+    setConversationBranches(prev => prev.filter(b => b.id !== branchId))
+    if (currentBranchId === branchId) {
+      setCurrentBranchId(null)
+    }
+    toast({ title: 'Branch Deleted', description: 'Branch has been removed' })
+  }
+
+  const handleRenameBranch = (branchId: string, newName: string) => {
+    setConversationBranches(prev => prev.map(b =>
+      b.id === branchId ? { ...b, name: newName } : b
+    ))
+  }
+
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -4213,6 +4359,18 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 const newValue = e.target.value
                 setInput(newValue)
 
+                // Slash command detection (when starting with /)
+                if (newValue.startsWith('/')) {
+                  const query = newValue.slice(1) // Remove "/"
+                  const rect = textareaRef.current?.getBoundingClientRect()
+                  if (rect) {
+                    slashCommands.open({ top: rect.top, left: rect.left + 10 })
+                    slashCommands.updateQuery(query)
+                  }
+                } else {
+                  slashCommands.close()
+                }
+
                 // Lightweight synchronous @ command detection (only if @ is present)
                 if (textareaRef.current && project && newValue.includes('@')) {
                   const atCommand = detectAtCommand(newValue, e.target.selectionStart)
@@ -4751,6 +4909,40 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Slash Commands Popup */}
+        <SlashCommands
+          isOpen={slashCommands.isOpen}
+          onClose={slashCommands.close}
+          onSelect={handleSlashCommandSelect}
+          query={slashCommands.query}
+          position={slashCommands.position}
+          commands={slashCommandHandlers}
+        />
+
+        {/* Voice Input Panel */}
+        <VoiceInputPanel
+          isOpen={showVoicePanel}
+          onClose={() => setShowVoicePanel(false)}
+          onTranscriptComplete={handleVoiceTranscript}
+        />
+
+        {/* Visual Diff Preview Dialog */}
+        <VisualDiffPreview
+          open={showDiffPreview}
+          onOpenChange={setShowDiffPreview}
+          fileChanges={pendingFileChanges}
+          onApprove={(changes) => {
+            // Apply the changes
+            setPendingFileChanges([])
+            setShowDiffPreview(false)
+            toast({ title: 'Changes Applied', description: `Applied ${changes.length} file(s)` })
+          }}
+          onReject={() => {
+            setPendingFileChanges([])
+            setShowDiffPreview(false)
+          }}
+        />
       </div>
     </div>
   )
