@@ -208,7 +208,7 @@ ${PIPILOT_KNOWLEDGE}
 
 Remember: You represent PiPilot. Be professional, helpful, and make users feel supported!`
 
-    const result = streamText({
+    const result = await streamText({
       model,
       system: systemPrompt,
       messages,
@@ -216,7 +216,7 @@ Remember: You represent PiPilot. Be professional, helpful, and make users feel s
       temperature: 0.7,
     })
 
-    return result.toDataStreamResponse()
+    return result.toTextStreamResponse()
   } catch (error) {
     console.error('Support chat error:', error)
     return new Response(

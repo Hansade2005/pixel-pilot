@@ -266,24 +266,12 @@ export default function SupportPage() {
         if (done) break
 
         const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('0:')) {
-            // Text content - parse the JSON string
-            try {
-              const textContent = JSON.parse(line.slice(2))
-              assistantMessage += textContent
-              setMessages(prev => {
-                const newMessages = [...prev]
-                newMessages[newMessages.length - 1] = { role: 'assistant', content: assistantMessage }
-                return newMessages
-              })
-            } catch {
-              // Skip malformed chunks
-            }
-          }
-        }
+        assistantMessage += chunk
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[newMessages.length - 1] = { role: 'assistant', content: assistantMessage }
+          return newMessages
+        })
       }
     } catch (error) {
       console.error('Chat error:', error)
