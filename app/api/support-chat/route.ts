@@ -1,7 +1,7 @@
 import { streamText } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 
-// Create Mistral provider for Pixtral
+// Create Mistral provider for Pixtral (supports vision)
 const mistralProvider = createMistral({
   apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 })
@@ -181,11 +181,29 @@ Yes! Click Export or use /export command to download your project as a ZIP file.
 Absolutely. We use industry-standard encryption. Your code is only accessible to you.
 `
 
+// Interface for message content parts
+interface TextContent {
+  type: 'text'
+  text: string
+}
+
+interface ImageContent {
+  type: 'image'
+  image: string // base64 data URL
+}
+
+type ContentPart = TextContent | ImageContent
+
+interface Message {
+  role: 'user' | 'assistant'
+  content: string | ContentPart[]
+}
+
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json()
+    const { messages } = await req.json() as { messages: Message[] }
 
-    // Get Mistral Pixtral model
+    // Get Mistral Pixtral model (supports vision)
     const model = mistralProvider('pixtral-12b-2409')
 
     // Create the system prompt with knowledge base
@@ -202,16 +220,36 @@ IMPORTANT GUIDELINES:
 6. Always be positive about PiPilot's capabilities
 7. If users have technical issues, provide step-by-step troubleshooting
 8. Mention the founder Hans Ade when relevant to company questions
+9. When users share screenshots, carefully analyze them to understand their issue and provide specific help based on what you see
 
 KNOWLEDGE BASE:
 ${PIPILOT_KNOWLEDGE}
 
 Remember: You represent PiPilot. Be professional, helpful, and make users feel supported!`
 
+    // Transform messages to handle multimodal content
+    const transformedMessages = messages.map((msg: Message) => {
+      if (typeof msg.content === 'string') {
+        return msg
+      }
+      // Handle multimodal messages (text + images)
+      return {
+        role: msg.role,
+        content: msg.content.map((part: ContentPart) => {
+          if (part.type === 'text') {
+            return { type: 'text' as const, text: part.text }
+          } else if (part.type === 'image') {
+            return { type: 'image' as const, image: part.image }
+          }
+          return part
+        })
+      }
+    })
+
     const result = await streamText({
       model,
       system: systemPrompt,
-      messages,
+      messages: transformedMessages,
       maxTokens: 1024,
       temperature: 0.7,
     })
