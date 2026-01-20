@@ -380,13 +380,57 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
     
+    // Handle opening file from search results or other sources
+    const handleOpenFileInEditor = async (event: CustomEvent) => {
+      const { filePath, lineNumber } = event.detail
+      console.log('[WorkspaceLayout] Opening file from event:', filePath, 'line:', lineNumber)
+
+      if (!selectedProject || !filePath) return
+
+      try {
+        await storageManager.init()
+        const files = await storageManager.getFiles(selectedProject.id)
+        const file = files.find(f => f.path === filePath)
+
+        if (file) {
+          setSelectedFile(file)
+          // Switch to code tab on desktop, editor tab on mobile
+          if (isMobile) {
+            setMobileTab('editor')
+          } else {
+            setActiveTab('code')
+          }
+          console.log('[WorkspaceLayout] File opened successfully:', file.name)
+
+          // Dispatch event for code editor to scroll to line
+          if (lineNumber) {
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('editor-scroll-to-line', {
+                detail: { lineNumber }
+              }))
+            }, 100)
+          }
+        } else {
+          console.warn('[WorkspaceLayout] File not found:', filePath)
+          toast({
+            title: 'File not found',
+            description: `Could not find ${filePath}`,
+            variant: 'destructive'
+          })
+        }
+      } catch (error) {
+        console.error('[WorkspaceLayout] Error opening file:', error)
+      }
+    }
+
     window.addEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
     window.addEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
     window.addEventListener('preview-ready', handlePreviewReady as EventListener)
     window.addEventListener('preview-starting', handlePreviewStarting as EventListener)
     window.addEventListener('preview-stopped', handlePreviewStopped as EventListener)
     window.addEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
-    
+    window.addEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
+
     return () => {
       window.removeEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
       window.removeEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
@@ -394,8 +438,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       window.removeEventListener('preview-starting', handlePreviewStarting as EventListener)
       window.removeEventListener('preview-stopped', handlePreviewStopped as EventListener)
       window.removeEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
+      window.removeEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
     }
-  }, [])
+  }, [selectedProject, isMobile, toast])
 
   // Auto-restore from cloud and load projects from IndexedDB on client-side
   useEffect(() => {

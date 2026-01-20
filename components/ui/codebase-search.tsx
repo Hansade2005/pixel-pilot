@@ -412,80 +412,80 @@ export function CodebaseSearch({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
+      <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-[85vh] flex flex-col p-4 sm:p-6">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Search className="h-4 w-4 sm:h-5 sm:w-5" />
             Codebase Search
           </DialogTitle>
-          <DialogDescription>
-            Search across your entire codebase with regex support. Attach results as context or replace across files.
+          <DialogDescription className="text-xs sm:text-sm">
+            Search across your entire codebase with regex support.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'search' | 'replace')} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="search" className="flex items-center gap-2">
-              <Search className="h-4 w-4" />
-              Search
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'search' | 'replace')} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+            <TabsTrigger value="search" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Search className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span>Search</span>
             </TabsTrigger>
-            <TabsTrigger value="replace" className="flex items-center gap-2">
-              <Replace className="h-4 w-4" />
-              Search & Replace
+            <TabsTrigger value="replace" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Replace className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Search &</span> Replace
             </TabsTrigger>
           </TabsList>
 
           {/* Search Tab */}
-          <TabsContent value="search" className="flex-1 flex flex-col min-h-0 space-y-4">
+          <TabsContent value="search" className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2 sm:space-y-4 mt-2">
             {/* Search Input */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3 flex-shrink-0">
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Input
                     ref={searchInputRef}
-                    placeholder="Search text or regex pattern..."
+                    placeholder="Search text or regex..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="font-mono"
+                    className="font-mono text-sm h-9 sm:h-10"
                   />
                 </div>
-                <Button onClick={performSearch} disabled={isSearching || !searchQuery.trim()}>
+                <Button onClick={performSearch} disabled={isSearching || !searchQuery.trim()} className="h-9 sm:h-10 px-3">
                   {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </Button>
               </div>
 
-              {/* Search Options */}
-              <div className="flex flex-wrap gap-4 text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={caseSensitive} onCheckedChange={(c) => setCaseSensitive(!!c)} />
-                  <span>Case Sensitive</span>
+              {/* Search Options - Responsive */}
+              <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={caseSensitive} onCheckedChange={(c) => setCaseSensitive(!!c)} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Case</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={useRegex} onCheckedChange={(c) => setUseRegex(!!c)} />
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={useRegex} onCheckedChange={(c) => setUseRegex(!!c)} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Regex</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={wholeWord} onCheckedChange={(c) => setWholeWord(!!c)} />
-                  <span>Whole Word</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={wholeWord} onCheckedChange={(c) => setWholeWord(!!c)} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Word</span>
                 </label>
               </div>
 
-              {/* File Filters */}
+              {/* File Filters - Collapsible */}
               <Collapsible>
                 <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                   <ChevronRight className="h-3 w-3" />
-                  File Filters
+                  Filters
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-2 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs">Include (e.g., *.tsx,*.ts)</Label>
+                      <Label className="text-xs">Include</Label>
                       <Input
                         value={includePattern}
                         onChange={(e) => setIncludePattern(e.target.value)}
-                        placeholder="*.tsx,*.ts,src/"
-                        className="h-8 text-xs"
+                        placeholder="*.tsx,*.ts"
+                        className="h-7 sm:h-8 text-xs"
                       />
                     </div>
                     <div>
@@ -493,8 +493,8 @@ export function CodebaseSearch({
                       <Input
                         value={excludePattern}
                         onChange={(e) => setExcludePattern(e.target.value)}
-                        placeholder="node_modules,dist"
-                        className="h-8 text-xs"
+                        placeholder="node_modules"
+                        className="h-7 sm:h-8 text-xs"
                       />
                     </div>
                   </div>
@@ -504,128 +504,142 @@ export function CodebaseSearch({
 
             {/* Results Summary */}
             {totalMatches > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm flex-shrink-0">
                 <span className="text-muted-foreground">
-                  Found <strong className="text-foreground">{totalMatches}</strong> matches in{" "}
+                  <strong className="text-foreground">{totalMatches}</strong> matches in{" "}
                   <strong className="text-foreground">{results.length}</strong> files
                 </span>
               </div>
             )}
 
-            {/* Results List */}
-            <ScrollArea className="flex-1 border rounded-md">
-              <div className="p-2 space-y-1">
-                {results.length === 0 && !isSearching && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Search className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                    <p>Enter a search term and press Enter</p>
-                    <p className="text-xs mt-1">Supports regex patterns when enabled</p>
-                  </div>
-                )}
+            {/* Results List - Fixed height scrollable container */}
+            <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-2 space-y-1">
+                  {results.length === 0 && !isSearching && (
+                    <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                      <Search className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 opacity-20" />
+                      <p className="text-xs sm:text-sm">Enter a search term and press Enter</p>
+                    </div>
+                  )}
 
-                {results.map((fileResult) => (
-                  <Collapsible
-                    key={fileResult.filePath}
-                    open={fileResult.isExpanded}
-                    onOpenChange={() => toggleFileExpansion(fileResult.filePath)}
-                  >
-                    <CollapsibleTrigger className="flex items-center gap-2 w-full p-2 hover:bg-muted/50 rounded text-left">
-                      {fileResult.isExpanded ? (
-                        <ChevronDown className="h-4 w-4 shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0" />
-                      )}
-                      <FileCode className="h-4 w-4 shrink-0 text-blue-400" />
-                      <span className="font-mono text-sm truncate flex-1">{fileResult.filePath}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {fileResult.results.length}
-                      </Badge>
-                    </CollapsibleTrigger>
+                  {isSearching && (
+                    <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                      <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
+                      <p className="text-xs sm:text-sm">Searching...</p>
+                    </div>
+                  )}
 
-                    <CollapsibleContent>
-                      <div className="ml-6 border-l pl-4 space-y-1">
-                        {fileResult.results.map((result) => (
-                          <div
-                            key={result.id}
-                            className="group flex items-start gap-2 py-1 px-2 hover:bg-muted/30 rounded cursor-pointer"
-                          >
-                            <span className="text-xs text-muted-foreground w-8 text-right shrink-0 pt-0.5">
-                              {result.lineNumber}
-                            </span>
+                  {results.map((fileResult) => (
+                    <Collapsible
+                      key={fileResult.filePath}
+                      open={fileResult.isExpanded}
+                      onOpenChange={() => toggleFileExpansion(fileResult.filePath)}
+                    >
+                      <CollapsibleTrigger className="flex items-center gap-2 w-full p-1.5 sm:p-2 hover:bg-muted/50 rounded text-left">
+                        {fileResult.isExpanded ? (
+                          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                        )}
+                        <FileCode className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-blue-400" />
+                        <span className="font-mono text-xs sm:text-sm truncate flex-1">{fileResult.filePath}</span>
+                        <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5">
+                          {fileResult.results.length}
+                        </Badge>
+                      </CollapsibleTrigger>
+
+                      <CollapsibleContent>
+                        <div className="ml-4 sm:ml-6 border-l pl-2 sm:pl-4 space-y-0.5 sm:space-y-1">
+                          {fileResult.results.map((result) => (
                             <div
-                              className="flex-1 font-mono text-xs overflow-hidden"
-                              onClick={() => handleResultClick(result)}
+                              key={result.id}
+                              className="group flex items-start gap-1 sm:gap-2 py-1 px-1 sm:px-2 hover:bg-muted/30 rounded cursor-pointer"
                             >
-                              <code className="whitespace-pre-wrap break-all">
-                                {highlightMatch(result.lineContent, result.matchStart, result.matchEnd)}
-                              </code>
-                            </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0"
-                                      onClick={() => handleResultClick(result)}
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Open file</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              <span className="text-[10px] sm:text-xs text-muted-foreground w-6 sm:w-8 text-right shrink-0 pt-0.5">
+                                {result.lineNumber}
+                              </span>
+                              <div
+                                className="flex-1 font-mono text-[10px] sm:text-xs overflow-hidden min-w-0"
+                                onClick={() => handleResultClick(result)}
+                              >
+                                <code className="whitespace-pre-wrap break-all block">
+                                  {highlightMatch(result.lineContent, result.matchStart, result.matchEnd)}
+                                </code>
+                              </div>
+                              <div className="flex items-center gap-0.5 sm:gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-5 w-5 sm:h-6 sm:w-6 p-0"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleResultClick(result)
+                                        }}
+                                      >
+                                        <ExternalLink className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Open file</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
 
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className={cn(
-                                        "h-6 w-6 p-0",
-                                        isResultAttached(result.id) && "text-green-500"
-                                      )}
-                                      onClick={() => handleAttachContext(result)}
-                                      disabled={isResultAttached(result.id)}
-                                    >
-                                      {isResultAttached(result.id) ? (
-                                        <Check className="h-3 w-3" />
-                                      ) : (
-                                        <Plus className="h-3 w-3" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {isResultAttached(result.id) ? 'Already attached' : 'Attach as context'}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className={cn(
+                                          "h-5 w-5 sm:h-6 sm:w-6 p-0",
+                                          isResultAttached(result.id) && "text-green-500"
+                                        )}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleAttachContext(result)
+                                        }}
+                                        disabled={isResultAttached(result.id)}
+                                      >
+                                        {isResultAttached(result.id) ? (
+                                          <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                        ) : (
+                                          <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {isResultAttached(result.id) ? 'Attached' : 'Attach'}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
                   </Collapsible>
                 ))}
               </div>
             </ScrollArea>
+          </div>
           </TabsContent>
 
           {/* Replace Tab */}
-          <TabsContent value="replace" className="flex-1 flex flex-col min-h-0 space-y-4">
+          <TabsContent value="replace" className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-2 sm:space-y-4 mt-2">
             {/* Search and Replace Inputs */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3 flex-shrink-0">
               <div className="grid grid-cols-1 gap-2">
                 <div>
                   <Label className="text-xs">Search</Label>
                   <Input
-                    placeholder="Search text or regex pattern..."
+                    placeholder="Search text or regex..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="font-mono"
+                    className="font-mono text-sm h-9 sm:h-10"
                   />
                 </div>
                 <div>
@@ -635,36 +649,36 @@ export function CodebaseSearch({
                     value={replaceQuery}
                     onChange={(e) => setReplaceQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="font-mono"
+                    className="font-mono text-sm h-9 sm:h-10"
                   />
                 </div>
               </div>
 
-              {/* Options */}
-              <div className="flex flex-wrap gap-4 text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={caseSensitive} onCheckedChange={(c) => setCaseSensitive(!!c)} />
-                  <span>Case Sensitive</span>
+              {/* Options - Responsive */}
+              <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={caseSensitive} onCheckedChange={(c) => setCaseSensitive(!!c)} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Case</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={useRegex} onCheckedChange={(c) => setUseRegex(!!c)} />
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={useRegex} onCheckedChange={(c) => setUseRegex(!!c)} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Regex</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={wholeWord} onCheckedChange={(c) => setWholeWord(!!c)} />
-                  <span>Whole Word</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox checked={wholeWord} onCheckedChange={(c) => setWholeWord(!!c)} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Word</span>
                 </label>
               </div>
 
-              <div className="flex gap-2">
-                <Button onClick={previewReplace} disabled={isReplacing || !searchQuery.trim()} variant="outline">
-                  {isReplacing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Preview Changes
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={previewReplace} disabled={isReplacing || !searchQuery.trim()} variant="outline" className="h-8 sm:h-9 text-xs sm:text-sm">
+                  {isReplacing ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1 sm:mr-2" /> : null}
+                  Preview
                 </Button>
                 {replacePreview.length > 0 && (
-                  <Button onClick={executeReplace} disabled={isReplacing || selectedFilesForReplace.size === 0}>
-                    <Replace className="h-4 w-4 mr-2" />
-                    Replace in {selectedFilesForReplace.size} Files
+                  <Button onClick={executeReplace} disabled={isReplacing || selectedFilesForReplace.size === 0} className="h-8 sm:h-9 text-xs sm:text-sm">
+                    <Replace className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Replace ({selectedFilesForReplace.size})
                   </Button>
                 )}
               </div>
@@ -672,80 +686,86 @@ export function CodebaseSearch({
 
             {/* Replace Preview */}
             {replacePreview.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {replacePreview.reduce((acc, p) => acc + p.matchCount, 0)} replacements in {replacePreview.length} files
+              <div className="space-y-2 flex-shrink-0">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
+                    {replacePreview.reduce((acc, p) => acc + p.matchCount, 0)} in {replacePreview.length} files
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1 sm:gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-6 sm:h-7 text-xs px-2"
                       onClick={() => setSelectedFilesForReplace(new Set(replacePreview.map(p => p.filePath)))}
                     >
-                      Select All
+                      All
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-6 sm:h-7 text-xs px-2"
                       onClick={() => setSelectedFilesForReplace(new Set())}
                     >
-                      Deselect All
+                      None
                     </Button>
                   </div>
                 </div>
               </div>
             )}
 
-            <ScrollArea className="flex-1 border rounded-md">
-              <div className="p-2 space-y-2">
-                {replacePreview.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Replace className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                    <p>Enter search and replace text</p>
-                    <p className="text-xs mt-1">Click "Preview Changes" to see affected files</p>
-                  </div>
-                )}
+            {/* Replace Preview List - Fixed height scrollable */}
+            <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-2 space-y-1.5 sm:space-y-2">
+                  {replacePreview.length === 0 && (
+                    <div className="text-center py-6 sm:py-8 text-muted-foreground">
+                      <Replace className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 opacity-20" />
+                      <p className="text-xs sm:text-sm">Enter search and replace text</p>
+                      <p className="text-[10px] sm:text-xs mt-1">Click "Preview" to see affected files</p>
+                    </div>
+                  )}
 
-                {replacePreview.map((preview) => (
-                  <div
-                    key={preview.filePath}
-                    className={cn(
-                      "p-3 border rounded-md",
-                      selectedFilesForReplace.has(preview.filePath)
-                        ? "border-primary bg-primary/5"
-                        : "border-muted"
-                    )}
-                  >
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <Checkbox
-                        checked={selectedFilesForReplace.has(preview.filePath)}
-                        onCheckedChange={(checked) => {
-                          setSelectedFilesForReplace(prev => {
-                            const next = new Set(prev)
-                            if (checked) {
-                              next.add(preview.filePath)
-                            } else {
-                              next.delete(preview.filePath)
-                            }
-                            return next
-                          })
-                        }}
-                      />
-                      <FileCode className="h-4 w-4 text-blue-400" />
-                      <span className="font-mono text-sm flex-1 truncate">{preview.filePath}</span>
-                      <Badge variant="secondary">{preview.matchCount} matches</Badge>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  {replacePreview.map((preview) => (
+                    <div
+                      key={preview.filePath}
+                      className={cn(
+                        "p-2 sm:p-3 border rounded-md",
+                        selectedFilesForReplace.has(preview.filePath)
+                          ? "border-primary bg-primary/5"
+                          : "border-muted"
+                      )}
+                    >
+                      <label className="flex items-center gap-2 sm:gap-3 cursor-pointer">
+                        <Checkbox
+                          checked={selectedFilesForReplace.has(preview.filePath)}
+                          onCheckedChange={(checked) => {
+                            setSelectedFilesForReplace(prev => {
+                              const next = new Set(prev)
+                              if (checked) {
+                                next.add(preview.filePath)
+                              } else {
+                                next.delete(preview.filePath)
+                              }
+                              return next
+                            })
+                          }}
+                          className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                        />
+                        <FileCode className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400 shrink-0" />
+                        <span className="font-mono text-xs sm:text-sm flex-1 truncate min-w-0">{preview.filePath}</span>
+                        <Badge variant="secondary" className="text-[10px] sm:text-xs shrink-0">{preview.matchCount}</Badge>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
 
             {/* Warning */}
             {replacePreview.length > 0 && selectedFilesForReplace.size > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-sm">
-                <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
-                <span>This will modify {selectedFilesForReplace.size} files. Make sure you have a backup or version control.</span>
+              <div className="flex items-start gap-2 p-2 sm:p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-xs sm:text-sm flex-shrink-0">
+                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 shrink-0 mt-0.5" />
+                <span>Modifying {selectedFilesForReplace.size} files. Ensure backup exists.</span>
               </div>
             )}
           </TabsContent>
@@ -753,16 +773,16 @@ export function CodebaseSearch({
 
         {/* Attached Contexts Preview */}
         {attachedContexts.length > 0 && (
-          <div className="border-t pt-3 mt-2">
-            <Label className="text-xs text-muted-foreground mb-2 block">
-              Attached as Context ({attachedContexts.length})
+          <div className="border-t pt-2 sm:pt-3 mt-2 flex-shrink-0">
+            <Label className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 sm:mb-2 block">
+              Attached ({attachedContexts.length})
             </Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {attachedContexts.map((ctx) => (
                 <Badge
                   key={ctx.id}
                   variant="secondary"
-                  className="flex items-center gap-1 pr-1"
+                  className="text-[10px] sm:text-xs flex items-center gap-1 pr-1"
                 >
                   <FileCode className="h-3 w-3" />
                   <span className="font-mono text-xs">
