@@ -843,7 +843,7 @@ export default function SupportPage() {
                             </div>
                           )}
                           {msg.role === 'assistant' ? (
-                            <Response className="text-sm text-gray-200 prose prose-sm prose-invert max-w-none [&>p]:text-gray-200 [&>ul]:text-gray-200 [&>ol]:text-gray-200 [&>li]:text-gray-200 [&>h1]:text-gray-100 [&>h2]:text-gray-100 [&>h3]:text-gray-100 [&>h4]:text-gray-100 [&>a]:text-purple-400 [&>a]:hover:text-purple-300 [&>code]:bg-gray-700 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>pre]:bg-gray-900 [&>pre]:p-3 [&>pre]:rounded-lg [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&>blockquote]:border-purple-500">
+                            <Response className="text-sm text-gray-200 prose prose-sm prose-invert max-w-none overflow-hidden break-words [word-break:break-word] [&>p]:text-gray-200 [&>ul]:text-gray-200 [&>ol]:text-gray-200 [&>li]:text-gray-200 [&>h1]:text-gray-100 [&>h2]:text-gray-100 [&>h3]:text-gray-100 [&>h4]:text-gray-100 [&>a]:text-purple-400 [&>a]:hover:text-purple-300 [&>a]:break-all [&>code]:bg-gray-700 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>code]:break-all [&>pre]:bg-gray-900 [&>pre]:p-3 [&>pre]:rounded-lg [&>pre]:overflow-x-auto [&>pre]:max-w-full [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:whitespace-pre-wrap [&_pre_code]:break-all [&>blockquote]:border-purple-500">
                               {getMessageText(msg.content)}
                             </Response>
                           ) : (
