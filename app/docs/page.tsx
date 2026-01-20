@@ -50,6 +50,9 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 
+// Storage key for chat persistence
+const STORAGE_KEY = 'pipilot_docs_chat'
+
 // Types for multimodal messages
 interface TextContent {
   type: 'text'
@@ -86,6 +89,29 @@ interface DocsData {
   sections: DocSection[]
 }
 
+// Serialize messages for localStorage (exclude image data)
+function serializeMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map(msg => {
+    if (typeof msg.content === 'string') return msg
+    // Filter out image parts for storage, keep text only
+    const textParts = msg.content.filter((p): p is TextContent => p.type === 'text')
+    if (textParts.length === 0) {
+      return { role: msg.role, content: '[Image/Screenshot shared]' }
+    }
+    // If there were images, note it in the content
+    const hadImages = msg.content.some(p => p.type === 'image')
+    if (hadImages) {
+      return {
+        role: msg.role,
+        content: textParts.length === 1
+          ? `${textParts[0].text}\n\n[Image/Screenshot shared]`
+          : textParts.map(p => p.text).join('\n') + '\n\n[Image/Screenshot shared]'
+      }
+    }
+    return { role: msg.role, content: textParts.length === 1 ? textParts[0].text : textParts }
+  })
+}
+
 export default function DocsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [docsData, setDocsData] = useState<DocsData | null>(null)
@@ -101,6 +127,8 @@ export default function DocsPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isCapturing, setIsCapturing] = useState(false)
+  const [toolStatus, setToolStatus] = useState<string | null>(null)
+  const toolTimerRef = useRef<NodeJS.Timeout | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -152,10 +180,41 @@ export default function DocsPage() {
     }
   }, [chatOpen, chatMinimized])
 
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored) as ChatMessage[]
+        setMessages(parsed)
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error)
+    }
+  }, [])
+
+  // Save chat history to localStorage when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        const toStore = serializeMessagesForStorage(messages)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore))
+      } catch (error) {
+        console.error('Failed to save chat history:', error)
+      }
+    }
+  }, [messages])
+
   // Clear chat history
   const clearChat = useCallback(() => {
     setMessages([])
     setAttachments([])
+    setToolStatus(null)
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (error) {
+      console.error('Failed to clear chat history from storage:', error)
+    }
     toast.success("Chat history cleared")
   }, [])
 
@@ -378,6 +437,12 @@ export default function DocsPage() {
     setMessages(prev => [...prev, userMessage])
     setAttachments([])
     setIsLoading(true)
+    setToolStatus(null)
+
+    // Set a timer to show "Searching docs..." if response takes a while (indicating tool use)
+    toolTimerRef.current = setTimeout(() => {
+      setToolStatus('Searching documentation...')
+    }, 1200)
 
     try {
       const response = await fetch('/api/support-chat', {
@@ -395,12 +460,23 @@ export default function DocsPage() {
 
       const decoder = new TextDecoder()
       let assistantMessage = ''
+      let firstChunkReceived = false
 
       setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+
+        // Clear tool status when first real content arrives
+        if (!firstChunkReceived) {
+          firstChunkReceived = true
+          if (toolTimerRef.current) {
+            clearTimeout(toolTimerRef.current)
+            toolTimerRef.current = null
+          }
+          setToolStatus(null)
+        }
 
         const chunk = decoder.decode(value)
         assistantMessage += chunk
@@ -417,6 +493,11 @@ export default function DocsPage() {
         content: "I'm sorry, I encountered an error. Please try again or contact support at hello@pipilot.dev"
       }])
     } finally {
+      if (toolTimerRef.current) {
+        clearTimeout(toolTimerRef.current)
+        toolTimerRef.current = null
+      }
+      setToolStatus(null)
       setIsLoading(false)
     }
   }
@@ -924,10 +1005,17 @@ export default function DocsPage() {
                           <Bot className="h-4 w-4 text-purple-400" />
                         </div>
                         <div className="bg-gray-800 p-3 rounded-2xl rounded-bl-md">
-                          <div className="flex items-center gap-2 text-purple-400">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Thinking...</span>
-                          </div>
+                          {toolStatus ? (
+                            <div className="flex items-center gap-2 text-blue-400">
+                              <Search className="h-4 w-4 animate-pulse" />
+                              <span className="text-sm">{toolStatus}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-purple-400">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Thinking...</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
