@@ -39,33 +39,65 @@ async function loadDocsData(): Promise<DocsData> {
   }
 }
 
+// Common query expansions for better search results
+const QUERY_EXPANSIONS: Record<string, string> = {
+  'models': 'model|Multi-Model|Mistral|Claude|Grok|LLM|AI engine',
+  'model': 'model|Multi-Model|Mistral|Claude|Grok|LLM|AI engine',
+  'ai': 'AI|artificial intelligence|conversational|LLM|machine learning',
+  'deploy': 'deploy|deployment|hosting|Vercel|Netlify|publish',
+  'database': 'database|Supabase|storage|backend|data',
+  'auth': 'auth|authentication|login|signup|OAuth',
+  'mobile': 'mobile|Expo|iOS|Android|native|app',
+  'framework': 'framework|Next.js|Vite|React|Expo',
+  'payment': 'payment|Stripe|billing|subscription|checkout',
+}
+
+// Function to expand query for better search results
+function expandQuery(query: string): string {
+  const lowerQuery = query.toLowerCase().trim()
+
+  // Check if query matches any expansion
+  for (const [key, expansion] of Object.entries(QUERY_EXPANSIONS)) {
+    if (lowerQuery === key || lowerQuery.includes(key)) {
+      return expansion
+    }
+  }
+
+  return query
+}
+
 // Function to search docs using regex
 function searchDocs(docsData: DocsData, query: string, maxResults: number = 3): string {
   try {
+    // Expand query for better results
+    const expandedQuery = expandQuery(query)
+
     // Create regex from query (case insensitive)
-    const regex = new RegExp(query, 'gi')
+    const regex = new RegExp(expandedQuery, 'gi')
 
     const results: Array<{
       title: string
       overview: string
       matches: string[]
       score: number
+      relevantSnippets: string[]
     }> = []
 
     for (const section of docsData.sections) {
       const matches: string[] = []
+      const relevantSnippets: string[] = []
       let score = 0
 
-      // Check title
+      // Check title (highest priority)
       if (regex.test(section.title)) {
-        score += 10
+        score += 15
         matches.push(`Title match: "${section.title}"`)
       }
       regex.lastIndex = 0 // Reset regex
 
       // Check overview
       if (regex.test(section.overview)) {
-        score += 5
+        score += 8
         matches.push(`Overview match`)
       }
       regex.lastIndex = 0
@@ -73,26 +105,32 @@ function searchDocs(docsData: DocsData, query: string, maxResults: number = 3): 
       // Check keywords
       for (const keyword of section.search_keywords) {
         if (regex.test(keyword)) {
-          score += 3
+          score += 5
           matches.push(`Keyword: "${keyword}"`)
         }
         regex.lastIndex = 0
       }
 
-      // Check content and extract matching snippets
+      // Check content and extract matching snippets with context
       const contentMatches = section.content.match(regex)
       if (contentMatches) {
-        score += contentMatches.length
+        // Give more weight to sections with multiple matches
+        score += Math.min(contentMatches.length * 2, 20)
 
-        // Extract context around matches (first 3)
+        // Extract context around matches - look for meaningful lines
         const lines = section.content.split('\n')
         let snippetCount = 0
-        for (const line of lines) {
-          if (snippetCount >= 3) break
+        for (let i = 0; i < lines.length && snippetCount < 3; i++) {
+          const line = lines[i]
           regex.lastIndex = 0
-          if (regex.test(line) && line.trim().length > 10) {
-            const snippet = line.trim().slice(0, 200)
-            matches.push(`Content: "...${snippet}..."`)
+          if (regex.test(line) && line.trim().length > 15) {
+            // Include the line and possibly the next line for context
+            let snippet = line.trim()
+            if (i + 1 < lines.length && lines[i + 1].trim().startsWith('-')) {
+              snippet += '\n' + lines[i + 1].trim()
+            }
+            relevantSnippets.push(snippet.slice(0, 300))
+            matches.push(`Content: "${snippet.slice(0, 100)}..."`)
             snippetCount++
           }
         }
@@ -103,7 +141,8 @@ function searchDocs(docsData: DocsData, query: string, maxResults: number = 3): 
           title: section.title,
           overview: section.overview,
           matches,
-          score
+          score,
+          relevantSnippets
         })
       }
     }
@@ -113,16 +152,22 @@ function searchDocs(docsData: DocsData, query: string, maxResults: number = 3): 
     const topResults = results.slice(0, maxResults)
 
     if (topResults.length === 0) {
-      return `No documentation found matching "${query}". Try a different search term.`
+      return `No documentation found matching "${query}". Try a different search term or ask me directly - I have built-in knowledge about PiPilot.`
     }
 
-    // Format results
-    let output = `Found ${topResults.length} relevant documentation section(s):\n\n`
+    // Format results with snippets for better context
+    let output = `Found ${topResults.length} relevant documentation section(s) for "${query}":\n\n`
 
     for (const result of topResults) {
       output += `## ${result.title}\n`
       output += `**Overview:** ${result.overview}\n`
-      output += `**Matches:** ${result.matches.slice(0, 3).join('; ')}\n\n`
+      if (result.relevantSnippets.length > 0) {
+        output += `**Relevant content:**\n`
+        for (const snippet of result.relevantSnippets.slice(0, 2)) {
+          output += `- ${snippet}\n`
+        }
+      }
+      output += `\n`
     }
 
     return output
@@ -354,25 +399,29 @@ Your role is to help users with questions about PiPilot, troubleshoot issues, an
 
 IMPORTANT GUIDELINES:
 1. Be friendly, helpful, and concise
-2. Use the knowledge base below to answer questions accurately
-3. If you don't know something, USE THE search_docs TOOL to search PiPilot's documentation for accurate information
-4. Use markdown formatting for better readability (bold, lists, code blocks when needed)
-5. Keep responses focused and not too long
-6. Always be positive about PiPilot's capabilities
-7. If users have technical issues, provide step-by-step troubleshooting
-8. Mention the founder Hans Ade when relevant to company questions
-9. When users share screenshots, carefully analyze them to understand their issue and provide specific help based on what you see
-10. For detailed technical questions, use the search_docs tool with regex patterns to find relevant documentation
-11. If you need the full content of a specific documentation section, use get_section_content tool
+2. FIRST check the KNOWLEDGE BASE below - it contains comprehensive information about PiPilot features, AI models, frameworks, integrations, and more
+3. For common questions (models, features, frameworks, pricing, founder, getting started), answer from the KNOWLEDGE BASE directly - don't search
+4. Only use search_docs tool when: (a) question is very specific/technical, (b) you need exact documentation wording, (c) the knowledge base doesn't cover the topic
+5. Use markdown formatting for better readability (bold, lists, code blocks when needed)
+6. Keep responses focused and not too long
+7. Always be positive about PiPilot's capabilities
+8. If users have technical issues, provide step-by-step troubleshooting
+9. Mention the founder Hans Ade when relevant to company questions
+10. When users share screenshots, carefully analyze them to understand their issue and provide specific help
 
-AVAILABLE TOOLS:
-- search_docs: Search PiPilot documentation using regex patterns (e.g., "deploy.*vercel", "database|supabase", "pricing")
-- get_section_content: Get the full content of a specific documentation section by title
+SUPPORTED AI MODELS (from Knowledge Base):
+- **Mistral Pixtral**: Advanced vision and language processing (used for this chat)
+- **Grok Code Fast 1**: Specialized fast code generation
+- **Claude Sonnet 4.5**: High-quality code generation and analysis
+
+AVAILABLE TOOLS (use sparingly - prefer knowledge base):
+- search_docs: Search PiPilot documentation using regex patterns. Use expanded queries like "model|Mistral|Claude" not just "models"
+- get_section_content: Get full content of a specific documentation section by title
 
 KNOWLEDGE BASE (Quick Reference):
 ${PIPILOT_KNOWLEDGE}
 
-Remember: You represent PiPilot. Be professional, helpful, and make users feel supported! Use the search_docs tool when you need more detailed or specific information.`
+Remember: You represent PiPilot. Be professional, helpful, and make users feel supported! Answer from the knowledge base when possible.`
 
     // Transform messages to handle multimodal content
     const transformedMessages = messages.map((msg: Message) => {
