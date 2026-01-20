@@ -106,11 +106,11 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Tawk.to Live Chat - Hidden on workspace pages */}
+        {/* Tawk.to Live Chat - Hidden on main workspace page */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if (!window.location.pathname.startsWith('/workspace')) {
+              if (window.location.pathname !== '/workspace') {
                 var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
                 (function(){
                   var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
