@@ -89,27 +89,25 @@ interface DocsData {
   sections: DocSection[]
 }
 
-// Serialize messages for localStorage (exclude image data)
-function serializeMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
-  return messages.map(msg => {
+// Prepare messages for AI context - strip images from OLD messages, keep current message intact
+// This prevents sending old images as context while allowing current images to be analyzed
+function prepareMessagesForAI(messages: ChatMessage[], currentMessage: ChatMessage): ChatMessage[] {
+  const previousMessages = messages.map(msg => {
     if (typeof msg.content === 'string') return msg
-    // Filter out image parts for storage, keep text only
+    // For old messages, only keep text content (no images)
     const textParts = msg.content.filter((p): p is TextContent => p.type === 'text')
     if (textParts.length === 0) {
-      return { role: msg.role, content: '[Image/Screenshot shared]' }
+      return { role: msg.role, content: '[User shared an image/screenshot]' }
     }
-    // If there were images, note it in the content
+    // If there were images, note that images were shared but don't include them
     const hadImages = msg.content.some(p => p.type === 'image')
-    if (hadImages) {
-      return {
-        role: msg.role,
-        content: textParts.length === 1
-          ? `${textParts[0].text}\n\n[Image/Screenshot shared]`
-          : textParts.map(p => p.text).join('\n') + '\n\n[Image/Screenshot shared]'
-      }
+    if (hadImages && textParts.length === 1) {
+      return { role: msg.role, content: `${textParts[0].text}\n\n[Image/Screenshot was shared]` }
     }
     return { role: msg.role, content: textParts.length === 1 ? textParts[0].text : textParts }
   })
+  // Add current message with full content (including images)
+  return [...previousMessages, currentMessage]
 }
 
 export default function DocsPage() {
@@ -193,14 +191,32 @@ export default function DocsPage() {
     }
   }, [])
 
-  // Save chat history to localStorage when messages change
+  // Save chat history to localStorage when messages change (includes images for display)
   useEffect(() => {
     if (messages.length > 0) {
       try {
-        const toStore = serializeMessagesForStorage(messages)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore))
+        // Save full messages including images for display purposes
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
       } catch (error) {
-        console.error('Failed to save chat history:', error)
+        // If storage fails (quota exceeded due to images), try saving without images
+        console.error('Failed to save chat history with images, trying without:', error)
+        try {
+          const textOnlyMessages = messages.map(msg => {
+            if (typeof msg.content === 'string') return msg
+            const textParts = msg.content.filter((p): p is TextContent => p.type === 'text')
+            const hadImages = msg.content.some(p => p.type === 'image')
+            if (textParts.length === 0) {
+              return { role: msg.role, content: '[Image/Screenshot was shared]' }
+            }
+            if (hadImages) {
+              return { role: msg.role, content: textParts[0].text + '\n\n[Image/Screenshot was shared]' }
+            }
+            return { role: msg.role, content: textParts.length === 1 ? textParts[0].text : textParts }
+          })
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(textOnlyMessages))
+        } catch (e) {
+          console.error('Failed to save chat history:', e)
+        }
       }
     }
   }, [messages])
@@ -445,11 +461,14 @@ export default function DocsPage() {
     }, 1200)
 
     try {
+      // Prepare messages for AI - strip images from old messages, keep current message images
+      const messagesForAI = prepareMessagesForAI(messages, userMessage)
+
       const response = await fetch('/api/support-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage]
+          messages: messagesForAI
         })
       })
 
