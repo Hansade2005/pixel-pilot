@@ -19,7 +19,6 @@ import {
   MessageCircle,
   HelpCircle,
   BookOpen,
-  Zap,
   CreditCard,
   Settings,
   Code,
@@ -28,12 +27,13 @@ import {
   Send,
   Bot,
   Loader2,
-  ChevronRight,
-  ExternalLink,
   Sparkles,
   Users,
   Shield,
   FileQuestion,
+  X,
+  Minimize2,
+  Maximize2,
 } from "lucide-react"
 
 // FAQ Data organized by category
@@ -70,7 +70,7 @@ const faqCategories = [
     faqs: [
       {
         question: "What AI models does PiPilot use?",
-        answer: "PiPilot uses cutting-edge AI models including Claude by Anthropic, GPT-4, and Gemini. You can switch between models based on your needs - some excel at complex logic while others are great for creative designs."
+        answer: "PiPilot uses cutting-edge AI models including Claude by Anthropic, GPT-4, Gemini, and Mistral Pixtral. You can switch between models based on your needs - some excel at complex logic while others are great for creative designs."
       },
       {
         question: "What is AI Memory?",
@@ -202,12 +202,13 @@ const quickHelp = [
 
 export default function SupportPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [aiQuestion, setAiQuestion] = useState("")
-  const [aiResponse, setAiResponse] = useState("")
-  const [isAiLoading, setIsAiLoading] = useState(false)
-  const [showAiChat, setShowAiChat] = useState(false)
-  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'ai', content: string}[]>([])
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMinimized, setChatMinimized] = useState(false)
+  const [chatInput, setChatInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [messages, setMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Filter FAQs based on search query
   const filteredCategories = faqCategories.map(category => ({
@@ -222,46 +223,85 @@ export default function SupportPage() {
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [chatHistory])
+  }, [messages])
 
-  // Handle AI question submission
-  const handleAskAI = async () => {
-    if (!aiQuestion.trim()) return
+  // Focus input when chat opens
+  useEffect(() => {
+    if (chatOpen && !chatMinimized) {
+      inputRef.current?.focus()
+    }
+  }, [chatOpen, chatMinimized])
 
-    const userMessage = aiQuestion.trim()
-    setAiQuestion("")
-    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }])
-    setIsAiLoading(true)
-    setShowAiChat(true)
+  // Handle AI chat submission with streaming
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || isLoading) return
+
+    const userMessage = chatInput.trim()
+    setChatInput("")
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setIsLoading(true)
 
     try {
-      // Simulate AI response (in production, this would call your AI API)
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const response = await fetch('/api/support-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, { role: 'user', content: userMessage }]
+        })
+      })
 
-      // Generate contextual response based on keywords
-      let response = ""
-      const lowerQuestion = userMessage.toLowerCase()
+      if (!response.ok) throw new Error('Failed to get response')
 
-      if (lowerQuestion.includes("price") || lowerQuestion.includes("cost") || lowerQuestion.includes("plan")) {
-        response = "PiPilot offers flexible pricing plans! We have a **Free tier** for getting started, a **Pro plan** at $19/month for power users, and **Enterprise** for teams. Visit our [Pricing page](/pricing) for full details. Would you like me to explain the differences between plans?"
-      } else if (lowerQuestion.includes("start") || lowerQuestion.includes("begin") || lowerQuestion.includes("new")) {
-        response = "Getting started with PiPilot is easy! 🚀\n\n1. **Sign up** for a free account\n2. Click **'New Project'** in your workspace\n3. **Describe** what you want to build in the chat\n4. Watch as AI generates your app!\n\nWould you like me to walk you through creating your first project?"
-      } else if (lowerQuestion.includes("export") || lowerQuestion.includes("download")) {
-        response = "To export your project:\n\n1. Open your project in the workspace\n2. Click the **Export** button in the toolbar, or\n3. Type `/export` in the chat\n\nYou'll get a ZIP file with all your source code, ready to deploy anywhere! Need help with deployment?"
-      } else if (lowerQuestion.includes("ai") || lowerQuestion.includes("model")) {
-        response = "PiPilot uses multiple AI models:\n\n• **Claude** (Anthropic) - Great for complex reasoning\n• **GPT-4** (OpenAI) - Versatile and creative\n• **Gemini** (Google) - Fast and efficient\n\nYou can switch models anytime using the model selector in your workspace!"
-      } else if (lowerQuestion.includes("bug") || lowerQuestion.includes("error") || lowerQuestion.includes("issue")) {
-        response = "Sorry to hear you're having issues! Here's how to get help:\n\n1. **Refresh** the page and try again\n2. **Clear** your browser cache\n3. Check our **status page** for any outages\n4. **Contact support** via live chat or email hello@pipilot.dev\n\nCan you describe the specific error you're seeing?"
-      } else {
-        response = `Thanks for your question about "${userMessage}"!\n\nI'm here to help with anything related to PiPilot. You can ask me about:\n\n• Getting started & tutorials\n• Features & capabilities\n• Billing & pricing\n• Technical issues\n• Account settings\n\nFor complex issues, our support team is also available via the **live chat widget** or email at **hello@pipilot.dev**. How else can I help?`
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No reader available')
+
+      const decoder = new TextDecoder()
+      let assistantMessage = ''
+
+      // Add empty assistant message that we'll update
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('0:')) {
+            // Text content - parse the JSON string
+            try {
+              const textContent = JSON.parse(line.slice(2))
+              assistantMessage += textContent
+              setMessages(prev => {
+                const newMessages = [...prev]
+                newMessages[newMessages.length - 1] = { role: 'assistant', content: assistantMessage }
+                return newMessages
+              })
+            } catch {
+              // Skip malformed chunks
+            }
+          }
+        }
       }
-
-      setChatHistory(prev => [...prev, { role: 'ai', content: response }])
     } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'ai', content: "Sorry, I encountered an error. Please try again or contact our support team at hello@pipilot.dev" }])
+      console.error('Chat error:', error)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "I'm sorry, I encountered an error. Please try again or contact support at hello@pipilot.dev"
+      }])
     } finally {
-      setIsAiLoading(false)
+      setIsLoading(false)
     }
+  }
+
+  // Open chat with a question
+  const openChatWithQuestion = (question: string) => {
+    setChatOpen(true)
+    setChatMinimized(false)
+    setChatInput(question)
+    setTimeout(() => inputRef.current?.focus(), 100)
   }
 
   return (
@@ -292,7 +332,7 @@ export default function SupportPage() {
               Find answers to common questions, get help from our AI assistant, or reach out to our support team.
             </p>
 
-            {/* Search Bar */}
+            {/* Search Bar with Ask AI Button */}
             <div className="relative max-w-2xl mx-auto mb-8">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
@@ -300,103 +340,23 @@ export default function SupportPage() {
                 placeholder="Search for answers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 pr-4 py-6 text-lg bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-400 rounded-xl focus:ring-2 focus:ring-blue-500"
+                className="pl-12 pr-32 py-6 text-lg bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-400 rounded-xl focus:ring-2 focus:ring-blue-500"
               />
+              <Button
+                onClick={() => {
+                  if (searchQuery.trim()) {
+                    openChatWithQuestion(searchQuery)
+                  } else {
+                    setChatOpen(true)
+                    setChatMinimized(false)
+                  }
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Ask AI</span>
+              </Button>
             </div>
-          </div>
-
-          {/* AI Assistant Section */}
-          <div className="max-w-4xl mx-auto mb-16">
-            <Card className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 border-purple-500/30 overflow-hidden">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-500/20 rounded-lg">
-                    <Bot className="h-6 w-6 text-purple-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-white text-xl">Ask PiPilot AI</CardTitle>
-                    <p className="text-gray-400 text-sm">Get instant answers from our AI assistant</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Chat History */}
-                {showAiChat && chatHistory.length > 0 && (
-                  <div className="mb-4 max-h-80 overflow-y-auto space-y-4 p-4 bg-gray-900/50 rounded-lg">
-                    {chatHistory.map((msg, idx) => (
-                      <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-3 rounded-lg ${
-                          msg.role === 'user'
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-800 text-gray-200'
-                        }`}>
-                          {msg.role === 'ai' && (
-                            <div className="flex items-center gap-2 mb-2 text-purple-400 text-sm font-medium">
-                              <Bot className="h-4 w-4" />
-                              PiPilot AI
-                            </div>
-                          )}
-                          <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
-                        </div>
-                      </div>
-                    ))}
-                    {isAiLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-800 p-3 rounded-lg">
-                          <div className="flex items-center gap-2 text-purple-400">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Thinking...</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
-                )}
-
-                {/* Input Area */}
-                <div className="flex gap-3">
-                  <Input
-                    type="text"
-                    placeholder="Ask anything about PiPilot..."
-                    value={aiQuestion}
-                    onChange={(e) => setAiQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleAskAI()}
-                    className="flex-1 bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-400"
-                    disabled={isAiLoading}
-                  />
-                  <Button
-                    onClick={handleAskAI}
-                    disabled={isAiLoading || !aiQuestion.trim()}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    {isAiLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-
-                {/* Suggested Questions */}
-                {!showAiChat && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="text-gray-400 text-sm">Try asking:</span>
-                    {["How do I get started?", "What are the pricing plans?", "How do I export my project?"].map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setAiQuestion(q)
-                        }}
-                        className="text-sm text-purple-400 hover:text-purple-300 hover:underline"
-                      >
-                        "{q}"
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
 
           {/* Quick Help Cards */}
@@ -431,11 +391,20 @@ export default function SupportPage() {
                   <FileQuestion className="h-12 w-12 text-gray-500 mx-auto mb-4" />
                   <h3 className="text-white font-semibold mb-2">No results found</h3>
                   <p className="text-gray-400 mb-4">
-                    We couldn't find any FAQs matching "{searchQuery}". Try different keywords or ask our AI assistant above.
+                    We couldn't find any FAQs matching "{searchQuery}". Try different keywords or ask our AI assistant.
                   </p>
-                  <Button variant="outline" onClick={() => setSearchQuery("")}>
-                    Clear Search
-                  </Button>
+                  <div className="flex gap-3 justify-center">
+                    <Button variant="outline" onClick={() => setSearchQuery("")}>
+                      Clear Search
+                    </Button>
+                    <Button
+                      onClick={() => openChatWithQuestion(searchQuery)}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Ask AI Instead
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
@@ -481,17 +450,23 @@ export default function SupportPage() {
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-6">
-                  <div className="text-center p-6 bg-gray-800/50 rounded-xl">
+                  <div
+                    className="text-center p-6 bg-gray-800/50 rounded-xl cursor-pointer hover:bg-gray-800/70 transition-colors"
+                    onClick={() => {
+                      setChatOpen(true)
+                      setChatMinimized(false)
+                    }}
+                  >
                     <div className="w-14 h-14 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
-                      <MessageCircle className="h-7 w-7 text-purple-400" />
+                      <Bot className="h-7 w-7 text-purple-400" />
                     </div>
-                    <h3 className="text-white font-semibold mb-2">Live Chat</h3>
+                    <h3 className="text-white font-semibold mb-2">AI Assistant</h3>
                     <p className="text-gray-400 text-sm mb-4">
-                      Chat with our support team in real-time using the chat widget
+                      Chat with our AI assistant for instant answers powered by Mistral Pixtral
                     </p>
-                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                      <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse" />
-                      Online Now
+                    <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Powered by AI
                     </Badge>
                   </div>
 
@@ -519,6 +494,163 @@ export default function SupportPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Floating AI Chatbot Widget */}
+      {!chatOpen && (
+        <button
+          onClick={() => {
+            setChatOpen(true)
+            setChatMinimized(false)
+          }}
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all duration-300 group"
+          aria-label="Open AI Chat"
+        >
+          <Bot className="h-8 w-8 text-white" />
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900 animate-pulse" />
+          <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
+            Ask PiPilot AI
+          </div>
+        </button>
+      )}
+
+      {/* Chat Window */}
+      {chatOpen && (
+        <div
+          className={`fixed z-50 transition-all duration-300 ${
+            chatMinimized
+              ? 'bottom-6 right-6 w-72'
+              : 'bottom-6 right-6 w-[400px] max-w-[calc(100vw-48px)]'
+          }`}
+        >
+          <div className={`bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
+            chatMinimized ? 'h-auto' : 'h-[600px] max-h-[calc(100vh-100px)]'
+          }`}>
+            {/* Chat Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                  <Bot className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold">PiPilot AI</h3>
+                  <p className="text-white/70 text-xs">Powered by Mistral Pixtral</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setChatMinimized(!chatMinimized)}
+                  className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  {chatMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                </button>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Chat Content */}
+            {!chatMinimized && (
+              <>
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {messages.length === 0 && (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Bot className="h-8 w-8 text-purple-400" />
+                      </div>
+                      <h4 className="text-white font-medium mb-2">Hi! I'm PiPilot AI</h4>
+                      <p className="text-gray-400 text-sm mb-4">
+                        I'm here to help you with anything about PiPilot. Ask me anything!
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {["How do I get started?", "What can I build?", "Pricing plans"].map((q, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setChatInput(q)
+                              setTimeout(() => handleSendMessage(), 100)
+                            }}
+                            className="text-xs bg-gray-800 text-purple-400 px-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'flex gap-2'}`}>
+                        {msg.role === 'assistant' && (
+                          <div className="w-7 h-7 bg-purple-500/20 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5">
+                            <Bot className="h-4 w-4 text-purple-400" />
+                          </div>
+                        )}
+                        <div className={`p-3 rounded-2xl ${
+                          msg.role === 'user'
+                            ? 'bg-purple-600 text-white rounded-br-md'
+                            : 'bg-gray-800 text-gray-200 rounded-bl-md'
+                        }`}>
+                          <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                    <div className="flex justify-start">
+                      <div className="flex gap-2">
+                        <div className="w-7 h-7 bg-purple-500/20 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5">
+                          <Bot className="h-4 w-4 text-purple-400" />
+                        </div>
+                        <div className="bg-gray-800 p-3 rounded-2xl rounded-bl-md">
+                          <div className="flex items-center gap-2 text-purple-400">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Thinking...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="p-4 border-t border-gray-800">
+                  <div className="flex gap-2">
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="Ask anything about PiPilot..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                      className="flex-1 bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 rounded-xl"
+                      disabled={isLoading}
+                    />
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={isLoading || !chatInput.trim()}
+                      className="bg-purple-600 hover:bg-purple-700 rounded-xl px-4"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
