@@ -247,6 +247,11 @@ export default function SupportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
 
+  // Persistent screen sharing state
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const screenStreamRef = useRef<MediaStream | null>(null)
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null)
+
   // Filter FAQs based on search query
   const filteredCategories = faqCategories.map(category => ({
     ...category,
@@ -347,8 +352,8 @@ export default function SupportPage() {
     if (docInputRef.current) docInputRef.current.value = ''
   }, [])
 
-  // Handle screen capture
-  const handleScreenCapture = useCallback(async () => {
+  // Start persistent screen sharing
+  const startScreenSharing = useCallback(async () => {
     try {
       setIsCapturing(true)
 
@@ -360,42 +365,76 @@ export default function SupportPage() {
         audio: false
       })
 
-      // Create video element to capture frame
+      // Create video element and keep it alive
       const video = document.createElement('video')
       video.srcObject = stream
       await video.play()
 
-      // Wait a moment for the video to be ready
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Store references
+      screenStreamRef.current = stream
+      screenVideoRef.current = video
 
-      // Create canvas and capture frame
+      // Listen for when user stops sharing via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenSharing()
+      }
+
+      setIsScreenSharing(true)
+      toast.success("Screen sharing started! Screenshots will be auto-attached to your messages.")
+    } catch (error) {
+      if ((error as Error).name !== 'NotAllowedError') {
+        toast.error("Failed to start screen sharing")
+        console.error('Screen share error:', error)
+      }
+    } finally {
+      setIsCapturing(false)
+    }
+  }, [])
+
+  // Stop screen sharing
+  const stopScreenSharing = useCallback(() => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop())
+      screenStreamRef.current = null
+    }
+    screenVideoRef.current = null
+    setIsScreenSharing(false)
+    toast.success("Screen sharing stopped")
+  }, [])
+
+  // Capture frame from active screen share
+  const captureScreenFrame = useCallback((): string | null => {
+    if (!screenVideoRef.current || !screenStreamRef.current) return null
+
+    try {
+      const video = screenVideoRef.current
       const canvas = document.createElement('canvas')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       const ctx = canvas.getContext('2d')
       ctx?.drawImage(video, 0, 0)
-
-      // Stop all tracks
-      stream.getTracks().forEach(track => track.stop())
-
-      // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/png')
-
-      setAttachments(prev => [...prev, {
-        type: 'screenshot',
-        name: `Screenshot ${new Date().toLocaleTimeString()}`,
-        data: dataUrl,
-        preview: dataUrl
-      }])
-
-      toast.success("Screenshot captured!")
+      return canvas.toDataURL('image/png')
     } catch (error) {
-      if ((error as Error).name !== 'NotAllowedError') {
-        toast.error("Failed to capture screen")
-        console.error('Screen capture error:', error)
+      console.error('Failed to capture frame:', error)
+      return null
+    }
+  }, [])
+
+  // Toggle screen sharing
+  const handleScreenToggle = useCallback(() => {
+    if (isScreenSharing) {
+      stopScreenSharing()
+    } else {
+      startScreenSharing()
+    }
+  }, [isScreenSharing, startScreenSharing, stopScreenSharing])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop())
       }
-    } finally {
-      setIsCapturing(false)
     }
   }, [])
 
@@ -421,15 +460,29 @@ export default function SupportPage() {
 
   // Handle AI chat submission with streaming
   const handleSendMessage = async () => {
-    if ((!chatInput.trim() && attachments.length === 0) || isLoading) return
+    if ((!chatInput.trim() && attachments.length === 0 && !isScreenSharing) || isLoading) return
 
     const userText = chatInput.trim()
     setChatInput("")
 
+    // Auto-capture screen if sharing is active
+    let currentAttachments = [...attachments]
+    if (isScreenSharing) {
+      const screenFrame = captureScreenFrame()
+      if (screenFrame) {
+        currentAttachments.push({
+          type: 'screenshot',
+          name: `Screen ${new Date().toLocaleTimeString()}`,
+          data: screenFrame,
+          preview: screenFrame
+        })
+      }
+    }
+
     // Build message content
     let messageContent: string | ContentPart[]
 
-    if (attachments.length > 0) {
+    if (currentAttachments.length > 0) {
       const contentParts: ContentPart[] = []
 
       // Add text if present
@@ -438,7 +491,7 @@ export default function SupportPage() {
       }
 
       // Add images and documents
-      for (const att of attachments) {
+      for (const att of currentAttachments) {
         if (att.type === 'image' || att.type === 'screenshot') {
           contentParts.push({ type: 'image', image: att.data })
         } else if (att.type === 'document') {
@@ -927,17 +980,29 @@ export default function SupportPage() {
                       <span>Doc</span>
                     </button>
                     <button
-                      onClick={handleScreenCapture}
+                      onClick={handleScreenToggle}
                       disabled={isCapturing}
-                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      title="Capture screen"
+                      className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                        isScreenSharing
+                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                          : 'text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700'
+                      }`}
+                      title={isScreenSharing ? "Stop screen sharing" : "Start screen sharing"}
                     >
                       {isCapturing ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : isScreenSharing ? (
+                        <>
+                          <span className="relative flex h-2 w-2 mr-1">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                          </span>
+                          <Monitor className="h-3.5 w-3.5" />
+                        </>
                       ) : (
-                        <Camera className="h-3.5 w-3.5" />
+                        <Monitor className="h-3.5 w-3.5" />
                       )}
-                      <span>Screen</span>
+                      <span>{isScreenSharing ? 'Sharing' : 'Screen'}</span>
                     </button>
                   </div>
 

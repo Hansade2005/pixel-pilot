@@ -1,10 +1,148 @@
-import { streamText } from 'ai'
+import { streamText, tool } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
+import { z } from 'zod'
+import { promises as fs } from 'fs'
+import path from 'path'
 
 // Create Mistral provider for Pixtral (supports vision)
 const mistralProvider = createMistral({
   apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 })
+
+// Interface for docs.json structure
+interface DocSection {
+  title: string
+  overview: string
+  content: string
+  search_keywords: string[]
+}
+
+interface DocsData {
+  sections: DocSection[]
+}
+
+// Cache for docs data
+let cachedDocsData: DocsData | null = null
+
+// Function to load docs data
+async function loadDocsData(): Promise<DocsData> {
+  if (cachedDocsData) return cachedDocsData
+
+  try {
+    const docsPath = path.join(process.cwd(), 'public', 'docs.json')
+    const docsContent = await fs.readFile(docsPath, 'utf-8')
+    cachedDocsData = JSON.parse(docsContent)
+    return cachedDocsData!
+  } catch (error) {
+    console.error('Failed to load docs.json:', error)
+    return { sections: [] }
+  }
+}
+
+// Function to search docs using regex
+function searchDocs(docsData: DocsData, query: string, maxResults: number = 3): string {
+  try {
+    // Create regex from query (case insensitive)
+    const regex = new RegExp(query, 'gi')
+
+    const results: Array<{
+      title: string
+      overview: string
+      matches: string[]
+      score: number
+    }> = []
+
+    for (const section of docsData.sections) {
+      const matches: string[] = []
+      let score = 0
+
+      // Check title
+      if (regex.test(section.title)) {
+        score += 10
+        matches.push(`Title match: "${section.title}"`)
+      }
+      regex.lastIndex = 0 // Reset regex
+
+      // Check overview
+      if (regex.test(section.overview)) {
+        score += 5
+        matches.push(`Overview match`)
+      }
+      regex.lastIndex = 0
+
+      // Check keywords
+      for (const keyword of section.search_keywords) {
+        if (regex.test(keyword)) {
+          score += 3
+          matches.push(`Keyword: "${keyword}"`)
+        }
+        regex.lastIndex = 0
+      }
+
+      // Check content and extract matching snippets
+      const contentMatches = section.content.match(regex)
+      if (contentMatches) {
+        score += contentMatches.length
+
+        // Extract context around matches (first 3)
+        const lines = section.content.split('\n')
+        let snippetCount = 0
+        for (const line of lines) {
+          if (snippetCount >= 3) break
+          regex.lastIndex = 0
+          if (regex.test(line) && line.trim().length > 10) {
+            const snippet = line.trim().slice(0, 200)
+            matches.push(`Content: "...${snippet}..."`)
+            snippetCount++
+          }
+        }
+      }
+
+      if (score > 0) {
+        results.push({
+          title: section.title,
+          overview: section.overview,
+          matches,
+          score
+        })
+      }
+    }
+
+    // Sort by score and limit results
+    results.sort((a, b) => b.score - a.score)
+    const topResults = results.slice(0, maxResults)
+
+    if (topResults.length === 0) {
+      return `No documentation found matching "${query}". Try a different search term.`
+    }
+
+    // Format results
+    let output = `Found ${topResults.length} relevant documentation section(s):\n\n`
+
+    for (const result of topResults) {
+      output += `## ${result.title}\n`
+      output += `**Overview:** ${result.overview}\n`
+      output += `**Matches:** ${result.matches.slice(0, 3).join('; ')}\n\n`
+    }
+
+    return output
+  } catch (error) {
+    return `Search error: Invalid regex pattern. Please use a simpler search term.`
+  }
+}
+
+// Function to get full section content
+function getSectionContent(docsData: DocsData, sectionTitle: string): string {
+  const section = docsData.sections.find(
+    s => s.title.toLowerCase() === sectionTitle.toLowerCase()
+  )
+
+  if (!section) {
+    return `Section "${sectionTitle}" not found. Available sections: ${docsData.sections.map(s => s.title).join(', ')}`
+  }
+
+  return `# ${section.title}\n\n**Overview:** ${section.overview}\n\n${section.content}`
+}
 
 // PiPilot knowledge base - comprehensive documentation
 const PIPILOT_KNOWLEDGE = `
@@ -206,6 +344,9 @@ export async function POST(req: Request) {
     // Get Mistral Pixtral model (supports vision)
     const model = mistralProvider('pixtral-12b-2409')
 
+    // Load docs data for tools
+    const docsData = await loadDocsData()
+
     // Create the system prompt with knowledge base
     const systemPrompt = `You are PiPilot's friendly and knowledgeable AI support assistant. Your name is "PiPilot AI".
 
@@ -214,18 +355,24 @@ Your role is to help users with questions about PiPilot, troubleshoot issues, an
 IMPORTANT GUIDELINES:
 1. Be friendly, helpful, and concise
 2. Use the knowledge base below to answer questions accurately
-3. If you don't know something, say so and suggest contacting support at hello@pipilot.dev
+3. If you don't know something, USE THE search_docs TOOL to search PiPilot's documentation for accurate information
 4. Use markdown formatting for better readability (bold, lists, code blocks when needed)
 5. Keep responses focused and not too long
 6. Always be positive about PiPilot's capabilities
 7. If users have technical issues, provide step-by-step troubleshooting
 8. Mention the founder Hans Ade when relevant to company questions
 9. When users share screenshots, carefully analyze them to understand their issue and provide specific help based on what you see
+10. For detailed technical questions, use the search_docs tool with regex patterns to find relevant documentation
+11. If you need the full content of a specific documentation section, use get_section_content tool
 
-KNOWLEDGE BASE:
+AVAILABLE TOOLS:
+- search_docs: Search PiPilot documentation using regex patterns (e.g., "deploy.*vercel", "database|supabase", "pricing")
+- get_section_content: Get the full content of a specific documentation section by title
+
+KNOWLEDGE BASE (Quick Reference):
 ${PIPILOT_KNOWLEDGE}
 
-Remember: You represent PiPilot. Be professional, helpful, and make users feel supported!`
+Remember: You represent PiPilot. Be professional, helpful, and make users feel supported! Use the search_docs tool when you need more detailed or specific information.`
 
     // Transform messages to handle multimodal content
     const transformedMessages = messages.map((msg: Message) => {
@@ -252,6 +399,28 @@ Remember: You represent PiPilot. Be professional, helpful, and make users feel s
       messages: transformedMessages,
       maxTokens: 1024,
       temperature: 0.7,
+      tools: {
+        search_docs: tool({
+          description: 'Search PiPilot documentation using regex patterns. Use this to find relevant documentation about features, integrations, troubleshooting, etc. Returns matching sections with snippets.',
+          parameters: z.object({
+            query: z.string().describe('Regex pattern to search for (e.g., "deploy.*vercel", "database|supabase", "pricing", "slash.*command")'),
+            maxResults: z.number().optional().default(3).describe('Maximum number of results to return (default: 3)')
+          }),
+          execute: async ({ query, maxResults }) => {
+            return searchDocs(docsData, query, maxResults)
+          }
+        }),
+        get_section_content: tool({
+          description: 'Get the full content of a specific documentation section by its title. Use this when you need detailed information from a specific section.',
+          parameters: z.object({
+            sectionTitle: z.string().describe('The exact title of the section (e.g., "PiPilot Features", "Supported Frameworks", "Integration System")')
+          }),
+          execute: async ({ sectionTitle }) => {
+            return getSectionContent(docsData, sectionTitle)
+          }
+        })
+      },
+      maxSteps: 3, // Allow up to 3 tool calls
     })
 
     return result.toTextStreamResponse()
