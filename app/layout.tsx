@@ -111,7 +111,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               var isWorkspaceWithProject = window.location.pathname === '/workspace' && window.location.search.includes('projectId');
-              if (!isWorkspaceWithProject) {
+              var isSupportPage = window.location.pathname === '/support';
+              if (!isWorkspaceWithProject && !isSupportPage) {
                 var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
                 (function(){
                   var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
