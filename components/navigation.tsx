@@ -258,9 +258,6 @@ export function Navigation() {
               <Link href="/community" className="text-white hover:text-gray-300 transition-colors">
                 Community
               </Link>
-              <Link href="/blog" className="text-white hover:text-gray-300 transition-colors">
-                Blog
-              </Link>
               <Link href="/enterprise" className="text-white hover:text-gray-300 transition-colors">
                 Business
               </Link>
@@ -269,6 +266,9 @@ export function Navigation() {
               </Link>
               <Link href="/docs" className="text-white hover:text-gray-300 transition-colors">
                 Docs
+              </Link>
+              <Link href="/support" className="text-white hover:text-gray-300 transition-colors">
+                Support
               </Link>
             </div>
           )}

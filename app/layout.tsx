@@ -106,23 +106,65 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Tawk.to Live Chat - Hidden on workspace with project open */}
+        {/* Tawk.to Live Chat - Dynamically hidden on specific pages */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              var isWorkspaceWithProject = window.location.pathname === '/workspace' && window.location.search.includes('projectId');
-              var isSupportPage = window.location.pathname === '/support';
-              if (!isWorkspaceWithProject && !isSupportPage) {
-                var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-                (function(){
-                  var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
-                  s1.async=true;
-                  s1.src='https://embed.tawk.to/696f56620938061981966d61/1jfdeist0';
-                  s1.charset='UTF-8';
-                  s1.setAttribute('crossorigin','*');
-                  s0.parentNode.insertBefore(s1,s0);
-                })();
+              var Tawk_API = Tawk_API || {};
+              var Tawk_LoadStart = new Date();
+
+              // Function to check if widget should be hidden
+              function shouldHideTawkWidget() {
+                var isWorkspaceWithProject = window.location.pathname === '/workspace' && window.location.search.includes('projectId');
+                var isSupportPage = window.location.pathname === '/support';
+                return isWorkspaceWithProject || isSupportPage;
               }
+
+              // Function to update widget visibility
+              function updateTawkVisibility() {
+                if (typeof Tawk_API.hideWidget === 'function' && typeof Tawk_API.showWidget === 'function') {
+                  if (shouldHideTawkWidget()) {
+                    Tawk_API.hideWidget();
+                  } else {
+                    Tawk_API.showWidget();
+                  }
+                }
+              }
+
+              // Set initial visibility on load
+              Tawk_API.onLoad = function() {
+                updateTawkVisibility();
+              };
+
+              // Listen for route changes (Next.js client-side navigation)
+              (function() {
+                var originalPushState = history.pushState;
+                var originalReplaceState = history.replaceState;
+
+                history.pushState = function() {
+                  originalPushState.apply(this, arguments);
+                  setTimeout(updateTawkVisibility, 100);
+                };
+
+                history.replaceState = function() {
+                  originalReplaceState.apply(this, arguments);
+                  setTimeout(updateTawkVisibility, 100);
+                };
+
+                window.addEventListener('popstate', function() {
+                  setTimeout(updateTawkVisibility, 100);
+                });
+              })();
+
+              // Load Tawk.to script
+              (function(){
+                var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
+                s1.async=true;
+                s1.src='https://embed.tawk.to/696f56620938061981966d61/1jfdeist0';
+                s1.charset='UTF-8';
+                s1.setAttribute('crossorigin','*');
+                s0.parentNode.insertBefore(s1,s0);
+              })();
             `,
           }}
         />
