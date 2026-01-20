@@ -1,4 +1,4 @@
-import { streamText, tool } from 'ai'
+import { streamText, tool, stepCountIs } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 import { z } from 'zod'
 import { promises as fs } from 'fs'
@@ -420,7 +420,7 @@ Remember: You represent PiPilot. Be professional, helpful, and make users feel s
           }
         })
       },
-      maxSteps: 3, // Allow up to 3 tool calls
+      stopWhen: stepCountIs(3), // Stop when max steps reached
     })
 
     return result.toTextStreamResponse()
