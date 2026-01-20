@@ -20,6 +20,10 @@ import {
   Zap,
   Globe,
   Users,
+  Calendar,
+  Rocket,
+  Target,
+  Heart,
 } from "lucide-react"
 
 export default function AboutPage() {
@@ -112,6 +116,102 @@ export default function AboutPage() {
             </div>
           </div>
 
+          {/* The Origin Story Section */}
+          <div className="max-w-4xl mx-auto mb-20">
+            <div className="text-center mb-12">
+              <Badge className="mb-4 bg-orange-500/20 text-orange-300 border-orange-500/30">
+                <Calendar className="h-3 w-3 mr-1" /> July 29, 2025
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                The Day Everything Changed
+              </h2>
+              <p className="text-gray-400">How frustration became the fuel for innovation</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-sm rounded-2xl p-8 md:p-10 border border-gray-700 relative overflow-hidden">
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl" />
+
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center shrink-0">
+                    <Target className="h-6 w-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">The Frustration</h3>
+                    <p className="text-gray-300 leading-relaxed">
+                      It was late July 2025, and I found myself staring at my screen for the hundredth time that week,
+                      wrestling with the same repetitive tasks. I had tried every AI-powered development tool on the market—
+                      <span className="text-white"> Lovable, Bolt, Cursor, Windsurf</span>—you name it, I used it.
+                      But none of them delivered what I truly needed: <span className="text-purple-400 font-medium">complete automation</span>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center shrink-0">
+                    <Lightbulb className="h-6 w-6 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">The Breaking Point</h3>
+                    <p className="text-gray-300 leading-relaxed">
+                      Every tool promised to revolutionize my workflow, but they all fell short. I was still manually
+                      configuring environments, still copying and pasting code between windows, still babysitting AI
+                      that couldn't remember what we discussed five minutes ago. The tools were smart, sure—but they
+                      weren't <span className="text-white">intelligent enough</span>. They couldn't think ahead. They
+                      couldn't understand context. They couldn't give me the <span className="text-pink-400 font-medium">true freedom</span>
+                      to just describe what I wanted and watch it come to life.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center shrink-0">
+                    <Rocket className="h-6 w-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">The Decision</h3>
+                    <p className="text-gray-300 leading-relaxed">
+                      On <span className="text-white font-semibold">July 29, 2025</span>, I made a decision that would change everything.
+                      Instead of waiting for someone else to build the tool I desperately needed, I decided to build it myself.
+                      If the existing tools couldn't give me full automation—the ability to truly converse with an AI that
+                      understands my project, remembers our history, and executes complete workflows without constant
+                      hand-holding—then I would create one that could.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center shrink-0">
+                    <Heart className="h-6 w-6 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">The Birth of PiPilot</h3>
+                    <p className="text-gray-300 leading-relaxed">
+                      And so PiPilot was born—not in a boardroom, not from a business plan, but from genuine frustration
+                      and a relentless drive to solve a problem I lived with every single day. I built PiPilot for
+                      developers like me: people who don't want to fight their tools, who want AI that truly
+                      <span className="text-purple-400 font-medium"> understands</span>,
+                      <span className="text-pink-400 font-medium"> remembers</span>, and
+                      <span className="text-blue-400 font-medium"> delivers</span>.
+                      Today, PiPilot represents everything I wished existed back then—and everything I'm committed to
+                      making even better for developers around the world.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-gray-700">
+                  <p className="text-gray-400 italic text-center">
+                    "I didn't start PiPilot to compete with other tools. I started it because I needed something
+                    they couldn't give me. And if I needed it, I knew others did too."
+                  </p>
+                  <p className="text-purple-400 text-center mt-2 font-medium">— Hans Ade, Founder</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Founder Section */}
           <div className="max-w-6xl mx-auto mb-20">
             <div className="text-center mb-12">
@@ -119,7 +219,7 @@ export default function AboutPage() {
                 Meet the Founder
               </Badge>
               <h2 className="text-3xl md:text-4xl font-bold text-white">
-                The Vision Behind PiPilot
+                The Mind Behind PiPilot
               </h2>
             </div>
 
