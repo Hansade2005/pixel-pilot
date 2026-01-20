@@ -10,11 +10,8 @@ import {
   ChevronRight,
   Plus,
   Replace,
-  AlertTriangle,
   Check,
   Loader2,
-  FolderOpen,
-  Copy,
   ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -802,17 +799,6 @@ export function CodebaseSearch({
                     className="h-full bg-primary transition-all duration-300 ease-out"
                     style={{ width: `${(replaceProgress.current / replaceProgress.total) * 100}%` }}
                   />
-                </div>
-              </div>
-            )}
-
-            {/* Warning */}
-            {replacePreview.length > 0 && selectedFilesForReplace.size > 0 && !replaceProgress && (
-              <div className="flex items-start gap-2 p-2 sm:p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-xs sm:text-sm flex-shrink-0">
-                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <span className="font-medium">Modifying {selectedFilesForReplace.size} file{selectedFilesForReplace.size !== 1 ? 's' : ''}. </span>
-                  <span className="text-muted-foreground">Ensure backup exists before proceeding.</span>
                 </div>
               </div>
             )}

@@ -7,6 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Github,
   Rocket,
@@ -19,6 +30,7 @@ import {
   GitBranch,
   Clock,
   Database,
+  Pencil,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment } from "@/lib/storage-manager"
@@ -48,6 +60,12 @@ export default function ProjectPage() {
   const [productionSite, setProductionSite] = useState<any>(null)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploymentType, setDeploymentType] = useState<'preview' | 'production'>('preview')
+
+  // Edit project state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editName, setEditName] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     getCurrentUser()
@@ -264,6 +282,69 @@ export default function ProjectPage() {
     })
   }
 
+  const openEditDialog = () => {
+    if (project) {
+      setEditName(project.name || "")
+      setEditDescription(project.description || "")
+      setIsEditDialogOpen(true)
+    }
+  }
+
+  const saveProjectDetails = async () => {
+    if (!project || !editName.trim()) {
+      toast({
+        title: "Error",
+        description: "Project name is required",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await storageManager.init()
+
+      // Generate new slug from name
+      const newSlug = editName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+      await storageManager.updateWorkspace(project.id, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+        slug: newSlug,
+        updatedAt: new Date().toISOString()
+      })
+
+      // Update local state
+      setProject(prev => prev ? {
+        ...prev,
+        name: editName.trim(),
+        description: editDescription.trim(),
+        slug: newSlug
+      } : null)
+
+      setIsEditDialogOpen(false)
+
+      toast({
+        title: "Project Updated",
+        description: "Project details have been saved successfully"
+      })
+
+      // If slug changed, redirect to new URL
+      if (newSlug !== slug) {
+        router.push(`/workspace/projects/${newSlug}`)
+      }
+    } catch (error) {
+      console.error('Error saving project:', error)
+      toast({
+        title: "Error",
+        description: "Failed to save project details",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen relative overflow-hidden">
@@ -344,25 +425,36 @@ export default function ProjectPage() {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-                <div>
-                  <h1 className="text-3xl font-bold text-white">
-                    <span className="block sm:hidden">
-                      {project.name?.slice(0, 3) ?? ''}
-                      {project.name && project.name.length > 3 ? '…' : ''}
-                    </span>
-                    <span className="hidden sm:inline">
-                      {project.name}
-                    </span>
-                  </h1>
-                  <p className="text-gray-400">
-                    <span className="block sm:hidden">
-                      {(project.description || 'No description')?.slice(0, 3)}
-                      {(project.description || 'No description').length > 3 ? '…' : ''}
-                    </span>
-                    <span className="hidden sm:inline">
-                      {project.description || 'No description'}
-                    </span>
-                  </p>
+                <div className="flex items-start gap-2">
+                  <div>
+                    <h1 className="text-3xl font-bold text-white">
+                      <span className="block sm:hidden">
+                        {project.name?.slice(0, 3) ?? ''}
+                        {project.name && project.name.length > 3 ? '…' : ''}
+                      </span>
+                      <span className="hidden sm:inline">
+                        {project.name}
+                      </span>
+                    </h1>
+                    <p className="text-gray-400">
+                      <span className="block sm:hidden">
+                        {(project.description || 'No description')?.slice(0, 3)}
+                        {(project.description || 'No description').length > 3 ? '…' : ''}
+                      </span>
+                      <span className="hidden sm:inline">
+                        {project.description || 'No description'}
+                      </span>
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={openEditDialog}
+                    className="text-gray-400 hover:text-white h-8 w-8 p-0"
+                    title="Edit project details"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -598,6 +690,54 @@ export default function ProjectPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Edit Project Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>
+              Update your project name and description.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Project Name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="My Awesome Project"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Describe your project..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={saveProjectDetails}
+              disabled={isSaving || !editName.trim()}
+            >
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
