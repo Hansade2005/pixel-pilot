@@ -105,7 +105,13 @@ export default function DocsPage() {
       'Performance Optimization': Zap,
       'Troubleshooting Guide': AlertCircle,
       'MCP Server Integration': Server,
-      'PiPilot SDK': Code
+      'PiPilot SDK': Code,
+      // New feature sections
+      'Slash Commands System': Terminal,
+      'Conversation Branching': Workflow,
+      'AI Memory System': Brain,
+      'Multi-Chat Session Support': Layers,
+      'Codebase Search & Replace': Search
     }
     return iconMap[title] || BookOpen
   }
@@ -131,7 +137,13 @@ export default function DocsPage() {
       'Performance Optimization': 'purple',
       'Troubleshooting Guide': 'gray',
       'MCP Server Integration': 'blue',
-      'PiPilot SDK': 'green'
+      'PiPilot SDK': 'green',
+      // New feature sections
+      'Slash Commands System': 'orange',
+      'Conversation Branching': 'indigo',
+      'AI Memory System': 'green',
+      'Multi-Chat Session Support': 'blue',
+      'Codebase Search & Replace': 'pink'
     }
     return colorMap[title] || 'purple'
   }

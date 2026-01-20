@@ -51,6 +51,7 @@ import { VisualDiffPreview, type FileChange } from '@/components/ui/visual-diff-
 import { EnhancedToolPanel, type ToolExecution } from '@/components/ui/enhanced-tool-panel'
 import { ConversationBranchManager, BranchFromMessageButton, CreateBranchDialog, type ConversationBranch } from '@/components/ui/conversation-branch'
 import { StreamingMessage } from '@/components/ui/streaming-text'
+import { CodebaseSearch, type AttachedSearchContext, SearchContextPill } from '@/components/ui/codebase-search'
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -1078,6 +1079,10 @@ export function ChatPanelV2({
 
   // Memory display dialog state
   const [showMemoryDialog, setShowMemoryDialog] = useState(false)
+
+  // Search dialog state
+  const [showSearchDialog, setShowSearchDialog] = useState(false)
+  const [attachedSearchContexts, setAttachedSearchContexts] = useState<AttachedSearchContext[]>([])
 
   // Load database ID from workspace if not provided
   // Try multiple methods for maximum accuracy
@@ -2993,15 +2998,7 @@ export function ChatPanelV2({
       sendCommandAsMessage('Optimize the code for better performance. Identify bottlenecks and suggest improvements.')
     },
     onSearch: () => {
-      setInput('Search the codebase for: ')
-      textareaRef.current?.focus()
-      // Position cursor after the text
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.value.length
-          textareaRef.current.selectionEnd = textareaRef.current.value.length
-        }
-      }, 10)
+      setShowSearchDialog(true)
     },
     onDeploy: () => {
       if (project?.id) {
@@ -3220,6 +3217,40 @@ export function ChatPanelV2({
       ((messages.find(m => m.id === branchingMessageId)?.content?.length || 0) > 100 ? '...' : '')
     : undefined
 
+  // Handle opening file from search results
+  const handleOpenFileFromSearch = useCallback((filePath: string, lineNumber?: number) => {
+    // Dispatch event to open file in editor (handled by workspace-layout or file explorer)
+    const event = new CustomEvent('openFileInEditor', {
+      detail: { filePath, lineNumber }
+    })
+    window.dispatchEvent(event)
+
+    // Also try to focus the file in the file explorer if available
+    const fileEvent = new CustomEvent('focusFileInExplorer', {
+      detail: { path: filePath }
+    })
+    window.dispatchEvent(fileEvent)
+
+    toast({
+      title: 'Opening file',
+      description: `${filePath}${lineNumber ? `:${lineNumber}` : ''}`
+    })
+  }, [toast])
+
+  // Handle attaching search context
+  const handleAttachSearchContext = useCallback((context: AttachedSearchContext) => {
+    setAttachedSearchContexts(prev => {
+      // Don't add duplicates
+      if (prev.some(c => c.id === context.id)) return prev
+      return [...prev, context]
+    })
+  }, [])
+
+  // Handle removing search context
+  const handleRemoveSearchContext = useCallback((id: string) => {
+    setAttachedSearchContexts(prev => prev.filter(c => c.id !== id))
+  }, [])
+
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -3349,11 +3380,24 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       }
     }
 
+    // Add search context attachments
+    if (attachedSearchContexts.length > 0) {
+      const searchContexts = attachedSearchContexts
+        .map(ctx => `\n\n--- Search Result: ${ctx.filePath}:${ctx.lineNumber} ---\n${ctx.content}\n--- End Result ---`)
+        .join('')
+
+      if (searchContexts) {
+        enhancedContent = `${enhancedContent}\n\n=== SEARCH CONTEXT ===${searchContexts}\n=== END SEARCH CONTEXT ===`
+        displayContent = `${displayContent}\n\n🔍 **Search Context:**${attachedSearchContexts.map(ctx => `\n- \`${ctx.filePath}:${ctx.lineNumber}\`: ${ctx.content.slice(0, 50)}${ctx.content.length > 50 ? '...' : ''}`).join('')}`
+      }
+    }
+
     // Clear attachments
     setAttachedFiles([])
     setAttachedImages([])
     setAttachedUploadedFiles([])
     setAttachedUrls([])
+    setAttachedSearchContexts([])
     setInput('')
     setIsLoading(true)
 
@@ -4512,7 +4556,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         )}
 
         {/* Attachments Display */}
-        {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0) && (
+        {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0 || attachedSearchContexts.length > 0) && (
           <div className="mb-2 flex flex-wrap gap-2">
             {attachedFiles.map((file: AttachedFile) => (
               <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
@@ -4551,6 +4595,15 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   <X className="size-3" />
                 </button>
               </div>
+            ))}
+            {/* Search Context Attachments */}
+            {attachedSearchContexts.map((ctx: AttachedSearchContext) => (
+              <SearchContextPill
+                key={ctx.id}
+                context={ctx}
+                onRemove={() => handleRemoveSearchContext(ctx.id)}
+                onClick={() => handleOpenFileFromSearch(ctx.filePath, ctx.lineNumber)}
+              />
             ))}
           </div>
         )}
@@ -5227,6 +5280,17 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Codebase Search Dialog */}
+        <CodebaseSearch
+          open={showSearchDialog}
+          onOpenChange={setShowSearchDialog}
+          projectId={project?.id || null}
+          onOpenFile={handleOpenFileFromSearch}
+          onAttachContext={handleAttachSearchContext}
+          attachedContexts={attachedSearchContexts}
+          onRemoveContext={handleRemoveSearchContext}
+        />
       </div>
     </div>
   )
