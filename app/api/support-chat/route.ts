@@ -380,16 +380,27 @@ Remember: You represent PiPilot. Be professional, helpful, and make users feel s
         return msg
       }
       // Handle multimodal messages (text + images)
+      const transformedContent = msg.content.map((part: ContentPart) => {
+        if (part.type === 'text') {
+          return { type: 'text' as const, text: part.text }
+        } else if (part.type === 'image') {
+          // Ensure image is properly formatted for AI SDK
+          // AI SDK accepts: URL, data URI, base64 string, Uint8Array, Buffer
+          const imageData = part.image
+          return { type: 'image' as const, image: imageData }
+        }
+        return part
+      })
+
+      // Log image count for debugging
+      const imageCount = transformedContent.filter(p => p.type === 'image').length
+      if (imageCount > 0) {
+        console.log(`Processing message with ${imageCount} image(s)`)
+      }
+
       return {
         role: msg.role,
-        content: msg.content.map((part: ContentPart) => {
-          if (part.type === 'text') {
-            return { type: 'text' as const, text: part.text }
-          } else if (part.type === 'image') {
-            return { type: 'image' as const, image: part.image }
-          }
-          return part
-        })
+        content: transformedContent
       }
     })
 
