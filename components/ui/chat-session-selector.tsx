@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { MessageSquare, Plus, MoreHorizontal, Pencil, Trash2, Check, X, GitBranch } from "lucide-react"
+import { MessageSquare, Plus, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -344,14 +344,6 @@ export function ChatSessionSelector({
             </div>
           )}
 
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-xs text-muted-foreground justify-center"
-            disabled
-          >
-            <GitBranch className="h-3 w-3 mr-1" />
-            Branch from message (coming soon)
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </TooltipProvider>

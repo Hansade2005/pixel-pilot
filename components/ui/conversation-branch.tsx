@@ -74,7 +74,7 @@ interface CreateBranchDialogProps {
   onCreateBranch: (name: string, description?: string) => void
 }
 
-function CreateBranchDialog({
+export function CreateBranchDialog({
   open,
   onOpenChange,
   messagePreview,

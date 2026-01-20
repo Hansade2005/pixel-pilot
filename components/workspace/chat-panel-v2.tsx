@@ -24,7 +24,7 @@ import {
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
-  CreditCard, Coins
+  CreditCard, Coins, GitBranch
 } from 'lucide-react'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -49,7 +49,7 @@ import { MemoryContextDisplay } from '@/components/ui/memory-context-display'
 import { VoiceInputPanel } from '@/components/ui/voice-input-panel'
 import { VisualDiffPreview, type FileChange } from '@/components/ui/visual-diff-preview'
 import { EnhancedToolPanel, type ToolExecution } from '@/components/ui/enhanced-tool-panel'
-import { ConversationBranchManager, BranchFromMessageButton, type ConversationBranch } from '@/components/ui/conversation-branch'
+import { ConversationBranchManager, BranchFromMessageButton, CreateBranchDialog, type ConversationBranch } from '@/components/ui/conversation-branch'
 import { StreamingMessage } from '@/components/ui/streaming-text'
 
 // Compress project files using LZ4 + Zip for efficient transfer
@@ -157,6 +157,7 @@ const ExpandableUserMessage = ({
   onDelete,
   onRetry,
   onRevert,
+  onBranch,
   showRestore = false,
   isExpanded: controlledExpanded,
   onExpandedChange
@@ -167,6 +168,7 @@ const ExpandableUserMessage = ({
   onDelete: (messageId: string) => void
   onRetry: (messageId: string, content: string) => void
   onRevert: (messageId: string) => void
+  onBranch?: (messageId: string) => void
   showRestore?: boolean
   isExpanded?: boolean
   onExpandedChange?: (expanded: boolean) => void
@@ -213,6 +215,11 @@ const ExpandableUserMessage = ({
     onCopy(messageId, content);
   };
 
+  const handleBranch = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onBranch?.(messageId);
+  };
+
   const renderCheckpointButton = () => {
     if (showRestore) {
       return (
@@ -244,6 +251,11 @@ const ExpandableUserMessage = ({
                 <ArrowUp className="w-4 h-4" />
               </Action>
               {renderCheckpointButton()}
+              {onBranch && (
+                <Action tooltip="Branch from here" onClick={handleBranch}>
+                  <GitBranch className="w-4 h-4" />
+                </Action>
+              )}
               <Action tooltip="Copy message" onClick={handleCopy}>
                 <Copy className="w-4 h-4" />
               </Action>
@@ -307,6 +319,11 @@ const ExpandableUserMessage = ({
               <ArrowUp className="w-4 h-4" />
             </Action>
             {renderCheckpointButton()}
+            {onBranch && (
+              <Action tooltip="Branch from here" onClick={handleBranch}>
+                <GitBranch className="w-4 h-4" />
+              </Action>
+            )}
             <Action tooltip="Copy message" onClick={handleCopy}>
               <Copy className="w-4 h-4" />
             </Action>
@@ -1054,6 +1071,13 @@ export function ChatPanelV2({
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([])
   const [elapsedTime, setElapsedTime] = useState(0)
   const [currentChatSessionId, setCurrentChatSessionId] = useState<string | null>(null)
+
+  // Branch dialog state
+  const [showBranchDialog, setShowBranchDialog] = useState(false)
+  const [branchingMessageId, setBranchingMessageId] = useState<string | null>(null)
+
+  // Memory display dialog state
+  const [showMemoryDialog, setShowMemoryDialog] = useState(false)
 
   // Load database ID from workspace if not provided
   // Try multiple methods for maximum accuracy
@@ -3050,10 +3074,7 @@ export function ChatPanelV2({
       regenerateLastResponse()
     },
     onMemory: () => {
-      toast({
-        title: 'AI Memory',
-        description: `This chat has ${messages.length} messages. Session ID: ${currentChatSessionId?.slice(0, 8) || 'none'}...`
-      })
+      setShowMemoryDialog(true)
     },
     onSettings: () => {
       if (project?.name) {
@@ -3186,6 +3207,18 @@ export function ChatPanelV2({
   const handleRenameBranch = (branchId: string, newName: string) => {
     // Handled by ChatSessionSelector in workspace-layout
   }
+
+  // Handle opening branch dialog from message button
+  const handleBranchFromMessage = (messageId: string) => {
+    setBranchingMessageId(messageId)
+    setShowBranchDialog(true)
+  }
+
+  // Get message preview for branch dialog
+  const branchingMessagePreview = branchingMessageId
+    ? messages.find(m => m.id === branchingMessageId)?.content?.slice(0, 100) +
+      ((messages.find(m => m.id === branchingMessageId)?.content?.length || 0) > 100 ? '...' : '')
+    : undefined
 
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
@@ -4311,6 +4344,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   onDelete={handleDeleteMessage}
                   onRetry={handleRetryMessage}
                   onRevert={handleRevertToCheckpoint}
+                  onBranch={handleBranchFromMessage}
                   showRestore={restoreMessageId === message.id}
                 />
               </div>
@@ -5151,6 +5185,48 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             setShowDiffPreview(false)
           }}
         />
+
+        {/* Branch Creation Dialog */}
+        <CreateBranchDialog
+          open={showBranchDialog}
+          onOpenChange={setShowBranchDialog}
+          messagePreview={branchingMessagePreview}
+          onCreateBranch={(name, description) => {
+            if (branchingMessageId) {
+              handleCreateBranch(branchingMessageId, name, description)
+              setBranchingMessageId(null)
+            }
+          }}
+        />
+
+        {/* Memory Context Dialog */}
+        <Dialog open={showMemoryDialog} onOpenChange={setShowMemoryDialog}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                AI Memory & Context
+              </DialogTitle>
+              <DialogDescription>
+                View what AI remembers about this project and conversation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <MemoryContextDisplay
+                workspaceId={project?.id || null}
+                userId={project?.userId || ''}
+              />
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Current Session:</strong> {currentChatSessionId?.slice(0, 12) || 'None'}...
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <strong>Messages in this chat:</strong> {messages.length}
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
