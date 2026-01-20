@@ -5254,7 +5254,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
         {/* Memory Context Dialog */}
         <Dialog open={showMemoryDialog} onOpenChange={setShowMemoryDialog}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg z-[100]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
