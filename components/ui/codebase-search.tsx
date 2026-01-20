@@ -120,6 +120,7 @@ export function CodebaseSearch({
     matchCount: number
   }[]>([])
   const [selectedFilesForReplace, setSelectedFilesForReplace] = useState<Set<string>>(new Set())
+  const [replaceProgress, setReplaceProgress] = useState<{ current: number; total: number } | null>(null)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -316,7 +317,13 @@ export function CodebaseSearch({
       return
     }
 
+    if (!projectId) {
+      toast({ title: 'No project', description: 'Select a project first', variant: 'destructive' })
+      return
+    }
+
     setIsReplacing(true)
+    setReplaceProgress({ current: 0, total: selectedFilesForReplace.size })
 
     try {
       const { storageManager } = await import('@/lib/storage-manager')
@@ -324,37 +331,57 @@ export function CodebaseSearch({
 
       let replacedCount = 0
       let totalReplacements = 0
+      const errors: string[] = []
 
       for (const preview of replacePreview) {
         if (!selectedFilesForReplace.has(preview.filePath)) continue
 
-        // Update file with new content
-        const files = await storageManager.getFiles(projectId!)
-        const file = files.find(f => f.path === preview.filePath)
+        try {
+          // Use the correct API: updateFile(projectId, filePath, data)
+          await storageManager.updateFile(projectId, preview.filePath, {
+            content: preview.newContent,
+            updatedAt: new Date().toISOString()
+          })
 
-        if (file) {
-          await storageManager.updateFile(file.id, { content: preview.newContent })
           replacedCount++
           totalReplacements += preview.matchCount
+          setReplaceProgress({ current: replacedCount, total: selectedFilesForReplace.size })
+        } catch (fileError) {
+          console.error(`Failed to update ${preview.filePath}:`, fileError)
+          errors.push(preview.filePath)
         }
       }
 
-      toast({
-        title: 'Replace completed',
-        description: `Replaced ${totalReplacements} occurrences in ${replacedCount} files`,
-      })
+      // Dispatch files-changed event to refresh file explorer
+      window.dispatchEvent(new CustomEvent('files-changed', {
+        detail: { projectId, forceRefresh: true }
+      }))
 
-      // Clear preview and re-search
+      if (errors.length > 0) {
+        toast({
+          title: 'Replace partially completed',
+          description: `Replaced ${totalReplacements} occurrences in ${replacedCount} files. Failed: ${errors.length}`,
+          variant: 'destructive'
+        })
+      } else {
+        toast({
+          title: 'Replace completed',
+          description: `Replaced ${totalReplacements} occurrences in ${replacedCount} files`,
+        })
+      }
+
+      // Clear preview and reset
       setReplacePreview([])
       setSelectedFilesForReplace(new Set())
-      performSearch()
+      setReplaceProgress(null)
     } catch (error) {
       console.error('Replace error:', error)
       toast({ title: 'Replace failed', description: 'An error occurred', variant: 'destructive' })
     } finally {
       setIsReplacing(false)
+      setReplaceProgress(null)
     }
-  }, [projectId, replacePreview, selectedFilesForReplace, toast, performSearch])
+  }, [projectId, replacePreview, selectedFilesForReplace, toast])
 
   // Toggle file expansion
   const toggleFileExpansion = (filePath: string) => {
@@ -412,7 +439,7 @@ export function CodebaseSearch({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-[85vh] flex flex-col p-4 sm:p-6">
+      <DialogContent className="w-[95vw] max-w-4xl h-[90vh] sm:h-[85vh] flex flex-col p-4 sm:p-6 z-[100]">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Search className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -761,11 +788,32 @@ export function CodebaseSearch({
               </ScrollArea>
             </div>
 
+            {/* Progress indicator during replace */}
+            {replaceProgress && (
+              <div className="space-y-2 flex-shrink-0">
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground">
+                    Replacing... {replaceProgress.current}/{replaceProgress.total} files
+                  </span>
+                  <span className="font-mono">{Math.round((replaceProgress.current / replaceProgress.total) * 100)}%</span>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300 ease-out"
+                    style={{ width: `${(replaceProgress.current / replaceProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Warning */}
-            {replacePreview.length > 0 && selectedFilesForReplace.size > 0 && (
+            {replacePreview.length > 0 && selectedFilesForReplace.size > 0 && !replaceProgress && (
               <div className="flex items-start gap-2 p-2 sm:p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-xs sm:text-sm flex-shrink-0">
                 <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 shrink-0 mt-0.5" />
-                <span>Modifying {selectedFilesForReplace.size} files. Ensure backup exists.</span>
+                <div className="flex-1">
+                  <span className="font-medium">Modifying {selectedFilesForReplace.size} file{selectedFilesForReplace.size !== 1 ? 's' : ''}. </span>
+                  <span className="text-muted-foreground">Ensure backup exists before proceeding.</span>
+                </div>
               </div>
             )}
           </TabsContent>
