@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,6 @@ import {
 import Link from "next/link"
 import {
   Search,
-  MessageCircle,
   HelpCircle,
   BookOpen,
   CreditCard,
@@ -34,7 +33,40 @@ import {
   X,
   Minimize2,
   Maximize2,
+  Trash2,
+  Image as ImageIcon,
+  Paperclip,
+  Monitor,
+  FileText,
+  Camera,
 } from "lucide-react"
+import { toast } from "sonner"
+
+// Types for multimodal messages
+interface TextContent {
+  type: 'text'
+  text: string
+}
+
+interface ImageContent {
+  type: 'image'
+  image: string
+}
+
+type ContentPart = TextContent | ImageContent
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string | ContentPart[]
+}
+
+// Attachment type for UI display
+interface Attachment {
+  type: 'image' | 'document' | 'screenshot'
+  name: string
+  data: string // base64 data URL
+  preview?: string
+}
 
 // FAQ Data organized by category
 const faqCategories = [
@@ -206,9 +238,13 @@ export default function SupportPage() {
   const [chatMinimized, setChatMinimized] = useState(false)
   const [chatInput, setChatInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [isCapturing, setIsCapturing] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
 
   // Filter FAQs based on search query
   const filteredCategories = faqCategories.map(category => ({
@@ -232,13 +268,195 @@ export default function SupportPage() {
     }
   }, [chatOpen, chatMinimized])
 
+  // Clear chat history
+  const clearChat = useCallback(() => {
+    setMessages([])
+    setAttachments([])
+    toast.success("Chat history cleared")
+  }, [])
+
+  // Handle image upload
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) {
+        toast.error("Please select an image file")
+        return
+      }
+
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast.error("Image must be less than 10MB")
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string
+        setAttachments(prev => [...prev, {
+          type: 'image',
+          name: file.name,
+          data: dataUrl,
+          preview: dataUrl
+        }])
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }, [])
+
+  // Handle document upload
+  const handleDocUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    Array.from(files).forEach(file => {
+      const validTypes = ['text/plain', 'text/markdown', 'application/pdf']
+      if (!validTypes.includes(file.type) && !file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+        toast.error("Please select a TXT, MD, or PDF file")
+        return
+      }
+
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error("Document must be less than 5MB")
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const content = event.target?.result as string
+        setAttachments(prev => [...prev, {
+          type: 'document',
+          name: file.name,
+          data: content
+        }])
+      }
+
+      if (file.type === 'application/pdf') {
+        reader.readAsDataURL(file)
+      } else {
+        reader.readAsText(file)
+      }
+    })
+
+    // Reset input
+    if (docInputRef.current) docInputRef.current.value = ''
+  }, [])
+
+  // Handle screen capture
+  const handleScreenCapture = useCallback(async () => {
+    try {
+      setIsCapturing(true)
+
+      // Request screen sharing
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: 'browser'
+        } as MediaTrackConstraints,
+        audio: false
+      })
+
+      // Create video element to capture frame
+      const video = document.createElement('video')
+      video.srcObject = stream
+      await video.play()
+
+      // Wait a moment for the video to be ready
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Create canvas and capture frame
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx?.drawImage(video, 0, 0)
+
+      // Stop all tracks
+      stream.getTracks().forEach(track => track.stop())
+
+      // Convert to data URL
+      const dataUrl = canvas.toDataURL('image/png')
+
+      setAttachments(prev => [...prev, {
+        type: 'screenshot',
+        name: `Screenshot ${new Date().toLocaleTimeString()}`,
+        data: dataUrl,
+        preview: dataUrl
+      }])
+
+      toast.success("Screenshot captured!")
+    } catch (error) {
+      if ((error as Error).name !== 'NotAllowedError') {
+        toast.error("Failed to capture screen")
+        console.error('Screen capture error:', error)
+      }
+    } finally {
+      setIsCapturing(false)
+    }
+  }, [])
+
+  // Remove attachment
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  // Helper to get display content from message
+  const getMessageText = (content: string | ContentPart[]): string => {
+    if (typeof content === 'string') return content
+    const textPart = content.find(p => p.type === 'text') as TextContent | undefined
+    return textPart?.text || ''
+  }
+
+  // Helper to get images from message
+  const getMessageImages = (content: string | ContentPart[]): string[] => {
+    if (typeof content === 'string') return []
+    return content
+      .filter((p): p is ImageContent => p.type === 'image')
+      .map(p => p.image)
+  }
+
   // Handle AI chat submission with streaming
   const handleSendMessage = async () => {
-    if (!chatInput.trim() || isLoading) return
+    if ((!chatInput.trim() && attachments.length === 0) || isLoading) return
 
-    const userMessage = chatInput.trim()
+    const userText = chatInput.trim()
     setChatInput("")
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+
+    // Build message content
+    let messageContent: string | ContentPart[]
+
+    if (attachments.length > 0) {
+      const contentParts: ContentPart[] = []
+
+      // Add text if present
+      if (userText) {
+        contentParts.push({ type: 'text', text: userText })
+      }
+
+      // Add images and documents
+      for (const att of attachments) {
+        if (att.type === 'image' || att.type === 'screenshot') {
+          contentParts.push({ type: 'image', image: att.data })
+        } else if (att.type === 'document') {
+          // For documents, include content as text
+          contentParts.push({
+            type: 'text',
+            text: `[Document: ${att.name}]\n${att.data}`
+          })
+        }
+      }
+
+      messageContent = contentParts
+    } else {
+      messageContent = userText
+    }
+
+    const userMessage: ChatMessage = { role: 'user', content: messageContent }
+    setMessages(prev => [...prev, userMessage])
+    setAttachments([])
     setIsLoading(true)
 
     try {
@@ -246,7 +464,7 @@ export default function SupportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: userMessage }]
+          messages: [...messages, userMessage]
         })
       })
 
@@ -266,24 +484,12 @@ export default function SupportPage() {
         if (done) break
 
         const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('0:')) {
-            // Text content - parse the JSON string
-            try {
-              const textContent = JSON.parse(line.slice(2))
-              assistantMessage += textContent
-              setMessages(prev => {
-                const newMessages = [...prev]
-                newMessages[newMessages.length - 1] = { role: 'assistant', content: assistantMessage }
-                return newMessages
-              })
-            } catch {
-              // Skip malformed chunks
-            }
-          }
-        }
+        assistantMessage += chunk
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[newMessages.length - 1] = { role: 'assistant', content: assistantMessage }
+          return newMessages
+        })
       }
     } catch (error) {
       console.error('Chat error:', error)
@@ -306,6 +512,24 @@ export default function SupportPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleImageUpload}
+      />
+      <input
+        ref={docInputRef}
+        type="file"
+        accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
+        multiple
+        className="hidden"
+        onChange={handleDocUpload}
+      />
+
       {/* Enhanced Gradient Background */}
       <div className="absolute inset-0 lovable-gradient" />
 
@@ -462,7 +686,7 @@ export default function SupportPage() {
                     </div>
                     <h3 className="text-white font-semibold mb-2">AI Assistant</h3>
                     <p className="text-gray-400 text-sm mb-4">
-                      Chat with our AI assistant for instant answers powered by Mistral Pixtral
+                      Chat with our AI assistant for instant answers powered by Claude Opus 4.5
                     </p>
                     <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
                       <Sparkles className="h-3 w-3 mr-1" />
@@ -519,11 +743,11 @@ export default function SupportPage() {
           className={`fixed z-50 transition-all duration-300 ${
             chatMinimized
               ? 'bottom-6 right-6 w-72'
-              : 'bottom-6 right-6 w-[400px] max-w-[calc(100vw-48px)]'
+              : 'bottom-6 right-6 w-[420px] max-w-[calc(100vw-48px)]'
           }`}
         >
           <div className={`bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
-            chatMinimized ? 'h-auto' : 'h-[600px] max-h-[calc(100vh-100px)]'
+            chatMinimized ? 'h-auto' : 'h-[650px] max-h-[calc(100vh-100px)]'
           }`}>
             {/* Chat Header */}
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 flex items-center justify-between">
@@ -533,10 +757,18 @@ export default function SupportPage() {
                 </div>
                 <div>
                   <h3 className="text-white font-semibold">PiPilot AI</h3>
-                  <p className="text-white/70 text-xs">Powered by Mistral Pixtral</p>
+                  <p className="text-white/70 text-xs">Powered by Claude Opus 4.5</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {/* Clear Chat */}
+                <button
+                  onClick={clearChat}
+                  className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  title="Clear chat"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
                 <button
                   onClick={() => setChatMinimized(!chatMinimized)}
                   className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
@@ -564,7 +796,7 @@ export default function SupportPage() {
                       </div>
                       <h4 className="text-white font-medium mb-2">Hi! I'm PiPilot AI</h4>
                       <p className="text-gray-400 text-sm mb-4">
-                        I'm here to help you with anything about PiPilot. Ask me anything!
+                        I'm here to help you with anything about PiPilot. You can also share screenshots!
                       </p>
                       <div className="flex flex-wrap gap-2 justify-center">
                         {["How do I get started?", "What can I build?", "Pricing plans"].map((q, i) => (
@@ -596,7 +828,22 @@ export default function SupportPage() {
                             ? 'bg-purple-600 text-white rounded-br-md'
                             : 'bg-gray-800 text-gray-200 rounded-bl-md'
                         }`}>
-                          <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                          {/* Display images if any */}
+                          {getMessageImages(msg.content).length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {getMessageImages(msg.content).map((img, imgIdx) => (
+                                <img
+                                  key={imgIdx}
+                                  src={img}
+                                  alt="Attached"
+                                  className="max-w-[200px] max-h-[150px] rounded-lg object-cover"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                            {getMessageText(msg.content)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -620,8 +867,74 @@ export default function SupportPage() {
                   <div ref={chatEndRef} />
                 </div>
 
-                {/* Input Area */}
+                {/* Attachments Preview */}
+                {attachments.length > 0 && (
+                  <div className="px-4 pb-2">
+                    <div className="flex flex-wrap gap-2">
+                      {attachments.map((att, idx) => (
+                        <div key={idx} className="relative group">
+                          {att.preview ? (
+                            <img
+                              src={att.preview}
+                              alt={att.name}
+                              className="w-16 h-16 rounded-lg object-cover border border-gray-700"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
+                              <FileText className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
+                          <button
+                            onClick={() => removeAttachment(idx)}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3 text-white" />
+                          </button>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded-b-lg truncate">
+                            {att.type === 'screenshot' ? '📷' : att.type === 'image' ? '🖼️' : '📄'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Input Area with Attachment Buttons */}
                 <div className="p-4 border-t border-gray-800">
+                  {/* Attachment Buttons */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors"
+                      title="Upload image"
+                    >
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <span>Image</span>
+                    </button>
+                    <button
+                      onClick={() => docInputRef.current?.click()}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors"
+                      title="Attach document"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      <span>Doc</span>
+                    </button>
+                    <button
+                      onClick={handleScreenCapture}
+                      disabled={isCapturing}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-400 bg-gray-800 hover:bg-gray-700 px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      title="Capture screen"
+                    >
+                      {isCapturing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="h-3.5 w-3.5" />
+                      )}
+                      <span>Screen</span>
+                    </button>
+                  </div>
+
+                  {/* Text Input */}
                   <div className="flex gap-2">
                     <Input
                       ref={inputRef}
@@ -635,7 +948,7 @@ export default function SupportPage() {
                     />
                     <Button
                       onClick={handleSendMessage}
-                      disabled={isLoading || !chatInput.trim()}
+                      disabled={isLoading || (!chatInput.trim() && attachments.length === 0)}
                       className="bg-purple-600 hover:bg-purple-700 rounded-xl px-4"
                     >
                       {isLoading ? (
