@@ -273,14 +273,24 @@ export default function AboutPage() {
                       <GraduationCap className="h-5 w-5 text-purple-400" />
                       <h4 className="text-white font-semibold">Education</h4>
                     </div>
-                    <ul className="space-y-2 text-gray-300 text-sm">
+                    <ul className="space-y-3 text-gray-300 text-sm">
                       <li className="flex items-start gap-2">
                         <span className="text-purple-400 mt-1">•</span>
                         <span><strong className="text-white">Master's in Science and Engineering</strong> - Stanford University Online (2023-present) - Focus on Machine Learning, NLP & Computer Vision</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-purple-400 mt-1">•</span>
-                        <span><strong className="text-white">Bachelor's in Software Engineering</strong> - SwissLink Higher Institute of Business and Technology & Atlantic International University</span>
+                        <div>
+                          <span><strong className="text-white">Bachelor's in Software Engineering</strong> - SwissLink Higher Institute of Business and Technology & Atlantic International University</span>
+                          <Link
+                            href="https://www.aiu.edu/degree-verification/?ID=UB82014SY91231"
+                            target="_blank"
+                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Verify AIU Degree
+                          </Link>
+                        </div>
                       </li>
                     </ul>
                   </div>
