@@ -117,7 +117,8 @@ export default function RootLayout({
               function shouldHideTawkWidget() {
                 var isWorkspaceWithProject = window.location.pathname === '/workspace' && window.location.search.includes('projectId');
                 var isSupportPage = window.location.pathname === '/support';
-                return isWorkspaceWithProject || isSupportPage;
+                var isDocsPage = window.location.pathname === '/docs';
+                return isWorkspaceWithProject || isSupportPage || isDocsPage;
               }
 
               // Function to update widget visibility
