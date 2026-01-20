@@ -41,6 +41,7 @@ import {
   Camera,
 } from "lucide-react"
 import { toast } from "sonner"
+import { Response } from "@/components/ai-elements/response"
 
 // Types for multimodal messages
 interface TextContent {
@@ -841,9 +842,15 @@ export default function SupportPage() {
                               ))}
                             </div>
                           )}
-                          <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                            {getMessageText(msg.content)}
-                          </div>
+                          {msg.role === 'assistant' ? (
+                            <Response className="text-sm text-gray-200 prose prose-sm prose-invert max-w-none [&>p]:text-gray-200 [&>ul]:text-gray-200 [&>ol]:text-gray-200 [&>li]:text-gray-200 [&>h1]:text-gray-100 [&>h2]:text-gray-100 [&>h3]:text-gray-100 [&>h4]:text-gray-100 [&>a]:text-purple-400 [&>a]:hover:text-purple-300 [&>code]:bg-gray-700 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>pre]:bg-gray-900 [&>pre]:p-3 [&>pre]:rounded-lg [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&>blockquote]:border-purple-500">
+                              {getMessageText(msg.content)}
+                            </Response>
+                          ) : (
+                            <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                              {getMessageText(msg.content)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
