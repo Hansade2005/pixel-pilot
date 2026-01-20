@@ -450,7 +450,7 @@ export default function SupportPage() {
                     </div>
                     <h3 className="text-white font-semibold mb-2">AI Assistant</h3>
                     <p className="text-gray-400 text-sm mb-4">
-                      Chat with our AI assistant for instant answers powered by Mistral Pixtral
+                      Chat with our AI assistant for instant answers powered by Claude Opus 4.5
                     </p>
                     <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
                       <Sparkles className="h-3 w-3 mr-1" />
@@ -521,7 +521,7 @@ export default function SupportPage() {
                 </div>
                 <div>
                   <h3 className="text-white font-semibold">PiPilot AI</h3>
-                  <p className="text-white/70 text-xs">Powered by Mistral Pixtral</p>
+                  <p className="text-white/70 text-xs">Powered by Claude Opus 4.5</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
