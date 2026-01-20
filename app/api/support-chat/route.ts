@@ -39,95 +39,265 @@ async function loadDocsData(): Promise<DocsData> {
   }
 }
 
-// Function to search docs using regex
+// Semantic topic patterns for documentation search (inspired by semantic_code_navigator)
+const SEMANTIC_PATTERNS: Array<{
+  topic: string
+  pattern: RegExp
+  keywords: string[]
+  relevanceBoost: number
+  description: string
+}> = [
+  {
+    topic: 'ai_models',
+    pattern: /\b(AI model|Mistral|Claude|Grok|Pixtral|LLM|Multi-Model|vision|language model)\b/gi,
+    keywords: ['model', 'models', 'ai', 'llm', 'what model', 'which model', 'supported model'],
+    relevanceBoost: 20,
+    description: 'AI models and capabilities'
+  },
+  {
+    topic: 'frameworks',
+    pattern: /\b(Next\.js|Vite|React|Expo|framework|SSR|SSG|mobile app|native app)\b/gi,
+    keywords: ['framework', 'nextjs', 'vite', 'react', 'expo', 'mobile'],
+    relevanceBoost: 15,
+    description: 'Supported frameworks'
+  },
+  {
+    topic: 'deployment',
+    pattern: /\b(deploy|deployment|hosting|Vercel|Netlify|production|publish|domain|CDN)\b/gi,
+    keywords: ['deploy', 'deployment', 'host', 'hosting', 'vercel', 'netlify', 'publish'],
+    relevanceBoost: 15,
+    description: 'Deployment and hosting'
+  },
+  {
+    topic: 'database',
+    pattern: /\b(database|Supabase|storage|backend|PostgreSQL|real-time|authentication)\b/gi,
+    keywords: ['database', 'supabase', 'storage', 'data', 'backend', 'auth'],
+    relevanceBoost: 15,
+    description: 'Database and storage'
+  },
+  {
+    topic: 'features',
+    pattern: /\b(feature|capability|voice|visual editing|click-to-edit|AI assistant|conversational)\b/gi,
+    keywords: ['feature', 'features', 'capability', 'what can', 'how to', 'support'],
+    relevanceBoost: 12,
+    description: 'Platform features'
+  },
+  {
+    topic: 'pricing',
+    pattern: /\b(pricing|price|cost|plan|tier|free|pro|enterprise|subscription|billing)\b/gi,
+    keywords: ['pricing', 'price', 'cost', 'plan', 'free', 'pro', 'how much'],
+    relevanceBoost: 18,
+    description: 'Pricing and plans'
+  },
+  {
+    topic: 'integrations',
+    pattern: /\b(integration|GitHub|Stripe|OAuth|API|webhook|connect|MCP|SDK)\b/gi,
+    keywords: ['integration', 'github', 'stripe', 'connect', 'api', 'webhook'],
+    relevanceBoost: 12,
+    description: 'Third-party integrations'
+  },
+  {
+    topic: 'getting_started',
+    pattern: /\b(getting started|begin|create project|tutorial|guide|setup|first project)\b/gi,
+    keywords: ['start', 'getting started', 'begin', 'create', 'tutorial', 'new project'],
+    relevanceBoost: 12,
+    description: 'Getting started guides'
+  },
+  {
+    topic: 'commands',
+    pattern: /\b(slash command|\/\w+|shortcut|keyboard|command)\b/gi,
+    keywords: ['command', 'commands', 'slash', 'shortcut', '/help', '/export'],
+    relevanceBoost: 12,
+    description: 'Commands and shortcuts'
+  },
+  {
+    topic: 'founder',
+    pattern: /\b(Hans Ade|founder|CEO|Anye|created|built|Pixelways)\b/gi,
+    keywords: ['founder', 'who made', 'who created', 'hans', 'ceo', 'about'],
+    relevanceBoost: 15,
+    description: 'Founder and company info'
+  }
+]
+
+// Analyze query to find matching semantic patterns and build expanded search
+function analyzeQueryIntent(query: string): { patterns: typeof SEMANTIC_PATTERNS, expandedQuery: string } {
+  const lowerQuery = query.toLowerCase()
+  const matchedPatterns: typeof SEMANTIC_PATTERNS = []
+
+  // Find all patterns whose keywords match the query
+  for (const pattern of SEMANTIC_PATTERNS) {
+    const matchesKeyword = pattern.keywords.some(kw => lowerQuery.includes(kw))
+    if (matchesKeyword) {
+      matchedPatterns.push(pattern)
+    }
+  }
+
+  // Build expanded query from matched patterns OR use original query
+  let expandedQuery: string
+  if (matchedPatterns.length > 0) {
+    // Combine all matched pattern regexes
+    const patternSources = matchedPatterns.map(p =>
+      p.pattern.source.replace(/\\b\(/g, '(').replace(/\)\\b/g, ')')
+    )
+    expandedQuery = patternSources.join('|')
+  } else {
+    // Escape special regex chars and search literally
+    expandedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  return { patterns: matchedPatterns, expandedQuery }
+}
+
+// Enhanced semantic search function (inspired by semantic_code_navigator from chat-v2)
 function searchDocs(docsData: DocsData, query: string, maxResults: number = 3): string {
   try {
-    // Create regex from query (case insensitive)
-    const regex = new RegExp(query, 'gi')
+    // Analyze query intent and get matching patterns
+    const { patterns: matchedPatterns, expandedQuery } = analyzeQueryIntent(query)
+
+    // Create regex from expanded query
+    const regex = new RegExp(expandedQuery, 'gi')
 
     const results: Array<{
       title: string
       overview: string
-      matches: string[]
+      topic: string
       score: number
+      matchDetails: string[]
+      snippets: string[]
     }> = []
 
     for (const section of docsData.sections) {
-      const matches: string[] = []
+      const matchDetails: string[] = []
+      const snippets: string[] = []
       let score = 0
+      let topicMatched = 'general'
 
-      // Check title
-      if (regex.test(section.title)) {
-        score += 10
-        matches.push(`Title match: "${section.title}"`)
-      }
-      regex.lastIndex = 0 // Reset regex
-
-      // Check overview
-      if (regex.test(section.overview)) {
-        score += 5
-        matches.push(`Overview match`)
-      }
+      // 1. Title match (highest priority)
       regex.lastIndex = 0
-
-      // Check keywords
-      for (const keyword of section.search_keywords) {
-        if (regex.test(keyword)) {
-          score += 3
-          matches.push(`Keyword: "${keyword}"`)
-        }
-        regex.lastIndex = 0
+      if (regex.test(section.title)) {
+        score += 25
+        matchDetails.push(`Title: "${section.title}"`)
       }
 
-      // Check content and extract matching snippets
+      // 2. Overview match
+      regex.lastIndex = 0
+      if (regex.test(section.overview)) {
+        score += 15
+        matchDetails.push(`Overview matched`)
+      }
+
+      // 3. Keywords match
+      let keywordHits = 0
+      for (const keyword of section.search_keywords) {
+        regex.lastIndex = 0
+        if (regex.test(keyword)) {
+          keywordHits++
+          score += 8
+        }
+      }
+      if (keywordHits > 0) {
+        matchDetails.push(`${keywordHits} keyword(s)`)
+      }
+
+      // 4. Apply semantic pattern boosts (key improvement from semantic_code_navigator)
+      for (const pattern of matchedPatterns) {
+        pattern.pattern.lastIndex = 0
+        const patternMatches = section.content.match(pattern.pattern)
+        if (patternMatches && patternMatches.length > 0) {
+          const boost = Math.min(patternMatches.length * 4, pattern.relevanceBoost)
+          score += boost
+          topicMatched = pattern.topic
+          matchDetails.push(`${pattern.description} (${patternMatches.length}x)`)
+        }
+      }
+
+      // 5. Content matches with snippet extraction
+      regex.lastIndex = 0
       const contentMatches = section.content.match(regex)
       if (contentMatches) {
-        score += contentMatches.length
+        score += Math.min(contentMatches.length * 3, 18)
 
-        // Extract context around matches (first 3)
+        // Extract meaningful snippets around matches
         const lines = section.content.split('\n')
         let snippetCount = 0
-        for (const line of lines) {
-          if (snippetCount >= 3) break
+
+        for (let i = 0; i < lines.length && snippetCount < 3; i++) {
+          const line = lines[i].trim()
+          if (line.length < 15) continue
+
           regex.lastIndex = 0
-          if (regex.test(line) && line.trim().length > 10) {
-            const snippet = line.trim().slice(0, 200)
-            matches.push(`Content: "...${snippet}..."`)
+          if (regex.test(line)) {
+            // Include context: check if next line is a list item
+            let snippet = line
+            if (i + 1 < lines.length && lines[i + 1].trim().startsWith('-')) {
+              snippet += '\n  ' + lines[i + 1].trim()
+              if (i + 2 < lines.length && lines[i + 2].trim().startsWith('-')) {
+                snippet += '\n  ' + lines[i + 2].trim()
+              }
+            }
+            snippets.push(snippet.slice(0, 350))
             snippetCount++
           }
         }
+      }
+
+      // 6. Exact query match bonus
+      if (section.title.toLowerCase().includes(query.toLowerCase())) {
+        score += 12
+      }
+      if (section.overview.toLowerCase().includes(query.toLowerCase())) {
+        score += 8
       }
 
       if (score > 0) {
         results.push({
           title: section.title,
           overview: section.overview,
-          matches,
-          score
+          topic: topicMatched,
+          score,
+          matchDetails,
+          snippets
         })
       }
     }
 
-    // Sort by score and limit results
+    // Sort by score and limit
     results.sort((a, b) => b.score - a.score)
     const topResults = results.slice(0, maxResults)
 
     if (topResults.length === 0) {
-      return `No documentation found matching "${query}". Try a different search term.`
+      return `No documentation found for "${query}". Try different keywords or ask me directly - I have comprehensive knowledge about PiPilot!`
     }
 
-    // Format results
-    let output = `Found ${topResults.length} relevant documentation section(s):\n\n`
+    // Format output with rich details
+    const topicDesc = matchedPatterns.length > 0
+      ? matchedPatterns.map(p => p.description).join(', ')
+      : 'general search'
 
-    for (const result of topResults) {
-      output += `## ${result.title}\n`
-      output += `**Overview:** ${result.overview}\n`
-      output += `**Matches:** ${result.matches.slice(0, 3).join('; ')}\n\n`
+    let output = `📚 **Search Results** for "${query}" (${topicDesc})\n\n`
+
+    for (let i = 0; i < topResults.length; i++) {
+      const r = topResults[i]
+      output += `**${i + 1}. ${r.title}** (score: ${r.score})\n`
+      output += `${r.overview}\n`
+
+      if (r.matchDetails.length > 0) {
+        output += `_Matched: ${r.matchDetails.slice(0, 3).join(', ')}_\n`
+      }
+
+      if (r.snippets.length > 0) {
+        output += `**Key content:**\n`
+        for (const snip of r.snippets.slice(0, 2)) {
+          output += `> ${snip}\n`
+        }
+      }
+      output += `\n`
     }
 
     return output
   } catch (error) {
-    return `Search error: Invalid regex pattern. Please use a simpler search term.`
+    console.error('Search error:', error)
+    return `Search error for "${query}". Try simpler terms or ask me directly!`
   }
 }
 
@@ -354,25 +524,29 @@ Your role is to help users with questions about PiPilot, troubleshoot issues, an
 
 IMPORTANT GUIDELINES:
 1. Be friendly, helpful, and concise
-2. Use the knowledge base below to answer questions accurately
-3. If you don't know something, USE THE search_docs TOOL to search PiPilot's documentation for accurate information
-4. Use markdown formatting for better readability (bold, lists, code blocks when needed)
-5. Keep responses focused and not too long
-6. Always be positive about PiPilot's capabilities
-7. If users have technical issues, provide step-by-step troubleshooting
-8. Mention the founder Hans Ade when relevant to company questions
-9. When users share screenshots, carefully analyze them to understand their issue and provide specific help based on what you see
-10. For detailed technical questions, use the search_docs tool with regex patterns to find relevant documentation
-11. If you need the full content of a specific documentation section, use get_section_content tool
+2. FIRST check the KNOWLEDGE BASE below - it contains comprehensive information about PiPilot features, AI models, frameworks, integrations, and more
+3. For common questions (models, features, frameworks, pricing, founder, getting started), answer from the KNOWLEDGE BASE directly - don't search
+4. Only use search_docs tool when: (a) question is very specific/technical, (b) you need exact documentation wording, (c) the knowledge base doesn't cover the topic
+5. Use markdown formatting for better readability (bold, lists, code blocks when needed)
+6. Keep responses focused and not too long
+7. Always be positive about PiPilot's capabilities
+8. If users have technical issues, provide step-by-step troubleshooting
+9. Mention the founder Hans Ade when relevant to company questions
+10. When users share screenshots, carefully analyze them to understand their issue and provide specific help
 
-AVAILABLE TOOLS:
-- search_docs: Search PiPilot documentation using regex patterns (e.g., "deploy.*vercel", "database|supabase", "pricing")
-- get_section_content: Get the full content of a specific documentation section by title
+SUPPORTED AI MODELS (from Knowledge Base):
+- **Mistral Pixtral**: Advanced vision and language processing (used for this chat)
+- **Grok Code Fast 1**: Specialized fast code generation
+- **Claude Sonnet 4.5**: High-quality code generation and analysis
+
+AVAILABLE TOOLS (use sparingly - prefer knowledge base):
+- search_docs: Search PiPilot documentation using regex patterns. Use expanded queries like "model|Mistral|Claude" not just "models"
+- get_section_content: Get full content of a specific documentation section by title
 
 KNOWLEDGE BASE (Quick Reference):
 ${PIPILOT_KNOWLEDGE}
 
-Remember: You represent PiPilot. Be professional, helpful, and make users feel supported! Use the search_docs tool when you need more detailed or specific information.`
+Remember: You represent PiPilot. Be professional, helpful, and make users feel supported! Answer from the knowledge base when possible.`
 
     // Transform messages to handle multimodal content
     const transformedMessages = messages.map((msg: Message) => {
