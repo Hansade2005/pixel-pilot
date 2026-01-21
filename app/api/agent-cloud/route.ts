@@ -4,15 +4,23 @@
  * API endpoint for running Claude Code in E2B sandboxes.
  * Configured with Vercel AI Gateway for unified AI routing.
  *
+ * Features:
+ * - Sandbox reuse with Sandbox.connect() for persistent sessions
+ * - Conversation memory persistence across messages
+ * - Real-time streaming with Server-Sent Events
+ * - GitHub repo cloning and git operations
+ * - Internet access enabled for sandboxes
+ *
  * POST /api/agent-cloud
- * - action: 'create' - Create a new sandbox session with repo
- * - action: 'run' - Run a Claude Code prompt
+ * - action: 'create' - Create or connect to existing sandbox
+ * - action: 'run' - Run a Claude Code prompt (with memory)
  * - action: 'playwright' - Run a Playwright script
  * - action: 'commit' - Commit changes in the sandbox
  * - action: 'push' - Push changes to remote
  * - action: 'diff' - Get git diff stats
  * - action: 'terminate' - Terminate a sandbox
  * - action: 'status' - Get sandbox status
+ * - action: 'list' - List all sandboxes for user
  *
  * Environment Variables Required:
  * - VERCEL_AI_GATEWAY_API_KEY: Your Vercel AI Gateway API key
@@ -34,24 +42,36 @@ const AVAILABLE_MODELS = {
   haiku: 'mistral/devstral-small-2',   // Quick tasks
 } as const
 
-// Store active sandboxes (in production, use Redis or database)
+// Store active sandboxes with user association
+// Key: `${userId}-${repoFullName}` or `${userId}-default`
 const activeSandboxes = new Map<string, {
+  sandboxId: string
   sandbox: Sandbox
   createdAt: Date
   lastActivity: Date
   model?: string
+  userId: string
   repo?: {
     full_name: string
     branch: string
     cloned: boolean
   }
+  // Conversation history for memory persistence
+  conversationHistory: Array<{
+    role: 'user' | 'assistant'
+    content: string
+    timestamp: Date
+  }>
 }>()
 
-// Cleanup inactive sandboxes after 10 minutes
-const SANDBOX_TIMEOUT = 10 * 60 * 1000
+// Cleanup inactive sandboxes after 30 minutes (increased from 10)
+const SANDBOX_TIMEOUT = 30 * 60 * 1000
 
 // Working directory for cloned repos
 const PROJECT_DIR = '/home/user/project'
+
+// Conversation history file path in sandbox
+const HISTORY_FILE = '/home/user/.claude_history.json'
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,9 +103,12 @@ export async function POST(request: NextRequest) {
       case 'status':
         return handleStatus(sandboxId)
 
+      case 'list':
+        return handleList(request)
+
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status' },
+          { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status, list' },
           { status: 400 }
         )
     }
@@ -113,17 +136,51 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Get sandbox entry
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry by sandboxId
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let entryKey: string | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      entryKey = key
+      break
+    }
+  }
+
   if (!sandboxEntry) {
-    return NextResponse.json(
-      { error: 'Sandbox not found' },
-      { status: 404 }
-    )
+    // Try to reconnect to the sandbox
+    try {
+      console.log(`[Agent Cloud] Attempting to reconnect to sandbox: ${sandboxId}`)
+      const sandbox = await Sandbox.connect(sandboxId)
+
+      // Create a temporary entry for this reconnected sandbox
+      sandboxEntry = {
+        sandboxId,
+        sandbox,
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        userId: 'reconnected',
+        conversationHistory: []
+      }
+    } catch (error) {
+      console.error(`[Agent Cloud] Failed to reconnect to sandbox ${sandboxId}:`, error)
+      return NextResponse.json(
+        { error: 'Sandbox not found or expired. Create a new session.' },
+        { status: 404 }
+      )
+    }
   }
 
   // Determine working directory based on repo
   const workDir = sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user'
+
+  // Add user message to conversation history
+  sandboxEntry.conversationHistory.push({
+    role: 'user',
+    content: prompt,
+    timestamp: new Date()
+  })
 
   // Create a streaming response
   const encoder = new TextEncoder()
@@ -131,13 +188,24 @@ export async function GET(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const { sandbox } = sandboxEntry
-        sandboxEntry.lastActivity = new Date()
+        const { sandbox } = sandboxEntry!
+        sandboxEntry!.lastActivity = new Date()
 
         // Send start event
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start', sandboxId })}\n\n`))
 
-        const escapedPrompt = prompt.replace(/'/g, "'\\''")
+        // Build conversation context for Claude
+        const conversationContext = sandboxEntry!.conversationHistory
+          .slice(-10) // Last 10 messages for context
+          .map(msg => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
+          .join('\n\n')
+
+        // Create prompt with conversation history
+        const fullPrompt = conversationContext
+          ? `Previous conversation:\n${conversationContext}\n\nCurrent request: ${prompt}`
+          : prompt
+
+        const escapedPrompt = fullPrompt.replace(/'/g, "'\\''")
         const command = `cd ${workDir} && echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
 
         let fullOutput = ''
@@ -153,9 +221,26 @@ export async function GET(request: NextRequest) {
           }
         })
 
+        // Add assistant response to conversation history
+        sandboxEntry!.conversationHistory.push({
+          role: 'assistant',
+          content: fullOutput,
+          timestamp: new Date()
+        })
+
+        // Save conversation history to sandbox for persistence
+        try {
+          await sandbox.files.write(
+            HISTORY_FILE,
+            JSON.stringify(sandboxEntry!.conversationHistory, null, 2)
+          )
+        } catch (e) {
+          console.warn('[Agent Cloud] Failed to save conversation history:', e)
+        }
+
         // Get git diff stats if repo is cloned
         let diffStats = { additions: 0, deletions: 0 }
-        if (sandboxEntry.repo?.cloned) {
+        if (sandboxEntry!.repo?.cloned) {
           try {
             const diffResult = await sandbox.commands.run(
               `cd ${PROJECT_DIR} && git diff --shortstat`,
@@ -175,7 +260,8 @@ export async function GET(request: NextRequest) {
           type: 'complete',
           exitCode: result.exitCode,
           output: fullOutput,
-          diffStats
+          diffStats,
+          messageCount: sandboxEntry!.conversationHistory.length
         })}\n\n`))
 
         controller.close()
@@ -199,8 +285,8 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Create a new sandbox session with Vercel AI Gateway
- * Optionally clone a GitHub repo into the sandbox
+ * Create or reconnect to a sandbox session
+ * If user already has a sandbox for this repo, reconnect to it
  */
 async function handleCreate(
   request: NextRequest,
@@ -216,6 +302,19 @@ async function handleCreate(
   // Cleanup old sandboxes first
   cleanupInactiveSandboxes()
 
+  // Get current user
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    )
+  }
+
+  const userId = user.id
+
   // Get Vercel AI Gateway API key
   const aiGatewayKey = process.env.VERCEL_AI_GATEWAY_API_KEY
   if (!aiGatewayKey) {
@@ -225,24 +324,117 @@ async function handleCreate(
     )
   }
 
+  // Create sandbox key for this user/repo combination
+  const sandboxKey = config?.repo
+    ? `${userId}-${config.repo.full_name}`
+    : `${userId}-default`
+
+  // Check if we already have an active sandbox for this user/repo
+  const existingEntry = activeSandboxes.get(sandboxKey)
+  if (existingEntry) {
+    try {
+      // Try to reconnect to verify it's still alive
+      console.log(`[Agent Cloud] Reconnecting to existing sandbox: ${existingEntry.sandboxId}`)
+      const sandbox = await Sandbox.connect(existingEntry.sandboxId)
+
+      // Update the entry
+      existingEntry.sandbox = sandbox
+      existingEntry.lastActivity = new Date()
+
+      console.log(`[Agent Cloud] Reconnected to sandbox: ${existingEntry.sandboxId}`)
+
+      return NextResponse.json({
+        success: true,
+        sandboxId: existingEntry.sandboxId,
+        model: AVAILABLE_MODELS[existingEntry.model as keyof typeof AVAILABLE_MODELS || 'sonnet'],
+        gateway: AI_GATEWAY_BASE_URL,
+        repoCloned: existingEntry.repo?.cloned || false,
+        projectDir: existingEntry.repo?.cloned ? PROJECT_DIR : '/home/user',
+        reconnected: true,
+        messageCount: existingEntry.conversationHistory.length,
+        message: 'Reconnected to existing sandbox',
+      })
+    } catch (error) {
+      console.log(`[Agent Cloud] Existing sandbox expired, creating new one`)
+      activeSandboxes.delete(sandboxKey)
+    }
+  }
+
+  // Also check E2B for any running sandboxes with matching metadata
+  try {
+    const paginator = Sandbox.list({
+      query: {
+        state: ['running'],
+        metadata: { userId, repo: config?.repo?.full_name || 'default' }
+      }
+    })
+    const runningSandboxes = await paginator.nextItems()
+
+    if (runningSandboxes.length > 0) {
+      const existingSandbox = runningSandboxes[0]
+      console.log(`[Agent Cloud] Found running sandbox in E2B: ${existingSandbox.sandboxId}`)
+
+      try {
+        const sandbox = await Sandbox.connect(existingSandbox.sandboxId)
+
+        // Load conversation history from sandbox if exists
+        let conversationHistory: any[] = []
+        try {
+          const historyContent = await sandbox.files.read(HISTORY_FILE)
+          conversationHistory = JSON.parse(historyContent)
+        } catch (e) {
+          // No history file yet
+        }
+
+        const entry = {
+          sandboxId: existingSandbox.sandboxId,
+          sandbox,
+          createdAt: existingSandbox.startedAt,
+          lastActivity: new Date(),
+          model: config?.model || 'sonnet',
+          userId,
+          repo: config?.repo ? {
+            full_name: config.repo.full_name,
+            branch: config.repo.branch,
+            cloned: true // Assume cloned if sandbox exists
+          } : undefined,
+          conversationHistory
+        }
+
+        activeSandboxes.set(sandboxKey, entry)
+
+        return NextResponse.json({
+          success: true,
+          sandboxId: existingSandbox.sandboxId,
+          model: AVAILABLE_MODELS[config?.model || 'sonnet'],
+          gateway: AI_GATEWAY_BASE_URL,
+          repoCloned: true,
+          projectDir: PROJECT_DIR,
+          reconnected: true,
+          messageCount: conversationHistory.length,
+          message: 'Reconnected to running sandbox from E2B',
+        })
+      } catch (error) {
+        console.warn(`[Agent Cloud] Failed to reconnect to E2B sandbox:`, error)
+      }
+    }
+  } catch (error) {
+    console.warn(`[Agent Cloud] Failed to list E2B sandboxes:`, error)
+  }
+
   // Get GitHub token if repo is specified
   let githubToken: string | undefined
   if (config?.repo) {
     try {
-      const supabase = await createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user) {
-        const tokens = await getDeploymentTokens(user.id)
-        githubToken = tokens?.github
-      }
+      const tokens = await getDeploymentTokens(userId)
+      githubToken = tokens?.github
+      console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
     } catch (e) {
       console.warn('[Agent Cloud] Failed to get GitHub token:', e)
     }
   }
 
   // Configure environment variables for Claude Code with Vercel AI Gateway
-  // IMPORTANT: ANTHROPIC_API_KEY must be empty string so Claude Code uses ANTHROPIC_AUTH_TOKEN
   const envs: Record<string, string> = {
     // Vercel AI Gateway configuration
     ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
@@ -263,21 +455,42 @@ async function handleCreate(
     envs.GITHUB_TOKEN = githubToken
   }
 
-  // Use our custom template or fall back to anthropic-claude-code
-  const template = config?.template || 'pipilot-agent'
+  // Use our custom template or fall back to base
+  const template = config?.template || 'base'
   const selectedModel = config?.model || 'sonnet'
 
-  console.log(`[Agent Cloud] Creating sandbox with template: ${template}`)
+  console.log(`[Agent Cloud] Creating new sandbox with template: ${template}`)
   console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
   const sandbox = await Sandbox.create(template, {
-    timeoutMs: 5 * 60 * 1000, // 5 minutes
+    timeoutMs: 30 * 60 * 1000, // 30 minutes timeout
     envs,
+    metadata: {
+      userId,
+      repo: config?.repo?.full_name || 'default',
+      model: selectedModel
+    }
   })
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
+
+  // Install Claude Code CLI in the sandbox
+  console.log(`[Agent Cloud] Installing Claude Code CLI...`)
+  try {
+    const installResult = await sandbox.commands.run(
+      'npm install -g @anthropic-ai/claude-code',
+      { timeoutMs: 120000 }
+    )
+    if (installResult.exitCode !== 0) {
+      console.warn(`[Agent Cloud] Claude Code install warning:`, installResult.stderr)
+    } else {
+      console.log(`[Agent Cloud] Claude Code CLI installed successfully`)
+    }
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
+  }
 
   // Clone repo if specified
   if (config?.repo && githubToken) {
@@ -288,14 +501,14 @@ async function handleCreate(
       const cloneUrl = `https://${githubToken}@github.com/${config.repo.full_name}.git`
       const cloneResult = await sandbox.commands.run(
         `git clone --branch ${config.repo.branch} --single-branch ${cloneUrl} ${PROJECT_DIR}`,
-        { timeoutMs: 60000 }
+        { timeoutMs: 120000 }
       )
 
       if (cloneResult.exitCode === 0) {
         repoCloned = true
         console.log(`[Agent Cloud] Repo cloned successfully`)
 
-        // Configure git user (use generic info)
+        // Configure git user
         await sandbox.commands.run(
           `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
           { timeoutMs: 5000 }
@@ -308,16 +521,20 @@ async function handleCreate(
     }
   }
 
-  activeSandboxes.set(sandboxId, {
+  // Store sandbox entry
+  activeSandboxes.set(sandboxKey, {
+    sandboxId,
     sandbox,
     createdAt: new Date(),
     lastActivity: new Date(),
     model: selectedModel,
+    userId,
     repo: config?.repo ? {
       full_name: config.repo.full_name,
       branch: config.repo.branch,
       cloned: repoCloned,
     } : undefined,
+    conversationHistory: []
   })
 
   console.log(`[Agent Cloud] Sandbox created: ${sandboxId}`)
@@ -329,6 +546,8 @@ async function handleCreate(
     gateway: AI_GATEWAY_BASE_URL,
     repoCloned,
     projectDir: repoCloned ? PROJECT_DIR : '/home/user',
+    reconnected: false,
+    messageCount: 0,
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned`
       : 'Sandbox created with Vercel AI Gateway',
@@ -353,12 +572,34 @@ async function handleRun(
     )
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
   if (!sandboxEntry) {
-    return NextResponse.json(
-      { error: 'Sandbox not found. Create one first with action: create' },
-      { status: 404 }
-    )
+    // Try to reconnect
+    try {
+      const sandbox = await Sandbox.connect(sandboxId)
+      sandboxEntry = {
+        sandboxId,
+        sandbox,
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        userId: 'reconnected',
+        conversationHistory: []
+      }
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Sandbox not found or expired. Create a new session.' },
+        { status: 404 }
+      )
+    }
   }
 
   const { sandbox } = sandboxEntry
@@ -367,6 +608,13 @@ async function handleRun(
   // Use project dir if repo is cloned, otherwise use specified or default
   const workDir = options?.workingDirectory ||
     (sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user')
+
+  // Add to conversation history
+  sandboxEntry.conversationHistory.push({
+    role: 'user',
+    content: prompt,
+    timestamp: new Date()
+  })
 
   const escapedPrompt = prompt.replace(/'/g, "'\\''")
   const command = `cd ${workDir} && echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
@@ -386,6 +634,13 @@ async function handleRun(
     }
   })
 
+  // Add assistant response to history
+  sandboxEntry.conversationHistory.push({
+    role: 'assistant',
+    content: stdout,
+    timestamp: new Date()
+  })
+
   // Get recently modified files
   const filesResult = await sandbox.commands.run(
     `find ${workDir} -type f -mmin -5 2>/dev/null | head -50`,
@@ -399,6 +654,7 @@ async function handleRun(
     stderr: stderr || result.stderr || '',
     exitCode: result.exitCode || 0,
     files,
+    messageCount: sandboxEntry.conversationHistory.length
   })
 }
 
@@ -413,7 +669,16 @@ async function handlePlaywright(sandboxId: string, script: string) {
     )
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
   if (!sandboxEntry) {
     return NextResponse.json(
       { error: 'Sandbox not found' },
@@ -473,7 +738,16 @@ async function handleCommit(sandboxId: string, message?: string) {
     )
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
   if (!sandboxEntry) {
     return NextResponse.json(
       { error: 'Sandbox not found' },
@@ -519,7 +793,16 @@ async function handlePush(request: NextRequest, sandboxId: string) {
     )
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
   if (!sandboxEntry) {
     return NextResponse.json(
       { error: 'Sandbox not found' },
@@ -563,7 +846,16 @@ async function handleDiff(sandboxId: string) {
     )
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
   if (!sandboxEntry) {
     return NextResponse.json(
       { error: 'Sandbox not found' },
@@ -629,17 +921,39 @@ async function handleTerminate(sandboxId: string) {
     )
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
-  if (!sandboxEntry) {
-    return NextResponse.json(
-      { error: 'Sandbox not found' },
-      { status: 404 }
-    )
+  // Find and remove sandbox entry
+  let entryKey: string | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      entryKey = key
+      break
+    }
   }
 
+  if (!entryKey) {
+    // Try to kill it directly in E2B
+    try {
+      const sandbox = await Sandbox.connect(sandboxId)
+      await sandbox.kill()
+      console.log(`[Agent Cloud] Sandbox terminated via E2B: ${sandboxId}`)
+      return NextResponse.json({
+        success: true,
+        message: 'Sandbox terminated successfully',
+      })
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Sandbox not found' },
+        { status: 404 }
+      )
+    }
+  }
+
+  const entry = activeSandboxes.get(entryKey)!
+
   try {
-    await sandboxEntry.sandbox.kill()
-    activeSandboxes.delete(sandboxId)
+    await entry.sandbox.kill()
+    activeSandboxes.delete(entryKey)
     console.log(`[Agent Cloud] Sandbox terminated: ${sandboxId}`)
 
     return NextResponse.json({
@@ -647,6 +961,7 @@ async function handleTerminate(sandboxId: string) {
       message: 'Sandbox terminated successfully',
     })
   } catch (error) {
+    activeSandboxes.delete(entryKey)
     return NextResponse.json(
       { error: `Failed to terminate sandbox: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
@@ -661,11 +976,14 @@ async function handleStatus(sandboxId: string) {
   if (!sandboxId) {
     // Return all active sandboxes
     const sandboxes = Array.from(activeSandboxes.entries()).map(([id, entry]) => ({
-      sandboxId: id,
+      key: id,
+      sandboxId: entry.sandboxId,
       createdAt: entry.createdAt.toISOString(),
       lastActivity: entry.lastActivity.toISOString(),
       age: Date.now() - entry.createdAt.getTime(),
       repo: entry.repo,
+      messageCount: entry.conversationHistory.length,
+      userId: entry.userId
     }))
 
     return NextResponse.json({
@@ -675,7 +993,16 @@ async function handleStatus(sandboxId: string) {
     })
   }
 
-  const sandboxEntry = activeSandboxes.get(sandboxId)
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
   if (!sandboxEntry) {
     return NextResponse.json(
       { error: 'Sandbox not found' },
@@ -690,7 +1017,50 @@ async function handleStatus(sandboxId: string) {
     lastActivity: sandboxEntry.lastActivity.toISOString(),
     age: Date.now() - sandboxEntry.createdAt.getTime(),
     repo: sandboxEntry.repo,
+    messageCount: sandboxEntry.conversationHistory.length,
   })
+}
+
+/**
+ * List all sandboxes for current user (from E2B)
+ */
+async function handleList(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    )
+  }
+
+  try {
+    const paginator = Sandbox.list({
+      query: {
+        state: ['running'],
+        metadata: { userId: user.id }
+      }
+    })
+    const sandboxes = await paginator.nextItems()
+
+    return NextResponse.json({
+      success: true,
+      count: sandboxes.length,
+      sandboxes: sandboxes.map(s => ({
+        sandboxId: s.sandboxId,
+        startedAt: s.startedAt,
+        metadata: s.metadata
+      }))
+    })
+  } catch (error) {
+    console.error('[Agent Cloud] Failed to list sandboxes:', error)
+    return NextResponse.json({
+      success: true,
+      count: 0,
+      sandboxes: []
+    })
+  }
 }
 
 /**
@@ -698,11 +1068,11 @@ async function handleStatus(sandboxId: string) {
  */
 function cleanupInactiveSandboxes() {
   const now = Date.now()
-  for (const [sandboxId, entry] of activeSandboxes.entries()) {
+  for (const [key, entry] of activeSandboxes.entries()) {
     if (now - entry.lastActivity.getTime() > SANDBOX_TIMEOUT) {
-      console.log(`[Agent Cloud] Cleaning up inactive sandbox: ${sandboxId}`)
+      console.log(`[Agent Cloud] Cleaning up inactive sandbox: ${entry.sandboxId}`)
       entry.sandbox.kill().catch(console.error)
-      activeSandboxes.delete(sandboxId)
+      activeSandboxes.delete(key)
     }
   }
 }
@@ -710,8 +1080,8 @@ function cleanupInactiveSandboxes() {
 // Cleanup on module unload
 if (typeof process !== 'undefined') {
   process.on('beforeExit', () => {
-    for (const [sandboxId, entry] of activeSandboxes.entries()) {
-      console.log(`[Agent Cloud] Cleaning up sandbox on exit: ${sandboxId}`)
+    for (const [key, entry] of activeSandboxes.entries()) {
+      console.log(`[Agent Cloud] Cleaning up sandbox on exit: ${entry.sandboxId}`)
       entry.sandbox.kill().catch(console.error)
     }
   })
