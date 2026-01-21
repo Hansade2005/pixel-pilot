@@ -37,7 +37,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useRepoAgent } from "@/hooks/use-repo-agent"
+import { createClient } from "@/lib/supabase/client"
+import { getDeploymentTokens } from "@/lib/cloud-sync"
 
 // Storage key for session persistence
 const STORAGE_KEY = 'pipilot_agent_cloud'
@@ -120,22 +121,19 @@ export default function AgentCloudPage() {
   const [branches, setBranches] = useState<string[]>([])
   const [selectedBranch, setSelectedBranch] = useState<string>('main')
   const [isLoadingBranches, setIsLoadingBranches] = useState(false)
-  const [hasCheckedConnection, setHasCheckedConnection] = useState(false)
 
-  // Use the repo agent hook for GitHub connection
-  const {
-    connectionStatus,
-    isLoadingConnection,
-    isConnected,
-    checkConnection,
-    fetchRepositories,
-    fetchBranches: fetchRepoBranches,
-    repositories,
-    isLoadingRepos,
-  } = useRepoAgent()
+  // GitHub connection state (following deployment-client pattern)
+  const [storedTokens, setStoredTokens] = useState<{
+    github?: string
+    vercel?: string
+    netlify?: string
+  }>({})
+  const [isLoadingTokens, setIsLoadingTokens] = useState(true)
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false)
 
-  // Derived state: still initializing if we haven't checked connection yet
-  const isInitializing = !hasCheckedConnection && !isLoadingConnection
+  // Derived state
+  const isConnected = !!storedTokens.github
+  const isInitializing = isLoadingTokens
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -197,32 +195,114 @@ export default function AgentCloudPage() {
     }
   }, [activeSessionId])
 
-  // Check GitHub connection and load repos on mount
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const connected = await checkConnection()
-        setHasCheckedConnection(true)
-        if (connected) {
-          const fetchedRepos = await fetchRepositories()
-          if (fetchedRepos.length > 0) {
-            setRepos(fetchedRepos as Repository[])
-          }
-        }
-      } catch (error) {
-        console.error('Failed to initialize GitHub connection:', error)
-        setHasCheckedConnection(true)
-      }
-    }
-    init()
-  }, [])
+  // Load stored deployment tokens from database (following deployment-client pattern)
+  const loadStoredTokens = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-  // Update repos when repositories from hook change
-  useEffect(() => {
-    if (repositories.length > 0) {
-      setRepos(repositories as Repository[])
+      if (!user) {
+        console.log('loadStoredTokens: No user found')
+        setIsLoadingTokens(false)
+        return
+      }
+
+      console.log('loadStoredTokens: Loading tokens for user:', user.id)
+      const tokens = await getDeploymentTokens(user.id)
+      console.log('loadStoredTokens: Retrieved tokens:', tokens ? 'Found' : 'None')
+
+      if (tokens) {
+        const newTokens = {
+          github: tokens.github || undefined,
+          vercel: tokens.vercel || undefined,
+          netlify: tokens.netlify || undefined
+        }
+        console.log('loadStoredTokens: GitHub token available:', !!newTokens.github)
+        setStoredTokens(newTokens)
+
+        // If GitHub token exists, fetch repos
+        if (newTokens.github) {
+          await fetchUserRepos(newTokens.github)
+        }
+      } else {
+        console.log('loadStoredTokens: No tokens found')
+        setStoredTokens({})
+      }
+    } catch (error) {
+      console.error('loadStoredTokens: Error:', error)
+    } finally {
+      setIsLoadingTokens(false)
     }
-  }, [repositories])
+  }
+
+  // Fetch user's GitHub repositories using token directly
+  const fetchUserRepos = async (githubToken: string) => {
+    setIsLoadingRepos(true)
+    try {
+      const response = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated&type=all', {
+        headers: {
+          'Authorization': `Bearer ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'PiPilot-Agent-Cloud'
+        }
+      })
+
+      if (!response.ok) {
+        console.error('fetchUserRepos: GitHub API error:', response.status)
+        return
+      }
+
+      const data = await response.json()
+      const formattedRepos: Repository[] = data.map((repo: any) => ({
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        private: repo.private,
+        description: repo.description,
+        language: repo.language,
+        updated_at: repo.updated_at,
+        default_branch: repo.default_branch
+      }))
+
+      console.log('fetchUserRepos: Found', formattedRepos.length, 'repositories')
+      setRepos(formattedRepos)
+    } catch (error) {
+      console.error('fetchUserRepos: Error:', error)
+    } finally {
+      setIsLoadingRepos(false)
+    }
+  }
+
+  // Fetch branches for a repository using token directly
+  const fetchBranches = async (repoFullName: string): Promise<string[]> => {
+    if (!storedTokens.github) return []
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repoFullName}/branches?per_page=100`, {
+        headers: {
+          'Authorization': `Bearer ${storedTokens.github}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'PiPilot-Agent-Cloud'
+        }
+      })
+
+      if (!response.ok) {
+        console.error('fetchBranches: GitHub API error:', response.status)
+        return []
+      }
+
+      const data = await response.json()
+      return data.map((branch: any) => branch.name)
+    } catch (error) {
+      console.error('fetchBranches: Error:', error)
+      return []
+    }
+  }
+
+  // Initialize on mount
+  useEffect(() => {
+    loadStoredTokens()
+  }, [])
 
   // Close mobile menu on resize
   useEffect(() => {
@@ -238,7 +318,7 @@ export default function AgentCloudPage() {
   const loadBranches = async (repoFullName: string) => {
     setIsLoadingBranches(true)
     try {
-      const fetchedBranches = await fetchRepoBranches(repoFullName)
+      const fetchedBranches = await fetchBranches(repoFullName)
       setBranches(fetchedBranches)
       if (fetchedBranches.includes('main')) {
         setSelectedBranch('main')
@@ -656,7 +736,7 @@ export default function AgentCloudPage() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-800 max-h-80 overflow-y-auto">
-            {isInitializing || isLoadingConnection || isLoadingRepos ? (
+            {isInitializing || isLoadingTokens || isLoadingRepos ? (
               <div className="p-4 text-center text-zinc-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                 <span className="font-mono">Loading...</span>
@@ -1038,7 +1118,7 @@ export default function AgentCloudPage() {
               <p className="text-zinc-500 max-w-md mb-8 leading-relaxed">
                 Select a repository from the sidebar and create a new session to start coding with Claude.
               </p>
-              {isInitializing || isLoadingConnection ? (
+              {isInitializing || isLoadingTokens ? (
                 <div className="flex items-center gap-3 text-zinc-500">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span className="font-mono">Checking GitHub connection...</span>
