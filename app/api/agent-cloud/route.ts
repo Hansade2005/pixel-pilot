@@ -5,9 +5,12 @@
  * Configured with Vercel AI Gateway for unified AI routing.
  *
  * POST /api/agent-cloud
- * - action: 'create' - Create a new sandbox session
+ * - action: 'create' - Create a new sandbox session with repo
  * - action: 'run' - Run a Claude Code prompt
  * - action: 'playwright' - Run a Playwright script
+ * - action: 'commit' - Commit changes in the sandbox
+ * - action: 'push' - Push changes to remote
+ * - action: 'diff' - Get git diff stats
  * - action: 'terminate' - Terminate a sandbox
  * - action: 'status' - Get sandbox status
  *
@@ -18,6 +21,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
+import { createClient } from '@/lib/supabase/server'
+import { getDeploymentTokens } from '@/lib/cloud-sync'
 
 // Vercel AI Gateway configuration
 const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
@@ -35,25 +40,42 @@ const activeSandboxes = new Map<string, {
   createdAt: Date
   lastActivity: Date
   model?: string
+  repo?: {
+    full_name: string
+    branch: string
+    cloned: boolean
+  }
 }>()
 
 // Cleanup inactive sandboxes after 10 minutes
 const SANDBOX_TIMEOUT = 10 * 60 * 1000
 
+// Working directory for cloned repos
+const PROJECT_DIR = '/home/user/project'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, sandboxId, prompt, script, config } = body
+    const { action, sandboxId, prompt, script, config, message } = body
 
     switch (action) {
       case 'create':
-        return handleCreate(config)
+        return handleCreate(request, config)
 
       case 'run':
         return handleRun(sandboxId, prompt, body.options)
 
       case 'playwright':
         return handlePlaywright(sandboxId, script)
+
+      case 'commit':
+        return handleCommit(sandboxId, message)
+
+      case 'push':
+        return handlePush(request, sandboxId)
+
+      case 'diff':
+        return handleDiff(sandboxId)
 
       case 'terminate':
         return handleTerminate(sandboxId)
@@ -63,7 +85,7 @@ export async function POST(request: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use: create, run, playwright, terminate, status' },
+          { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status' },
           { status: 400 }
         )
     }
@@ -91,19 +113,24 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // Get sandbox entry
+  const sandboxEntry = activeSandboxes.get(sandboxId)
+  if (!sandboxEntry) {
+    return NextResponse.json(
+      { error: 'Sandbox not found' },
+      { status: 404 }
+    )
+  }
+
+  // Determine working directory based on repo
+  const workDir = sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user'
+
   // Create a streaming response
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const sandboxEntry = activeSandboxes.get(sandboxId)
-        if (!sandboxEntry) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: 'Sandbox not found' })}\n\n`))
-          controller.close()
-          return
-        }
-
         const { sandbox } = sandboxEntry
         sandboxEntry.lastActivity = new Date()
 
@@ -111,7 +138,7 @@ export async function GET(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start', sandboxId })}\n\n`))
 
         const escapedPrompt = prompt.replace(/'/g, "'\\''")
-        const command = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
+        const command = `cd ${workDir} && echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
 
         let fullOutput = ''
 
@@ -126,11 +153,29 @@ export async function GET(request: NextRequest) {
           }
         })
 
+        // Get git diff stats if repo is cloned
+        let diffStats = { additions: 0, deletions: 0 }
+        if (sandboxEntry.repo?.cloned) {
+          try {
+            const diffResult = await sandbox.commands.run(
+              `cd ${PROJECT_DIR} && git diff --shortstat`,
+              { timeoutMs: 5000 }
+            )
+            const match = diffResult.stdout?.match(/(\d+) insertion.*?(\d+) deletion/)
+            if (match) {
+              diffStats = { additions: parseInt(match[1]), deletions: parseInt(match[2]) }
+            }
+          } catch (e) {
+            // Ignore diff errors
+          }
+        }
+
         // Send completion event
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'complete',
           exitCode: result.exitCode,
-          output: fullOutput
+          output: fullOutput,
+          diffStats
         })}\n\n`))
 
         controller.close()
@@ -155,11 +200,19 @@ export async function GET(request: NextRequest) {
 
 /**
  * Create a new sandbox session with Vercel AI Gateway
+ * Optionally clone a GitHub repo into the sandbox
  */
-async function handleCreate(config?: {
-  model?: 'sonnet' | 'opus' | 'haiku'
-  template?: string
-}) {
+async function handleCreate(
+  request: NextRequest,
+  config?: {
+    model?: 'sonnet' | 'opus' | 'haiku'
+    template?: string
+    repo?: {
+      full_name: string
+      branch: string
+    }
+  }
+) {
   // Cleanup old sandboxes first
   cleanupInactiveSandboxes()
 
@@ -170,6 +223,22 @@ async function handleCreate(config?: {
       { error: 'VERCEL_AI_GATEWAY_API_KEY not configured. Add it to your environment variables.' },
       { status: 500 }
     )
+  }
+
+  // Get GitHub token if repo is specified
+  let githubToken: string | undefined
+  if (config?.repo) {
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const tokens = await getDeploymentTokens(user.id)
+        githubToken = tokens?.github
+      }
+    } catch (e) {
+      console.warn('[Agent Cloud] Failed to get GitHub token:', e)
+    }
   }
 
   // Configure environment variables for Claude Code with Vercel AI Gateway
@@ -189,6 +258,11 @@ async function handleCreate(config?: {
     PLAYWRIGHT_BROWSERS_PATH: '0',
   }
 
+  // Add GitHub token if available
+  if (githubToken) {
+    envs.GITHUB_TOKEN = githubToken
+  }
+
   // Use our custom template or fall back to anthropic-claude-code
   const template = config?.template || 'pipilot-agent'
   const selectedModel = config?.model || 'sonnet'
@@ -203,11 +277,47 @@ async function handleCreate(config?: {
   })
 
   const sandboxId = sandbox.sandboxId
+  let repoCloned = false
+
+  // Clone repo if specified
+  if (config?.repo && githubToken) {
+    try {
+      console.log(`[Agent Cloud] Cloning repo: ${config.repo.full_name} (${config.repo.branch})`)
+
+      // Clone the repo using the token for auth
+      const cloneUrl = `https://${githubToken}@github.com/${config.repo.full_name}.git`
+      const cloneResult = await sandbox.commands.run(
+        `git clone --branch ${config.repo.branch} --single-branch ${cloneUrl} ${PROJECT_DIR}`,
+        { timeoutMs: 60000 }
+      )
+
+      if (cloneResult.exitCode === 0) {
+        repoCloned = true
+        console.log(`[Agent Cloud] Repo cloned successfully`)
+
+        // Configure git user (use generic info)
+        await sandbox.commands.run(
+          `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
+          { timeoutMs: 5000 }
+        )
+      } else {
+        console.error(`[Agent Cloud] Clone failed:`, cloneResult.stderr)
+      }
+    } catch (error) {
+      console.error(`[Agent Cloud] Failed to clone repo:`, error)
+    }
+  }
+
   activeSandboxes.set(sandboxId, {
     sandbox,
     createdAt: new Date(),
     lastActivity: new Date(),
     model: selectedModel,
+    repo: config?.repo ? {
+      full_name: config.repo.full_name,
+      branch: config.repo.branch,
+      cloned: repoCloned,
+    } : undefined,
   })
 
   console.log(`[Agent Cloud] Sandbox created: ${sandboxId}`)
@@ -217,7 +327,11 @@ async function handleCreate(config?: {
     sandboxId,
     model: AVAILABLE_MODELS[selectedModel],
     gateway: AI_GATEWAY_BASE_URL,
-    message: 'Sandbox created with Vercel AI Gateway',
+    repoCloned,
+    projectDir: repoCloned ? PROJECT_DIR : '/home/user',
+    message: repoCloned
+      ? `Sandbox created with ${config?.repo?.full_name} cloned`
+      : 'Sandbox created with Vercel AI Gateway',
   })
 }
 
@@ -250,7 +364,10 @@ async function handleRun(
   const { sandbox } = sandboxEntry
   sandboxEntry.lastActivity = new Date()
 
-  const workDir = options?.workingDirectory || '/home/user'
+  // Use project dir if repo is cloned, otherwise use specified or default
+  const workDir = options?.workingDirectory ||
+    (sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user')
+
   const escapedPrompt = prompt.replace(/'/g, "'\\''")
   const command = `cd ${workDir} && echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
 
@@ -346,6 +463,162 @@ async function handlePlaywright(sandboxId: string, script: string) {
 }
 
 /**
+ * Commit changes in the sandbox
+ */
+async function handleCommit(sandboxId: string, message?: string) {
+  if (!sandboxId) {
+    return NextResponse.json(
+      { error: 'sandboxId is required' },
+      { status: 400 }
+    )
+  }
+
+  const sandboxEntry = activeSandboxes.get(sandboxId)
+  if (!sandboxEntry) {
+    return NextResponse.json(
+      { error: 'Sandbox not found' },
+      { status: 404 }
+    )
+  }
+
+  if (!sandboxEntry.repo?.cloned) {
+    return NextResponse.json(
+      { error: 'No repo cloned in this sandbox' },
+      { status: 400 }
+    )
+  }
+
+  const { sandbox } = sandboxEntry
+  sandboxEntry.lastActivity = new Date()
+
+  const commitMessage = message || 'Changes by PiPilot Agent'
+
+  // Add all changes and commit
+  const result = await sandbox.commands.run(
+    `cd ${PROJECT_DIR} && git add -A && git commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
+    { timeoutMs: 30000 }
+  )
+
+  return NextResponse.json({
+    success: result.exitCode === 0,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    exitCode: result.exitCode || 0,
+    message: result.exitCode === 0 ? 'Changes committed' : 'Commit failed',
+  })
+}
+
+/**
+ * Push changes to remote
+ */
+async function handlePush(request: NextRequest, sandboxId: string) {
+  if (!sandboxId) {
+    return NextResponse.json(
+      { error: 'sandboxId is required' },
+      { status: 400 }
+    )
+  }
+
+  const sandboxEntry = activeSandboxes.get(sandboxId)
+  if (!sandboxEntry) {
+    return NextResponse.json(
+      { error: 'Sandbox not found' },
+      { status: 404 }
+    )
+  }
+
+  if (!sandboxEntry.repo?.cloned) {
+    return NextResponse.json(
+      { error: 'No repo cloned in this sandbox' },
+      { status: 400 }
+    )
+  }
+
+  const { sandbox, repo } = sandboxEntry
+  sandboxEntry.lastActivity = new Date()
+
+  // Push to the same branch
+  const result = await sandbox.commands.run(
+    `cd ${PROJECT_DIR} && git push origin ${repo.branch}`,
+    { timeoutMs: 60000 }
+  )
+
+  return NextResponse.json({
+    success: result.exitCode === 0,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    exitCode: result.exitCode || 0,
+    message: result.exitCode === 0 ? 'Changes pushed to remote' : 'Push failed',
+  })
+}
+
+/**
+ * Get git diff stats
+ */
+async function handleDiff(sandboxId: string) {
+  if (!sandboxId) {
+    return NextResponse.json(
+      { error: 'sandboxId is required' },
+      { status: 400 }
+    )
+  }
+
+  const sandboxEntry = activeSandboxes.get(sandboxId)
+  if (!sandboxEntry) {
+    return NextResponse.json(
+      { error: 'Sandbox not found' },
+      { status: 404 }
+    )
+  }
+
+  if (!sandboxEntry.repo?.cloned) {
+    return NextResponse.json({
+      success: true,
+      additions: 0,
+      deletions: 0,
+      changedFiles: 0,
+      files: [],
+    })
+  }
+
+  const { sandbox } = sandboxEntry
+  sandboxEntry.lastActivity = new Date()
+
+  // Get diff stats
+  const statsResult = await sandbox.commands.run(
+    `cd ${PROJECT_DIR} && git diff --shortstat`,
+    { timeoutMs: 5000 }
+  )
+
+  // Get changed files
+  const filesResult = await sandbox.commands.run(
+    `cd ${PROJECT_DIR} && git diff --name-only`,
+    { timeoutMs: 5000 }
+  )
+
+  let additions = 0
+  let deletions = 0
+  let changedFiles = 0
+
+  const statsMatch = statsResult.stdout?.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/)
+  if (statsMatch) {
+    changedFiles = parseInt(statsMatch[1]) || 0
+    additions = parseInt(statsMatch[2]) || 0
+    deletions = parseInt(statsMatch[3]) || 0
+  }
+
+  const files = filesResult.stdout?.split('\n').filter(Boolean) || []
+
+  return NextResponse.json({
+    success: true,
+    additions,
+    deletions,
+    changedFiles,
+    files,
+  })
+}
+
+/**
  * Terminate a sandbox
  */
 async function handleTerminate(sandboxId: string) {
@@ -392,6 +665,7 @@ async function handleStatus(sandboxId: string) {
       createdAt: entry.createdAt.toISOString(),
       lastActivity: entry.lastActivity.toISOString(),
       age: Date.now() - entry.createdAt.getTime(),
+      repo: entry.repo,
     }))
 
     return NextResponse.json({
@@ -415,6 +689,7 @@ async function handleStatus(sandboxId: string) {
     createdAt: sandboxEntry.createdAt.toISOString(),
     lastActivity: sandboxEntry.lastActivity.toISOString(),
     age: Date.now() - sandboxEntry.createdAt.getTime(),
+    repo: sandboxEntry.repo,
   })
 }
 

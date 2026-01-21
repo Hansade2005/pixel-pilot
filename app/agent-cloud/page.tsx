@@ -245,7 +245,11 @@ export default function AgentCloudPage() {
         body: JSON.stringify({
           action: 'create',
           config: {
-            model: selectedModel
+            model: selectedModel,
+            repo: {
+              full_name: selectedRepo.full_name,
+              branch: selectedBranch
+            }
           }
         })
       })
@@ -257,6 +261,7 @@ export default function AgentCloudPage() {
       }
 
       const modelInfo = MODELS.find(m => m.id === selectedModel)
+      const repoCloned = data.repoCloned === true
       const newSession: Session = {
         id: crypto.randomUUID(),
         sandboxId: data.sandboxId,
@@ -270,16 +275,21 @@ export default function AgentCloudPage() {
           branch: selectedBranch,
         },
         stats: { additions: 0, deletions: 0 },
-        lines: [
-          { type: 'system', content: `Connected to ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+        lines: repoCloned ? [
+          { type: 'system', content: `Cloned ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          { type: 'system', content: `Working directory: ${data.projectDir}`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
           { type: 'system', content: 'Ready. Ask Claude to write code...', timestamp: new Date() },
+        ] : [
+          { type: 'system', content: `Failed to clone ${selectedRepo.full_name}. Check GitHub permissions.`, timestamp: new Date() },
+          { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
+          { type: 'system', content: 'You can still run Claude Code, but changes won\'t be persisted.', timestamp: new Date() },
         ]
       }
 
       setSessions(prev => [newSession, ...prev])
       setActiveSessionId(newSession.id)
-      toast.success('Session created')
+      toast.success(repoCloned ? `Cloned ${selectedRepo.name}` : 'Session created (clone failed)')
     } catch (error) {
       console.error('Failed to create session:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to create session')
@@ -368,19 +378,21 @@ export default function AgentCloudPage() {
               addLine('error', data.data)
               break
             case 'complete':
-              // Update stats (mock for now)
-              setSessions(prev => prev.map(s => {
-                if (s.id === activeSessionId) {
-                  return {
-                    ...s,
-                    stats: {
-                      additions: (s.stats?.additions || 0) + Math.floor(Math.random() * 20),
-                      deletions: (s.stats?.deletions || 0) + Math.floor(Math.random() * 5)
+              // Update stats with real diff data from API
+              if (data.diffStats) {
+                setSessions(prev => prev.map(s => {
+                  if (s.id === activeSessionId) {
+                    return {
+                      ...s,
+                      stats: {
+                        additions: (s.stats?.additions || 0) + (data.diffStats.additions || 0),
+                        deletions: (s.stats?.deletions || 0) + (data.diffStats.deletions || 0)
+                      }
                     }
                   }
-                }
-                return s
-              }))
+                  return s
+                }))
+              }
               eventSource.close()
               setIsLoading(false)
               setIsStreaming(false)
