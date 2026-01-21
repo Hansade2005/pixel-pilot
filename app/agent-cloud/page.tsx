@@ -1079,7 +1079,7 @@ export default function AgentCloudPage() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Mobile sidebar */}
         <div className={`
-          fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-zinc-950 border-r border-zinc-800/50 z-50
+          fixed inset-y-0 left-0 w-[340px] max-w-[90vw] bg-zinc-950 border-r border-zinc-800/50 z-50
           transform transition-transform duration-300 ease-out md:hidden
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           pt-16
@@ -1089,7 +1089,7 @@ export default function AgentCloudPage() {
 
         {/* Desktop sidebar */}
         {sidebarOpen && (
-          <div className="w-80 border-r border-zinc-800/50 flex-col bg-zinc-950 hidden md:flex">
+          <div className="w-[340px] min-w-[340px] border-r border-zinc-800/50 flex-col bg-zinc-950 hidden md:flex">
             <SidebarContent />
           </div>
         )}
