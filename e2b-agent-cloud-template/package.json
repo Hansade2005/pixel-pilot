@@ -1,0 +1,17 @@
+{
+  "name": "pipilot-agent-cloud",
+  "version": "1.0.0",
+  "description": "PiPilot Agent Cloud - Claude Code + Playwright in E2B sandbox",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "private": true
+}
