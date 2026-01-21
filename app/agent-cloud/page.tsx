@@ -44,7 +44,16 @@ interface Session {
   createdAt: Date
   status: 'active' | 'terminated'
   lines: TerminalLine[]
+  model?: string
+  gateway?: string
 }
+
+// Available models through Vercel AI Gateway
+const MODELS = [
+  { id: 'sonnet', name: 'Grok Code Fast 1', provider: 'xAI', description: 'Fast code generation' },
+  { id: 'opus', name: 'GLM 4.7', provider: 'ZAI', description: 'High quality responses' },
+  { id: 'haiku', name: 'Devstral Small 2', provider: 'Mistral', description: 'Quick tasks' },
+] as const
 
 export default function AgentCloudPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -56,8 +65,7 @@ export default function AgentCloudPage() {
   const [copied, setCopied] = useState(false)
 
   // Settings
-  const [useAIGateway, setUseAIGateway] = useState(false)
-  const [aiGatewayUrl, setAiGatewayUrl] = useState('')
+  const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku'>('sonnet')
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -79,8 +87,7 @@ export default function AgentCloudPage() {
           })
         }
         if (parsed.settings) {
-          setUseAIGateway(parsed.settings.useAIGateway || false)
-          setAiGatewayUrl(parsed.settings.aiGatewayUrl || '')
+          setSelectedModel(parsed.settings.selectedModel || 'sonnet')
         }
       }
     } catch (error) {
@@ -93,12 +100,12 @@ export default function AgentCloudPage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         session,
-        settings: { useAIGateway, aiGatewayUrl }
+        settings: { selectedModel }
       }))
     } catch (error) {
       console.error('Failed to save session:', error)
     }
-  }, [session, useAIGateway, aiGatewayUrl])
+  }, [session, selectedModel])
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -120,17 +127,14 @@ export default function AgentCloudPage() {
   const createSession = async () => {
     setIsCreating(true)
     try {
-      const config: Record<string, string> = {}
-      if (useAIGateway && aiGatewayUrl) {
-        config.anthropicBaseUrl = aiGatewayUrl
-      }
-
       const response = await fetch('/api/agent-cloud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create',
-          config
+          config: {
+            model: selectedModel
+          }
         })
       })
 
@@ -140,13 +144,17 @@ export default function AgentCloudPage() {
         throw new Error(data.error || 'Failed to create sandbox')
       }
 
+      const modelInfo = MODELS.find(m => m.id === selectedModel)
       const newSession: Session = {
         sandboxId: data.sandboxId,
         createdAt: new Date(),
         status: 'active',
+        model: data.model,
+        gateway: data.gateway,
         lines: [
-          { type: 'system', content: 'Agent Cloud sandbox created', timestamp: new Date() },
+          { type: 'system', content: 'Agent Cloud sandbox created with Vercel AI Gateway', timestamp: new Date() },
           { type: 'system', content: `Sandbox ID: ${data.sandboxId}`, timestamp: new Date() },
+          { type: 'system', content: `Model: ${modelInfo?.name || data.model} (${modelInfo?.provider || 'AI Gateway'})`, timestamp: new Date() },
           { type: 'system', content: 'Claude Code is ready. Type a prompt and press Enter to start.', timestamp: new Date() },
         ]
       }
@@ -315,35 +323,35 @@ export default function AgentCloudPage() {
           </CardHeader>
           {showSettings && (
             <CardContent className="pt-0 space-y-4">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="ai-gateway"
-                  checked={useAIGateway}
-                  onChange={(e) => setUseAIGateway(e.target.checked)}
-                  className="h-4 w-4 rounded"
-                />
-                <label htmlFor="ai-gateway" className="text-sm">
-                  Use Vercel AI Gateway
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Select Model
                 </label>
-              </div>
-              {useAIGateway && (
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">
-                    AI Gateway URL
-                  </label>
-                  <input
-                    type="text"
-                    value={aiGatewayUrl}
-                    onChange={(e) => setAiGatewayUrl(e.target.value)}
-                    placeholder="https://api.vercel.ai/v1"
-                    className="w-full px-3 py-2 text-sm rounded-md border bg-background"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {MODELS.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => setSelectedModel(model.id)}
+                      disabled={session !== null}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        selectedModel === model.id
+                          ? 'border-orange-500 bg-orange-500/10'
+                          : 'border-border hover:border-orange-500/50'
+                      } ${session !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="font-medium text-sm">{model.name}</div>
+                      <div className="text-xs text-muted-foreground">{model.provider}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{model.description}</div>
+                    </button>
+                  ))}
                 </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Vercel AI Gateway provides caching, rate limiting, and analytics for AI API calls.
-              </p>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                <Zap className="h-4 w-4 text-orange-500" />
+                <p className="text-xs text-muted-foreground">
+                  Powered by Vercel AI Gateway at <code className="bg-background px-1 rounded">ai-gateway.vercel.sh</code>
+                </p>
+              </div>
             </CardContent>
           )}
         </Card>
@@ -358,12 +366,19 @@ export default function AgentCloudPage() {
                 {session ? `Sandbox: ${session.sandboxId.slice(0, 8)}...` : 'No active sandbox'}
               </span>
               {session && (
-                <Badge
-                  variant={session.status === 'active' ? 'default' : 'secondary'}
-                  className="text-xs"
-                >
-                  {session.status}
-                </Badge>
+                <>
+                  <Badge
+                    variant={session.status === 'active' ? 'default' : 'secondary'}
+                    className="text-xs"
+                  >
+                    {session.status}
+                  </Badge>
+                  {session.model && (
+                    <Badge variant="outline" className="text-xs">
+                      {MODELS.find(m => session.model?.includes(m.id.charAt(0)))?.name || session.model}
+                    </Badge>
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -508,10 +523,10 @@ export default function AgentCloudPage() {
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Bot className="h-5 w-5 text-orange-500" />
-              <h3 className="font-medium">Claude Code CLI</h3>
+              <h3 className="font-medium">Multi-Model Support</h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              Anthropic's official coding agent that can write, edit, and understand code autonomously.
+              Choose from Grok Code Fast 1, GLM 4.7, or Devstral Small 2 via Vercel AI Gateway.
             </p>
           </Card>
           <Card className="p-4">
@@ -529,7 +544,7 @@ export default function AgentCloudPage() {
               <h3 className="font-medium">Vercel AI Gateway</h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              Optional integration for caching, rate limiting, and analytics on AI API calls.
+              Unified API routing with caching, rate limiting, and usage analytics built-in.
             </p>
           </Card>
         </div>

@@ -2,7 +2,7 @@
  * Agent Cloud API
  *
  * API endpoint for running Claude Code in E2B sandboxes.
- * Supports streaming output and Vercel AI Gateway integration.
+ * Configured with Vercel AI Gateway for unified AI routing.
  *
  * POST /api/agent-cloud
  * - action: 'create' - Create a new sandbox session
@@ -10,16 +10,31 @@
  * - action: 'playwright' - Run a Playwright script
  * - action: 'terminate' - Terminate a sandbox
  * - action: 'status' - Get sandbox status
+ *
+ * Environment Variables Required:
+ * - VERCEL_AI_GATEWAY_API_KEY: Your Vercel AI Gateway API key
+ * - E2B_API_KEY: Your E2B API key (for sandbox creation)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
+
+// Vercel AI Gateway configuration
+const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
+
+// Available models through Vercel AI Gateway
+const AVAILABLE_MODELS = {
+  sonnet: 'xai/grok-code-fast-1',      // Fast code generation
+  opus: 'zai/glm-4.7',                  // High quality
+  haiku: 'mistral/devstral-small-2',   // Quick tasks
+} as const
 
 // Store active sandboxes (in production, use Redis or database)
 const activeSandboxes = new Map<string, {
   sandbox: Sandbox
   createdAt: Date
   lastActivity: Date
+  model?: string
 }>()
 
 // Cleanup inactive sandboxes after 10 minutes
@@ -139,39 +154,48 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Create a new sandbox session
+ * Create a new sandbox session with Vercel AI Gateway
  */
 async function handleCreate(config?: {
-  anthropicBaseUrl?: string
+  model?: 'sonnet' | 'opus' | 'haiku'
   template?: string
 }) {
   // Cleanup old sandboxes first
   cleanupInactiveSandboxes()
 
-  const anthropicApiKey = process.env.ANTHROPIC_API_KEY
-  if (!anthropicApiKey) {
+  // Get Vercel AI Gateway API key
+  const aiGatewayKey = process.env.VERCEL_AI_GATEWAY_API_KEY
+  if (!aiGatewayKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY not configured' },
+      { error: 'VERCEL_AI_GATEWAY_API_KEY not configured. Add it to your environment variables.' },
       { status: 500 }
     )
   }
 
+  // Configure environment variables for Claude Code with Vercel AI Gateway
+  // IMPORTANT: ANTHROPIC_API_KEY must be empty string so Claude Code uses ANTHROPIC_AUTH_TOKEN
   const envs: Record<string, string> = {
-    ANTHROPIC_API_KEY: anthropicApiKey,
+    // Vercel AI Gateway configuration
+    ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
+    ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
+    ANTHROPIC_API_KEY: '', // Must be empty - Claude Code checks this first
+
+    // Model overrides via AI Gateway
+    ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+
+    // Playwright configuration
     PLAYWRIGHT_BROWSERS_PATH: '0',
   }
 
-  // Configure Vercel AI Gateway if specified
-  if (config?.anthropicBaseUrl) {
-    envs.ANTHROPIC_BASE_URL = config.anthropicBaseUrl
-  } else if (process.env.ANTHROPIC_BASE_URL) {
-    envs.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL
-  }
-
-  // Use specified template or default to anthropic-claude-code
-  const template = config?.template || 'anthropic-claude-code'
+  // Use our custom template or fall back to anthropic-claude-code
+  const template = config?.template || 'pipilot-agent'
+  const selectedModel = config?.model || 'sonnet'
 
   console.log(`[Agent Cloud] Creating sandbox with template: ${template}`)
+  console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
+  console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
   const sandbox = await Sandbox.create(template, {
     timeoutMs: 5 * 60 * 1000, // 5 minutes
@@ -183,6 +207,7 @@ async function handleCreate(config?: {
     sandbox,
     createdAt: new Date(),
     lastActivity: new Date(),
+    model: selectedModel,
   })
 
   console.log(`[Agent Cloud] Sandbox created: ${sandboxId}`)
@@ -190,7 +215,9 @@ async function handleCreate(config?: {
   return NextResponse.json({
     success: true,
     sandboxId,
-    message: 'Sandbox created successfully',
+    model: AVAILABLE_MODELS[selectedModel],
+    gateway: AI_GATEWAY_BASE_URL,
+    message: 'Sandbox created with Vercel AI Gateway',
   })
 }
 
