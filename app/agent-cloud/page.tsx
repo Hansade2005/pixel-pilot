@@ -5,30 +5,26 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Terminal,
-  Send,
   Loader2,
   Square,
   Trash2,
   GitBranch,
   ChevronDown,
-  FileCode,
   Copy,
   Check,
   Bot,
   ExternalLink,
-  Image as ImageIcon,
   MoreVertical,
   Plus,
   Github,
   FolderGit2,
   PanelLeft,
   Sparkles,
-  File,
-  ChevronRight,
-  SlidersHorizontal,
   Menu,
   X,
   Circle,
+  Search,
+  Globe,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -36,12 +32,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { PremiumChatInput } from "@/components/agent-cloud/premium-chat-input"
+import { Response } from "@/components/ai-elements/response"
 
 // Storage key for session persistence
-const STORAGE_KEY = 'pipilot_agent_cloud'
+const STORAGE_KEY = 'pipilot_agent_cloud_v2'
 
 interface TerminalLine {
   type: 'input' | 'output' | 'error' | 'system' | 'file' | 'diff' | 'tool'
@@ -74,6 +73,7 @@ interface Session {
     additions: number
     deletions: number
   }
+  messageCount?: number
 }
 
 interface Repository {
@@ -104,13 +104,14 @@ export default function AgentCloudPage() {
 
   // UI state
   const [prompt, setPrompt] = useState('')
+  const [sidebarPrompt, setSidebarPrompt] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [expandedDiffs, setExpandedDiffs] = useState<Record<number, boolean>>({})
+  const [repoSearchQuery, setRepoSearchQuery] = useState('')
 
   // Settings
   const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku'>('sonnet')
@@ -122,7 +123,7 @@ export default function AgentCloudPage() {
   const [selectedBranch, setSelectedBranch] = useState<string>('main')
   const [isLoadingBranches, setIsLoadingBranches] = useState(false)
 
-  // GitHub connection state (following deployment-client pattern)
+  // GitHub connection state
   const [storedTokens, setStoredTokens] = useState<{
     github?: string
     vercel?: string
@@ -139,6 +140,14 @@ export default function AgentCloudPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const sidebarInputRef = useRef<HTMLTextAreaElement>(null)
 
+  // Filter repos by search query
+  const filteredRepos = repoSearchQuery
+    ? repos.filter(repo =>
+        repo.name.toLowerCase().includes(repoSearchQuery.toLowerCase()) ||
+        repo.full_name.toLowerCase().includes(repoSearchQuery.toLowerCase())
+      )
+    : repos
+
   // Load sessions from localStorage
   useEffect(() => {
     try {
@@ -146,10 +155,10 @@ export default function AgentCloudPage() {
       if (stored) {
         const parsed = JSON.parse(stored)
         if (parsed.sessions) {
-          const loadedSessions = parsed.sessions.map((s: any) => ({
+          const loadedSessions = parsed.sessions.map((s: Session) => ({
             ...s,
             createdAt: new Date(s.createdAt),
-            lines: s.lines.map((line: any) => ({
+            lines: s.lines.map((line: TerminalLine) => ({
               ...line,
               timestamp: new Date(line.timestamp)
             }))
@@ -195,21 +204,18 @@ export default function AgentCloudPage() {
     }
   }, [activeSessionId])
 
-  // Load stored deployment tokens from database (following deployment-client pattern)
+  // Load stored deployment tokens from database
   const loadStoredTokens = async () => {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        console.log('loadStoredTokens: No user found')
         setIsLoadingTokens(false)
         return
       }
 
-      console.log('loadStoredTokens: Loading tokens for user:', user.id)
       const tokens = await getDeploymentTokens(user.id)
-      console.log('loadStoredTokens: Retrieved tokens:', tokens ? 'Found' : 'None')
 
       if (tokens) {
         const newTokens = {
@@ -217,15 +223,12 @@ export default function AgentCloudPage() {
           vercel: tokens.vercel || undefined,
           netlify: tokens.netlify || undefined
         }
-        console.log('loadStoredTokens: GitHub token available:', !!newTokens.github)
         setStoredTokens(newTokens)
 
-        // If GitHub token exists, fetch repos
         if (newTokens.github) {
           await fetchUserRepos(newTokens.github)
         }
       } else {
-        console.log('loadStoredTokens: No tokens found')
         setStoredTokens({})
       }
     } catch (error) {
@@ -235,7 +238,7 @@ export default function AgentCloudPage() {
     }
   }
 
-  // Fetch user's GitHub repositories using token directly
+  // Fetch user's GitHub repositories
   const fetchUserRepos = async (githubToken: string) => {
     setIsLoadingRepos(true)
     try {
@@ -253,7 +256,7 @@ export default function AgentCloudPage() {
       }
 
       const data = await response.json()
-      const formattedRepos: Repository[] = data.map((repo: any) => ({
+      const formattedRepos: Repository[] = data.map((repo: Repository) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -264,7 +267,6 @@ export default function AgentCloudPage() {
         default_branch: repo.default_branch
       }))
 
-      console.log('fetchUserRepos: Found', formattedRepos.length, 'repositories')
       setRepos(formattedRepos)
     } catch (error) {
       console.error('fetchUserRepos: Error:', error)
@@ -273,7 +275,7 @@ export default function AgentCloudPage() {
     }
   }
 
-  // Fetch branches for a repository using token directly
+  // Fetch branches for a repository
   const fetchBranches = async (repoFullName: string): Promise<string[]> => {
     if (!storedTokens.github) return []
 
@@ -292,7 +294,7 @@ export default function AgentCloudPage() {
       }
 
       const data = await response.json()
-      return data.map((branch: any) => branch.name)
+      return data.map((branch: { name: string }) => branch.name)
     } catch (error) {
       console.error('fetchBranches: Error:', error)
       return []
@@ -337,6 +339,7 @@ export default function AgentCloudPage() {
   const selectRepo = (repo: Repository) => {
     setSelectedRepo(repo)
     loadBranches(repo.full_name)
+    setRepoSearchQuery('')
   }
 
   const addLine = useCallback((type: TerminalLine['type'], content: string, meta?: TerminalLine['meta']) => {
@@ -382,8 +385,9 @@ export default function AgentCloudPage() {
 
       const modelInfo = MODELS.find(m => m.id === selectedModel)
       const repoCloned = data.repoCloned === true
+      const reconnected = data.reconnected === true
 
-      // Generate session title from prompt or repo name
+      // Generate session title
       const sessionTitle = initialPrompt
         ? initialPrompt.slice(0, 50) + (initialPrompt.length > 50 ? '...' : '')
         : `Session in ${selectedRepo.name}`
@@ -402,9 +406,16 @@ export default function AgentCloudPage() {
           branch: selectedBranch,
         },
         stats: { additions: 0, deletions: 0 },
-        lines: repoCloned ? [
+        messageCount: data.messageCount || 0,
+        lines: reconnected ? [
+          { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
+          { type: 'system', content: `Repository: ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: DuckDuckGo Search, Arxiv`, timestamp: new Date() },
+        ] : repoCloned ? [
           { type: 'system', content: `Cloned ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: DuckDuckGo Search, Arxiv`, timestamp: new Date() },
         ] : [
           { type: 'system', content: `Failed to clone ${selectedRepo.full_name}`, timestamp: new Date() },
         ]
@@ -413,13 +424,23 @@ export default function AgentCloudPage() {
       setSessions(prev => [newSession, ...prev])
       setActiveSessionId(newSession.id)
       setMobileMenuOpen(false)
-      toast.success(repoCloned ? `Cloned ${selectedRepo.name}` : 'Session created')
+      setSidebarPrompt('')
+
+      toast.success(
+        reconnected
+          ? `Reconnected to ${selectedRepo.name}`
+          : repoCloned
+            ? `Cloned ${selectedRepo.name}`
+            : 'Session created'
+      )
 
       // If there's an initial prompt, run it after session creation
       if (initialPrompt && repoCloned) {
+        // Use the new session ID to run the prompt
         setTimeout(() => {
           setPrompt(initialPrompt)
-        }, 100)
+          runPromptForSession(newSession.id, newSession.sandboxId, initialPrompt)
+        }, 500)
       }
     } catch (error) {
       console.error('Failed to create session:', error)
@@ -464,32 +485,24 @@ export default function AgentCloudPage() {
     }
   }
 
-  const runPrompt = async () => {
-    if (!activeSession || !prompt.trim() || isLoading) return
-
-    const currentPrompt = prompt.trim()
-    setPrompt('')
+  const runPromptForSession = async (sessionId: string, sandboxId: string, promptText: string) => {
     setIsLoading(true)
     setIsStreaming(true)
 
-    // Update session title if it's the first user message
-    if (activeSession.lines.filter(l => l.type === 'input').length === 0) {
-      setSessions(prev => prev.map(s => {
-        if (s.id === activeSessionId) {
-          return {
-            ...s,
-            title: currentPrompt.slice(0, 50) + (currentPrompt.length > 50 ? '...' : '')
-          }
+    // Add input line
+    setSessions(prev => prev.map(s => {
+      if (s.id === sessionId) {
+        return {
+          ...s,
+          lines: [...s.lines, { type: 'input' as const, content: promptText, timestamp: new Date() }]
         }
-        return s
-      }))
-    }
-
-    addLine('input', currentPrompt)
+      }
+      return s
+    }))
 
     try {
       const eventSource = new EventSource(
-        `/api/agent-cloud?sandboxId=${encodeURIComponent(activeSession.sandboxId)}&prompt=${encodeURIComponent(currentPrompt)}`
+        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxId)}&prompt=${encodeURIComponent(promptText)}`
       )
 
       let fullOutput = ''
@@ -504,7 +517,7 @@ export default function AgentCloudPage() {
             case 'stdout':
               fullOutput += data.data
               setSessions(prev => prev.map(s => {
-                if (s.id === activeSessionId) {
+                if (s.id === sessionId) {
                   const lines = [...s.lines]
                   const lastLine = lines[lines.length - 1]
                   if (lastLine && lastLine.type === 'output') {
@@ -518,18 +531,27 @@ export default function AgentCloudPage() {
               }))
               break
             case 'stderr':
-              addLine('error', data.data)
+              setSessions(prev => prev.map(s => {
+                if (s.id === sessionId) {
+                  return {
+                    ...s,
+                    lines: [...s.lines, { type: 'error' as const, content: data.data, timestamp: new Date() }]
+                  }
+                }
+                return s
+              }))
               break
             case 'complete':
               if (data.diffStats) {
                 setSessions(prev => prev.map(s => {
-                  if (s.id === activeSessionId) {
+                  if (s.id === sessionId) {
                     return {
                       ...s,
                       stats: {
                         additions: (s.stats?.additions || 0) + (data.diffStats.additions || 0),
                         deletions: (s.stats?.deletions || 0) + (data.diffStats.deletions || 0)
-                      }
+                      },
+                      messageCount: data.messageCount
                     }
                   }
                   return s
@@ -540,7 +562,15 @@ export default function AgentCloudPage() {
               setIsStreaming(false)
               break
             case 'error':
-              addLine('error', data.message)
+              setSessions(prev => prev.map(s => {
+                if (s.id === sessionId) {
+                  return {
+                    ...s,
+                    lines: [...s.lines, { type: 'error' as const, content: data.message, timestamp: new Date() }]
+                  }
+                }
+                return s
+              }))
               eventSource.close()
               setIsLoading(false)
               setIsStreaming(false)
@@ -555,29 +585,62 @@ export default function AgentCloudPage() {
         eventSource.close()
         setIsLoading(false)
         setIsStreaming(false)
-        addLine('error', 'Connection lost. Please try again.')
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              lines: [...s.lines, { type: 'error' as const, content: 'Connection lost. Please try again.', timestamp: new Date() }]
+            }
+          }
+          return s
+        }))
       }
 
     } catch (error) {
       console.error('Failed to run prompt:', error)
-      addLine('error', error instanceof Error ? error.message : 'Failed to run prompt')
+      setSessions(prev => prev.map(s => {
+        if (s.id === sessionId) {
+          return {
+            ...s,
+            lines: [...s.lines, {
+              type: 'error' as const,
+              content: error instanceof Error ? error.message : 'Failed to run prompt',
+              timestamp: new Date()
+            }]
+          }
+        }
+        return s
+      }))
       setIsLoading(false)
       setIsStreaming(false)
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      runPrompt()
+  const runPrompt = async () => {
+    if (!activeSession || !prompt.trim() || isLoading) return
+
+    const currentPrompt = prompt.trim()
+    setPrompt('')
+
+    // Update session title if it's the first user message
+    if (activeSession.lines.filter(l => l.type === 'input').length === 0) {
+      setSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          return {
+            ...s,
+            title: currentPrompt.slice(0, 50) + (currentPrompt.length > 50 ? '...' : '')
+          }
+        }
+        return s
+      }))
     }
+
+    await runPromptForSession(activeSession.id, activeSession.sandboxId, currentPrompt)
   }
 
-  const handleSidebarSubmit = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && prompt.trim()) {
-      e.preventDefault()
-      createSession(prompt.trim())
-      setPrompt('')
+  const handleSidebarSubmit = () => {
+    if (sidebarPrompt.trim()) {
+      createSession(sidebarPrompt.trim())
     }
   }
 
@@ -589,10 +652,6 @@ export default function AgentCloudPage() {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()
-  }
-
-  const toggleDiff = (index: number) => {
-    setExpandedDiffs(prev => ({ ...prev, [index]: !prev[index] }))
   }
 
   // Render a single message line
@@ -613,7 +672,7 @@ export default function AgentCloudPage() {
               <span className="text-xs font-semibold">U</span>
             </div>
             <div className="flex-1 pt-0.5">
-              <p className="text-zinc-100 font-mono text-sm leading-relaxed">{line.content}</p>
+              <p className="text-zinc-100 font-sans text-sm leading-relaxed">{line.content}</p>
             </div>
           </div>
         )
@@ -626,9 +685,12 @@ export default function AgentCloudPage() {
             </div>
             <div className="flex-1 min-w-0 pt-0.5">
               <div className="relative">
-                <pre className="whitespace-pre-wrap text-sm text-zinc-300 font-mono leading-relaxed">
-                  {line.content}
-                </pre>
+                {/* Use Streamdown Response component for Markdown rendering */}
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <Response className="text-zinc-300 font-sans">
+                    {line.content}
+                  </Response>
+                </div>
                 <button
                   onClick={() => copyToClipboard(line.content, `output-${index}`)}
                   className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded-md hover:bg-zinc-700"
@@ -656,70 +718,29 @@ export default function AgentCloudPage() {
           </div>
         )
 
-      case 'diff':
-        const diffMeta = line.meta || {}
-        return (
-          <div key={index} className="py-2">
-            <button
-              onClick={() => toggleDiff(index)}
-              className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors font-mono"
-            >
-              <ChevronRight className={`h-4 w-4 transition-transform ${expandedDiffs[index] ? 'rotate-90' : ''}`} />
-              <File className="h-4 w-4" />
-              <span>{diffMeta.fileName || 'Changes'}</span>
-              {diffMeta.additions !== undefined && (
-                <span className="text-green-500">+{diffMeta.additions}</span>
-              )}
-              {diffMeta.deletions !== undefined && (
-                <span className="text-red-500">-{diffMeta.deletions}</span>
-              )}
-            </button>
-            {expandedDiffs[index] && diffMeta.diffLines && (
-              <div className="mt-2 ml-6 bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
-                <pre className="text-xs p-3 overflow-x-auto font-mono">
-                  {diffMeta.diffLines.map((diffLine: string, i: number) => (
-                    <div
-                      key={i}
-                      className={
-                        diffLine.startsWith('+') ? 'text-green-400 bg-green-500/10' :
-                        diffLine.startsWith('-') ? 'text-red-400 bg-red-500/10' :
-                        'text-zinc-400'
-                      }
-                    >
-                      {diffLine}
-                    </div>
-                  ))}
-                </pre>
-              </div>
-            )}
-          </div>
-        )
-
       default:
         return null
     }
   }
 
-  // Sidebar content component (reused for mobile and desktop)
+  // Sidebar content component
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* Input area */}
+      {/* Sidebar chat input */}
       <div className="p-4 border-b border-zinc-800/50">
-        <div className="relative">
-          <textarea
-            ref={sidebarInputRef}
-            placeholder="Ask Claude to write code..."
-            className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm resize-none h-20 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500/50 font-mono transition-all"
-            value={!activeSession ? prompt : ''}
-            onChange={(e) => !activeSession && setPrompt(e.target.value)}
-            onKeyDown={handleSidebarSubmit}
-            disabled={!selectedRepo || isCreating}
-          />
-        </div>
-        <div className="flex items-center gap-3 mt-3 text-zinc-600">
-          <ImageIcon className="h-4 w-4" />
-          <span className="text-sm font-mono">...</span>
-        </div>
+        <PremiumChatInput
+          ref={sidebarInputRef}
+          value={sidebarPrompt}
+          onChange={setSidebarPrompt}
+          onSubmit={handleSidebarSubmit}
+          placeholder="Ask Claude to write code..."
+          disabled={!selectedRepo || isCreating}
+          isLoading={isCreating}
+          variant="sidebar"
+          repo={selectedRepo}
+          branch={selectedBranch}
+          model={MODELS.find(m => m.id === selectedModel)?.name}
+        />
       </div>
 
       {/* Repository and settings */}
@@ -735,7 +756,7 @@ export default function AgentCloudPage() {
               <ChevronDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-800 max-h-80 overflow-y-auto">
+          <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-800 max-h-80 overflow-hidden">
             {isInitializing || isLoadingTokens || isLoadingRepos ? (
               <div className="p-4 text-center text-zinc-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
@@ -759,21 +780,45 @@ export default function AgentCloudPage() {
                 No repositories found
               </div>
             ) : (
-              repos.map(repo => (
-                <DropdownMenuItem
-                  key={repo.id}
-                  onClick={() => selectRepo(repo)}
-                  className="flex items-center gap-2 cursor-pointer py-2.5"
-                >
-                  <FolderGit2 className="h-4 w-4 text-zinc-500 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate font-medium">{repo.name}</div>
-                    {repo.description && (
-                      <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
-                    )}
+              <>
+                {/* Search input */}
+                <div className="p-2 border-b border-zinc-800">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+                    <input
+                      type="text"
+                      placeholder="Search repositories..."
+                      value={repoSearchQuery}
+                      onChange={(e) => setRepoSearchQuery(e.target.value)}
+                      className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md pl-8 pr-3 py-1.5 text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                    />
                   </div>
-                </DropdownMenuItem>
-              ))
+                </div>
+                <div className="overflow-y-auto max-h-60">
+                  {filteredRepos.map(repo => (
+                    <DropdownMenuItem
+                      key={repo.id}
+                      onClick={() => selectRepo(repo)}
+                      className="flex items-center gap-2 cursor-pointer py-2.5"
+                    >
+                      <FolderGit2 className="h-4 w-4 text-zinc-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium">{repo.name}</span>
+                          {repo.private && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">
+                              private
+                            </Badge>
+                          )}
+                        </div>
+                        {repo.description && (
+                          <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -842,9 +887,6 @@ export default function AgentCloudPage() {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-zinc-500 font-medium tracking-wide">Sessions</span>
-            <button className="p-1 hover:bg-zinc-800 rounded transition-colors">
-              <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
-            </button>
           </div>
 
           {sessions.length === 0 ? (
@@ -1009,13 +1051,21 @@ export default function AgentCloudPage() {
           </div>
         )}
 
-        {/* Right - Branch info */}
-        {activeSession?.repo && (
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <GitBranch className="h-4 w-4" />
-            <span className="font-mono hidden sm:inline">{activeSession.repo.branch}</span>
-          </div>
-        )}
+        {/* Right - Branch info and MCP indicator */}
+        <div className="flex items-center gap-3">
+          {activeSession?.repo && (
+            <>
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <Globe className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="hidden sm:inline">MCP</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-zinc-500">
+                <GitBranch className="h-4 w-4" />
+                <span className="font-mono hidden sm:inline">{activeSession.repo.branch}</span>
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Mobile sidebar overlay */}
@@ -1076,34 +1126,22 @@ export default function AgentCloudPage() {
                 </div>
               </div>
 
-              {/* Input area */}
+              {/* Main chat input */}
               {activeSession.status === 'active' && (
                 <div className="border-t border-zinc-800/50 p-4">
                   <div className="max-w-3xl mx-auto">
-                    <div className="relative flex items-end gap-3">
-                      <textarea
-                        ref={inputRef}
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Reply to Claude..."
-                        className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm resize-none min-h-[52px] max-h-[200px] placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500/50 font-mono transition-all"
-                        disabled={isLoading}
-                        rows={1}
-                      />
-                      <Button
-                        onClick={runPrompt}
-                        disabled={!prompt.trim() || isLoading}
-                        size="icon"
-                        className="h-[52px] w-[52px] rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shrink-0 shadow-lg shadow-orange-500/20"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Send className="h-5 w-5" />
-                        )}
-                      </Button>
-                    </div>
+                    <PremiumChatInput
+                      ref={inputRef}
+                      value={prompt}
+                      onChange={setPrompt}
+                      onSubmit={runPrompt}
+                      placeholder="Reply to Claude..."
+                      disabled={isLoading}
+                      isLoading={isLoading}
+                      autoFocus
+                      variant="main"
+                      repo={activeSession.repo}
+                    />
                   </div>
                 </div>
               )}
@@ -1115,9 +1153,13 @@ export default function AgentCloudPage() {
                 <Bot className="h-14 w-14 text-orange-500" />
               </div>
               <h2 className="text-2xl font-semibold mb-3 tracking-tight">Welcome to Claude Code</h2>
-              <p className="text-zinc-500 max-w-md mb-8 leading-relaxed">
+              <p className="text-zinc-500 max-w-md mb-4 leading-relaxed">
                 Select a repository from the sidebar and create a new session to start coding with Claude.
               </p>
+              <div className="flex items-center gap-2 text-xs text-zinc-600 mb-8">
+                <Globe className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Web search enabled via MCP (DuckDuckGo, Arxiv)</span>
+              </div>
               {isInitializing || isLoadingTokens ? (
                 <div className="flex items-center gap-3 text-zinc-500">
                   <Loader2 className="h-5 w-5 animate-spin" />
