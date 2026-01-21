@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,10 +14,10 @@ import {
   Sparkles,
   ArrowUp,
 } from "lucide-react"
-import { useAgentCloud, type TerminalLine, type Session } from "../layout"
+import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
 
-export default function SessionPage() {
+function SessionPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('id')
@@ -368,5 +368,18 @@ User Request: ${currentPrompt}`
         </div>
       )}
     </>
+  )
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function SessionPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+      </div>
+    }>
+      <SessionPageInner />
+    </Suspense>
   )
 }

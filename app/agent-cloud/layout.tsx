@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, createContext, useContext, useCallback } from "react"
+import { useState, useEffect, createContext, useContext, useCallback, Suspense } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -117,7 +117,8 @@ export function useAgentCloud() {
   return context
 }
 
-export default function AgentCloudLayout({
+// Inner component that uses useSearchParams
+function AgentCloudLayoutInner({
   children,
 }: {
   children: React.ReactNode
@@ -647,5 +648,22 @@ export default function AgentCloudLayout({
         </div>
       </div>
     </AgentCloudContext.Provider>
+  )
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function AgentCloudLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-zinc-950">
+        <div className="animate-spin h-8 w-8 border-2 border-orange-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <AgentCloudLayoutInner>{children}</AgentCloudLayoutInner>
+    </Suspense>
   )
 }
