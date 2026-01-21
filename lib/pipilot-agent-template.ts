@@ -4,18 +4,31 @@
  * A combined E2B sandbox template that includes:
  * - Claude Code CLI (@anthropic-ai/claude-code)
  * - Playwright with Chromium for browser automation
- * - Vercel AI Gateway support via ANTHROPIC_BASE_URL
+ * - Vercel AI Gateway for unified AI routing
  *
  * This enables autonomous coding agents that can:
  * 1. Write and modify code using Claude Code
  * 2. Test UIs and flows using Playwright
  * 3. Route API calls through Vercel AI Gateway
+ * 4. Use any model available through AI Gateway
  */
 
 import { Sandbox } from 'e2b'
 
 // Template configuration
 export const PIPILOT_AGENT_TEMPLATE = 'pipilot-agent'
+
+// Vercel AI Gateway configuration
+export const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
+
+// Available models through Vercel AI Gateway
+export const AVAILABLE_MODELS = {
+  sonnet: 'xai/grok-code-fast-1',      // Fast code generation
+  opus: 'zai/glm-4.7',                  // High quality
+  haiku: 'mistral/devstral-small-2',   // Quick tasks
+} as const
+
+export type ModelType = keyof typeof AVAILABLE_MODELS
 
 // Template definition for building custom E2B template
 // Use this with `e2b template build` or Template.build()
@@ -54,12 +67,10 @@ export const templateDefinition = {
 
 // Environment variables for Vercel AI Gateway
 export interface AgentCloudConfig {
-  // Vercel AI Gateway URL (optional, defaults to direct Anthropic API)
-  anthropicBaseUrl?: string
-  // Anthropic API key (required)
-  anthropicApiKey: string
-  // E2B API key (required)
-  e2bApiKey: string
+  // Vercel AI Gateway API key (required)
+  aiGatewayKey: string
+  // Model to use (default: sonnet)
+  model?: ModelType
   // Sandbox timeout in milliseconds (default: 5 minutes)
   timeoutMs?: number
 }
@@ -68,24 +79,34 @@ export interface AgentCloudConfig {
  * Create a PiPilot Agent Cloud sandbox
  *
  * This creates an E2B sandbox with Claude Code and Playwright pre-installed.
- * You can optionally configure Vercel AI Gateway for API routing.
+ * Configured with Vercel AI Gateway for unified AI routing.
  */
 export async function createAgentCloudSandbox(config: AgentCloudConfig): Promise<{
   sandbox: Sandbox
   sandboxId: string
+  model: string
+  gateway: string
   runClaudeCode: (prompt: string, options?: ClaudeCodeOptions) => Promise<ClaudeCodeResult>
   runPlaywright: (script: string) => Promise<PlaywrightResult>
   terminate: () => Promise<void>
 }> {
-  // Prepare environment variables
-  const envs: Record<string, string> = {
-    ANTHROPIC_API_KEY: config.anthropicApiKey,
-    PLAYWRIGHT_BROWSERS_PATH: '0', // Required for Playwright to find browsers
-  }
+  const selectedModel = config.model || 'sonnet'
 
-  // Configure Vercel AI Gateway if specified
-  if (config.anthropicBaseUrl) {
-    envs.ANTHROPIC_BASE_URL = config.anthropicBaseUrl
+  // Configure environment variables for Claude Code with Vercel AI Gateway
+  // IMPORTANT: ANTHROPIC_API_KEY must be empty string so Claude Code uses ANTHROPIC_AUTH_TOKEN
+  const envs: Record<string, string> = {
+    // Vercel AI Gateway configuration
+    ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
+    ANTHROPIC_AUTH_TOKEN: config.aiGatewayKey,
+    ANTHROPIC_API_KEY: '', // Must be empty - Claude Code checks this first
+
+    // Model overrides via AI Gateway
+    ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+
+    // Playwright configuration
+    PLAYWRIGHT_BROWSERS_PATH: '0',
   }
 
   // Create sandbox with the pipilot-agent template
@@ -94,6 +115,10 @@ export async function createAgentCloudSandbox(config: AgentCloudConfig): Promise
   const templateToUse = await checkTemplateExists(PIPILOT_AGENT_TEMPLATE)
     ? PIPILOT_AGENT_TEMPLATE
     : 'anthropic-claude-code'
+
+  console.log(`[Agent Cloud] Creating sandbox with template: ${templateToUse}`)
+  console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
+  console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
   const sandbox = await Sandbox.create(templateToUse, {
     timeoutMs: config.timeoutMs || 5 * 60 * 1000, // 5 minutes default
@@ -105,6 +130,8 @@ export async function createAgentCloudSandbox(config: AgentCloudConfig): Promise
   return {
     sandbox,
     sandboxId: sandbox.sandboxId,
+    model: AVAILABLE_MODELS[selectedModel],
+    gateway: AI_GATEWAY_BASE_URL,
 
     /**
      * Run a prompt with Claude Code
