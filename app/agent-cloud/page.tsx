@@ -114,6 +114,7 @@ export default function AgentCloudPage() {
   const [branches, setBranches] = useState<string[]>([])
   const [selectedBranch, setSelectedBranch] = useState<string>('main')
   const [isLoadingBranches, setIsLoadingBranches] = useState(false)
+  const [hasCheckedConnection, setHasCheckedConnection] = useState(false)
 
   // Use the repo agent hook for GitHub connection
   const {
@@ -126,6 +127,9 @@ export default function AgentCloudPage() {
     repositories,
     isLoadingRepos,
   } = useRepoAgent()
+
+  // Derived state: still initializing if we haven't checked connection yet
+  const isInitializing = !hasCheckedConnection && !isLoadingConnection
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -189,12 +193,18 @@ export default function AgentCloudPage() {
   // Check GitHub connection and load repos on mount
   useEffect(() => {
     const init = async () => {
-      const connected = await checkConnection()
-      if (connected) {
-        const fetchedRepos = await fetchRepositories()
-        if (fetchedRepos.length > 0) {
-          setRepos(fetchedRepos as Repository[])
+      try {
+        const connected = await checkConnection()
+        setHasCheckedConnection(true)
+        if (connected) {
+          const fetchedRepos = await fetchRepositories()
+          if (fetchedRepos.length > 0) {
+            setRepos(fetchedRepos as Repository[])
+          }
         }
+      } catch (error) {
+        console.error('Failed to initialize GitHub connection:', error)
+        setHasCheckedConnection(true)
       }
     }
     init()
@@ -663,7 +673,7 @@ export default function AgentCloudPage() {
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-700 max-h-80 overflow-y-auto">
-                    {isLoadingConnection || isLoadingRepos ? (
+                    {isInitializing || isLoadingConnection || isLoadingRepos ? (
                       <div className="p-4 text-center text-zinc-500 text-sm">
                         <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                         Loading...
@@ -941,7 +951,12 @@ export default function AgentCloudPage() {
               <p className="text-zinc-500 max-w-md mb-6">
                 Select a repository from the sidebar and create a new session to start coding with Claude.
               </p>
-              {!isConnected && !isLoadingConnection && (
+              {isInitializing || isLoadingConnection ? (
+                <div className="flex items-center gap-2 text-zinc-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Checking GitHub connection...</span>
+                </div>
+              ) : !isConnected ? (
                 <Button
                   onClick={() => window.location.href = '/workspace/deployment'}
                   className="bg-zinc-800 hover:bg-zinc-700"
@@ -949,7 +964,7 @@ export default function AgentCloudPage() {
                   <Github className="h-4 w-4 mr-2" />
                   Connect GitHub
                 </Button>
-              )}
+              ) : null}
             </div>
           )}
         </div>
