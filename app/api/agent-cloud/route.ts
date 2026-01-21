@@ -10,6 +10,8 @@
  * - Real-time streaming with Server-Sent Events
  * - GitHub repo cloning and git operations
  * - Internet access enabled for sandboxes
+ * - MCP support (DuckDuckGo, Arxiv) for web search capabilities
+ * - Public repo cloning (no token required)
  *
  * POST /api/agent-cloud
  * - action: 'create' - Create or connect to existing sandbox
@@ -492,16 +494,54 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
   }
 
-  // Clone repo if specified
-  if (config?.repo && githubToken) {
+  // Setup MCP configuration for web search (DuckDuckGo, Arxiv)
+  console.log(`[Agent Cloud] Setting up MCP tools (DuckDuckGo, Arxiv)...`)
+  try {
+    // Create .claude directory for MCP config
+    await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
+
+    // MCP configuration for DuckDuckGo and Arxiv search
+    const mcpConfig = JSON.stringify({
+      mcpServers: {
+        duckduckgo: {
+          command: "npx",
+          args: ["-y", "@anthropic/mcp-server-duckduckgo"]
+        },
+        arxiv: {
+          command: "npx",
+          args: ["-y", "@anthropic/mcp-server-arxiv"],
+          env: {
+            STORAGE_PATH: "/home/user/.arxiv"
+          }
+        },
+        filesystem: {
+          command: "npx",
+          args: ["-y", "@anthropic/mcp-server-filesystem", PROJECT_DIR]
+        }
+      }
+    }, null, 2)
+
+    await sandbox.files.write('/home/user/.claude/mcp.json', mcpConfig)
+    console.log(`[Agent Cloud] MCP tools configured successfully`)
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to setup MCP tools:`, e)
+  }
+
+  // Clone repo if specified (supports both public and private repos)
+  if (config?.repo) {
     try {
       console.log(`[Agent Cloud] Cloning repo: ${config.repo.full_name} (${config.repo.branch})`)
 
-      // Clone the repo using the token for auth
-      const cloneUrl = `https://${githubToken}@github.com/${config.repo.full_name}.git`
+      // Use authenticated URL for private repos, public URL for public repos
+      const cloneUrl = githubToken
+        ? `https://${githubToken}@github.com/${config.repo.full_name}.git`
+        : `https://github.com/${config.repo.full_name}.git`
+
+      console.log(`[Agent Cloud] Cloning with ${githubToken ? 'authenticated' : 'public'} URL`)
+
       const cloneResult = await sandbox.commands.run(
-        `git clone --branch ${config.repo.branch} --single-branch ${cloneUrl} ${PROJECT_DIR}`,
-        { timeoutMs: 120000 }
+        `git clone --branch ${config.repo.branch} --single-branch --depth 50 ${cloneUrl} ${PROJECT_DIR}`,
+        { timeoutMs: 180000 } // 3 minutes timeout for large repos
       )
 
       if (cloneResult.exitCode === 0) {
@@ -513,8 +553,60 @@ async function handleCreate(
           `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
           { timeoutMs: 5000 }
         )
+
+        // Create a new working branch for Claude's changes
+        const workingBranch = `claude-agent-${Date.now()}`
+        const branchResult = await sandbox.commands.run(
+          `cd ${PROJECT_DIR} && git checkout -b ${workingBranch}`,
+          { timeoutMs: 10000 }
+        )
+
+        if (branchResult.exitCode === 0) {
+          console.log(`[Agent Cloud] Created working branch: ${workingBranch}`)
+        } else {
+          console.warn(`[Agent Cloud] Failed to create working branch:`, branchResult.stderr)
+        }
+
+        // Install project dependencies if package.json exists
+        console.log(`[Agent Cloud] Checking for project dependencies...`)
+        try {
+          const depsResult = await sandbox.commands.run(
+            `cd ${PROJECT_DIR} && [ -f package.json ] && npm install || echo "No package.json"`,
+            { timeoutMs: 180000 }
+          )
+          if (depsResult.stdout?.includes('No package.json')) {
+            console.log(`[Agent Cloud] No package.json found, skipping npm install`)
+          } else {
+            console.log(`[Agent Cloud] Dependencies installed`)
+          }
+        } catch (e) {
+          console.warn(`[Agent Cloud] Dependency installation warning:`, e)
+        }
       } else {
         console.error(`[Agent Cloud] Clone failed:`, cloneResult.stderr)
+
+        // Try public clone if private failed
+        if (githubToken && cloneResult.stderr?.includes('Authentication')) {
+          console.log(`[Agent Cloud] Retrying with public URL...`)
+          const publicCloneResult = await sandbox.commands.run(
+            `git clone --branch ${config.repo.branch} --single-branch --depth 50 https://github.com/${config.repo.full_name}.git ${PROJECT_DIR}`,
+            { timeoutMs: 180000 }
+          )
+          if (publicCloneResult.exitCode === 0) {
+            repoCloned = true
+            console.log(`[Agent Cloud] Repo cloned successfully with public URL`)
+
+            // Configure git and create branch
+            await sandbox.commands.run(
+              `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
+              { timeoutMs: 5000 }
+            )
+            await sandbox.commands.run(
+              `cd ${PROJECT_DIR} && git checkout -b claude-agent-${Date.now()}`,
+              { timeoutMs: 10000 }
+            )
+          }
+        }
       }
     } catch (error) {
       console.error(`[Agent Cloud] Failed to clone repo:`, error)
@@ -548,9 +640,11 @@ async function handleCreate(
     projectDir: repoCloned ? PROJECT_DIR : '/home/user',
     reconnected: false,
     messageCount: 0,
+    mcpEnabled: true,
+    mcpTools: ['duckduckgo', 'arxiv', 'filesystem'],
     message: repoCloned
-      ? `Sandbox created with ${config?.repo?.full_name} cloned`
-      : 'Sandbox created with Vercel AI Gateway',
+      ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
+      : 'Sandbox created with Vercel AI Gateway (MCP enabled)',
   })
 }
 
