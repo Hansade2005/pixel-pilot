@@ -118,7 +118,8 @@ export default function RootLayout({
                 var isWorkspaceWithProject = window.location.pathname === '/workspace' && window.location.search.includes('projectId');
                 var isSupportPage = window.location.pathname === '/support';
                 var isDocsPage = window.location.pathname === '/docs';
-                return isWorkspaceWithProject || isSupportPage || isDocsPage;
+                var isAgentCloudPage = window.location.pathname === '/agent-cloud';
+                return isWorkspaceWithProject || isSupportPage || isDocsPage || isAgentCloudPage;
               }
 
               // Function to update widget visibility
