@@ -7,7 +7,6 @@ import {
   Terminal,
   Send,
   Loader2,
-  Play,
   Square,
   Trash2,
   GitBranch,
@@ -15,15 +14,17 @@ import {
   FileCode,
   Copy,
   Check,
-  Zap,
   Bot,
   ExternalLink,
   Image as ImageIcon,
   MoreVertical,
   Plus,
-  Settings,
   Github,
   FolderGit2,
+  PanelLeft,
+  Sparkles,
+  File,
+  ChevronRight,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -31,16 +32,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { useRepoAgent } from "@/hooks/use-repo-agent"
 
 // Storage key for session persistence
 const STORAGE_KEY = 'pipilot_agent_cloud'
 
 interface TerminalLine {
-  type: 'input' | 'output' | 'error' | 'system' | 'file' | 'diff'
+  type: 'input' | 'output' | 'error' | 'system' | 'file' | 'diff' | 'tool'
   content: string
   timestamp: Date
+  meta?: {
+    toolName?: string
+    fileName?: string
+    additions?: number
+    deletions?: number
+    diffLines?: string[]
+  }
 }
 
 interface Session {
@@ -70,6 +78,7 @@ interface Repository {
   description: string | null
   language: string | null
   updated_at: string
+  default_branch: string
 }
 
 // Available models through Vercel AI Gateway
@@ -92,7 +101,9 @@ export default function AgentCloudPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [expandedDiffs, setExpandedDiffs] = useState<Record<number, boolean>>({})
 
   // Settings
   const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku'>('sonnet')
@@ -102,9 +113,19 @@ export default function AgentCloudPage() {
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null)
   const [branches, setBranches] = useState<string[]>([])
   const [selectedBranch, setSelectedBranch] = useState<string>('main')
-  const [isLoadingRepos, setIsLoadingRepos] = useState(false)
   const [isLoadingBranches, setIsLoadingBranches] = useState(false)
-  const [githubConnected, setGithubConnected] = useState(false)
+
+  // Use the repo agent hook for GitHub connection
+  const {
+    connectionStatus,
+    isLoadingConnection,
+    isConnected,
+    checkConnection,
+    fetchRepositories,
+    fetchBranches: fetchRepoBranches,
+    repositories,
+    isLoadingRepos,
+  } = useRepoAgent()
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -165,47 +186,39 @@ export default function AgentCloudPage() {
     }
   }, [activeSessionId])
 
-  // Load GitHub repos on mount
+  // Check GitHub connection and load repos on mount
   useEffect(() => {
-    loadRepos()
+    const init = async () => {
+      const connected = await checkConnection()
+      if (connected) {
+        const fetchedRepos = await fetchRepositories()
+        if (fetchedRepos.length > 0) {
+          setRepos(fetchedRepos as Repository[])
+        }
+      }
+    }
+    init()
   }, [])
 
-  const loadRepos = async () => {
-    setIsLoadingRepos(true)
-    try {
-      const response = await fetch('/api/repo-agent/repos')
-      const data = await response.json()
-
-      if (data.connected && data.repos) {
-        setGithubConnected(true)
-        setRepos(data.repos)
-      } else {
-        setGithubConnected(false)
-      }
-    } catch (error) {
-      console.error('Failed to load repos:', error)
-      setGithubConnected(false)
-    } finally {
-      setIsLoadingRepos(false)
+  // Update repos when repositories from hook change
+  useEffect(() => {
+    if (repositories.length > 0) {
+      setRepos(repositories as Repository[])
     }
-  }
+  }, [repositories])
 
   const loadBranches = async (repoFullName: string) => {
     setIsLoadingBranches(true)
     try {
-      const response = await fetch(`/api/repo-agent/branches?repo=${encodeURIComponent(repoFullName)}`)
-      const data = await response.json()
-
-      if (data.branches) {
-        setBranches(data.branches)
-        // Default to main or master
-        if (data.branches.includes('main')) {
-          setSelectedBranch('main')
-        } else if (data.branches.includes('master')) {
-          setSelectedBranch('master')
-        } else if (data.branches.length > 0) {
-          setSelectedBranch(data.branches[0])
-        }
+      const fetchedBranches = await fetchRepoBranches(repoFullName)
+      setBranches(fetchedBranches)
+      // Default to main or master
+      if (fetchedBranches.includes('main')) {
+        setSelectedBranch('main')
+      } else if (fetchedBranches.includes('master')) {
+        setSelectedBranch('master')
+      } else if (fetchedBranches.length > 0) {
+        setSelectedBranch(fetchedBranches[0])
       }
     } catch (error) {
       console.error('Failed to load branches:', error)
@@ -219,12 +232,12 @@ export default function AgentCloudPage() {
     loadBranches(repo.full_name)
   }
 
-  const addLine = useCallback((type: TerminalLine['type'], content: string) => {
+  const addLine = useCallback((type: TerminalLine['type'], content: string, meta?: TerminalLine['meta']) => {
     setSessions(prev => prev.map(s => {
       if (s.id === activeSessionId) {
         return {
           ...s,
-          lines: [...s.lines, { type, content, timestamp: new Date() }]
+          lines: [...s.lines, { type, content, timestamp: new Date(), meta }]
         }
       }
       return s
@@ -341,7 +354,7 @@ export default function AgentCloudPage() {
     setIsLoading(true)
     setIsStreaming(true)
 
-    addLine('input', `> ${currentPrompt}`)
+    addLine('input', currentPrompt)
 
     try {
       const eventSource = new EventSource(
@@ -356,7 +369,7 @@ export default function AgentCloudPage() {
 
           switch (data.type) {
             case 'start':
-              addLine('system', 'Running...')
+              // Silent start
               break
             case 'stdout':
               fullOutput += data.data
@@ -431,395 +444,515 @@ export default function AgentCloudPage() {
     }
   }
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
   }
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()
   }
 
-  return (
-    <div className="h-screen flex bg-zinc-950 text-zinc-100">
-      {/* Sidebar */}
-      <div className="w-80 border-r border-zinc-800 flex flex-col">
-        {/* Logo */}
-        <div className="p-4 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500">
-              <Zap className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-semibold">Agent Cloud</span>
-            <Badge variant="secondary" className="text-[10px] bg-zinc-800 text-zinc-400">Beta</Badge>
-          </div>
-        </div>
+  const toggleDiff = (index: number) => {
+    setExpandedDiffs(prev => ({ ...prev, [index]: !prev[index] }))
+  }
 
-        {/* New Session Input */}
-        <div className="p-4 border-b border-zinc-800">
-          <div className="space-y-3">
-            <textarea
-              placeholder="Ask Claude to write code..."
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm resize-none h-16 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-              disabled={!selectedRepo}
-            />
-            <div className="flex items-center gap-2 text-xs">
-              <ImageIcon className="h-4 w-4 text-zinc-500" />
-              <span className="text-zinc-500">...</span>
+  // Render a single message line with proper formatting
+  const renderLine = (line: TerminalLine, index: number) => {
+    switch (line.type) {
+      case 'system':
+        return (
+          <div key={index} className="flex items-start gap-2 text-zinc-500 text-sm py-1">
+            <Sparkles className="h-4 w-4 mt-0.5 text-orange-500 shrink-0" />
+            <span>{line.content}</span>
+          </div>
+        )
+
+      case 'input':
+        return (
+          <div key={index} className="flex items-start gap-3 py-3">
+            <div className="h-6 w-6 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
+              <span className="text-xs font-medium">U</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-zinc-100">{line.content}</p>
             </div>
           </div>
-        </div>
+        )
 
-        {/* Repository Selector */}
-        <div className="p-4 border-b border-zinc-800 space-y-2">
-          <div className="flex items-center gap-2">
-            <Github className="h-4 w-4 text-zinc-500" />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 text-sm hover:text-white transition-colors">
-                  {selectedRepo ? selectedRepo.name : 'Select repository'}
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64 bg-zinc-900 border-zinc-700">
-                {isLoadingRepos ? (
-                  <div className="p-4 text-center text-zinc-500 text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                    Loading repos...
-                  </div>
-                ) : !githubConnected ? (
-                  <div className="p-4 text-center text-zinc-500 text-sm">
-                    <Github className="h-6 w-6 mx-auto mb-2" />
-                    <p>GitHub not connected</p>
-                    <Button size="sm" className="mt-2" variant="outline">
-                      Connect GitHub
-                    </Button>
-                  </div>
-                ) : repos.length === 0 ? (
-                  <div className="p-4 text-center text-zinc-500 text-sm">
-                    No repositories found
-                  </div>
-                ) : (
-                  repos.map(repo => (
-                    <DropdownMenuItem
-                      key={repo.id}
-                      onClick={() => selectRepo(repo)}
-                      className="flex items-center gap-2 cursor-pointer"
-                    >
-                      <FolderGit2 className="h-4 w-4 text-zinc-500" />
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate">{repo.name}</div>
-                        {repo.description && (
-                          <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
-                        )}
-                      </div>
-                      {repo.private && (
-                        <Badge variant="outline" className="text-[10px]">Private</Badge>
-                      )}
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <GitBranch className="h-3 w-3 text-zinc-500" />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-1">
-                    {selectedBranch}
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
-                  {isLoadingBranches ? (
-                    <div className="p-2 text-center text-zinc-500 text-sm">
-                      <Loader2 className="h-3 w-3 animate-spin mx-auto" />
-                    </div>
-                  ) : branches.length === 0 ? (
-                    <div className="p-2 text-center text-zinc-500 text-sm">
-                      Select a repo first
-                    </div>
+      case 'output':
+        return (
+          <div key={index} className="flex items-start gap-3 py-3 group">
+            <div className="h-6 w-6 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0">
+              <Bot className="h-3.5 w-3.5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="relative">
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm text-zinc-300 bg-transparent p-0 m-0 font-sans">
+                    {line.content}
+                  </pre>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(line.content, `output-${index}`)}
+                  className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded hover:bg-zinc-700"
+                >
+                  {copied === `output-${index}` ? (
+                    <Check className="h-3 w-3 text-emerald-400" />
                   ) : (
-                    branches.map(branch => (
-                      <DropdownMenuItem
-                        key={branch}
-                        onClick={() => setSelectedBranch(branch)}
-                        className="cursor-pointer"
-                      >
-                        {branch}
-                      </DropdownMenuItem>
-                    ))
+                    <Copy className="h-3 w-3 text-zinc-500" />
                   )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-1">
-                  {MODELS.find(m => m.id === selectedModel)?.name || 'Default'}
-                  <ChevronDown className="h-3 w-3" />
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
-                {MODELS.map(model => (
-                  <DropdownMenuItem
-                    key={model.id}
-                    onClick={() => setSelectedModel(model.id)}
-                    className="cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-medium">{model.name}</div>
-                      <div className="text-xs text-zinc-500">{model.description}</div>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-2">
-            <div className="flex items-center justify-between px-2 py-1">
-              <span className="text-xs text-zinc-500 uppercase tracking-wider">Sessions</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 p-0"
-                onClick={createSession}
-                disabled={isCreating || !selectedRepo}
-              >
-                {isCreating ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Plus className="h-3 w-3" />
-                )}
-              </Button>
-            </div>
-
-            {sessions.length === 0 ? (
-              <div className="text-center py-8 text-zinc-500 text-sm">
-                <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No sessions yet</p>
-                <p className="text-xs mt-1">Select a repo and start coding</p>
               </div>
-            ) : (
-              <div className="space-y-1 mt-2">
-                {sessions.map(session => (
-                  <button
-                    key={session.id}
-                    onClick={() => setActiveSessionId(session.id)}
-                    className={`w-full text-left p-2 rounded-lg transition-colors group ${
-                      activeSessionId === session.id
-                        ? 'bg-zinc-800'
-                        : 'hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
-                          {session.repo?.name || 'Untitled'}
-                        </div>
-                        <div className="text-xs text-zinc-500 flex items-center gap-2">
-                          <span>{formatTime(session.createdAt)}</span>
-                          {session.stats && (
-                            <span className="flex items-center gap-1">
-                              <span className="text-green-500">+{session.stats.additions}</span>
-                              <span className="text-red-500">-{session.stats.deletions}</span>
-                            </span>
-                          )}
-                          {session.status === 'active' && (
-                            <Badge className="h-4 text-[10px] bg-green-500/20 text-green-400">
-                              Active
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            onClick={(e) => e.stopPropagation()}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-700 rounded transition-all"
-                          >
-                            <MoreVertical className="h-3 w-3" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
-                          {session.status === 'active' && (
-                            <DropdownMenuItem
-                              onClick={() => terminateSession(session.id)}
-                              className="cursor-pointer text-yellow-500"
-                            >
-                              <Square className="h-3 w-3 mr-2" />
-                              Stop
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => deleteSession(session.id)}
-                            className="cursor-pointer text-red-500"
-                          >
-                            <Trash2 className="h-3 w-3 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+            </div>
+          </div>
+        )
+
+      case 'error':
+        return (
+          <div key={index} className="flex items-start gap-3 py-2">
+            <div className="h-6 w-6 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+              <span className="text-xs text-red-400">!</span>
+            </div>
+            <div className="flex-1 text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">
+              {line.content}
+            </div>
+          </div>
+        )
+
+      case 'file':
+        return (
+          <div key={index} className="flex items-center gap-2 py-1 text-sm">
+            <FileCode className="h-4 w-4 text-blue-400" />
+            <span className="text-blue-400">{line.content}</span>
+          </div>
+        )
+
+      case 'diff':
+        const diffMeta = line.meta || {}
+        return (
+          <div key={index} className="py-2">
+            <button
+              onClick={() => toggleDiff(index)}
+              className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              <ChevronRight className={`h-4 w-4 transition-transform ${expandedDiffs[index] ? 'rotate-90' : ''}`} />
+              <File className="h-4 w-4" />
+              <span>{diffMeta.fileName || 'Changes'}</span>
+              {diffMeta.additions !== undefined && (
+                <span className="text-green-500">+{diffMeta.additions}</span>
+              )}
+              {diffMeta.deletions !== undefined && (
+                <span className="text-red-500">-{diffMeta.deletions}</span>
+              )}
+            </button>
+            {expandedDiffs[index] && diffMeta.diffLines && (
+              <div className="mt-2 ml-6 bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
+                <pre className="text-xs p-3 overflow-x-auto">
+                  {diffMeta.diffLines.map((diffLine: string, i: number) => (
+                    <div
+                      key={i}
+                      className={
+                        diffLine.startsWith('+') ? 'text-green-400 bg-green-500/10' :
+                        diffLine.startsWith('-') ? 'text-red-400 bg-red-500/10' :
+                        'text-zinc-400'
+                      }
+                    >
+                      {diffLine}
                     </div>
-                  </button>
-                ))}
+                  ))}
+                </pre>
               </div>
             )}
           </div>
-        </div>
+        )
 
-        {/* Settings */}
-        <div className="p-4 border-t border-zinc-800">
-          <button className="flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors">
-            <Settings className="h-4 w-4" />
-            Settings
+      case 'tool':
+        return (
+          <div key={index} className="flex items-center gap-2 py-1 px-3 bg-zinc-900/50 rounded-lg text-sm text-zinc-400">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>{line.meta?.toolName || line.content}</span>
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-zinc-950 text-zinc-100">
+      {/* Header - Claude Code style */}
+      <header className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-950">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors"
+          >
+            <PanelLeft className="h-5 w-5 text-zinc-400" />
           </button>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-lg">Claude Code</span>
+            <Badge variant="secondary" className="text-[10px] bg-zinc-800 text-zinc-400 font-normal">
+              Research preview
+            </Badge>
+          </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {activeSession ? (
-          <>
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">{activeSession.repo?.name}</span>
-                <Badge variant="outline" className="text-xs">
-                  {activeSession.repo?.branch}
-                </Badge>
-                {activeSession.stats && (
-                  <span className="text-xs flex items-center gap-1 text-zinc-500">
-                    <span className="text-green-500">+{activeSession.stats.additions}</span>
-                    <span className="text-red-500">-{activeSession.stats.deletions}</span>
-                  </span>
-                )}
+        {/* Center - Task dropdown */}
+        {activeSession && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-800 rounded-lg transition-colors">
+                <span className="text-sm">{activeSession.repo?.name || 'Untitled'}</span>
+                <ChevronDown className="h-4 w-4 text-zinc-500" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
+              {sessions.map(session => (
+                <DropdownMenuItem
+                  key={session.id}
+                  onClick={() => setActiveSessionId(session.id)}
+                  className="cursor-pointer"
+                >
+                  {session.repo?.name || 'Untitled'}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Right - Branch */}
+        {activeSession?.repo && (
+          <div className="flex items-center gap-2 text-sm text-zinc-400">
+            <GitBranch className="h-4 w-4" />
+            <span>{activeSession.repo.branch}</span>
+          </div>
+        )}
+      </header>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-950">
+            {/* New prompt input */}
+            <div className="p-4 border-b border-zinc-800">
+              <textarea
+                placeholder="Ask Claude to write code..."
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm resize-none h-20 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                disabled={!selectedRepo || isCreating}
+                value={!activeSession ? prompt : ''}
+                onChange={(e) => !activeSession && setPrompt(e.target.value)}
+              />
+              <div className="flex items-center gap-2 mt-2 text-xs text-zinc-500">
+                <ImageIcon className="h-4 w-4" />
+                <span>Drop images or paste</span>
               </div>
+            </div>
+
+            {/* Repository selector */}
+            <div className="p-4 border-b border-zinc-800 space-y-3">
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="h-7 text-xs">
-                  View PR
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs">
-                  Open in CLI
-                  <Terminal className="h-3 w-3 ml-1" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Terminal */}
-            <div
-              ref={terminalRef}
-              className="flex-1 overflow-y-auto p-4 font-mono text-sm"
-            >
-              <div className="space-y-3">
-                {activeSession.lines.map((line, index) => (
-                  <div key={index} className="group">
-                    {line.type === 'system' && (
-                      <div className="text-zinc-500 flex items-center gap-2">
-                        <span className="text-orange-500">*</span>
-                        {line.content}
+                <Github className="h-4 w-4 text-zinc-500" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1 text-sm hover:text-white transition-colors">
+                      {selectedRepo ? selectedRepo.name : 'Select repository'}
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-700 max-h-80 overflow-y-auto">
+                    {isLoadingConnection || isLoadingRepos ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                        Loading...
                       </div>
-                    )}
-                    {line.type === 'input' && (
-                      <div className="text-emerald-400">{line.content}</div>
-                    )}
-                    {line.type === 'output' && (
-                      <div className="text-zinc-100 whitespace-pre-wrap relative bg-zinc-900/50 rounded-lg p-3">
-                        {line.content}
-                        <button
-                          onClick={() => copyToClipboard(line.content)}
-                          className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded hover:bg-zinc-700"
+                    ) : !isConnected ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">
+                        <Github className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                        <p className="mb-2">GitHub not connected</p>
+                        <p className="text-xs mb-3">Connect your account in settings</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.location.href = '/workspace/deployment'}
+                          className="text-xs"
                         >
-                          {copied ? (
-                            <Check className="h-3 w-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="h-3 w-3 text-zinc-500" />
+                          Connect GitHub
+                        </Button>
+                      </div>
+                    ) : repos.length === 0 ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">
+                        No repositories found
+                      </div>
+                    ) : (
+                      repos.map(repo => (
+                        <DropdownMenuItem
+                          key={repo.id}
+                          onClick={() => selectRepo(repo)}
+                          className="flex items-center gap-2 cursor-pointer py-2"
+                        >
+                          <FolderGit2 className="h-4 w-4 text-zinc-500 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate font-medium">{repo.name}</div>
+                            {repo.description && (
+                              <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
+                            )}
+                          </div>
+                          {repo.private && (
+                            <Badge variant="outline" className="text-[10px] shrink-0">Private</Badge>
                           )}
-                        </button>
-                      </div>
+                        </DropdownMenuItem>
+                      ))
                     )}
-                    {line.type === 'error' && (
-                      <div className="text-red-400 bg-red-500/10 rounded-lg p-3">{line.content}</div>
-                    )}
-                    {line.type === 'file' && (
-                      <div className="text-blue-400 flex items-center gap-2">
-                        <FileCode className="h-3 w-3" />
-                        {line.content}
-                      </div>
-                    )}
-                    {line.type === 'diff' && (
-                      <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
-                        <pre className="text-xs">{line.content}</pre>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isStreaming && (
-                  <div className="flex items-center gap-2 text-orange-400">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>Claude is working...</span>
-                  </div>
-                )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div className="flex items-center gap-4 text-sm">
+                {/* Branch selector */}
+                <div className="flex items-center gap-1">
+                  <GitBranch className="h-3 w-3 text-zinc-500" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-zinc-400 hover:text-white transition-colors flex items-center gap-1">
+                        {selectedBranch}
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-zinc-900 border-zinc-700 max-h-60 overflow-y-auto">
+                      {isLoadingBranches ? (
+                        <div className="p-2 text-center text-zinc-500 text-sm">
+                          <Loader2 className="h-3 w-3 animate-spin mx-auto" />
+                        </div>
+                      ) : branches.length === 0 ? (
+                        <div className="p-2 text-center text-zinc-500 text-sm">
+                          Select a repo first
+                        </div>
+                      ) : (
+                        branches.map(branch => (
+                          <DropdownMenuItem
+                            key={branch}
+                            onClick={() => setSelectedBranch(branch)}
+                            className="cursor-pointer"
+                          >
+                            {branch}
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Model selector */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="text-zinc-400 hover:text-white transition-colors flex items-center gap-1">
+                      {MODELS.find(m => m.id === selectedModel)?.name || 'Default'}
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
+                    {MODELS.map(model => (
+                      <DropdownMenuItem
+                        key={model.id}
+                        onClick={() => setSelectedModel(model.id)}
+                        className="cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-medium">{model.name}</div>
+                          <div className="text-xs text-zinc-500">{model.description}</div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
-            {/* Input */}
-            {activeSession.status === 'active' && (
-              <div className="p-4 border-t border-zinc-800">
-                <div className="flex gap-2">
-                  <textarea
-                    ref={inputRef}
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Ask Claude to write code..."
-                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm resize-none min-h-[48px] max-h-[200px] placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    disabled={isLoading}
-                    rows={1}
-                  />
+            {/* Sessions list */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-2">
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Sessions</span>
                   <Button
-                    onClick={runPrompt}
-                    disabled={!prompt.trim() || isLoading}
-                    className="self-end bg-orange-500 hover:bg-orange-600 text-white"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 hover:bg-zinc-800"
+                    onClick={createSession}
+                    disabled={isCreating || !selectedRepo}
                   >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                    {isCreating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <Plus className="h-3.5 w-3.5" />
                     )}
                   </Button>
                 </div>
+
+                {sessions.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    <Bot className="h-10 w-10 mx-auto mb-3 text-zinc-700" />
+                    <p className="text-sm text-zinc-500 mb-1">No sessions yet</p>
+                    <p className="text-xs text-zinc-600">Select a repo and start coding</p>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5 mt-1">
+                    {sessions.map(session => (
+                      <button
+                        key={session.id}
+                        onClick={() => setActiveSessionId(session.id)}
+                        className={`w-full text-left px-2 py-2 rounded-lg transition-colors group ${
+                          activeSessionId === session.id
+                            ? 'bg-zinc-800'
+                            : 'hover:bg-zinc-800/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">
+                              {session.repo?.name || 'Untitled'}
+                            </div>
+                            <div className="text-xs text-zinc-500 flex items-center gap-2 mt-0.5">
+                              <span>{formatTime(session.createdAt)}</span>
+                              {session.stats && (session.stats.additions > 0 || session.stats.deletions > 0) && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-green-500">+{session.stats.additions}</span>
+                                  <span className="text-red-500">-{session.stats.deletions}</span>
+                                </span>
+                              )}
+                              {session.status === 'active' && (
+                                <Badge className="h-4 text-[10px] bg-green-500/20 text-green-400 border-0">
+                                  Active
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-zinc-700 rounded transition-all"
+                              >
+                                <MoreVertical className="h-3 w-3" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
+                              {session.status === 'active' && (
+                                <DropdownMenuItem
+                                  onClick={() => terminateSession(session.id)}
+                                  className="cursor-pointer text-yellow-500"
+                                >
+                                  <Square className="h-3 w-3 mr-2" />
+                                  Stop
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => deleteSession(session.id)}
+                                className="cursor-pointer text-red-500"
+                              >
+                                <Trash2 className="h-3 w-3 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </>
-        ) : (
-          /* Empty State */
-          <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 mb-6">
-              <Bot className="h-12 w-12 text-orange-500" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Welcome to Agent Cloud</h2>
-            <p className="text-zinc-500 max-w-md mb-6">
-              Select a repository from the sidebar and start a new session to begin coding with Claude.
-            </p>
-            {!githubConnected && (
-              <Button className="bg-zinc-800 hover:bg-zinc-700">
-                <Github className="h-4 w-4 mr-2" />
-                Connect GitHub
-              </Button>
-            )}
           </div>
         )}
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {activeSession ? (
+            <>
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-zinc-800">
+                <Button size="sm" variant="outline" className="h-7 text-xs bg-zinc-900 border-zinc-700 hover:bg-zinc-800">
+                  View PR
+                  <ExternalLink className="h-3 w-3 ml-1.5" />
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs bg-zinc-900 border-zinc-700 hover:bg-zinc-800">
+                  Open in CLI
+                  <Terminal className="h-3 w-3 ml-1.5" />
+                </Button>
+              </div>
+
+              {/* Chat/Terminal area */}
+              <div
+                ref={terminalRef}
+                className="flex-1 overflow-y-auto px-4 py-4"
+              >
+                <div className="max-w-3xl mx-auto space-y-1">
+                  {activeSession.lines.map((line, index) => renderLine(line, index))}
+                  {isStreaming && (
+                    <div className="flex items-center gap-2 py-2 text-orange-400">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Claude is working...</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Input area */}
+              {activeSession.status === 'active' && (
+                <div className="border-t border-zinc-800 p-4">
+                  <div className="max-w-3xl mx-auto">
+                    <div className="relative flex items-end gap-2">
+                      <textarea
+                        ref={inputRef}
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Reply to Claude..."
+                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm resize-none min-h-[48px] max-h-[200px] placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                        disabled={isLoading}
+                        rows={1}
+                      />
+                      <Button
+                        onClick={runPrompt}
+                        disabled={!prompt.trim() || isLoading}
+                        size="icon"
+                        className="h-[48px] w-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Send className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Empty state */
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 mb-6">
+                <Bot className="h-12 w-12 text-orange-500" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Welcome to Claude Code</h2>
+              <p className="text-zinc-500 max-w-md mb-6">
+                Select a repository from the sidebar and create a new session to start coding with Claude.
+              </p>
+              {!isConnected && !isLoadingConnection && (
+                <Button
+                  onClick={() => window.location.href = '/workspace/deployment'}
+                  className="bg-zinc-800 hover:bg-zinc-700"
+                >
+                  <Github className="h-4 w-4 mr-2" />
+                  Connect GitHub
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
