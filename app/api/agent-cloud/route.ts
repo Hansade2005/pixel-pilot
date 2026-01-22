@@ -427,6 +427,23 @@ async function handleCreate(
 
       console.log(`[Agent Cloud] Reconnected to sandbox: ${existingEntry.sandboxId}`)
 
+      // Reconfigure MCP on reconnection (tokens may have changed)
+      try {
+        const mcpUrl = sandbox.getMcpUrl()
+        const mcpToken = await sandbox.getMcpToken()
+        console.log(`[Agent Cloud] Reconfiguring MCP gateway on reconnection...`)
+
+        // Remove old MCP gateway and re-add with fresh token
+        await sandbox.commands.run(`claude mcp remove e2b-mcp-gateway 2>/dev/null || true`, { timeoutMs: 5000 })
+        await sandbox.commands.run(
+          `claude mcp add --transport http e2b-mcp-gateway "${mcpUrl}" --header "Authorization: Bearer ${mcpToken}"`,
+          { timeoutMs: 30000 }
+        )
+        console.log(`[Agent Cloud] MCP gateway reconfigured on reconnection`)
+      } catch (e) {
+        console.warn(`[Agent Cloud] Failed to reconfigure MCP on reconnection:`, e)
+      }
+
       return NextResponse.json({
         success: true,
         sandboxId: existingEntry.sandboxId,
@@ -484,6 +501,23 @@ async function handleCreate(
           }
         } catch (e) {
           // Couldn't get branch, that's ok
+        }
+
+        // Reconfigure MCP on reconnection (tokens may have changed)
+        try {
+          const mcpUrl = sandbox.getMcpUrl()
+          const mcpToken = await sandbox.getMcpToken()
+          console.log(`[Agent Cloud] Reconfiguring MCP gateway on E2B reconnection...`)
+
+          // Remove old MCP gateway and re-add with fresh token
+          await sandbox.commands.run(`claude mcp remove e2b-mcp-gateway 2>/dev/null || true`, { timeoutMs: 5000 })
+          await sandbox.commands.run(
+            `claude mcp add --transport http e2b-mcp-gateway "${mcpUrl}" --header "Authorization: Bearer ${mcpToken}"`,
+            { timeoutMs: 30000 }
+          )
+          console.log(`[Agent Cloud] MCP gateway reconfigured on E2B reconnection`)
+        } catch (e) {
+          console.warn(`[Agent Cloud] Failed to reconfigure MCP on E2B reconnection:`, e)
         }
 
         const entry = {
@@ -618,7 +652,11 @@ async function handleCreate(
       { timeoutMs: 30000 }
     )
     if (mcpResult.exitCode === 0) {
-      console.log(`[Agent Cloud] E2B MCP gateway added successfully (Tavily + Puppeteer)`)
+      console.log(`[Agent Cloud] E2B MCP gateway added successfully`)
+
+      // Verify MCP is configured by listing MCP servers
+      const listResult = await sandbox.commands.run(`claude mcp list 2>&1`, { timeoutMs: 10000 })
+      console.log(`[Agent Cloud] MCP servers configured: ${listResult.stdout?.trim() || 'none'}`)
     } else {
       console.warn(`[Agent Cloud] E2B MCP gateway warning:`, mcpResult.stderr)
     }

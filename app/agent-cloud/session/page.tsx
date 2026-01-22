@@ -212,28 +212,8 @@ User Request: ${currentPrompt}`
         enhancedPrompt = githubContext
       }
 
-      // Check sandbox status first via a quick fetch to detect 404
-      const checkResponse = await fetch(`/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent('ping')}`, {
-        method: 'GET',
-      })
-
-      // If sandbox not found/expired, recreate it
-      if (checkResponse.status === 404) {
-        console.log('Sandbox expired, recreating...')
-        const newSandboxId = await recreateSandbox()
-        if (newSandboxId) {
-          // Retry with the new sandbox
-          setIsLoading(false)
-          setIsStreaming(false)
-          runPrompt(currentPrompt, newSandboxId)
-          return
-        } else {
-          setIsLoading(false)
-          setIsStreaming(false)
-          return
-        }
-      }
-
+      // Connect to the streaming endpoint
+      // EventSource handles errors and we have sandbox recreation logic in onerror
       const eventSource = new EventSource(
         `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`
       )
