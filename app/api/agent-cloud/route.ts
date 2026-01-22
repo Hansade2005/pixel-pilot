@@ -228,13 +228,12 @@ export async function GET(request: NextRequest) {
         // This avoids shell escaping issues with single quotes, $, backticks, etc.
         const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
 
-        // Use stdbuf to force unbuffered output for real-time streaming
-        // Decode base64 prompt and pipe to Claude to avoid shell metacharacter issues
-        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions" 2>&1`
+        // Use --output-format stream-json for real-time streaming with newline-delimited JSON
+        // This gives us structured events we can parse and stream to the frontend immediately
+        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json 2>&1`
 
         let fullOutput = ''
-        let lastSendTime = Date.now()
-        let outputBuffer = ''
+        let jsonBuffer = ''
 
         // Start heartbeat to keep connection alive
         const heartbeatInterval = setInterval(() => {
@@ -249,18 +248,72 @@ export async function GET(request: NextRequest) {
             onStdout: (data) => {
               if (isClosed) return
 
-              fullOutput += data
-              outputBuffer += data
+              jsonBuffer += data
 
-              // Send output immediately for real-time feel
-              // Flush buffer every 50ms or on newlines for smoother streaming
-              const now = Date.now()
-              const hasNewline = outputBuffer.includes('\n')
+              // Process complete JSON lines (newline-delimited JSON)
+              const lines = jsonBuffer.split('\n')
+              // Keep incomplete line in buffer
+              jsonBuffer = lines.pop() || ''
 
-              if (hasNewline || now - lastSendTime > 50 || outputBuffer.length > 100) {
-                send({ type: 'stdout', data: outputBuffer, timestamp: now })
-                outputBuffer = ''
-                lastSendTime = now
+              for (const line of lines) {
+                if (!line.trim()) continue
+
+                try {
+                  const event = JSON.parse(line)
+
+                  // Handle different event types from stream-json
+                  if (event.type === 'assistant' && event.message?.content) {
+                    // Assistant message with content blocks
+                    for (const block of event.message.content) {
+                      if (block.type === 'text') {
+                        fullOutput += block.text
+                        send({ type: 'text', data: block.text, timestamp: Date.now() })
+                      } else if (block.type === 'tool_use') {
+                        send({
+                          type: 'tool_use',
+                          toolName: block.name,
+                          toolId: block.id,
+                          input: block.input,
+                          timestamp: Date.now()
+                        })
+                      }
+                    }
+                  } else if (event.type === 'content_block_delta') {
+                    // Streaming text delta
+                    if (event.delta?.type === 'text_delta' && event.delta?.text) {
+                      fullOutput += event.delta.text
+                      send({ type: 'text', data: event.delta.text, timestamp: Date.now() })
+                    }
+                  } else if (event.type === 'content_block_start') {
+                    // Tool use starting
+                    if (event.content_block?.type === 'tool_use') {
+                      send({
+                        type: 'tool_start',
+                        toolName: event.content_block.name,
+                        toolId: event.content_block.id,
+                        timestamp: Date.now()
+                      })
+                    }
+                  } else if (event.type === 'result') {
+                    // Final result with full output
+                    if (event.result) {
+                      fullOutput = event.result
+                    }
+                    send({ type: 'result', data: event, timestamp: Date.now() })
+                  } else if (event.type === 'system' || event.type === 'error') {
+                    // System messages or errors
+                    send({ type: event.type, data: event, timestamp: Date.now() })
+                  } else {
+                    // Forward other events as-is for debugging
+                    send({ type: 'stream_event', data: event, timestamp: Date.now() })
+                  }
+                } catch (parseError) {
+                  // Not valid JSON, might be raw output - send as stdout
+                  if (line.trim()) {
+                    fullOutput += line + '\n'
+                    send({ type: 'stdout', data: line + '\n', timestamp: Date.now() })
+                  }
+                }
               }
             },
             onStderr: (data) => {
@@ -269,9 +322,21 @@ export async function GET(request: NextRequest) {
             }
           })
 
-          // Flush any remaining buffer
-          if (outputBuffer && !isClosed) {
-            send({ type: 'stdout', data: outputBuffer, timestamp: Date.now() })
+          // Process any remaining buffer
+          if (jsonBuffer.trim() && !isClosed) {
+            try {
+              const event = JSON.parse(jsonBuffer)
+              if (event.type === 'result' && event.result) {
+                fullOutput = event.result
+              }
+              send({ type: 'stream_event', data: event, timestamp: Date.now() })
+            } catch {
+              // Raw text
+              if (jsonBuffer.trim()) {
+                fullOutput += jsonBuffer
+                send({ type: 'stdout', data: jsonBuffer, timestamp: Date.now() })
+              }
+            }
           }
 
           // Clear heartbeat
