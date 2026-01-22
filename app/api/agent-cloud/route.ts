@@ -436,6 +436,7 @@ async function handleCreate(
         projectDir: existingEntry.repo?.cloned ? PROJECT_DIR : '/home/user',
         reconnected: true,
         messageCount: existingEntry.conversationHistory.length,
+        workingBranch: existingEntry.workingBranch, // Include working branch for header display
         message: 'Reconnected to existing sandbox',
       })
     } catch (error) {
@@ -470,6 +471,21 @@ async function handleCreate(
           // No history file yet
         }
 
+        // Try to get the current working branch from the sandbox
+        let workingBranch: string | undefined
+        try {
+          const branchResult = await sandbox.commands.run(
+            `cd ${PROJECT_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null`,
+            { timeoutMs: 5000 }
+          )
+          if (branchResult.exitCode === 0 && branchResult.stdout?.trim()) {
+            workingBranch = branchResult.stdout.trim()
+            console.log(`[Agent Cloud] Found working branch in sandbox: ${workingBranch}`)
+          }
+        } catch (e) {
+          // Couldn't get branch, that's ok
+        }
+
         const entry = {
           sandboxId: existingSandbox.sandboxId,
           sandbox,
@@ -482,6 +498,7 @@ async function handleCreate(
             branch: config.repo.branch,
             cloned: true // Assume cloned if sandbox exists
           } : undefined,
+          workingBranch,
           conversationHistory
         }
 
@@ -496,6 +513,7 @@ async function handleCreate(
           projectDir: PROJECT_DIR,
           reconnected: true,
           messageCount: conversationHistory.length,
+          workingBranch, // Include working branch for header display
           message: 'Reconnected to running sandbox from E2B',
         })
       } catch (error) {
