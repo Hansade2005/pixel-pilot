@@ -265,14 +265,11 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         // Base64 encode the system prompt for safe shell passing
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
-        // Use --output-format stream-json for real-time streaming with newline-delimited JSON
-        // stdbuf -oL forces line-buffered output so each JSON line is flushed immediately
-        // --verbose is required when using stream-json with -p (print mode)
-        // --append-system-prompt adds git workflow instructions while keeping Claude's default capabilities
-        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt \\"$(echo '${base64SystemPrompt}' | base64 -d)\\"" 2>&1`
+        // Use plain text output for reliable real-time streaming
+        // Each chunk from onStdout is immediately sent to frontend via SSE
+        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
 
         let fullOutput = ''
-        let jsonBuffer = ''
 
         // Start heartbeat to keep connection alive
         const heartbeatInterval = setInterval(() => {
@@ -286,97 +283,15 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
             timeoutMs: 0, // No timeout
             onStdout: (data) => {
               if (isClosed) return
-
-              jsonBuffer += data
-
-              // Process complete JSON lines (newline-delimited JSON)
-              const lines = jsonBuffer.split('\n')
-              // Keep incomplete line in buffer
-              jsonBuffer = lines.pop() || ''
-
-              for (const line of lines) {
-                if (!line.trim()) continue
-
-                try {
-                  const event = JSON.parse(line)
-
-                  // Handle different event types from stream-json
-                  if (event.type === 'assistant' && event.message?.content) {
-                    // Assistant message with content blocks
-                    for (const block of event.message.content) {
-                      if (block.type === 'text') {
-                        fullOutput += block.text
-                        send({ type: 'text', data: block.text, timestamp: Date.now() })
-                      } else if (block.type === 'tool_use') {
-                        send({
-                          type: 'tool_use',
-                          toolName: block.name,
-                          toolId: block.id,
-                          input: block.input,
-                          timestamp: Date.now()
-                        })
-                      }
-                    }
-                  } else if (event.type === 'content_block_delta') {
-                    // Streaming text delta
-                    if (event.delta?.type === 'text_delta' && event.delta?.text) {
-                      fullOutput += event.delta.text
-                      send({ type: 'text', data: event.delta.text, timestamp: Date.now() })
-                    }
-                  } else if (event.type === 'content_block_start') {
-                    // Tool use starting
-                    if (event.content_block?.type === 'tool_use') {
-                      send({
-                        type: 'tool_start',
-                        toolName: event.content_block.name,
-                        toolId: event.content_block.id,
-                        timestamp: Date.now()
-                      })
-                    }
-                  } else if (event.type === 'result') {
-                    // Final result with full output
-                    if (event.result) {
-                      fullOutput = event.result
-                    }
-                    send({ type: 'result', data: event, timestamp: Date.now() })
-                  } else if (event.type === 'system' || event.type === 'error') {
-                    // System messages or errors
-                    send({ type: event.type, data: event, timestamp: Date.now() })
-                  } else {
-                    // Forward other events as-is for debugging
-                    send({ type: 'stream_event', data: event, timestamp: Date.now() })
-                  }
-                } catch (parseError) {
-                  // Not valid JSON, might be raw output - send as stdout
-                  if (line.trim()) {
-                    fullOutput += line + '\n'
-                    send({ type: 'stdout', data: line + '\n', timestamp: Date.now() })
-                  }
-                }
-              }
+              // Immediately send each chunk to frontend - this is the key for real-time streaming
+              fullOutput += data
+              send({ type: 'stdout', data, timestamp: Date.now() })
             },
             onStderr: (data) => {
               if (isClosed) return
-              send({ type: 'stderr', data })
+              send({ type: 'stderr', data, timestamp: Date.now() })
             }
           })
-
-          // Process any remaining buffer
-          if (jsonBuffer.trim() && !isClosed) {
-            try {
-              const event = JSON.parse(jsonBuffer)
-              if (event.type === 'result' && event.result) {
-                fullOutput = event.result
-              }
-              send({ type: 'stream_event', data: event, timestamp: Date.now() })
-            } catch {
-              // Raw text
-              if (jsonBuffer.trim()) {
-                fullOutput += jsonBuffer
-                send({ type: 'stdout', data: jsonBuffer, timestamp: Date.now() })
-              }
-            }
-          }
 
           // Clear heartbeat
           clearInterval(heartbeatInterval)
