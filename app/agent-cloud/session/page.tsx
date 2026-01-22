@@ -4,13 +4,10 @@ import { useState, useRef, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
-  Terminal,
   Loader2,
-  GitBranch,
   Copy,
   Check,
   Bot,
-  ExternalLink,
   Sparkles,
   ArrowUp,
 } from "lucide-react"
@@ -561,28 +558,6 @@ User Request: ${currentPrompt}`
 
   return (
     <>
-      {/* Action buttons */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/50">
-        <div className="flex items-center gap-2 text-sm text-zinc-500">
-          {activeSession.repo && (
-            <>
-              <GitBranch className="h-4 w-4" />
-              <span className="font-mono">{activeSession.repo.branch}</span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-8 text-xs bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 rounded-lg">
-            View PR
-            <ExternalLink className="h-3 w-3 ml-1.5" />
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 rounded-lg">
-            Open in CLI
-            <Terminal className="h-3 w-3 ml-1.5" />
-          </Button>
-        </div>
-      </div>
-
       {/* Chat area */}
       <div
         ref={terminalRef}

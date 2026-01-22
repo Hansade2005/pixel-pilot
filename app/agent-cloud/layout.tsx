@@ -15,6 +15,8 @@ import {
   Menu,
   X,
   Globe,
+  GitBranch,
+  ExternalLink,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -56,6 +58,7 @@ export interface Session {
     full_name: string
     branch: string
   }
+  workingBranch?: string // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
   stats?: {
     additions: number
     deletions: number
@@ -345,7 +348,8 @@ function AgentCloudLayoutInner({
             repo: {
               full_name: selectedRepo.full_name,
               branch: selectedBranch
-            }
+            },
+            initialPrompt // Pass the initial prompt for branch naming (first 4 words)
           }
         })
       })
@@ -359,6 +363,7 @@ function AgentCloudLayoutInner({
       const modelInfo = MODELS.find(m => m.id === selectedModel)
       const repoCloned = data.repoCloned === true
       const reconnected = data.reconnected === true
+      const workingBranch = data.workingBranch // The branch created for this session
 
       const sessionTitle = initialPrompt.slice(0, 50) + (initialPrompt.length > 50 ? '...' : '')
 
@@ -375,6 +380,7 @@ function AgentCloudLayoutInner({
           full_name: selectedRepo.full_name,
           branch: selectedBranch,
         },
+        workingBranch, // Store the working branch for display
         stats: { additions: 0, deletions: 0 },
         messageCount: data.messageCount || 0,
         pendingPrompt: initialPrompt, // Store the initial prompt to auto-send
@@ -385,6 +391,7 @@ function AgentCloudLayoutInner({
           { type: 'system', content: `MCP Tools: Tavily Search, Playwright, GitHub`, timestamp: new Date() },
         ] : repoCloned ? [
           { type: 'system', content: `Cloned ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          { type: 'system', content: `Working branch: ${workingBranch || 'main'}`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
           { type: 'system', content: `MCP Tools: Tavily Search, Playwright, GitHub`, timestamp: new Date() },
         ] : [
@@ -608,8 +615,41 @@ function AgentCloudLayoutInner({
             </div>
           </div>
 
-          {/* Right - MCP indicator */}
+          {/* Right - Branch, View PR, MCP indicator */}
           <div className="flex items-center gap-3">
+            {/* Branch name - clickable to open in GitHub */}
+            {activeSessionId && sessions.find(s => s.id === activeSessionId)?.workingBranch && (
+              <a
+                href={`https://github.com/${sessions.find(s => s.id === activeSessionId)?.repo?.full_name}/tree/${sessions.find(s => s.id === activeSessionId)?.workingBranch}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                title={sessions.find(s => s.id === activeSessionId)?.workingBranch}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                <span className="font-mono hidden sm:inline">
+                  {(sessions.find(s => s.id === activeSessionId)?.workingBranch || '').length > 25
+                    ? (sessions.find(s => s.id === activeSessionId)?.workingBranch || '').slice(0, 25) + '...'
+                    : sessions.find(s => s.id === activeSessionId)?.workingBranch}
+                </span>
+              </a>
+            )}
+
+            {/* View PR button */}
+            {activeSessionId && sessions.find(s => s.id === activeSessionId)?.workingBranch && (
+              <a
+                href={`https://github.com/${sessions.find(s => s.id === activeSessionId)?.repo?.full_name}/pulls?q=head:${sessions.find(s => s.id === activeSessionId)?.workingBranch}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button size="sm" variant="outline" className="h-7 text-xs bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 rounded-lg">
+                  View PR
+                  <ExternalLink className="h-3 w-3 ml-1.5" />
+                </Button>
+              </a>
+            )}
+
+            {/* MCP indicator */}
             <div className="flex items-center gap-1.5 text-xs text-zinc-500">
               <Globe className="h-3.5 w-3.5 text-emerald-500" />
               <span className="hidden sm:inline">MCP Enabled</span>
