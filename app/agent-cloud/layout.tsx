@@ -382,11 +382,11 @@ function AgentCloudLayoutInner({
           { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
           { type: 'system', content: `Repository: ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily Search, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily Search, Playwright, GitHub`, timestamp: new Date() },
         ] : repoCloned ? [
           { type: 'system', content: `Cloned ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily Search, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily Search, Playwright, GitHub`, timestamp: new Date() },
         ] : [
           { type: 'system', content: `Failed to clone ${selectedRepo.full_name}`, timestamp: new Date() },
         ]

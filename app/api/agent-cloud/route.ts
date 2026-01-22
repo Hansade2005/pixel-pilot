@@ -554,8 +554,8 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
   }
 
-  // Setup MCP configuration with HTTP-based servers (Tavily for web search, GitHub for repo operations)
-  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, GitHub, Filesystem)...`)
+  // Setup MCP configuration with HTTP-based servers (Tavily for web search, GitHub for repo operations, Playwright for browser automation)
+  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, Playwright, GitHub, Filesystem)...`)
   try {
     // Create .claude directory for MCP config
     await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
@@ -567,6 +567,11 @@ async function handleCreate(
       tavily: {
         type: "http",
         url: "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
+      },
+      // Playwright MCP server for browser automation
+      playwright: {
+        command: "npx",
+        args: ["@playwright/mcp@latest"]
       },
       // Filesystem MCP server for local file operations
       filesystem: {
@@ -711,7 +716,7 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: true,
-    mcpTools: githubToken ? ['tavily', 'github', 'filesystem'] : ['tavily', 'filesystem'],
+    mcpTools: githubToken ? ['tavily', 'playwright', 'github', 'filesystem'] : ['tavily', 'playwright', 'filesystem'],
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
       : 'Sandbox created with Vercel AI Gateway (MCP enabled)',

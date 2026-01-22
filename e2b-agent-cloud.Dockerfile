@@ -54,9 +54,9 @@ RUN useradd -m -s /bin/bash user
 RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/project /app /home/user/.claude \
     && chown -R user:user /home/user /app
 
-# Pre-configure Tavily MCP HTTP server (API key embedded for web search capabilities)
+# Pre-configure MCP servers (Tavily for web search, Playwright for browser automation, Filesystem for local files)
 # This creates the base MCP config that will be extended at runtime with GitHub MCP
-RUN echo '{"mcpServers":{"tavily":{"type":"http","url":"https://mcp.tavily.com/mcp/?tavilyApiKey=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"},"filesystem":{"command":"npx","args":["-y","@anthropic/mcp-server-filesystem","/home/user/project"]}}}' > /home/user/.claude/mcp.json \
+RUN echo '{"mcpServers":{"tavily":{"type":"http","url":"https://mcp.tavily.com/mcp/?tavilyApiKey=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"},"playwright":{"command":"npx","args":["@playwright/mcp@latest"]},"filesystem":{"command":"npx","args":["-y","@anthropic/mcp-server-filesystem","/home/user/project"]}}}' > /home/user/.claude/mcp.json \
     && chown user:user /home/user/.claude/mcp.json
 
 # Set up Playwright in /app directory (required by Playwright)
