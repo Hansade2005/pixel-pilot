@@ -108,6 +108,9 @@ export async function POST(request: NextRequest) {
       case 'list':
         return handleList(request)
 
+      case 'restore':
+        return handleRestore(body.sandboxId, body.conversationHistory)
+
       default:
         return NextResponse.json(
           { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status, list' },
@@ -1155,6 +1158,69 @@ async function handleList(request: NextRequest) {
       sandboxes: []
     })
   }
+}
+
+/**
+ * Restore conversation history to a sandbox
+ * Used when recreating a sandbox after expiration
+ */
+async function handleRestore(
+  sandboxId: string,
+  conversationHistory: Array<{ role: 'user' | 'assistant', content: string, timestamp?: Date }>
+) {
+  if (!sandboxId || !conversationHistory) {
+    return NextResponse.json(
+      { error: 'sandboxId and conversationHistory are required' },
+      { status: 400 }
+    )
+  }
+
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
+  if (!sandboxEntry) {
+    return NextResponse.json(
+      { error: 'Sandbox not found' },
+      { status: 404 }
+    )
+  }
+
+  const { sandbox } = sandboxEntry
+  sandboxEntry.lastActivity = new Date()
+
+  // Merge conversation history (add timestamps if missing)
+  const formattedHistory = conversationHistory.map(msg => ({
+    role: msg.role,
+    content: msg.content,
+    timestamp: msg.timestamp || new Date()
+  }))
+
+  // Add to sandbox entry
+  sandboxEntry.conversationHistory = formattedHistory
+
+  // Write to sandbox filesystem for persistence
+  try {
+    await sandbox.files.write(
+      HISTORY_FILE,
+      JSON.stringify(formattedHistory, null, 2)
+    )
+    console.log(`[Agent Cloud] Restored ${formattedHistory.length} messages to sandbox ${sandboxId}`)
+  } catch (e) {
+    console.warn('[Agent Cloud] Failed to write conversation history:', e)
+  }
+
+  return NextResponse.json({
+    success: true,
+    messageCount: formattedHistory.length,
+    message: `Restored ${formattedHistory.length} messages to sandbox`
+  })
 }
 
 /**

@@ -118,7 +118,7 @@ export default function RootLayout({
                 var isWorkspaceWithProject = window.location.pathname === '/workspace' && window.location.search.includes('projectId');
                 var isSupportPage = window.location.pathname === '/support';
                 var isDocsPage = window.location.pathname === '/docs';
-                var isAgentCloudPage = window.location.pathname === '/agent-cloud';
+                var isAgentCloudPage = window.location.pathname.startsWith('/agent-cloud');
                 return isWorkspaceWithProject || isSupportPage || isDocsPage || isAgentCloudPage;
               }
 
