@@ -108,6 +108,9 @@ export async function POST(request: NextRequest) {
       case 'list':
         return handleList(request)
 
+      case 'restore':
+        return handleRestore(body.sandboxId, body.conversationHistory)
+
       default:
         return NextResponse.json(
           { error: 'Invalid action. Use: create, run, playwright, commit, push, diff, terminate, status, list' },
@@ -125,6 +128,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET endpoint for streaming output
+ * Implements real-time streaming similar to the preview route
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -184,17 +188,30 @@ export async function GET(request: NextRequest) {
     timestamp: new Date()
   })
 
-  // Create a streaming response
+  // Create a streaming response with real-time output
   const encoder = new TextEncoder()
+  let isClosed = false
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Helper to safely send data
+      const send = (payload: object) => {
+        if (!isClosed) {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`))
+          } catch (e) {
+            isClosed = true
+          }
+        }
+      }
+
       try {
         const { sandbox } = sandboxEntry!
         sandboxEntry!.lastActivity = new Date()
 
-        // Send start event
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start', sandboxId })}\n\n`))
+        // Send start event immediately
+        send({ type: 'start', sandboxId })
+        send({ type: 'log', message: 'Claude is thinking...' })
 
         // Build conversation context for Claude
         const conversationContext = sandboxEntry!.conversationHistory
@@ -208,70 +225,112 @@ export async function GET(request: NextRequest) {
           : prompt
 
         const escapedPrompt = fullPrompt.replace(/'/g, "'\\''")
-        const command = `cd ${workDir} && echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
+
+        // Use stdbuf to force unbuffered output for real-time streaming
+        // Also use script command to force TTY-like behavior
+        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions" 2>&1`
 
         let fullOutput = ''
+        let lastSendTime = Date.now()
+        let outputBuffer = ''
 
-        const result = await sandbox.commands.run(command, {
-          timeoutMs: 0,
-          onStdout: (data) => {
-            fullOutput += data
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'stdout', data })}\n\n`))
-          },
-          onStderr: (data) => {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'stderr', data })}\n\n`))
+        // Start heartbeat to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+          if (!isClosed) {
+            send({ type: 'heartbeat', timestamp: Date.now() })
           }
-        })
+        }, 15000) // Send heartbeat every 15 seconds
 
-        // Add assistant response to conversation history
-        sandboxEntry!.conversationHistory.push({
-          role: 'assistant',
-          content: fullOutput,
-          timestamp: new Date()
-        })
-
-        // Save conversation history to sandbox for persistence
         try {
-          await sandbox.files.write(
-            HISTORY_FILE,
-            JSON.stringify(sandboxEntry!.conversationHistory, null, 2)
-          )
-        } catch (e) {
-          console.warn('[Agent Cloud] Failed to save conversation history:', e)
-        }
+          const result = await sandbox.commands.run(command, {
+            timeoutMs: 0, // No timeout
+            onStdout: (data) => {
+              if (isClosed) return
 
-        // Get git diff stats if repo is cloned
-        let diffStats = { additions: 0, deletions: 0 }
-        if (sandboxEntry!.repo?.cloned) {
-          try {
-            const diffResult = await sandbox.commands.run(
-              `cd ${PROJECT_DIR} && git diff --shortstat`,
-              { timeoutMs: 5000 }
-            )
-            const match = diffResult.stdout?.match(/(\d+) insertion.*?(\d+) deletion/)
-            if (match) {
-              diffStats = { additions: parseInt(match[1]), deletions: parseInt(match[2]) }
+              fullOutput += data
+              outputBuffer += data
+
+              // Send output immediately for real-time feel
+              // Flush buffer every 50ms or on newlines for smoother streaming
+              const now = Date.now()
+              const hasNewline = outputBuffer.includes('\n')
+
+              if (hasNewline || now - lastSendTime > 50 || outputBuffer.length > 100) {
+                send({ type: 'stdout', data: outputBuffer, timestamp: now })
+                outputBuffer = ''
+                lastSendTime = now
+              }
+            },
+            onStderr: (data) => {
+              if (isClosed) return
+              send({ type: 'stderr', data })
             }
-          } catch (e) {
-            // Ignore diff errors
+          })
+
+          // Flush any remaining buffer
+          if (outputBuffer && !isClosed) {
+            send({ type: 'stdout', data: outputBuffer, timestamp: Date.now() })
           }
+
+          // Clear heartbeat
+          clearInterval(heartbeatInterval)
+
+          // Add assistant response to conversation history
+          sandboxEntry!.conversationHistory.push({
+            role: 'assistant',
+            content: fullOutput,
+            timestamp: new Date()
+          })
+
+          // Save conversation history to sandbox for persistence
+          try {
+            await sandbox.files.write(
+              HISTORY_FILE,
+              JSON.stringify(sandboxEntry!.conversationHistory, null, 2)
+            )
+          } catch (e) {
+            console.warn('[Agent Cloud] Failed to save conversation history:', e)
+          }
+
+          // Get git diff stats if repo is cloned
+          let diffStats = { additions: 0, deletions: 0 }
+          if (sandboxEntry!.repo?.cloned) {
+            try {
+              const diffResult = await sandbox.commands.run(
+                `cd ${PROJECT_DIR} && git diff --shortstat`,
+                { timeoutMs: 5000 }
+              )
+              const match = diffResult.stdout?.match(/(\d+) insertion.*?(\d+) deletion/)
+              if (match) {
+                diffStats = { additions: parseInt(match[1]), deletions: parseInt(match[2]) }
+              }
+            } catch (e) {
+              // Ignore diff errors
+            }
+          }
+
+          // Send completion event
+          send({
+            type: 'complete',
+            exitCode: result.exitCode,
+            output: fullOutput,
+            diffStats,
+            messageCount: sandboxEntry!.conversationHistory.length
+          })
+
+        } catch (cmdError) {
+          clearInterval(heartbeatInterval)
+          throw cmdError
         }
 
-        // Send completion event
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-          type: 'complete',
-          exitCode: result.exitCode,
-          output: fullOutput,
-          diffStats,
-          messageCount: sandboxEntry!.conversationHistory.length
-        })}\n\n`))
-
+        isClosed = true
         controller.close()
       } catch (error) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+        send({
           type: 'error',
           message: error instanceof Error ? error.message : 'Unknown error'
-        })}\n\n`))
+        })
+        isClosed = true
         controller.close()
       }
     }
@@ -280,8 +339,9 @@ export async function GET(request: NextRequest) {
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no', // Disable nginx buffering
     }
   })
 }
@@ -1155,6 +1215,69 @@ async function handleList(request: NextRequest) {
       sandboxes: []
     })
   }
+}
+
+/**
+ * Restore conversation history to a sandbox
+ * Used when recreating a sandbox after expiration
+ */
+async function handleRestore(
+  sandboxId: string,
+  conversationHistory: Array<{ role: 'user' | 'assistant', content: string, timestamp?: Date }>
+) {
+  if (!sandboxId || !conversationHistory) {
+    return NextResponse.json(
+      { error: 'sandboxId and conversationHistory are required' },
+      { status: 400 }
+    )
+  }
+
+  // Find sandbox entry
+  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+
+  for (const [key, entry] of activeSandboxes.entries()) {
+    if (entry.sandboxId === sandboxId) {
+      sandboxEntry = entry
+      break
+    }
+  }
+
+  if (!sandboxEntry) {
+    return NextResponse.json(
+      { error: 'Sandbox not found' },
+      { status: 404 }
+    )
+  }
+
+  const { sandbox } = sandboxEntry
+  sandboxEntry.lastActivity = new Date()
+
+  // Merge conversation history (add timestamps if missing)
+  const formattedHistory = conversationHistory.map(msg => ({
+    role: msg.role,
+    content: msg.content,
+    timestamp: msg.timestamp || new Date()
+  }))
+
+  // Add to sandbox entry
+  sandboxEntry.conversationHistory = formattedHistory
+
+  // Write to sandbox filesystem for persistence
+  try {
+    await sandbox.files.write(
+      HISTORY_FILE,
+      JSON.stringify(formattedHistory, null, 2)
+    )
+    console.log(`[Agent Cloud] Restored ${formattedHistory.length} messages to sandbox ${sandboxId}`)
+  } catch (e) {
+    console.warn('[Agent Cloud] Failed to write conversation history:', e)
+  }
+
+  return NextResponse.json({
+    success: true,
+    messageCount: formattedHistory.length,
+    message: `Restored ${formattedHistory.length} messages to sandbox`
+  })
 }
 
 /**

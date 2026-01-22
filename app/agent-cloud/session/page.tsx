@@ -31,6 +31,7 @@ function SessionPageInner() {
   const [prompt, setPrompt] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isRecreating, setIsRecreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
 
   const terminalRef = useRef<HTMLDivElement>(null)
@@ -38,6 +39,90 @@ function SessionPageInner() {
 
   // Find the active session
   const activeSession = sessions.find(s => s.id === sessionId) || null
+
+  // Recreate sandbox with conversation history
+  const recreateSandbox = useCallback(async (pendingPrompt?: string) => {
+    if (!activeSession) return null
+
+    setIsRecreating(true)
+
+    // Add system message about recreating
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId
+        ? { ...s, lines: [...s.lines, { type: 'system' as const, content: 'Session expired. Reconnecting...', timestamp: new Date() }] }
+        : s
+    ))
+
+    try {
+      // Create a new sandbox with same repo config
+      const response = await fetch('/api/agent-cloud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          config: {
+            model: activeSession.model || 'sonnet',
+            repo: activeSession.repo ? {
+              full_name: activeSession.repo.full_name,
+              branch: activeSession.repo.branch
+            } : undefined
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to recreate sandbox')
+      }
+
+      const data = await response.json()
+      const newSandboxId = data.sandboxId
+
+      // Convert frontend lines to conversation history format
+      const conversationHistory = activeSession.lines
+        .filter(l => l.type === 'input' || l.type === 'output')
+        .map(l => ({
+          role: l.type === 'input' ? 'user' as const : 'assistant' as const,
+          content: l.content,
+          timestamp: l.timestamp
+        }))
+
+      // Restore conversation history to the new sandbox
+      if (conversationHistory.length > 0) {
+        await fetch('/api/agent-cloud', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'restore',
+            sandboxId: newSandboxId,
+            conversationHistory
+          })
+        })
+      }
+
+      // Update session with new sandbox ID
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId
+          ? {
+              ...s,
+              sandboxId: newSandboxId,
+              lines: [...s.lines, { type: 'system' as const, content: 'Reconnected successfully. You can continue your conversation.', timestamp: new Date() }]
+            }
+          : s
+      ))
+
+      setIsRecreating(false)
+      return newSandboxId
+    } catch (error) {
+      console.error('Failed to recreate sandbox:', error)
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId
+          ? { ...s, lines: [...s.lines, { type: 'error' as const, content: 'Failed to reconnect. Please start a new session.', timestamp: new Date() }] }
+          : s
+      ))
+      setIsRecreating(false)
+      return null
+    }
+  }, [activeSession, sessionId, setSessions])
 
   // Redirect if session not found
   useEffect(() => {
@@ -53,9 +138,39 @@ function SessionPageInner() {
     }
   }, [activeSession?.lines])
 
+  // Auto-run pending prompt when session loads
+  const pendingPromptProcessedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (
+      activeSession?.pendingPrompt &&
+      activeSession?.id &&
+      !isLoading &&
+      !isRecreating &&
+      !pendingPromptProcessedRef.current.has(activeSession.id)
+    ) {
+      // Mark this session's pending prompt as processed
+      pendingPromptProcessedRef.current.add(activeSession.id)
+
+      // Store the pending prompt before clearing
+      const promptToRun = activeSession.pendingPrompt
+
+      // Clear the pending prompt from the session
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId
+          ? { ...s, pendingPrompt: undefined }
+          : s
+      ))
+
+      // Run the prompt after a short delay to let the page render
+      setTimeout(() => {
+        runPrompt(promptToRun)
+      }, 150)
+    }
+  }, [activeSession?.pendingPrompt, activeSession?.id, isLoading, isRecreating, sessionId, setSessions, runPrompt])
+
   // Focus input
   useEffect(() => {
-    if (activeSession && inputRef.current) {
+    if (activeSession && inputRef.current && !activeSession.pendingPrompt) {
       inputRef.current.focus()
     }
   }, [activeSession])
@@ -77,16 +192,22 @@ function SessionPageInner() {
   }
 
   // Run prompt with GitHub token passed to AI
-  const runPrompt = useCallback(async () => {
-    if (!activeSession || !prompt.trim() || isLoading) return
+  const runPrompt = useCallback(async (overridePrompt?: string, overrideSandboxId?: string) => {
+    if (!activeSession || isLoading || isRecreating) return
 
-    const currentPrompt = prompt.trim()
-    setPrompt('')
+    const currentPrompt = overridePrompt || prompt.trim()
+    if (!currentPrompt) return
+
+    const sandboxIdToUse = overrideSandboxId || activeSession.sandboxId
+
+    if (!overridePrompt) {
+      setPrompt('')
+    }
     setIsLoading(true)
     setIsStreaming(true)
 
     // Update session title if first message
-    if (activeSession.lines.filter(l => l.type === 'input').length === 0) {
+    if (!overridePrompt && activeSession.lines.filter(l => l.type === 'input').length === 0) {
       setSessions(prev => prev.map(s =>
         s.id === sessionId
           ? { ...s, title: currentPrompt.slice(0, 50) + (currentPrompt.length > 50 ? '...' : '') }
@@ -94,12 +215,14 @@ function SessionPageInner() {
       ))
     }
 
-    // Add input line
-    setSessions(prev => prev.map(s =>
-      s.id === sessionId
-        ? { ...s, lines: [...s.lines, { type: 'input' as const, content: currentPrompt, timestamp: new Date() }] }
-        : s
-    ))
+    // Add input line (skip if this is a retry after recreation)
+    if (!overridePrompt) {
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId
+          ? { ...s, lines: [...s.lines, { type: 'input' as const, content: currentPrompt, timestamp: new Date() }] }
+          : s
+      ))
+    }
 
     try {
       // Build prompt with GitHub context if token available
@@ -118,35 +241,90 @@ User Request: ${currentPrompt}`
         enhancedPrompt = githubContext
       }
 
+      // Check sandbox status first via a quick fetch to detect 404
+      const checkResponse = await fetch(`/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent('ping')}`, {
+        method: 'GET',
+      })
+
+      // If sandbox not found/expired, recreate it
+      if (checkResponse.status === 404) {
+        console.log('Sandbox expired, recreating...')
+        const newSandboxId = await recreateSandbox()
+        if (newSandboxId) {
+          // Retry with the new sandbox
+          setIsLoading(false)
+          setIsStreaming(false)
+          runPrompt(currentPrompt, newSandboxId)
+          return
+        } else {
+          setIsLoading(false)
+          setIsStreaming(false)
+          return
+        }
+      }
+
       const eventSource = new EventSource(
-        `/api/agent-cloud?sandboxId=${encodeURIComponent(activeSession.sandboxId)}&prompt=${encodeURIComponent(enhancedPrompt)}`
+        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`
       )
 
       let fullOutput = ''
+      let hasReceivedData = false
+      let pendingUpdate = false
+      let lastUpdateTime = 0
+
+      // Throttled update function for smooth real-time rendering
+      const updateOutput = (newOutput: string) => {
+        fullOutput = newOutput
+        const now = Date.now()
+
+        // Throttle updates to every 16ms (60fps) for smooth rendering
+        if (!pendingUpdate && now - lastUpdateTime > 16) {
+          pendingUpdate = true
+          requestAnimationFrame(() => {
+            setSessions(prev => prev.map(s => {
+              if (s.id === sessionId) {
+                const lines = [...s.lines]
+                const lastLine = lines[lines.length - 1]
+                if (lastLine && lastLine.type === 'output') {
+                  lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+                } else {
+                  lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
+                }
+                return { ...s, lines }
+              }
+              return s
+            }))
+            pendingUpdate = false
+            lastUpdateTime = Date.now()
+          })
+        }
+      }
 
       eventSource.onmessage = (event) => {
+        hasReceivedData = true
         try {
           const data = JSON.parse(event.data)
 
           switch (data.type) {
             case 'start':
+              // Stream has started
               break
+
+            case 'log':
+              // Status message from server (e.g., "Claude is thinking...")
+              // We can optionally show this in the UI
+              console.log('[Agent Cloud]', data.message)
+              break
+
+            case 'heartbeat':
+              // Keep-alive message, just acknowledge
+              break
+
             case 'stdout':
-              fullOutput += data.data
-              setSessions(prev => prev.map(s => {
-                if (s.id === sessionId) {
-                  const lines = [...s.lines]
-                  const lastLine = lines[lines.length - 1]
-                  if (lastLine && lastLine.type === 'output') {
-                    lines[lines.length - 1] = { ...lastLine, content: fullOutput }
-                  } else {
-                    lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
-                  }
-                  return { ...s, lines }
-                }
-                return s
-              }))
+              // Real-time output streaming
+              updateOutput(fullOutput + data.data)
               break
+
             case 'stderr':
               setSessions(prev => prev.map(s =>
                 s.id === sessionId
@@ -154,7 +332,23 @@ User Request: ${currentPrompt}`
                   : s
               ))
               break
+
             case 'complete':
+              // Ensure final output is rendered
+              if (fullOutput) {
+                setSessions(prev => prev.map(s => {
+                  if (s.id === sessionId) {
+                    const lines = [...s.lines]
+                    const lastLine = lines[lines.length - 1]
+                    if (lastLine && lastLine.type === 'output') {
+                      lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+                    }
+                    return { ...s, lines }
+                  }
+                  return s
+                }))
+              }
+
               if (data.diffStats) {
                 setSessions(prev => prev.map(s =>
                   s.id === sessionId
@@ -173,7 +367,26 @@ User Request: ${currentPrompt}`
               setIsLoading(false)
               setIsStreaming(false)
               break
+
             case 'error':
+              // Check if error is about sandbox expiration
+              const errorMsg = data.message || ''
+              if (errorMsg.includes('not found') || errorMsg.includes('expired')) {
+                eventSource.close()
+                console.log('Sandbox expired during stream, recreating...')
+                recreateSandbox().then(newSandboxId => {
+                  if (newSandboxId) {
+                    setIsLoading(false)
+                    setIsStreaming(false)
+                    runPrompt(currentPrompt, newSandboxId)
+                  } else {
+                    setIsLoading(false)
+                    setIsStreaming(false)
+                  }
+                })
+                return
+              }
+
               setSessions(prev => prev.map(s =>
                 s.id === sessionId
                   ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.message, timestamp: new Date() }] }
@@ -189,8 +402,21 @@ User Request: ${currentPrompt}`
         }
       }
 
-      eventSource.onerror = () => {
+      eventSource.onerror = async () => {
         eventSource.close()
+
+        // If we haven't received any data, this might be a 404 - try recreating
+        if (!hasReceivedData) {
+          console.log('Connection failed without data, attempting to recreate sandbox...')
+          const newSandboxId = await recreateSandbox()
+          if (newSandboxId) {
+            setIsLoading(false)
+            setIsStreaming(false)
+            runPrompt(currentPrompt, newSandboxId)
+            return
+          }
+        }
+
         setIsLoading(false)
         setIsStreaming(false)
         setSessions(prev => prev.map(s =>
@@ -209,7 +435,7 @@ User Request: ${currentPrompt}`
       setIsLoading(false)
       setIsStreaming(false)
     }
-  }, [activeSession, prompt, isLoading, sessionId, setSessions, storedTokens])
+  }, [activeSession, prompt, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -325,7 +551,13 @@ User Request: ${currentPrompt}`
       >
         <div className="max-w-3xl mx-auto space-y-2">
           {activeSession.lines.map((line, index) => renderLine(line, index))}
-          {isStreaming && (
+          {isRecreating && (
+            <div className="flex items-center gap-2 py-3 text-amber-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-mono">Reconnecting to session...</span>
+            </div>
+          )}
+          {isStreaming && !isRecreating && (
             <div className="flex items-center gap-2 py-3 text-orange-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="text-sm font-mono">Claude is working...</span>
@@ -344,19 +576,19 @@ User Request: ${currentPrompt}`
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Reply to Claude..."
-                disabled={isLoading}
+                placeholder={isRecreating ? "Reconnecting..." : "Reply to Claude..."}
+                disabled={isLoading || isRecreating}
                 className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 px-4 pt-3 pb-12 min-h-[44px] max-h-[120px] leading-6 overflow-y-auto"
                 rows={1}
               />
               <div className="absolute bottom-2 right-2">
                 <Button
-                  onClick={runPrompt}
-                  disabled={!prompt.trim() || isLoading}
+                  onClick={() => runPrompt()}
+                  disabled={!prompt.trim() || isLoading || isRecreating}
                   size="icon"
                   className="h-8 w-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:bg-zinc-700"
                 >
-                  {isLoading ? (
+                  {isLoading || isRecreating ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <ArrowUp className="h-4 w-4" />
