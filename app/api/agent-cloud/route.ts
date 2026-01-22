@@ -332,32 +332,9 @@ runQuery().catch(err => {
 });
 `
 
-        // Write the SDK script to sandbox
-        const scriptPath = '/tmp/claude-sdk-query.js'
+        // Write the SDK script to sandbox (use /home/user for proper permissions)
+        const scriptPath = '/home/user/claude-sdk-query.js'
         await sandbox.files.write(scriptPath, sdkScript)
-
-        // Ensure Claude Code SDK is installed (it may not be globally available)
-        send({ type: 'log', message: 'Setting up Claude Code SDK...' })
-        try {
-          // Check if SDK is already installed
-          const checkResult = await sandbox.commands.run(
-            `node -e "require('@anthropic-ai/claude-code')" 2>&1`,
-            { timeoutMs: 10000 }
-          )
-          if (checkResult.exitCode !== 0) {
-            // Install SDK locally in /tmp for the script
-            send({ type: 'log', message: 'Installing Claude Code SDK...' })
-            const installResult = await sandbox.commands.run(
-              `cd /tmp && npm install @anthropic-ai/claude-code 2>&1`,
-              { timeoutMs: 120000 }
-            )
-            if (installResult.exitCode !== 0) {
-              console.warn('[Agent Cloud] SDK install warning:', installResult.stdout)
-            }
-          }
-        } catch (e) {
-          console.warn('[Agent Cloud] Failed to check/install SDK:', e)
-        }
 
         let fullOutput = ''
 
@@ -370,9 +347,9 @@ runQuery().catch(err => {
 
         try {
           // Run the SDK script with Node.js
-          // Set NODE_PATH so Node can find SDK installed in /tmp
+          // Set NODE_PATH so Node can find SDK installed in /home/user/node_modules
           const result = await sandbox.commands.run(
-            `cd ${workDir} && NODE_PATH=/tmp/node_modules node ${scriptPath} 2>&1`,
+            `cd ${workDir} && NODE_PATH=/home/user/node_modules node ${scriptPath} 2>&1`,
             {
               timeoutMs: 0, // No timeout
               onStdout: (data) => {
@@ -761,6 +738,22 @@ async function handleCreate(
     }
   } catch (e) {
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
+  }
+
+  // Also install Claude Code SDK module in /home/user for programmatic usage
+  console.log(`[Agent Cloud] Installing Claude Code SDK module...`)
+  try {
+    const sdkInstallResult = await sandbox.commands.run(
+      'cd /home/user && npm install @anthropic-ai/claude-code',
+      { timeoutMs: 120000 }
+    )
+    if (sdkInstallResult.exitCode !== 0) {
+      console.warn(`[Agent Cloud] Claude Code SDK install warning:`, sdkInstallResult.stderr)
+    } else {
+      console.log(`[Agent Cloud] Claude Code SDK module installed successfully`)
+    }
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to install Claude Code SDK:`, e)
   }
 
   // Add E2B MCP gateway to Claude Code with authentication
