@@ -239,6 +239,36 @@ User Request: ${currentPrompt}`
 
       let fullOutput = ''
       let hasReceivedData = false
+      let pendingUpdate = false
+      let lastUpdateTime = 0
+
+      // Throttled update function for smooth real-time rendering
+      const updateOutput = (newOutput: string) => {
+        fullOutput = newOutput
+        const now = Date.now()
+
+        // Throttle updates to every 16ms (60fps) for smooth rendering
+        if (!pendingUpdate && now - lastUpdateTime > 16) {
+          pendingUpdate = true
+          requestAnimationFrame(() => {
+            setSessions(prev => prev.map(s => {
+              if (s.id === sessionId) {
+                const lines = [...s.lines]
+                const lastLine = lines[lines.length - 1]
+                if (lastLine && lastLine.type === 'output') {
+                  lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+                } else {
+                  lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
+                }
+                return { ...s, lines }
+              }
+              return s
+            }))
+            pendingUpdate = false
+            lastUpdateTime = Date.now()
+          })
+        }
+      }
 
       eventSource.onmessage = (event) => {
         hasReceivedData = true
@@ -247,23 +277,24 @@ User Request: ${currentPrompt}`
 
           switch (data.type) {
             case 'start':
+              // Stream has started
               break
+
+            case 'log':
+              // Status message from server (e.g., "Claude is thinking...")
+              // We can optionally show this in the UI
+              console.log('[Agent Cloud]', data.message)
+              break
+
+            case 'heartbeat':
+              // Keep-alive message, just acknowledge
+              break
+
             case 'stdout':
-              fullOutput += data.data
-              setSessions(prev => prev.map(s => {
-                if (s.id === sessionId) {
-                  const lines = [...s.lines]
-                  const lastLine = lines[lines.length - 1]
-                  if (lastLine && lastLine.type === 'output') {
-                    lines[lines.length - 1] = { ...lastLine, content: fullOutput }
-                  } else {
-                    lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
-                  }
-                  return { ...s, lines }
-                }
-                return s
-              }))
+              // Real-time output streaming
+              updateOutput(fullOutput + data.data)
               break
+
             case 'stderr':
               setSessions(prev => prev.map(s =>
                 s.id === sessionId
@@ -271,7 +302,23 @@ User Request: ${currentPrompt}`
                   : s
               ))
               break
+
             case 'complete':
+              // Ensure final output is rendered
+              if (fullOutput) {
+                setSessions(prev => prev.map(s => {
+                  if (s.id === sessionId) {
+                    const lines = [...s.lines]
+                    const lastLine = lines[lines.length - 1]
+                    if (lastLine && lastLine.type === 'output') {
+                      lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+                    }
+                    return { ...s, lines }
+                  }
+                  return s
+                }))
+              }
+
               if (data.diffStats) {
                 setSessions(prev => prev.map(s =>
                   s.id === sessionId
@@ -290,6 +337,7 @@ User Request: ${currentPrompt}`
               setIsLoading(false)
               setIsStreaming(false)
               break
+
             case 'error':
               // Check if error is about sandbox expiration
               const errorMsg = data.message || ''
