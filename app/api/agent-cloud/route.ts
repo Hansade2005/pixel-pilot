@@ -267,8 +267,9 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
         // Use --output-format stream-json for real-time streaming with newline-delimited JSON
         // stdbuf -oL forces line-buffered output so each JSON line is flushed immediately
+        // --verbose is required when using stream-json with -p (print mode)
         // --append-system-prompt adds git workflow instructions while keeping Claude's default capabilities
-        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json --append-system-prompt \\"$(echo '${base64SystemPrompt}' | base64 -d)\\"" 2>&1`
+        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt \\"$(echo '${base64SystemPrompt}' | base64 -d)\\"" 2>&1`
 
         let fullOutput = ''
         let jsonBuffer = ''
