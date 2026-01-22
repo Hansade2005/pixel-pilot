@@ -266,8 +266,8 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
         // Use stream-json output format for structured messages
-        // This allows us to parse tool_use, text, and result messages
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
+        // --verbose is required when using --output-format stream-json with -p (print mode)
+        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
