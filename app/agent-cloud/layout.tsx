@@ -387,6 +387,7 @@ function AgentCloudLayoutInner({
         lines: reconnected ? [
           { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
           { type: 'system', content: `Repository: ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          ...(workingBranch ? [{ type: 'system' as const, content: `Working branch: ${workingBranch}`, timestamp: new Date() }] : []),
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
           { type: 'system', content: `MCP Tools: Tavily, Puppeteer, GitHub`, timestamp: new Date() },
         ] : repoCloned ? [
@@ -439,13 +440,22 @@ function AgentCloudLayoutInner({
 
   // Delete session
   const deleteSession = (sessionId: string) => {
+    // Check if we're deleting the active session BEFORE updating state
+    const isDeletingActive = activeSessionId === sessionId
+    const remaining = sessions.filter(s => s.id !== sessionId)
+
+    // Update sessions state
     setSessions(prev => prev.filter(s => s.id !== sessionId))
-    if (activeSessionId === sessionId) {
-      const remaining = sessions.filter(s => s.id !== sessionId)
+
+    // If deleting the active session, redirect immediately
+    if (isDeletingActive) {
       if (remaining.length > 0) {
         setActiveSessionId(remaining[0].id)
       } else {
-        setActiveSessionId(null)
+        // No sessions left - redirect to new session page immediately
+        router.push('/agent-cloud/new')
+        setActiveSessionIdState(null)
+        setMobileMenuOpen(false)
       }
     }
   }
