@@ -671,8 +671,17 @@ function AgentCloudLayoutInner({
             fixed inset-y-0 left-0 w-72 bg-zinc-950 border-r border-zinc-800/50 z-50
             transform transition-transform duration-300 ease-out md:hidden
             ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-            pt-16
           `}>
+            {/* Mobile sidebar header with close button */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/50">
+              <span className="font-semibold text-sm">Sessions</span>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-zinc-400" />
+              </button>
+            </div>
             <SidebarContent />
           </div>
 
