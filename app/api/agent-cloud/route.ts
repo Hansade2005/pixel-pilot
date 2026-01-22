@@ -213,6 +213,7 @@ export async function GET(request: NextRequest) {
 
   // Create a streaming response with real-time output (exactly like preview route)
   let isClosed = false
+  const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -220,8 +221,9 @@ export async function GET(request: NextRequest) {
       const send = (payload: object) => {
         if (!isClosed) {
           try {
-            // SSE format: "data: {json}\n\n" - directly enqueue string
-            controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`)
+            // SSE format: "data: {json}\n\n" - encode to Uint8Array
+            const message = `data: ${JSON.stringify(payload)}\n\n`
+            controller.enqueue(encoder.encode(message))
           } catch (e) {
             isClosed = true
           }
