@@ -286,7 +286,6 @@ User Request: ${currentPrompt}`
 
             case 'log':
               // Status message from server (e.g., "Claude is thinking...")
-              // We can optionally show this in the UI
               console.log('[Agent Cloud]', data.message)
               break
 
@@ -294,9 +293,46 @@ User Request: ${currentPrompt}`
               // Keep-alive message, just acknowledge
               break
 
-            case 'stdout':
-              // Real-time output streaming
+            case 'text':
+              // Real-time text streaming from stream-json format
               updateOutput(fullOutput + data.data)
+              break
+
+            case 'stdout':
+              // Fallback raw output streaming
+              updateOutput(fullOutput + data.data)
+              break
+
+            case 'tool_start':
+              // Tool starting - show in UI
+              console.log('[Agent Cloud] Tool starting:', data.toolName)
+              setSessions(prev => prev.map(s =>
+                s.id === sessionId
+                  ? { ...s, lines: [...s.lines, {
+                      type: 'tool' as const,
+                      content: `Using tool: ${data.toolName}...`,
+                      timestamp: new Date(),
+                      meta: { toolName: data.toolName }
+                    }] }
+                  : s
+              ))
+              break
+
+            case 'tool_use':
+              // Tool usage complete
+              console.log('[Agent Cloud] Tool used:', data.toolName, data.input)
+              break
+
+            case 'result':
+              // Final result from stream-json
+              if (data.data?.result) {
+                updateOutput(data.data.result)
+              }
+              break
+
+            case 'stream_event':
+              // Other stream events - log for debugging
+              console.log('[Agent Cloud] Stream event:', data.data)
               break
 
             case 'stderr':
