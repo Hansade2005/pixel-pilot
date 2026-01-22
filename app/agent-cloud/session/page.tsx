@@ -138,35 +138,8 @@ function SessionPageInner() {
     }
   }, [activeSession?.lines])
 
-  // Auto-run pending prompt when session loads
+  // Ref for tracking processed pending prompts (defined here, used in effect after runPrompt)
   const pendingPromptProcessedRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    if (
-      activeSession?.pendingPrompt &&
-      activeSession?.id &&
-      !isLoading &&
-      !isRecreating &&
-      !pendingPromptProcessedRef.current.has(activeSession.id)
-    ) {
-      // Mark this session's pending prompt as processed
-      pendingPromptProcessedRef.current.add(activeSession.id)
-
-      // Store the pending prompt before clearing
-      const promptToRun = activeSession.pendingPrompt
-
-      // Clear the pending prompt from the session
-      setSessions(prev => prev.map(s =>
-        s.id === sessionId
-          ? { ...s, pendingPrompt: undefined }
-          : s
-      ))
-
-      // Run the prompt after a short delay to let the page render
-      setTimeout(() => {
-        runPrompt(promptToRun)
-      }, 150)
-    }
-  }, [activeSession?.pendingPrompt, activeSession?.id, isLoading, isRecreating, sessionId, setSessions, runPrompt])
 
   // Focus input
   useEffect(() => {
@@ -215,8 +188,9 @@ function SessionPageInner() {
       ))
     }
 
-    // Add input line (skip if this is a retry after recreation)
-    if (!overridePrompt) {
+    // Add input line (skip only if this is a retry after sandbox recreation)
+    // overrideSandboxId is only provided during recreation retries
+    if (!overrideSandboxId) {
       setSessions(prev => prev.map(s =>
         s.id === sessionId
           ? { ...s, lines: [...s.lines, { type: 'input' as const, content: currentPrompt, timestamp: new Date() }] }
@@ -436,6 +410,35 @@ User Request: ${currentPrompt}`
       setIsStreaming(false)
     }
   }, [activeSession, prompt, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
+
+  // Auto-run pending prompt when session loads (must be after runPrompt is defined)
+  useEffect(() => {
+    if (
+      activeSession?.pendingPrompt &&
+      activeSession?.id &&
+      !isLoading &&
+      !isRecreating &&
+      !pendingPromptProcessedRef.current.has(activeSession.id)
+    ) {
+      // Mark this session's pending prompt as processed
+      pendingPromptProcessedRef.current.add(activeSession.id)
+
+      // Store the pending prompt before clearing
+      const promptToRun = activeSession.pendingPrompt
+
+      // Clear the pending prompt from the session
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId
+          ? { ...s, pendingPrompt: undefined }
+          : s
+      ))
+
+      // Run the prompt after a short delay to let the page render
+      setTimeout(() => {
+        runPrompt(promptToRun)
+      }, 150)
+    }
+  }, [activeSession?.pendingPrompt, activeSession?.id, isLoading, isRecreating, sessionId, setSessions, runPrompt])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
