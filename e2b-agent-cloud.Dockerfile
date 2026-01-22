@@ -51,8 +51,13 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN useradd -m -s /bin/bash user
 
 # Create necessary directories with correct ownership
-RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/project /app \
+RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/project /app /home/user/.claude \
     && chown -R user:user /home/user /app
+
+# Pre-configure Tavily MCP HTTP server (API key embedded for web search capabilities)
+# This creates the base MCP config that will be extended at runtime with GitHub MCP
+RUN echo '{"mcpServers":{"tavily":{"type":"http","url":"https://mcp.tavily.com/mcp/?tavilyApiKey=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"},"filesystem":{"command":"npx","args":["-y","@anthropic/mcp-server-filesystem","/home/user/project"]}}}' > /home/user/.claude/mcp.json \
+    && chown user:user /home/user/.claude/mcp.json
 
 # Set up Playwright in /app directory (required by Playwright)
 WORKDIR /app
