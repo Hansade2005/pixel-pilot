@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET endpoint for streaming output using Claude Code SDK
- * Uses the SDK's query() function for structured message streaming
+ * GET endpoint for streaming output
+ * Implements real-time streaming similar to the preview route
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -245,11 +245,15 @@ export async function GET(request: NextRequest) {
           ? `Previous conversation:\n${conversationContext}\n\nCurrent request: ${prompt}`
           : prompt
 
+        // Use base64 encoding to safely pass prompts containing any characters
+        // This avoids shell escaping issues with single quotes, $, backticks, etc.
+        const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
+
         // Get the working branch for git workflow instructions
         const workingBranch = sandboxEntry!.workingBranch || 'main'
 
-        // System prompt for git workflow
-        const systemPrompt = `
+        // System prompt for git workflow - commit, push, and create PR using GitHub MCP
+        const gitWorkflowPrompt = `
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
 - After making code changes, ALWAYS commit them with a clear message
@@ -258,212 +262,104 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - Always provide meaningful commit messages and PR descriptions
 `.trim()
 
-        // Create the SDK generation script
-        const sdkScript = `
-const { query } = require('@anthropic-ai/claude-code');
+        // Base64 encode the system prompt for safe shell passing
+        const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
-async function runQuery() {
-  const prompt = ${JSON.stringify(fullPrompt)};
-  const systemPrompt = ${JSON.stringify(systemPrompt)};
-
-  const abortController = new AbortController();
-  let fullText = '';
-
-  try {
-    for await (const message of query({
-      prompt: prompt,
-      abortController: abortController,
-      options: {
-        maxTurns: 30,
-        systemPrompt: systemPrompt,
-        dangerouslySkipPermissions: true,
-        allowedTools: [
-          'Read', 'Write', 'Edit', 'MultiEdit',
-          'Bash', 'LS', 'Glob', 'Grep',
-          'WebFetch', 'WebSearch', 'TodoRead', 'TodoWrite'
-        ]
-      }
-    })) {
-      // Output structured messages with markers for parsing
-      if (message.type === 'text') {
-        fullText += message.text || '';
-        console.log('__SDK_TEXT__' + JSON.stringify({ type: 'text', text: message.text }));
-      } else if (message.type === 'tool_use') {
-        console.log('__SDK_TOOL_USE__' + JSON.stringify({
-          type: 'tool_use',
-          name: message.name,
-          input: message.input
-        }));
-      } else if (message.type === 'tool_result') {
-        console.log('__SDK_TOOL_RESULT__' + JSON.stringify({
-          type: 'tool_result',
-          result: typeof message.result === 'string' ? message.result.substring(0, 500) : message.result
-        }));
-      } else if (message.type === 'result') {
-        console.log('__SDK_RESULT__' + JSON.stringify({
-          type: 'result',
-          subtype: message.subtype,
-          result: message.result,
-          cost: message.total_cost_usd
-        }));
-      } else if (message.type === 'assistant') {
-        // Extract text from assistant message
-        const content = message.message?.content;
-        if (Array.isArray(content)) {
-          const textPart = content.find(c => c.type === 'text');
-          if (textPart?.text) {
-            fullText += textPart.text;
-            console.log('__SDK_TEXT__' + JSON.stringify({ type: 'text', text: textPart.text }));
-          }
-        }
-      }
-    }
-
-    console.log('__SDK_COMPLETE__' + JSON.stringify({ type: 'complete', fullText: fullText }));
-  } catch (error) {
-    console.error('__SDK_ERROR__' + JSON.stringify({ type: 'error', message: error.message }));
-    process.exit(1);
-  }
-}
-
-runQuery().catch(err => {
-  console.error('__SDK_ERROR__' + JSON.stringify({ type: 'error', message: err.message }));
-  process.exit(1);
-});
-`
-
-        // Write the SDK script to sandbox (use /home/user for proper permissions)
-        const scriptPath = '/home/user/claude-sdk-query.js'
-        await sandbox.files.write(scriptPath, sdkScript)
-
-        // Ensure Claude Code SDK is installed (may be missing on reconnected sandboxes)
-        send({ type: 'log', message: 'Checking Claude Code SDK...' })
-        let sdkInstalled = false
-        try {
-          // Check if SDK exists by trying to require it
-          const checkResult = await sandbox.commands.run(
-            `NODE_PATH=/home/user/node_modules node -e "require('@anthropic-ai/claude-code')" 2>&1`,
-            { timeoutMs: 10000 }
-          )
-          sdkInstalled = checkResult.exitCode === 0
-        } catch (e) {
-          // Check failed (throws on non-zero exit), SDK likely not installed
-          sdkInstalled = false
-        }
-
-        if (!sdkInstalled) {
-          send({ type: 'log', message: 'Installing Claude Code SDK...' })
-          try {
-            const installResult = await sandbox.commands.run(
-              'cd /home/user && npm install @anthropic-ai/claude-code 2>&1',
-              { timeoutMs: 120000 }
-            )
-            if (installResult.exitCode === 0) {
-              send({ type: 'log', message: 'Claude Code SDK ready' })
-            } else {
-              console.warn('[Agent Cloud] SDK install warning:', installResult.stdout || installResult.stderr)
-            }
-          } catch (installErr) {
-            console.error('[Agent Cloud] SDK install failed:', installErr)
-            send({ type: 'error', message: 'Failed to install Claude Code SDK' })
-          }
-        }
+        // Use stream-json output format for structured messages
+        // This allows us to parse tool_use, text, and result messages
+        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
 
         let fullOutput = ''
+        let textContent = '' // Accumulate text for conversation history
+        let jsonBuffer = '' // Buffer for incomplete JSON lines
 
         // Start heartbeat to keep connection alive
         const heartbeatInterval = setInterval(() => {
           if (!isClosed) {
             send({ type: 'heartbeat', timestamp: Date.now() })
           }
-        }, 15000)
+        }, 15000) // Send heartbeat every 15 seconds
 
         try {
-          // Run the SDK script with Node.js
-          // Set NODE_PATH so Node can find SDK installed in /home/user/node_modules
-          const result = await sandbox.commands.run(
-            `cd ${workDir} && NODE_PATH=/home/user/node_modules node ${scriptPath} 2>&1`,
-            {
-              timeoutMs: 0, // No timeout
-              onStdout: (data) => {
-                if (isClosed) return
+          const result = await sandbox.commands.run(command, {
+            timeoutMs: 0, // No timeout
+            onStdout: (data) => {
+              if (isClosed) return
+              fullOutput += data
 
-                // Parse SDK output markers
-                const lines = data.split('\n')
-                for (const line of lines) {
-                  if (line.startsWith('__SDK_TEXT__')) {
-                    try {
-                      const parsed = JSON.parse(line.substring('__SDK_TEXT__'.length))
-                      fullOutput += parsed.text || ''
-                      send({ type: 'text', data: parsed.text, timestamp: Date.now() })
-                    } catch (e) { /* ignore parse errors */ }
-                  } else if (line.startsWith('__SDK_TOOL_USE__')) {
-                    try {
-                      const parsed = JSON.parse(line.substring('__SDK_TOOL_USE__'.length))
-                      send({
-                        type: 'tool_use',
-                        name: parsed.name,
-                        input: parsed.input,
-                        timestamp: Date.now()
-                      })
-                    } catch (e) { /* ignore parse errors */ }
-                  } else if (line.startsWith('__SDK_TOOL_RESULT__')) {
-                    try {
-                      const parsed = JSON.parse(line.substring('__SDK_TOOL_RESULT__'.length))
-                      send({ type: 'tool_result', result: parsed.result, timestamp: Date.now() })
-                    } catch (e) { /* ignore parse errors */ }
-                  } else if (line.startsWith('__SDK_RESULT__')) {
-                    try {
-                      const parsed = JSON.parse(line.substring('__SDK_RESULT__'.length))
-                      send({
-                        type: 'result',
-                        subtype: parsed.subtype,
-                        result: parsed.result,
-                        cost: parsed.cost,
-                        timestamp: Date.now()
-                      })
-                    } catch (e) { /* ignore parse errors */ }
-                  } else if (line.startsWith('__SDK_COMPLETE__')) {
-                    try {
-                      const parsed = JSON.parse(line.substring('__SDK_COMPLETE__'.length))
-                      fullOutput = parsed.fullText || fullOutput
-                    } catch (e) { /* ignore parse errors */ }
-                  } else if (line.startsWith('__SDK_ERROR__')) {
-                    try {
-                      const parsed = JSON.parse(line.substring('__SDK_ERROR__'.length))
-                      send({ type: 'error', message: parsed.message, timestamp: Date.now() })
-                    } catch (e) { /* ignore parse errors */ }
-                  } else if (line.trim()) {
-                    // Regular stdout - send as raw output for backwards compatibility
+              // Parse JSON lines from stream-json output
+              jsonBuffer += data
+              const lines = jsonBuffer.split('\n')
+              jsonBuffer = lines.pop() || '' // Keep incomplete line in buffer
+
+              for (const line of lines) {
+                if (!line.trim()) continue
+
+                try {
+                  const message = JSON.parse(line)
+
+                  // Handle different message types from Claude CLI stream-json output
+                  if (message.type === 'text') {
+                    textContent += message.text || ''
+                    send({ type: 'text', data: message.text, timestamp: Date.now() })
+                  } else if (message.type === 'tool_use') {
+                    send({
+                      type: 'tool_use',
+                      name: message.name,
+                      input: message.input,
+                      timestamp: Date.now()
+                    })
+                  } else if (message.type === 'tool_result') {
+                    send({
+                      type: 'tool_result',
+                      result: typeof message.result === 'string'
+                        ? message.result.substring(0, 500)
+                        : message.result,
+                      timestamp: Date.now()
+                    })
+                  } else if (message.type === 'result') {
+                    send({
+                      type: 'result',
+                      subtype: message.subtype,
+                      result: message.result,
+                      cost: message.total_cost_usd,
+                      timestamp: Date.now()
+                    })
+                  } else if (message.type === 'assistant') {
+                    // Extract text from assistant message content
+                    const content = message.message?.content
+                    if (Array.isArray(content)) {
+                      const textPart = content.find((c: any) => c.type === 'text')
+                      if (textPart?.text) {
+                        textContent += textPart.text
+                        send({ type: 'text', data: textPart.text, timestamp: Date.now() })
+                      }
+                    }
+                  } else {
+                    // Send other message types as-is
+                    send({ type: message.type || 'unknown', ...message, timestamp: Date.now() })
+                  }
+                } catch (parseErr) {
+                  // Not valid JSON, send as raw stdout (fallback for non-JSON output)
+                  if (line.trim()) {
                     send({ type: 'stdout', data: line, timestamp: Date.now() })
                   }
                 }
-              },
-              onStderr: (data) => {
-                if (isClosed) return
-                // Check for SDK error markers in stderr
-                if (data.includes('__SDK_ERROR__')) {
-                  const match = data.match(/__SDK_ERROR__(.+)/)
-                  if (match) {
-                    try {
-                      const parsed = JSON.parse(match[1])
-                      send({ type: 'error', message: parsed.message, timestamp: Date.now() })
-                    } catch (e) { /* ignore */ }
-                  }
-                } else {
-                  send({ type: 'stderr', data, timestamp: Date.now() })
-                }
               }
+            },
+            onStderr: (data) => {
+              if (isClosed) return
+              send({ type: 'stderr', data, timestamp: Date.now() })
             }
-          )
+          })
 
           // Clear heartbeat
           clearInterval(heartbeatInterval)
 
-          // Add assistant response to conversation history
+          // Add assistant response to conversation history (use textContent for cleaner history)
           sandboxEntry!.conversationHistory.push({
             role: 'assistant',
-            content: fullOutput,
+            content: textContent || fullOutput,
             timestamp: new Date()
           })
 
@@ -729,7 +625,7 @@ async function handleCreate(
   console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
-  // Create sandbox (MCP servers can be added via claude mcp add command)
+  // Create sandbox (MCP will be configured via mcp.json file)
   const sandbox = await Sandbox.create(template, {
     timeoutMs: 30 * 60 * 1000, // 30 minutes timeout
     envs,
@@ -742,21 +638,6 @@ async function handleCreate(
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
-
-  // Try to get MCP gateway URL and token from E2B sandbox (may not be available in all SDK versions)
-  let mcpUrl: string | undefined
-  let mcpToken: string | undefined
-  try {
-    if (typeof sandbox.getMcpUrl === 'function') {
-      mcpUrl = sandbox.getMcpUrl()
-      mcpToken = await sandbox.getMcpToken()
-      console.log(`[Agent Cloud] MCP gateway URL: ${mcpUrl}`)
-    } else {
-      console.log(`[Agent Cloud] MCP gateway methods not available in this E2B SDK version`)
-    }
-  } catch (e) {
-    console.warn(`[Agent Cloud] Could not get MCP gateway info:`, e)
-  }
 
   // Install Claude Code CLI in the sandbox
   console.log(`[Agent Cloud] Installing Claude Code CLI...`)
@@ -774,69 +655,47 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
   }
 
-  // Also install Claude Code SDK module in /home/user for programmatic usage
-  console.log(`[Agent Cloud] Installing Claude Code SDK module...`)
+  // Setup MCP configuration by writing mcp.json file directly
+  // This is the working approach that was used before
+  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, Playwright, GitHub)...`)
   try {
-    const sdkInstallResult = await sandbox.commands.run(
-      'cd /home/user && npm install @anthropic-ai/claude-code',
-      { timeoutMs: 120000 }
-    )
-    if (sdkInstallResult.exitCode !== 0) {
-      console.warn(`[Agent Cloud] Claude Code SDK install warning:`, sdkInstallResult.stderr)
-    } else {
-      console.log(`[Agent Cloud] Claude Code SDK module installed successfully`)
-    }
-  } catch (e) {
-    console.warn(`[Agent Cloud] Failed to install Claude Code SDK:`, e)
-  }
+    // Create .claude directory for MCP config
+    await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
 
-  // Add E2B MCP gateway to Claude Code with authentication (if available)
-  // This gives Claude access to Tavily and Puppeteer tools
-  if (mcpUrl && mcpToken) {
-    console.log(`[Agent Cloud] Adding E2B MCP gateway to Claude Code...`)
-    try {
-      const mcpResult = await sandbox.commands.run(
-        `claude mcp add --transport http e2b-mcp-gateway "${mcpUrl}" --header "Authorization: Bearer ${mcpToken}"`,
-        { timeoutMs: 30000 }
-      )
-      if (mcpResult.exitCode === 0) {
-        console.log(`[Agent Cloud] E2B MCP gateway added successfully (Tavily + Puppeteer)`)
-      } else {
-        console.warn(`[Agent Cloud] E2B MCP gateway warning:`, mcpResult.stderr)
+    // Build MCP servers configuration
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mcpServers: Record<string, any> = {
+      // Tavily HTTP MCP server for web search
+      tavily: {
+        type: "http",
+        url: "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
+      },
+      // Playwright MCP server for browser automation
+      playwright: {
+        command: "npx",
+        args: ["@playwright/mcp@latest"]
       }
-    } catch (e) {
-      console.warn(`[Agent Cloud] Failed to add E2B MCP gateway:`, e)
     }
-  } else {
-    console.log(`[Agent Cloud] Skipping E2B MCP gateway (not available)`)
-  }
 
-  // Add GitHub MCP if token is available (for GitHub operations)
-  if (githubToken) {
-    console.log(`[Agent Cloud] Adding GitHub MCP...`)
-    try {
-      const githubMcpConfig = JSON.stringify({
+    // Add GitHub MCP if token is available (for GitHub operations)
+    if (githubToken) {
+      mcpServers.github = {
         type: "http",
         url: "https://api.githubcopilot.com/mcp",
         headers: {
           "Authorization": `Bearer ${githubToken}`
         }
-      })
-      const escapedConfig = githubMcpConfig.replace(/'/g, "'\\''")
-      const githubResult = await sandbox.commands.run(
-        `claude mcp add-json github '${escapedConfig}'`,
-        { timeoutMs: 30000 }
-      )
-      if (githubResult.exitCode === 0) {
-        console.log(`[Agent Cloud] GitHub MCP added with user token`)
-      } else {
-        console.warn(`[Agent Cloud] GitHub MCP warning:`, githubResult.stderr)
       }
-    } catch (e) {
-      console.warn(`[Agent Cloud] Failed to add GitHub MCP:`, e)
+      console.log(`[Agent Cloud] GitHub MCP configured with user token`)
+    } else {
+      console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
     }
-  } else {
-    console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
+
+    const mcpConfig = JSON.stringify({ mcpServers }, null, 2)
+    await sandbox.files.write('/home/user/.claude/mcp.json', mcpConfig)
+    console.log(`[Agent Cloud] MCP tools configured successfully`)
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to setup MCP tools:`, e)
   }
 
   // Track the working branch created for this session
