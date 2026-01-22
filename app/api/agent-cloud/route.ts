@@ -696,7 +696,7 @@ async function handleCreate(
   console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
-  // Create sandbox with built-in E2B MCP servers
+  // Create sandbox (MCP servers can be added via claude mcp add command)
   const sandbox = await Sandbox.create(template, {
     timeoutMs: 30 * 60 * 1000, // 30 minutes timeout
     envs,
@@ -705,24 +705,25 @@ async function handleCreate(
       repo: config?.repo?.full_name || 'default',
       model: selectedModel
     },
-    // E2B's built-in MCP servers - these are properly configured and accessible
-    mcp: {
-      // Tavily for AI-powered web search
-      tavily: {
-        tavilyApiKey: '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',
-      },
-      // Puppeteer for browser automation (E2B's built-in alternative to Playwright)
-      puppeteer: {},
-    },
   })
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
 
-  // Get MCP gateway URL and token from E2B sandbox
-  const mcpUrl = sandbox.getMcpUrl()
-  const mcpToken = await sandbox.getMcpToken()
-  console.log(`[Agent Cloud] MCP gateway URL: ${mcpUrl}`)
+  // Try to get MCP gateway URL and token from E2B sandbox (may not be available in all SDK versions)
+  let mcpUrl: string | undefined
+  let mcpToken: string | undefined
+  try {
+    if (typeof sandbox.getMcpUrl === 'function') {
+      mcpUrl = sandbox.getMcpUrl()
+      mcpToken = await sandbox.getMcpToken()
+      console.log(`[Agent Cloud] MCP gateway URL: ${mcpUrl}`)
+    } else {
+      console.log(`[Agent Cloud] MCP gateway methods not available in this E2B SDK version`)
+    }
+  } catch (e) {
+    console.warn(`[Agent Cloud] Could not get MCP gateway info:`, e)
+  }
 
   // Install Claude Code CLI in the sandbox
   console.log(`[Agent Cloud] Installing Claude Code CLI...`)
@@ -756,21 +757,25 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code SDK:`, e)
   }
 
-  // Add E2B MCP gateway to Claude Code with authentication
+  // Add E2B MCP gateway to Claude Code with authentication (if available)
   // This gives Claude access to Tavily and Puppeteer tools
-  console.log(`[Agent Cloud] Adding E2B MCP gateway to Claude Code...`)
-  try {
-    const mcpResult = await sandbox.commands.run(
-      `claude mcp add --transport http e2b-mcp-gateway "${mcpUrl}" --header "Authorization: Bearer ${mcpToken}"`,
-      { timeoutMs: 30000 }
-    )
-    if (mcpResult.exitCode === 0) {
-      console.log(`[Agent Cloud] E2B MCP gateway added successfully (Tavily + Puppeteer)`)
-    } else {
-      console.warn(`[Agent Cloud] E2B MCP gateway warning:`, mcpResult.stderr)
+  if (mcpUrl && mcpToken) {
+    console.log(`[Agent Cloud] Adding E2B MCP gateway to Claude Code...`)
+    try {
+      const mcpResult = await sandbox.commands.run(
+        `claude mcp add --transport http e2b-mcp-gateway "${mcpUrl}" --header "Authorization: Bearer ${mcpToken}"`,
+        { timeoutMs: 30000 }
+      )
+      if (mcpResult.exitCode === 0) {
+        console.log(`[Agent Cloud] E2B MCP gateway added successfully (Tavily + Puppeteer)`)
+      } else {
+        console.warn(`[Agent Cloud] E2B MCP gateway warning:`, mcpResult.stderr)
+      }
+    } catch (e) {
+      console.warn(`[Agent Cloud] Failed to add E2B MCP gateway:`, e)
     }
-  } catch (e) {
-    console.warn(`[Agent Cloud] Failed to add E2B MCP gateway:`, e)
+  } else {
+    console.log(`[Agent Cloud] Skipping E2B MCP gateway (not available)`)
   }
 
   // Add GitHub MCP if token is available (for GitHub operations)
