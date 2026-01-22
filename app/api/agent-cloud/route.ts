@@ -224,11 +224,13 @@ export async function GET(request: NextRequest) {
           ? `Previous conversation:\n${conversationContext}\n\nCurrent request: ${prompt}`
           : prompt
 
-        const escapedPrompt = fullPrompt.replace(/'/g, "'\\''")
+        // Use base64 encoding to safely pass prompts containing any characters
+        // This avoids shell escaping issues with single quotes, $, backticks, etc.
+        const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
 
         // Use stdbuf to force unbuffered output for real-time streaming
-        // Also use script command to force TTY-like behavior
-        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions" 2>&1`
+        // Decode base64 prompt and pipe to Claude to avoid shell metacharacter issues
+        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions" 2>&1`
 
         let fullOutput = ''
         let lastSendTime = Date.now()
@@ -785,8 +787,9 @@ async function handleRun(
     timestamp: new Date()
   })
 
-  const escapedPrompt = prompt.replace(/'/g, "'\\''")
-  const command = `cd ${workDir} && echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`
+  // Use base64 encoding to safely pass prompts containing any characters
+  const base64Prompt = Buffer.from(prompt, 'utf-8').toString('base64')
+  const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions`
 
   console.log(`[Agent Cloud] Running Claude Code in sandbox ${sandboxId}`)
 
