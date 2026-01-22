@@ -594,12 +594,8 @@ async function handleCreate(
       playwright: {
         command: "npx",
         args: ["@playwright/mcp@latest"]
-      },
-      // Filesystem MCP server for local file operations
-      filesystem: {
-        command: "npx",
-        args: ["-y", "@anthropic/mcp-server-filesystem", PROJECT_DIR]
       }
+      // Note: Claude Code has built-in filesystem access, no need for filesystem MCP
     }
 
     // Add GitHub MCP if token is available (for GitHub operations)
@@ -747,7 +743,7 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: true,
-    mcpTools: githubToken ? ['tavily', 'playwright', 'github', 'filesystem'] : ['tavily', 'playwright', 'filesystem'],
+    mcpTools: githubToken ? ['tavily', 'playwright', 'github'] : ['tavily', 'playwright'],
     workingBranch: createdWorkingBranch, // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
