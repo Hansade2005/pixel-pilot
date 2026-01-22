@@ -597,7 +597,7 @@ async function handleCreate(
 
   // Setup MCP configuration by writing mcp.json file directly
   // This is the working approach that was used before
-  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, Playwright, GitHub)...`)
+  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, Playwright, GitHub, Filesystem)...`)
   try {
     // Create .claude directory for MCP config
     await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
@@ -614,6 +614,11 @@ async function handleCreate(
       playwright: {
         command: "npx",
         args: ["@playwright/mcp@latest"]
+      },
+      // Filesystem MCP server for local file operations
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@anthropic/mcp-server-filesystem", PROJECT_DIR]
       }
     }
 
