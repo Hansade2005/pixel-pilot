@@ -266,8 +266,8 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
         // Use stream-json output format for structured messages
-        // This allows us to parse tool_use, text, and result messages
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
+        // --verbose is required when using --output-format stream-json with -p (print mode)
+        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
@@ -639,21 +639,7 @@ async function handleCreate(
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
 
-  // Install Claude Code CLI in the sandbox
-  console.log(`[Agent Cloud] Installing Claude Code CLI...`)
-  try {
-    const installResult = await sandbox.commands.run(
-      'npm install -g @anthropic-ai/claude-code',
-      { timeoutMs: 120000 }
-    )
-    if (installResult.exitCode !== 0) {
-      console.warn(`[Agent Cloud] Claude Code install warning:`, installResult.stderr)
-    } else {
-      console.log(`[Agent Cloud] Claude Code CLI installed successfully`)
-    }
-  } catch (e) {
-    console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
-  }
+  // Note: Claude Code CLI is pre-installed in the pipilot-agent template
 
   // Setup MCP configuration by writing mcp.json file directly
   // This is the working approach that was used before
