@@ -58,6 +58,7 @@ const activeSandboxes = new Map<string, {
     branch: string
     cloned: boolean
   }
+  workingBranch?: string // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
   // Conversation history for memory persistence
   conversationHistory: Array<{
     role: 'user' | 'assistant'
@@ -74,6 +75,26 @@ const PROJECT_DIR = '/home/user/project'
 
 // Conversation history file path in sandbox
 const HISTORY_FILE = '/home/user/.claude_history.json'
+
+/**
+ * Generate a branch name from the first 4 words of a prompt
+ * Example: "fix the login bug in auth" -> "pipilot-agent/fix-the-login-bug"
+ */
+function generateBranchName(prompt: string): string {
+  // Get first 4 words, lowercase, replace non-alphanumeric with dashes
+  const words = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 0)
+    .slice(0, 4)
+    .join('-')
+
+  // Add random suffix to avoid conflicts
+  const suffix = Math.random().toString(36).substring(2, 6)
+
+  return `pipilot-agent/${words || 'task'}-${suffix}`
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -228,10 +249,27 @@ export async function GET(request: NextRequest) {
         // This avoids shell escaping issues with single quotes, $, backticks, etc.
         const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
 
+        // Get the working branch for git workflow instructions
+        const workingBranch = sandboxEntry!.workingBranch || 'main'
+
+        // System prompt for git workflow - commit, push, and create PR
+        const gitWorkflowPrompt = `
+IMPORTANT GIT WORKFLOW INSTRUCTIONS:
+- You are working on branch: ${workingBranch}
+- After making code changes, ALWAYS commit them with a clear message
+- After committing, push to the remote: git push -u origin ${workingBranch}
+- After pushing, create a pull request using: gh pr create --title "Your PR title" --body "Description of changes"
+- If gh is not authenticated, use: gh auth login --with-token <<< "$GITHUB_TOKEN" first
+- Always provide meaningful commit messages and PR descriptions
+`.trim()
+
+        // Base64 encode the system prompt for safe shell passing
+        const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
+
         // Use --output-format stream-json for real-time streaming with newline-delimited JSON
         // stdbuf -oL forces line-buffered output so each JSON line is flushed immediately
-        // This ensures we get events as Claude generates them, not in batches
-        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json" 2>&1`
+        // --append-system-prompt adds git workflow instructions while keeping Claude's default capabilities
+        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json --append-system-prompt \\"$(echo '${base64SystemPrompt}' | base64 -d)\\"" 2>&1`
 
         let fullOutput = ''
         let jsonBuffer = ''
@@ -427,6 +465,7 @@ async function handleCreate(
       full_name: string
       branch: string
     }
+    initialPrompt?: string // Used to generate branch name from first 4 words
   }
 ) {
   // Cleanup old sandboxes first
@@ -697,8 +736,8 @@ async function handleCreate(
           { timeoutMs: 5000 }
         )
 
-        // Create a new working branch for Claude's changes
-        const workingBranch = `claude-agent-${Date.now()}`
+        // Create a new working branch for Claude's changes using the prompt
+        const workingBranch = generateBranchName(config?.initialPrompt || 'agent-task')
         const branchResult = await sandbox.commands.run(
           `cd ${PROJECT_DIR} && git checkout -b ${workingBranch}`,
           { timeoutMs: 10000 }
@@ -706,6 +745,11 @@ async function handleCreate(
 
         if (branchResult.exitCode === 0) {
           console.log(`[Agent Cloud] Created working branch: ${workingBranch}`)
+          // Store the working branch in sandbox entry for later use
+          activeSandboxes.set(sandboxKey, {
+            ...activeSandboxes.get(sandboxKey)!,
+            workingBranch
+          })
         } else {
           console.warn(`[Agent Cloud] Failed to create working branch:`, branchResult.stderr)
         }
@@ -739,15 +783,22 @@ async function handleCreate(
             repoCloned = true
             console.log(`[Agent Cloud] Repo cloned successfully with public URL`)
 
-            // Configure git and create branch
+            // Configure git and create branch using the prompt
+            const workingBranch = generateBranchName(config?.initialPrompt || 'agent-task')
             await sandbox.commands.run(
               `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
               { timeoutMs: 5000 }
             )
-            await sandbox.commands.run(
-              `cd ${PROJECT_DIR} && git checkout -b claude-agent-${Date.now()}`,
+            const branchResult = await sandbox.commands.run(
+              `cd ${PROJECT_DIR} && git checkout -b ${workingBranch}`,
               { timeoutMs: 10000 }
             )
+            if (branchResult.exitCode === 0) {
+              activeSandboxes.set(sandboxKey, {
+                ...activeSandboxes.get(sandboxKey)!,
+                workingBranch
+              })
+            }
           }
         }
       }
@@ -774,6 +825,10 @@ async function handleCreate(
 
   console.log(`[Agent Cloud] Sandbox created: ${sandboxId}`)
 
+  // Get the working branch from sandbox entry
+  const sandboxEntry = activeSandboxes.get(sandboxKey)
+  const workingBranch = sandboxEntry?.workingBranch
+
   return NextResponse.json({
     success: true,
     sandboxId,
@@ -785,6 +840,7 @@ async function handleCreate(
     messageCount: 0,
     mcpEnabled: true,
     mcpTools: githubToken ? ['tavily', 'playwright', 'github', 'filesystem'] : ['tavily', 'playwright', 'filesystem'],
+    workingBranch, // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
       : 'Sandbox created with Vercel AI Gateway (MCP enabled)',

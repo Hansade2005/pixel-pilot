@@ -56,6 +56,7 @@ export interface Session {
     full_name: string
     branch: string
   }
+  workingBranch?: string // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
   stats?: {
     additions: number
     deletions: number
@@ -345,7 +346,8 @@ function AgentCloudLayoutInner({
             repo: {
               full_name: selectedRepo.full_name,
               branch: selectedBranch
-            }
+            },
+            initialPrompt // Pass the initial prompt for branch naming (first 4 words)
           }
         })
       })
@@ -359,6 +361,7 @@ function AgentCloudLayoutInner({
       const modelInfo = MODELS.find(m => m.id === selectedModel)
       const repoCloned = data.repoCloned === true
       const reconnected = data.reconnected === true
+      const workingBranch = data.workingBranch // The branch created for this session
 
       const sessionTitle = initialPrompt.slice(0, 50) + (initialPrompt.length > 50 ? '...' : '')
 
@@ -375,6 +378,7 @@ function AgentCloudLayoutInner({
           full_name: selectedRepo.full_name,
           branch: selectedBranch,
         },
+        workingBranch, // Store the working branch for display
         stats: { additions: 0, deletions: 0 },
         messageCount: data.messageCount || 0,
         pendingPrompt: initialPrompt, // Store the initial prompt to auto-send
@@ -385,6 +389,7 @@ function AgentCloudLayoutInner({
           { type: 'system', content: `MCP Tools: Tavily Search, Playwright, GitHub`, timestamp: new Date() },
         ] : repoCloned ? [
           { type: 'system', content: `Cloned ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          { type: 'system', content: `Working branch: ${workingBranch || 'main'}`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
           { type: 'system', content: `MCP Tools: Tavily Search, Playwright, GitHub`, timestamp: new Date() },
         ] : [
