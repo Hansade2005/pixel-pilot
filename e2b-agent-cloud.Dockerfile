@@ -71,14 +71,19 @@ RUN useradd -m -s /bin/bash user
 RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/project /home/user/.claude /home/user/.cache/ms-playwright \
     && chown -R user:user /home/user
 
-# Pre-configure MCP servers (Tavily for web search, Playwright for browser automation, Filesystem for local files)
-# GitHub MCP is added dynamically at runtime with the user's token
-RUN echo '{"mcpServers":{"tavily":{"type":"http","url":"https://mcp.tavily.com/mcp/?tavilyApiKey=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"},"playwright":{"command":"npx","args":["-y","@playwright/mcp@latest"]},"filesystem":{"command":"npx","args":["-y","@anthropic-ai/mcp-server-filesystem","/home/user/project"]}}}' > /home/user/.claude/mcp.json \
-    && chown user:user /home/user/.claude/mcp.json
-
-# Switch to user for Playwright browser installation
+# Switch to user for Claude CLI config and Playwright browser installation
 USER user
 WORKDIR /home/user
+
+# Add MCP servers using Claude Code CLI
+# Tavily for web search (HTTP MCP)
+RUN claude mcp add --transport http tavily "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
+
+# Playwright for browser automation
+RUN claude mcp add playwright npx @playwright/mcp@latest
+
+# Filesystem for local file operations
+RUN claude mcp add filesystem npx -y @anthropic-ai/mcp-server-filesystem /home/user/project
 
 # Install Playwright browsers as user (Chromium only to save space)
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/ms-playwright
