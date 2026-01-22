@@ -539,8 +539,8 @@ async function handleCreate(
     envs.GITHUB_TOKEN = githubToken
   }
 
-  // Use our custom template or fall back to base
-  const template = config?.template || 'base'
+  // Use our custom E2B template (pipilot-agent) which has Claude Code + Playwright pre-installed
+  const template = config?.template || 'pipilot-agent'
   const selectedModel = config?.model || 'sonnet'
 
   console.log(`[Agent Cloud] Creating new sandbox with template: ${template}`)
