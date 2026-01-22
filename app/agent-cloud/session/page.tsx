@@ -212,12 +212,29 @@ User Request: ${currentPrompt}`
         enhancedPrompt = githubContext
       }
 
-      // Connect to the streaming endpoint
-      // EventSource handles errors and we have sandbox recreation logic in onerror
-      const eventSource = new EventSource(
-        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`
+      // Connect to the streaming endpoint using fetch with ReadableStreamDefaultReader
+      // This matches the preview panel pattern exactly for consistent streaming behavior
+      const response = await fetch(
+        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/event-stream',
+          },
+        }
       )
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to connect to agent')
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response stream available')
+      }
+
+      const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
       let pendingUpdate = false
@@ -251,165 +268,188 @@ User Request: ${currentPrompt}`
         }
       }
 
-      eventSource.onmessage = (event) => {
-        hasReceivedData = true
-        try {
-          const data = JSON.parse(event.data)
+      // Helper function to process SSE message (async for sandbox recreation)
+      const processMessage = async (data: any): Promise<boolean> => {
+        switch (data.type) {
+          case 'start':
+            // Stream has started
+            break
 
-          switch (data.type) {
-            case 'start':
-              // Stream has started
-              break
+          case 'log':
+            // Status message from server (e.g., "Claude is thinking...")
+            console.log('[Agent Cloud]', data.message)
+            break
 
-            case 'log':
-              // Status message from server (e.g., "Claude is thinking...")
-              console.log('[Agent Cloud]', data.message)
-              break
+          case 'heartbeat':
+            // Keep-alive message, just acknowledge
+            break
 
-            case 'heartbeat':
-              // Keep-alive message, just acknowledge
-              break
+          case 'text':
+            // Real-time text streaming from SDK
+            updateOutput(fullOutput + (data.data || ''))
+            break
 
-            case 'text':
-              // Real-time text streaming from SDK
-              updateOutput(fullOutput + (data.data || ''))
-              break
+          case 'stdout':
+            // Fallback raw output streaming
+            updateOutput(fullOutput + (data.data || ''))
+            break
 
-            case 'stdout':
-              // Fallback raw output streaming
-              updateOutput(fullOutput + (data.data || ''))
-              break
+          case 'tool_use':
+            // Tool being used - show in UI with details
+            console.log('[Agent Cloud] Tool used:', data.name, data.input)
+            const toolName = data.name
+            const input = data.input
+            let toolDescription = `Using ${toolName}`
 
-            case 'tool_use':
-              // Tool being used - show in UI with details
-              console.log('[Agent Cloud] Tool used:', data.name, data.input)
-              const toolName = data.name
-              const input = data.input
-              let toolDescription = `Using ${toolName}`
+            // Create user-friendly descriptions for common tools
+            if (toolName === 'Write' && input?.file_path) {
+              toolDescription = `Creating ${input.file_path.split('/').pop()}`
+            } else if (toolName === 'Edit' && input?.file_path) {
+              toolDescription = `Editing ${input.file_path.split('/').pop()}`
+            } else if (toolName === 'Read' && input?.file_path) {
+              toolDescription = `Reading ${input.file_path.split('/').pop()}`
+            } else if (toolName === 'Bash' && input?.command) {
+              toolDescription = `Running: ${input.command.substring(0, 60)}${input.command.length > 60 ? '...' : ''}`
+            } else if (toolName === 'Glob' && input?.pattern) {
+              toolDescription = `Searching: ${input.pattern}`
+            } else if (toolName === 'Grep' && input?.pattern) {
+              toolDescription = `Grep: ${input.pattern}`
+            }
 
-              // Create user-friendly descriptions for common tools
-              if (toolName === 'Write' && input?.file_path) {
-                toolDescription = `Creating ${input.file_path.split('/').pop()}`
-              } else if (toolName === 'Edit' && input?.file_path) {
-                toolDescription = `Editing ${input.file_path.split('/').pop()}`
-              } else if (toolName === 'Read' && input?.file_path) {
-                toolDescription = `Reading ${input.file_path.split('/').pop()}`
-              } else if (toolName === 'Bash' && input?.command) {
-                toolDescription = `Running: ${input.command.substring(0, 60)}${input.command.length > 60 ? '...' : ''}`
-              } else if (toolName === 'Glob' && input?.pattern) {
-                toolDescription = `Searching: ${input.pattern}`
-              } else if (toolName === 'Grep' && input?.pattern) {
-                toolDescription = `Grep: ${input.pattern}`
-              }
+            setSessions(prev => prev.map(s =>
+              s.id === sessionId
+                ? { ...s, lines: [...s.lines, {
+                    type: 'tool' as const,
+                    content: toolDescription,
+                    timestamp: new Date(),
+                    meta: { toolName, fileName: input?.file_path }
+                  }] }
+                : s
+            ))
+            break
 
+          case 'tool_result':
+            // Tool result - log for debugging
+            console.log('[Agent Cloud] Tool result:', data.result?.substring?.(0, 100) || data.result)
+            break
+
+          case 'result':
+            // Final SDK result
+            if (data.subtype === 'success') {
+              console.log('[Agent Cloud] Generation complete, cost:', data.cost)
+            }
+            if (data.result) {
+              updateOutput(fullOutput + '\n' + data.result)
+            }
+            break
+
+          case 'stderr':
+            setSessions(prev => prev.map(s =>
+              s.id === sessionId
+                ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.data, timestamp: new Date() }] }
+                : s
+            ))
+            break
+
+          case 'complete':
+            // Ensure final output is rendered
+            if (fullOutput) {
+              setSessions(prev => prev.map(s => {
+                if (s.id === sessionId) {
+                  const lines = [...s.lines]
+                  const lastLine = lines[lines.length - 1]
+                  if (lastLine && lastLine.type === 'output') {
+                    lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+                  }
+                  return { ...s, lines }
+                }
+                return s
+              }))
+            }
+
+            if (data.diffStats) {
               setSessions(prev => prev.map(s =>
                 s.id === sessionId
-                  ? { ...s, lines: [...s.lines, {
-                      type: 'tool' as const,
-                      content: toolDescription,
-                      timestamp: new Date(),
-                      meta: { toolName, fileName: input?.file_path }
-                    }] }
-                  : s
-              ))
-              break
-
-            case 'tool_result':
-              // Tool result - log for debugging
-              console.log('[Agent Cloud] Tool result:', data.result?.substring?.(0, 100) || data.result)
-              break
-
-            case 'result':
-              // Final SDK result
-              if (data.subtype === 'success') {
-                console.log('[Agent Cloud] Generation complete, cost:', data.cost)
-              }
-              if (data.result) {
-                updateOutput(fullOutput + '\n' + data.result)
-              }
-              break
-
-            case 'stderr':
-              setSessions(prev => prev.map(s =>
-                s.id === sessionId
-                  ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.data, timestamp: new Date() }] }
-                  : s
-              ))
-              break
-
-            case 'complete':
-              // Ensure final output is rendered
-              if (fullOutput) {
-                setSessions(prev => prev.map(s => {
-                  if (s.id === sessionId) {
-                    const lines = [...s.lines]
-                    const lastLine = lines[lines.length - 1]
-                    if (lastLine && lastLine.type === 'output') {
-                      lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+                  ? {
+                      ...s,
+                      stats: {
+                        additions: (s.stats?.additions || 0) + (data.diffStats.additions || 0),
+                        deletions: (s.stats?.deletions || 0) + (data.diffStats.deletions || 0)
+                      },
+                      messageCount: data.messageCount
                     }
-                    return { ...s, lines }
-                  }
-                  return s
-                }))
-              }
-
-              if (data.diffStats) {
-                setSessions(prev => prev.map(s =>
-                  s.id === sessionId
-                    ? {
-                        ...s,
-                        stats: {
-                          additions: (s.stats?.additions || 0) + (data.diffStats.additions || 0),
-                          deletions: (s.stats?.deletions || 0) + (data.diffStats.deletions || 0)
-                        },
-                        messageCount: data.messageCount
-                      }
-                    : s
-                ))
-              }
-              eventSource.close()
-              setIsLoading(false)
-              setIsStreaming(false)
-              break
-
-            case 'error':
-              // Check if error is about sandbox expiration
-              const errorMsg = data.message || ''
-              if (errorMsg.includes('not found') || errorMsg.includes('expired')) {
-                eventSource.close()
-                console.log('Sandbox expired during stream, recreating...')
-                recreateSandbox().then(newSandboxId => {
-                  if (newSandboxId) {
-                    setIsLoading(false)
-                    setIsStreaming(false)
-                    runPrompt(currentPrompt, newSandboxId)
-                  } else {
-                    setIsLoading(false)
-                    setIsStreaming(false)
-                  }
-                })
-                return
-              }
-
-              setSessions(prev => prev.map(s =>
-                s.id === sessionId
-                  ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.message, timestamp: new Date() }] }
                   : s
               ))
-              eventSource.close()
-              setIsLoading(false)
-              setIsStreaming(false)
-              break
-          }
-        } catch (e) {
-          console.error('Failed to parse SSE data:', e)
+            }
+            setIsLoading(false)
+            setIsStreaming(false)
+            return true // Signal to break out of stream loop
+
+          case 'error':
+            // Check if error is about sandbox expiration
+            const errorMsg = data.message || ''
+            if (errorMsg.includes('not found') || errorMsg.includes('expired')) {
+              console.log('Sandbox expired during stream, recreating...')
+              reader.cancel()
+              const newSandboxId = await recreateSandbox()
+              if (newSandboxId) {
+                setIsLoading(false)
+                setIsStreaming(false)
+                runPrompt(currentPrompt, newSandboxId)
+              } else {
+                setIsLoading(false)
+                setIsStreaming(false)
+              }
+              return true // Signal to break out of stream loop
+            }
+
+            setSessions(prev => prev.map(s =>
+              s.id === sessionId
+                ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.message, timestamp: new Date() }] }
+                : s
+            ))
+            setIsLoading(false)
+            setIsStreaming(false)
+            return true // Signal to break out of stream loop
         }
+        return false // Continue processing
       }
 
-      eventSource.onerror = async () => {
-        eventSource.close()
+      // Stream reading loop (matches preview panel pattern exactly)
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) {
+            console.log('[Agent Cloud] Stream ended')
+            break
+          }
 
-        // If we haven't received any data, this might be a 404 - try recreating
+          hasReceivedData = true
+          const chunk = decoder.decode(value, { stream: true })
+
+          // Parse SSE format: "data: {...}\n\n"
+          if (chunk.includes('data: ')) {
+            const lines = chunk.split('\n')
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6)) // Remove "data: " prefix
+                  const shouldBreak = await processMessage(data)
+                  if (shouldBreak) {
+                    reader.cancel()
+                    return
+                  }
+                } catch (e) {
+                  // Ignore parsing errors for non-JSON lines
+                }
+              }
+            }
+          }
+        }
+      } catch (streamError) {
+        console.error('[Agent Cloud] Streaming error:', streamError)
+        
+        // If we haven't received any data, this might be a connection issue - try recreating
         if (!hasReceivedData) {
           console.log('Connection failed without data, attempting to recreate sandbox...')
           const newSandboxId = await recreateSandbox()
@@ -421,13 +461,15 @@ User Request: ${currentPrompt}`
           }
         }
 
-        setIsLoading(false)
-        setIsStreaming(false)
         setSessions(prev => prev.map(s =>
           s.id === sessionId
             ? { ...s, lines: [...s.lines, { type: 'error' as const, content: 'Connection lost. Please try again.', timestamp: new Date() }] }
             : s
         ))
+      } finally {
+        reader.releaseLock()
+        setIsLoading(false)
+        setIsStreaming(false)
       }
     } catch (error) {
       console.error('Failed to run prompt:', error)

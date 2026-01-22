@@ -2918,6 +2918,7 @@ export function ChatPanelV2({
         userId: project.userId,
         title: `Chat ${workspaceSessions.length + 1}`,
         isActive: true,
+        lastMessageAt: new Date().toISOString(),
       })
 
       setCurrentChatSessionId(newSession.id)
@@ -3156,6 +3157,7 @@ export function ChatPanelV2({
         userId: project.userId,
         title: name || `Branch from message`,
         isActive: true,
+        lastMessageAt: new Date().toISOString(),
       })
 
       // Copy messages to the new session

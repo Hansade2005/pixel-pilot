@@ -24,7 +24,7 @@ interface DiffLine {
   newLineNumber?: number
 }
 
-interface FileChange {
+export interface FileChange {
   path: string
   oldContent: string
   newContent: string

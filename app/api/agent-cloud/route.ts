@@ -33,6 +33,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
 import { createClient } from '@/lib/supabase/server'
 import { getDeploymentTokens } from '@/lib/cloud-sync'
+import { EnhancedE2BSandbox, SandboxError, SandboxErrorType } from '@/lib/e2b-enhanced'
 
 // Vercel AI Gateway configuration
 const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
@@ -149,7 +150,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET endpoint for streaming output
- * Implements real-time streaming similar to the preview route
+ * Implements real-time streaming exactly like the preview route
+ * Uses ReadableStream with SSE format: "data: {...}\n\n"
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -164,7 +166,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Find sandbox entry by sandboxId
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
   let entryKey: string | undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
@@ -209,17 +211,17 @@ export async function GET(request: NextRequest) {
     timestamp: new Date()
   })
 
-  // Create a streaming response with real-time output
-  const encoder = new TextEncoder()
+  // Create a streaming response with real-time output (exactly like preview route)
   let isClosed = false
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Helper to safely send data
+      // Helper to safely send SSE-formatted data (matches preview route pattern)
       const send = (payload: object) => {
         if (!isClosed) {
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`))
+            // SSE format: "data: {json}\n\n" - directly enqueue string
+            controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`)
           } catch (e) {
             isClosed = true
           }
@@ -229,6 +231,9 @@ export async function GET(request: NextRequest) {
       try {
         const { sandbox } = sandboxEntry!
         sandboxEntry!.lastActivity = new Date()
+
+        // Wrap sandbox in EnhancedE2BSandbox for consistent streaming (same as preview route)
+        const enhancedSandbox = new EnhancedE2BSandbox(sandbox.sandboxId, sandbox)
 
         // Send start event immediately
         send({ type: 'start', sandboxId })
@@ -267,22 +272,25 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
         // Use stream-json output format for structured messages
         // --verbose is required when using --output-format stream-json with -p (print mode)
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
+        // Note: workingDirectory is handled by executeCommand, so we don't need cd here
+        const command = `echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
         let jsonBuffer = '' // Buffer for incomplete JSON lines
 
-        // Start heartbeat to keep connection alive
+        // Start heartbeat to keep connection alive (same interval as preview route)
         const heartbeatInterval = setInterval(() => {
           if (!isClosed) {
             send({ type: 'heartbeat', timestamp: Date.now() })
           }
-        }, 15000) // Send heartbeat every 15 seconds
+        }, 30000) // Send heartbeat every 30 seconds (matches preview route)
 
         try {
-          const result = await sandbox.commands.run(command, {
-            timeoutMs: 0, // No timeout
+          // Use EnhancedE2BSandbox.executeCommand for consistent streaming (same as preview route)
+          const result = await enhancedSandbox.executeCommand(command, {
+            workingDirectory: workDir,
+            timeoutMs: 0, // No timeout for Claude Code CLI
             onStdout: (data) => {
               if (isClosed) return
               fullOutput += data
@@ -365,10 +373,9 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
           // Save conversation history to sandbox for persistence
           try {
-            await sandbox.files.write(
-              HISTORY_FILE,
-              JSON.stringify(sandboxEntry!.conversationHistory, null, 2)
-            )
+            await enhancedSandbox.executeCommand(`cat > ${HISTORY_FILE} << 'HISTORY_EOF'
+${JSON.stringify(sandboxEntry!.conversationHistory, null, 2)}
+HISTORY_EOF`, { timeoutMs: 5000 })
           } catch (e) {
             console.warn('[Agent Cloud] Failed to save conversation history:', e)
           }
@@ -377,7 +384,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
           let diffStats = { additions: 0, deletions: 0 }
           if (sandboxEntry!.repo?.cloned) {
             try {
-              const diffResult = await sandbox.commands.run(
+              const diffResult = await enhancedSandbox.executeCommand(
                 `cd ${PROJECT_DIR} && git diff --shortstat`,
                 { timeoutMs: 5000 }
               )
@@ -401,15 +408,31 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
         } catch (cmdError) {
           clearInterval(heartbeatInterval)
-          throw cmdError
+          // Enhanced error handling with SandboxError
+          if (cmdError instanceof SandboxError) {
+            send({
+              type: 'error',
+              message: cmdError.message,
+              errorType: cmdError.type,
+              sandboxId: cmdError.sandboxId
+            })
+          } else {
+            throw cmdError
+          }
         }
 
         isClosed = true
         controller.close()
       } catch (error) {
+        // Handle SandboxError with proper type information
+        const errorMessage = error instanceof SandboxError 
+          ? `[${error.type}] ${error.message}`
+          : error instanceof Error ? error.message : 'Unknown error'
+        
         send({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Unknown error'
+          message: errorMessage,
+          errorType: error instanceof SandboxError ? error.type : undefined
         })
         isClosed = true
         controller.close()
@@ -834,7 +857,7 @@ async function handleRun(
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -932,7 +955,7 @@ async function handlePlaywright(sandboxId: string, script: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1001,7 +1024,7 @@ async function handleCommit(sandboxId: string, message?: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1056,7 +1079,7 @@ async function handlePush(request: NextRequest, sandboxId: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1109,7 +1132,7 @@ async function handleDiff(sandboxId: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1256,7 +1279,7 @@ async function handleStatus(sandboxId: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1341,7 +1364,7 @@ async function handleRestore(
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
