@@ -61,8 +61,8 @@ RUN npm install -g pnpm@9
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
 
-# Install Playwright and MCP servers globally so they're available to the user
-RUN npm install -g @anthropic-ai/mcp-server-filesystem @playwright/mcp playwright
+# Install Playwright globally (MCP servers will be run via npx)
+RUN npm install -g playwright
 
 # Create a user with proper setup (matching E2B conventions)
 RUN useradd -m -s /bin/bash user
