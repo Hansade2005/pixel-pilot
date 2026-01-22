@@ -71,16 +71,12 @@ RUN useradd -m -s /bin/bash user
 RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/project /home/user/.claude /home/user/.cache/ms-playwright \
     && chown -R user:user /home/user
 
-# Switch to user for Claude CLI config and Playwright browser installation
+# Switch to user for Playwright browser installation
 USER user
 WORKDIR /home/user
 
-# Add MCP servers using Claude Code CLI
-# Tavily for web search (HTTP MCP)
-RUN claude mcp add --transport http tavily "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
-
-# Playwright for browser automation
-RUN claude mcp add playwright npx @playwright/mcp@latest
+# MCP servers are added dynamically at runtime via the API
+# This ensures proper configuration with user-specific tokens (GitHub, etc.)
 
 # Install Playwright browsers as user (Chromium only to save space)
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/ms-playwright

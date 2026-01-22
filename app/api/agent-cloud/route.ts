@@ -576,45 +576,58 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
   }
 
-  // Setup MCP configuration with HTTP-based servers (Tavily for web search, GitHub for repo operations, Playwright for browser automation)
-  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, Playwright, GitHub, Filesystem)...`)
+  // Setup MCP servers dynamically using Claude CLI commands
+  // This ensures MCP servers are properly registered and accessible to the AI
+  console.log(`[Agent Cloud] Setting up MCP tools dynamically...`)
   try {
     // Create .claude directory for MCP config
     await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
 
-    // Build MCP servers configuration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mcpServers: Record<string, any> = {
-      // Tavily HTTP MCP server for web search
-      tavily: {
-        type: "http",
-        url: "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
-      },
-      // Playwright MCP server for browser automation
-      playwright: {
-        command: "npx",
-        args: ["@playwright/mcp@latest"]
-      }
-      // Note: Claude Code has built-in filesystem access, no need for filesystem MCP
+    // Add Tavily MCP for web search (HTTP transport)
+    const tavilyResult = await sandbox.commands.run(
+      `claude mcp add --transport http tavily "https://mcp.tavily.com/mcp/?tavilyApiKey=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"`,
+      { timeoutMs: 30000 }
+    )
+    if (tavilyResult.exitCode === 0) {
+      console.log(`[Agent Cloud] Tavily MCP added successfully`)
+    } else {
+      console.warn(`[Agent Cloud] Tavily MCP add warning:`, tavilyResult.stderr)
+    }
+
+    // Add Playwright MCP for browser automation
+    const playwrightResult = await sandbox.commands.run(
+      `claude mcp add playwright npx @playwright/mcp@latest`,
+      { timeoutMs: 30000 }
+    )
+    if (playwrightResult.exitCode === 0) {
+      console.log(`[Agent Cloud] Playwright MCP added successfully`)
+    } else {
+      console.warn(`[Agent Cloud] Playwright MCP add warning:`, playwrightResult.stderr)
     }
 
     // Add GitHub MCP if token is available (for GitHub operations)
     if (githubToken) {
-      mcpServers.github = {
+      const githubMcpConfig = JSON.stringify({
         type: "http",
         url: "https://api.githubcopilot.com/mcp",
         headers: {
           "Authorization": `Bearer ${githubToken}`
         }
+      })
+      const escapedConfig = githubMcpConfig.replace(/'/g, "'\\''")
+      const githubResult = await sandbox.commands.run(
+        `claude mcp add-json github '${escapedConfig}'`,
+        { timeoutMs: 30000 }
+      )
+      if (githubResult.exitCode === 0) {
+        console.log(`[Agent Cloud] GitHub MCP added with user token`)
+      } else {
+        console.warn(`[Agent Cloud] GitHub MCP add warning:`, githubResult.stderr)
       }
-      console.log(`[Agent Cloud] GitHub MCP configured with user token`)
     } else {
       console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
     }
 
-    const mcpConfig = JSON.stringify({ mcpServers }, null, 2)
-
-    await sandbox.files.write('/home/user/.claude/mcp.json', mcpConfig)
     console.log(`[Agent Cloud] MCP tools configured successfully`)
   } catch (e) {
     console.warn(`[Agent Cloud] Failed to setup MCP tools:`, e)
