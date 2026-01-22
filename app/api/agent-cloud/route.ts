@@ -338,31 +338,35 @@ runQuery().catch(err => {
 
         // Ensure Claude Code SDK is installed (may be missing on reconnected sandboxes)
         send({ type: 'log', message: 'Checking Claude Code SDK...' })
+        let sdkInstalled = false
         try {
+          // Check if SDK exists by trying to require it
           const checkResult = await sandbox.commands.run(
-            `node -e "require('@anthropic-ai/claude-code')" 2>&1`,
-            { timeoutMs: 10000, envs: { NODE_PATH: '/home/user/node_modules' } }
+            `NODE_PATH=/home/user/node_modules node -e "require('@anthropic-ai/claude-code')" 2>&1`,
+            { timeoutMs: 10000 }
           )
-          if (checkResult.exitCode !== 0) {
-            send({ type: 'log', message: 'Installing Claude Code SDK...' })
+          sdkInstalled = checkResult.exitCode === 0
+        } catch (e) {
+          // Check failed (throws on non-zero exit), SDK likely not installed
+          sdkInstalled = false
+        }
+
+        if (!sdkInstalled) {
+          send({ type: 'log', message: 'Installing Claude Code SDK...' })
+          try {
             const installResult = await sandbox.commands.run(
               'cd /home/user && npm install @anthropic-ai/claude-code 2>&1',
               { timeoutMs: 120000 }
             )
-            if (installResult.exitCode !== 0) {
-              console.warn('[Agent Cloud] SDK install warning:', installResult.stdout)
+            if (installResult.exitCode === 0) {
+              send({ type: 'log', message: 'Claude Code SDK ready' })
             } else {
-              send({ type: 'log', message: 'Claude Code SDK installed successfully' })
+              console.warn('[Agent Cloud] SDK install warning:', installResult.stdout || installResult.stderr)
             }
+          } catch (installErr) {
+            console.error('[Agent Cloud] SDK install failed:', installErr)
+            send({ type: 'error', message: 'Failed to install Claude Code SDK' })
           }
-        } catch (e) {
-          console.warn('[Agent Cloud] SDK check/install error:', e)
-          // Try to install anyway
-          send({ type: 'log', message: 'Installing Claude Code SDK...' })
-          await sandbox.commands.run(
-            'cd /home/user && npm install @anthropic-ai/claude-code 2>&1',
-            { timeoutMs: 120000 }
-          )
         }
 
         let fullOutput = ''
