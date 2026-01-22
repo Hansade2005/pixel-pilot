@@ -15,6 +15,8 @@ import {
   Menu,
   X,
   Globe,
+  GitBranch,
+  ExternalLink,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -613,8 +615,41 @@ function AgentCloudLayoutInner({
             </div>
           </div>
 
-          {/* Right - MCP indicator */}
+          {/* Right - Branch, View PR, MCP indicator */}
           <div className="flex items-center gap-3">
+            {/* Branch name - clickable to open in GitHub */}
+            {activeSessionId && sessions.find(s => s.id === activeSessionId)?.workingBranch && (
+              <a
+                href={`https://github.com/${sessions.find(s => s.id === activeSessionId)?.repo?.full_name}/tree/${sessions.find(s => s.id === activeSessionId)?.workingBranch}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                title={sessions.find(s => s.id === activeSessionId)?.workingBranch}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                <span className="font-mono hidden sm:inline">
+                  {(sessions.find(s => s.id === activeSessionId)?.workingBranch || '').length > 25
+                    ? (sessions.find(s => s.id === activeSessionId)?.workingBranch || '').slice(0, 25) + '...'
+                    : sessions.find(s => s.id === activeSessionId)?.workingBranch}
+                </span>
+              </a>
+            )}
+
+            {/* View PR button */}
+            {activeSessionId && sessions.find(s => s.id === activeSessionId)?.workingBranch && (
+              <a
+                href={`https://github.com/${sessions.find(s => s.id === activeSessionId)?.repo?.full_name}/pulls?q=head:${sessions.find(s => s.id === activeSessionId)?.workingBranch}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button size="sm" variant="outline" className="h-7 text-xs bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800 rounded-lg">
+                  View PR
+                  <ExternalLink className="h-3 w-3 ml-1.5" />
+                </Button>
+              </a>
+            )}
+
+            {/* MCP indicator */}
             <div className="flex items-center gap-1.5 text-xs text-zinc-500">
               <Globe className="h-3.5 w-3.5 text-emerald-500" />
               <span className="hidden sm:inline">MCP Enabled</span>
