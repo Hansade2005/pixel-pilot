@@ -271,45 +271,62 @@ User Request: ${currentPrompt}`
               break
 
             case 'text':
-              // Real-time text streaming from stream-json format
-              updateOutput(fullOutput + data.data)
+              // Real-time text streaming from SDK
+              updateOutput(fullOutput + (data.data || ''))
               break
 
             case 'stdout':
               // Fallback raw output streaming
-              updateOutput(fullOutput + data.data)
+              updateOutput(fullOutput + (data.data || ''))
               break
 
-            case 'tool_start':
-              // Tool starting - show in UI
-              console.log('[Agent Cloud] Tool starting:', data.toolName)
+            case 'tool_use':
+              // Tool being used - show in UI with details
+              console.log('[Agent Cloud] Tool used:', data.name, data.input)
+              const toolName = data.name
+              const input = data.input
+              let toolDescription = `Using ${toolName}`
+
+              // Create user-friendly descriptions for common tools
+              if (toolName === 'Write' && input?.file_path) {
+                toolDescription = `Creating ${input.file_path.split('/').pop()}`
+              } else if (toolName === 'Edit' && input?.file_path) {
+                toolDescription = `Editing ${input.file_path.split('/').pop()}`
+              } else if (toolName === 'Read' && input?.file_path) {
+                toolDescription = `Reading ${input.file_path.split('/').pop()}`
+              } else if (toolName === 'Bash' && input?.command) {
+                toolDescription = `Running: ${input.command.substring(0, 60)}${input.command.length > 60 ? '...' : ''}`
+              } else if (toolName === 'Glob' && input?.pattern) {
+                toolDescription = `Searching: ${input.pattern}`
+              } else if (toolName === 'Grep' && input?.pattern) {
+                toolDescription = `Grep: ${input.pattern}`
+              }
+
               setSessions(prev => prev.map(s =>
                 s.id === sessionId
                   ? { ...s, lines: [...s.lines, {
                       type: 'tool' as const,
-                      content: `Using tool: ${data.toolName}...`,
+                      content: toolDescription,
                       timestamp: new Date(),
-                      meta: { toolName: data.toolName }
+                      meta: { toolName, fileName: input?.file_path }
                     }] }
                   : s
               ))
               break
 
-            case 'tool_use':
-              // Tool usage complete
-              console.log('[Agent Cloud] Tool used:', data.toolName, data.input)
+            case 'tool_result':
+              // Tool result - log for debugging
+              console.log('[Agent Cloud] Tool result:', data.result?.substring?.(0, 100) || data.result)
               break
 
             case 'result':
-              // Final result from stream-json
-              if (data.data?.result) {
-                updateOutput(data.data.result)
+              // Final SDK result
+              if (data.subtype === 'success') {
+                console.log('[Agent Cloud] Generation complete, cost:', data.cost)
               }
-              break
-
-            case 'stream_event':
-              // Other stream events - log for debugging
-              console.log('[Agent Cloud] Stream event:', data.data)
+              if (data.result) {
+                updateOutput(fullOutput + '\n' + data.result)
+              }
               break
 
             case 'stderr':
@@ -520,6 +537,16 @@ User Request: ${currentPrompt}`
             <div className="flex-1 text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2 font-mono">
               {line.content}
             </div>
+          </div>
+        )
+
+      case 'tool':
+        return (
+          <div key={index} className="flex items-center gap-2 text-sm text-zinc-500 py-1">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span className="font-mono text-xs">
+              {line.content}
+            </span>
           </div>
         )
 
