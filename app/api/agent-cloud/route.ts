@@ -547,6 +547,7 @@ async function handleCreate(
   console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
+  // Create sandbox with built-in E2B MCP servers
   const sandbox = await Sandbox.create(template, {
     timeoutMs: 30 * 60 * 1000, // 30 minutes timeout
     envs,
@@ -554,11 +555,25 @@ async function handleCreate(
       userId,
       repo: config?.repo?.full_name || 'default',
       model: selectedModel
-    }
+    },
+    // E2B's built-in MCP servers - these are properly configured and accessible
+    mcp: {
+      // Tavily for AI-powered web search
+      tavily: {
+        tavilyApiKey: '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',
+      },
+      // Puppeteer for browser automation (E2B's built-in alternative to Playwright)
+      puppeteer: {},
+    },
   })
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
+
+  // Get MCP gateway URL and token from E2B sandbox
+  const mcpUrl = sandbox.getMcpUrl()
+  const mcpToken = await sandbox.getMcpToken()
+  console.log(`[Agent Cloud] MCP gateway URL: ${mcpUrl}`)
 
   // Install Claude Code CLI in the sandbox
   console.log(`[Agent Cloud] Installing Claude Code CLI...`)
@@ -576,37 +591,27 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
   }
 
-  // Setup MCP servers dynamically using Claude CLI commands
-  // This ensures MCP servers are properly registered and accessible to the AI
-  console.log(`[Agent Cloud] Setting up MCP tools dynamically...`)
+  // Add E2B MCP gateway to Claude Code with authentication
+  // This gives Claude access to Tavily and Puppeteer tools
+  console.log(`[Agent Cloud] Adding E2B MCP gateway to Claude Code...`)
   try {
-    // Create .claude directory for MCP config
-    await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
-
-    // Add Tavily MCP for web search (HTTP transport)
-    const tavilyResult = await sandbox.commands.run(
-      `claude mcp add --transport http tavily "https://mcp.tavily.com/mcp/?tavilyApiKey=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"`,
+    const mcpResult = await sandbox.commands.run(
+      `claude mcp add --transport http e2b-mcp-gateway "${mcpUrl}" --header "Authorization: Bearer ${mcpToken}"`,
       { timeoutMs: 30000 }
     )
-    if (tavilyResult.exitCode === 0) {
-      console.log(`[Agent Cloud] Tavily MCP added successfully`)
+    if (mcpResult.exitCode === 0) {
+      console.log(`[Agent Cloud] E2B MCP gateway added successfully (Tavily + Puppeteer)`)
     } else {
-      console.warn(`[Agent Cloud] Tavily MCP add warning:`, tavilyResult.stderr)
+      console.warn(`[Agent Cloud] E2B MCP gateway warning:`, mcpResult.stderr)
     }
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to add E2B MCP gateway:`, e)
+  }
 
-    // Add Playwright MCP for browser automation
-    const playwrightResult = await sandbox.commands.run(
-      `claude mcp add playwright npx @playwright/mcp@latest`,
-      { timeoutMs: 30000 }
-    )
-    if (playwrightResult.exitCode === 0) {
-      console.log(`[Agent Cloud] Playwright MCP added successfully`)
-    } else {
-      console.warn(`[Agent Cloud] Playwright MCP add warning:`, playwrightResult.stderr)
-    }
-
-    // Add GitHub MCP if token is available (for GitHub operations)
-    if (githubToken) {
+  // Add GitHub MCP if token is available (for GitHub operations)
+  if (githubToken) {
+    console.log(`[Agent Cloud] Adding GitHub MCP...`)
+    try {
       const githubMcpConfig = JSON.stringify({
         type: "http",
         url: "https://api.githubcopilot.com/mcp",
@@ -622,15 +627,13 @@ async function handleCreate(
       if (githubResult.exitCode === 0) {
         console.log(`[Agent Cloud] GitHub MCP added with user token`)
       } else {
-        console.warn(`[Agent Cloud] GitHub MCP add warning:`, githubResult.stderr)
+        console.warn(`[Agent Cloud] GitHub MCP warning:`, githubResult.stderr)
       }
-    } else {
-      console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
+    } catch (e) {
+      console.warn(`[Agent Cloud] Failed to add GitHub MCP:`, e)
     }
-
-    console.log(`[Agent Cloud] MCP tools configured successfully`)
-  } catch (e) {
-    console.warn(`[Agent Cloud] Failed to setup MCP tools:`, e)
+  } else {
+    console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
   }
 
   // Track the working branch created for this session
@@ -756,7 +759,7 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: true,
-    mcpTools: githubToken ? ['tavily', 'playwright', 'github'] : ['tavily', 'playwright'],
+    mcpTools: githubToken ? ['tavily', 'puppeteer', 'github'] : ['tavily', 'puppeteer'],
     workingBranch: createdWorkingBranch, // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
