@@ -82,9 +82,6 @@ RUN claude mcp add --transport http tavily "https://mcp.tavily.com/mcp/?tavilyAp
 # Playwright for browser automation
 RUN claude mcp add playwright npx @playwright/mcp@latest
 
-# Filesystem for local file operations
-RUN claude mcp add filesystem npx -y @anthropic-ai/mcp-server-filesystem /home/user/project
-
 # Install Playwright browsers as user (Chromium only to save space)
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/ms-playwright
 RUN npx playwright install chromium
