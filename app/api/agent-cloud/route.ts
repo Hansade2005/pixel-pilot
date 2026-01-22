@@ -336,6 +336,35 @@ runQuery().catch(err => {
         const scriptPath = '/home/user/claude-sdk-query.js'
         await sandbox.files.write(scriptPath, sdkScript)
 
+        // Ensure Claude Code SDK is installed (may be missing on reconnected sandboxes)
+        send({ type: 'log', message: 'Checking Claude Code SDK...' })
+        try {
+          const checkResult = await sandbox.commands.run(
+            `node -e "require('@anthropic-ai/claude-code')" 2>&1`,
+            { timeoutMs: 10000, envs: { NODE_PATH: '/home/user/node_modules' } }
+          )
+          if (checkResult.exitCode !== 0) {
+            send({ type: 'log', message: 'Installing Claude Code SDK...' })
+            const installResult = await sandbox.commands.run(
+              'cd /home/user && npm install @anthropic-ai/claude-code 2>&1',
+              { timeoutMs: 120000 }
+            )
+            if (installResult.exitCode !== 0) {
+              console.warn('[Agent Cloud] SDK install warning:', installResult.stdout)
+            } else {
+              send({ type: 'log', message: 'Claude Code SDK installed successfully' })
+            }
+          }
+        } catch (e) {
+          console.warn('[Agent Cloud] SDK check/install error:', e)
+          // Try to install anyway
+          send({ type: 'log', message: 'Installing Claude Code SDK...' })
+          await sandbox.commands.run(
+            'cd /home/user && npm install @anthropic-ai/claude-code 2>&1',
+            { timeoutMs: 120000 }
+          )
+        }
+
         let fullOutput = ''
 
         // Start heartbeat to keep connection alive
