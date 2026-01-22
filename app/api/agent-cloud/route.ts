@@ -10,7 +10,7 @@
  * - Real-time streaming with Server-Sent Events
  * - GitHub repo cloning and git operations
  * - Internet access enabled for sandboxes
- * - MCP support (DuckDuckGo, Arxiv) for web search capabilities
+ * - MCP support (Tavily for web search, GitHub for repo operations)
  * - Public repo cloning (no token required)
  *
  * POST /api/agent-cloud
@@ -554,32 +554,42 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
   }
 
-  // Setup MCP configuration for web search (DuckDuckGo, Arxiv)
-  console.log(`[Agent Cloud] Setting up MCP tools (DuckDuckGo, Arxiv)...`)
+  // Setup MCP configuration with HTTP-based servers (Tavily for web search, GitHub for repo operations)
+  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, GitHub, Filesystem)...`)
   try {
     // Create .claude directory for MCP config
     await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
 
-    // MCP configuration for DuckDuckGo and Arxiv search
-    const mcpConfig = JSON.stringify({
-      mcpServers: {
-        duckduckgo: {
-          command: "npx",
-          args: ["-y", "@anthropic/mcp-server-duckduckgo"]
-        },
-        arxiv: {
-          command: "npx",
-          args: ["-y", "@anthropic/mcp-server-arxiv"],
-          env: {
-            STORAGE_PATH: "/home/user/.arxiv"
-          }
-        },
-        filesystem: {
-          command: "npx",
-          args: ["-y", "@anthropic/mcp-server-filesystem", PROJECT_DIR]
+    // Build MCP servers configuration
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mcpServers: Record<string, any> = {
+      // Tavily HTTP MCP server for web search
+      tavily: {
+        type: "http",
+        url: "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
+      },
+      // Filesystem MCP server for local file operations
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@anthropic/mcp-server-filesystem", PROJECT_DIR]
+      }
+    }
+
+    // Add GitHub MCP if token is available (for GitHub operations)
+    if (githubToken) {
+      mcpServers.github = {
+        type: "http",
+        url: "https://api.githubcopilot.com/mcp",
+        headers: {
+          "Authorization": `Bearer ${githubToken}`
         }
       }
-    }, null, 2)
+      console.log(`[Agent Cloud] GitHub MCP configured with user token`)
+    } else {
+      console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
+    }
+
+    const mcpConfig = JSON.stringify({ mcpServers }, null, 2)
 
     await sandbox.files.write('/home/user/.claude/mcp.json', mcpConfig)
     console.log(`[Agent Cloud] MCP tools configured successfully`)
@@ -701,7 +711,7 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: true,
-    mcpTools: ['duckduckgo', 'arxiv', 'filesystem'],
+    mcpTools: githubToken ? ['tavily', 'github', 'filesystem'] : ['tavily', 'filesystem'],
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
       : 'Sandbox created with Vercel AI Gateway (MCP enabled)',
