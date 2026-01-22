@@ -138,9 +138,39 @@ function SessionPageInner() {
     }
   }, [activeSession?.lines])
 
+  // Auto-run pending prompt when session loads
+  const pendingPromptProcessedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (
+      activeSession?.pendingPrompt &&
+      activeSession?.id &&
+      !isLoading &&
+      !isRecreating &&
+      !pendingPromptProcessedRef.current.has(activeSession.id)
+    ) {
+      // Mark this session's pending prompt as processed
+      pendingPromptProcessedRef.current.add(activeSession.id)
+
+      // Store the pending prompt before clearing
+      const promptToRun = activeSession.pendingPrompt
+
+      // Clear the pending prompt from the session
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId
+          ? { ...s, pendingPrompt: undefined }
+          : s
+      ))
+
+      // Run the prompt after a short delay to let the page render
+      setTimeout(() => {
+        runPrompt(promptToRun)
+      }, 150)
+    }
+  }, [activeSession?.pendingPrompt, activeSession?.id, isLoading, isRecreating, sessionId, setSessions, runPrompt])
+
   // Focus input
   useEffect(() => {
-    if (activeSession && inputRef.current) {
+    if (activeSession && inputRef.current && !activeSession.pendingPrompt) {
       inputRef.current.focus()
     }
   }, [activeSession])

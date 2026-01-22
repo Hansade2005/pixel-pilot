@@ -61,6 +61,7 @@ export interface Session {
     deletions: number
   }
   messageCount?: number
+  pendingPrompt?: string // Initial prompt to auto-send when session page loads
 }
 
 export interface Repository {
@@ -376,6 +377,7 @@ function AgentCloudLayoutInner({
         },
         stats: { additions: 0, deletions: 0 },
         messageCount: data.messageCount || 0,
+        pendingPrompt: initialPrompt, // Store the initial prompt to auto-send
         lines: reconnected ? [
           { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
           { type: 'system', content: `Repository: ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
