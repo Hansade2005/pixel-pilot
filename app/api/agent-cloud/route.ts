@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET endpoint for streaming output
- * Implements real-time streaming similar to the preview route
+ * GET endpoint for streaming output using Claude Code SDK
+ * Uses the SDK's query() function for structured message streaming
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -245,15 +245,11 @@ export async function GET(request: NextRequest) {
           ? `Previous conversation:\n${conversationContext}\n\nCurrent request: ${prompt}`
           : prompt
 
-        // Use base64 encoding to safely pass prompts containing any characters
-        // This avoids shell escaping issues with single quotes, $, backticks, etc.
-        const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
-
         // Get the working branch for git workflow instructions
         const workingBranch = sandboxEntry!.workingBranch || 'main'
 
-        // System prompt for git workflow - commit, push, and create PR using GitHub MCP
-        const gitWorkflowPrompt = `
+        // System prompt for git workflow
+        const systemPrompt = `
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
 - After making code changes, ALWAYS commit them with a clear message
@@ -262,12 +258,83 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - Always provide meaningful commit messages and PR descriptions
 `.trim()
 
-        // Base64 encode the system prompt for safe shell passing
-        const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
+        // Create the SDK generation script
+        const sdkScript = `
+const { query } = require('@anthropic-ai/claude-code');
 
-        // Use plain text output for reliable real-time streaming
-        // Each chunk from onStdout is immediately sent to frontend via SSE
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
+async function runQuery() {
+  const prompt = ${JSON.stringify(fullPrompt)};
+  const systemPrompt = ${JSON.stringify(systemPrompt)};
+
+  const abortController = new AbortController();
+  let fullText = '';
+
+  try {
+    for await (const message of query({
+      prompt: prompt,
+      abortController: abortController,
+      options: {
+        maxTurns: 30,
+        systemPrompt: systemPrompt,
+        dangerouslySkipPermissions: true,
+        allowedTools: [
+          'Read', 'Write', 'Edit', 'MultiEdit',
+          'Bash', 'LS', 'Glob', 'Grep',
+          'WebFetch', 'WebSearch', 'TodoRead', 'TodoWrite'
+        ]
+      }
+    })) {
+      // Output structured messages with markers for parsing
+      if (message.type === 'text') {
+        fullText += message.text || '';
+        console.log('__SDK_TEXT__' + JSON.stringify({ type: 'text', text: message.text }));
+      } else if (message.type === 'tool_use') {
+        console.log('__SDK_TOOL_USE__' + JSON.stringify({
+          type: 'tool_use',
+          name: message.name,
+          input: message.input
+        }));
+      } else if (message.type === 'tool_result') {
+        console.log('__SDK_TOOL_RESULT__' + JSON.stringify({
+          type: 'tool_result',
+          result: typeof message.result === 'string' ? message.result.substring(0, 500) : message.result
+        }));
+      } else if (message.type === 'result') {
+        console.log('__SDK_RESULT__' + JSON.stringify({
+          type: 'result',
+          subtype: message.subtype,
+          result: message.result,
+          cost: message.total_cost_usd
+        }));
+      } else if (message.type === 'assistant') {
+        // Extract text from assistant message
+        const content = message.message?.content;
+        if (Array.isArray(content)) {
+          const textPart = content.find(c => c.type === 'text');
+          if (textPart?.text) {
+            fullText += textPart.text;
+            console.log('__SDK_TEXT__' + JSON.stringify({ type: 'text', text: textPart.text }));
+          }
+        }
+      }
+    }
+
+    console.log('__SDK_COMPLETE__' + JSON.stringify({ type: 'complete', fullText: fullText }));
+  } catch (error) {
+    console.error('__SDK_ERROR__' + JSON.stringify({ type: 'error', message: error.message }));
+    process.exit(1);
+  }
+}
+
+runQuery().catch(err => {
+  console.error('__SDK_ERROR__' + JSON.stringify({ type: 'error', message: err.message }));
+  process.exit(1);
+});
+`
+
+        // Write the SDK script to sandbox
+        const scriptPath = '/tmp/claude-sdk-query.js'
+        await sandbox.files.write(scriptPath, sdkScript)
 
         let fullOutput = ''
 
@@ -276,22 +343,85 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
           if (!isClosed) {
             send({ type: 'heartbeat', timestamp: Date.now() })
           }
-        }, 15000) // Send heartbeat every 15 seconds
+        }, 15000)
 
         try {
-          const result = await sandbox.commands.run(command, {
-            timeoutMs: 0, // No timeout
-            onStdout: (data) => {
-              if (isClosed) return
-              // Immediately send each chunk to frontend - this is the key for real-time streaming
-              fullOutput += data
-              send({ type: 'stdout', data, timestamp: Date.now() })
-            },
-            onStderr: (data) => {
-              if (isClosed) return
-              send({ type: 'stderr', data, timestamp: Date.now() })
+          // Run the SDK script with Node.js
+          const result = await sandbox.commands.run(
+            `cd ${workDir} && node ${scriptPath} 2>&1`,
+            {
+              timeoutMs: 0, // No timeout
+              onStdout: (data) => {
+                if (isClosed) return
+
+                // Parse SDK output markers
+                const lines = data.split('\n')
+                for (const line of lines) {
+                  if (line.startsWith('__SDK_TEXT__')) {
+                    try {
+                      const parsed = JSON.parse(line.substring('__SDK_TEXT__'.length))
+                      fullOutput += parsed.text || ''
+                      send({ type: 'text', data: parsed.text, timestamp: Date.now() })
+                    } catch (e) { /* ignore parse errors */ }
+                  } else if (line.startsWith('__SDK_TOOL_USE__')) {
+                    try {
+                      const parsed = JSON.parse(line.substring('__SDK_TOOL_USE__'.length))
+                      send({
+                        type: 'tool_use',
+                        name: parsed.name,
+                        input: parsed.input,
+                        timestamp: Date.now()
+                      })
+                    } catch (e) { /* ignore parse errors */ }
+                  } else if (line.startsWith('__SDK_TOOL_RESULT__')) {
+                    try {
+                      const parsed = JSON.parse(line.substring('__SDK_TOOL_RESULT__'.length))
+                      send({ type: 'tool_result', result: parsed.result, timestamp: Date.now() })
+                    } catch (e) { /* ignore parse errors */ }
+                  } else if (line.startsWith('__SDK_RESULT__')) {
+                    try {
+                      const parsed = JSON.parse(line.substring('__SDK_RESULT__'.length))
+                      send({
+                        type: 'result',
+                        subtype: parsed.subtype,
+                        result: parsed.result,
+                        cost: parsed.cost,
+                        timestamp: Date.now()
+                      })
+                    } catch (e) { /* ignore parse errors */ }
+                  } else if (line.startsWith('__SDK_COMPLETE__')) {
+                    try {
+                      const parsed = JSON.parse(line.substring('__SDK_COMPLETE__'.length))
+                      fullOutput = parsed.fullText || fullOutput
+                    } catch (e) { /* ignore parse errors */ }
+                  } else if (line.startsWith('__SDK_ERROR__')) {
+                    try {
+                      const parsed = JSON.parse(line.substring('__SDK_ERROR__'.length))
+                      send({ type: 'error', message: parsed.message, timestamp: Date.now() })
+                    } catch (e) { /* ignore parse errors */ }
+                  } else if (line.trim()) {
+                    // Regular stdout - send as raw output for backwards compatibility
+                    send({ type: 'stdout', data: line, timestamp: Date.now() })
+                  }
+                }
+              },
+              onStderr: (data) => {
+                if (isClosed) return
+                // Check for SDK error markers in stderr
+                if (data.includes('__SDK_ERROR__')) {
+                  const match = data.match(/__SDK_ERROR__(.+)/)
+                  if (match) {
+                    try {
+                      const parsed = JSON.parse(match[1])
+                      send({ type: 'error', message: parsed.message, timestamp: Date.now() })
+                    } catch (e) { /* ignore */ }
+                  }
+                } else {
+                  send({ type: 'stderr', data, timestamp: Date.now() })
+                }
+              }
             }
-          })
+          )
 
           // Clear heartbeat
           clearInterval(heartbeatInterval)
