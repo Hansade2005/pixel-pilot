@@ -229,8 +229,9 @@ export async function GET(request: NextRequest) {
         const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
 
         // Use --output-format stream-json for real-time streaming with newline-delimited JSON
-        // This gives us structured events we can parse and stream to the frontend immediately
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json 2>&1`
+        // stdbuf -oL forces line-buffered output so each JSON line is flushed immediately
+        // This ensures we get events as Claude generates them, not in batches
+        const command = `cd ${workDir} && stdbuf -oL -eL bash -c "echo '${base64Prompt}' | base64 -d | claude -p --dangerously-skip-permissions --output-format stream-json" 2>&1`
 
         let fullOutput = ''
         let jsonBuffer = ''
