@@ -336,6 +336,29 @@ runQuery().catch(err => {
         const scriptPath = '/tmp/claude-sdk-query.js'
         await sandbox.files.write(scriptPath, sdkScript)
 
+        // Ensure Claude Code SDK is installed (it may not be globally available)
+        send({ type: 'log', message: 'Setting up Claude Code SDK...' })
+        try {
+          // Check if SDK is already installed
+          const checkResult = await sandbox.commands.run(
+            `node -e "require('@anthropic-ai/claude-code')" 2>&1`,
+            { timeoutMs: 10000 }
+          )
+          if (checkResult.exitCode !== 0) {
+            // Install SDK locally in /tmp for the script
+            send({ type: 'log', message: 'Installing Claude Code SDK...' })
+            const installResult = await sandbox.commands.run(
+              `cd /tmp && npm install @anthropic-ai/claude-code 2>&1`,
+              { timeoutMs: 120000 }
+            )
+            if (installResult.exitCode !== 0) {
+              console.warn('[Agent Cloud] SDK install warning:', installResult.stdout)
+            }
+          }
+        } catch (e) {
+          console.warn('[Agent Cloud] Failed to check/install SDK:', e)
+        }
+
         let fullOutput = ''
 
         // Start heartbeat to keep connection alive
@@ -347,8 +370,9 @@ runQuery().catch(err => {
 
         try {
           // Run the SDK script with Node.js
+          // Set NODE_PATH so Node can find SDK installed in /tmp
           const result = await sandbox.commands.run(
-            `cd ${workDir} && node ${scriptPath} 2>&1`,
+            `cd ${workDir} && NODE_PATH=/tmp/node_modules node ${scriptPath} 2>&1`,
             {
               timeoutMs: 0, // No timeout
               onStdout: (data) => {
