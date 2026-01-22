@@ -709,6 +709,9 @@ async function handleCreate(
     console.warn(`[Agent Cloud] Failed to setup MCP tools:`, e)
   }
 
+  // Track the working branch created for this session
+  let createdWorkingBranch: string | undefined
+
   // Clone repo if specified (supports both public and private repos)
   if (config?.repo) {
     try {
@@ -745,11 +748,7 @@ async function handleCreate(
 
         if (branchResult.exitCode === 0) {
           console.log(`[Agent Cloud] Created working branch: ${workingBranch}`)
-          // Store the working branch in sandbox entry for later use
-          activeSandboxes.set(sandboxKey, {
-            ...activeSandboxes.get(sandboxKey)!,
-            workingBranch
-          })
+          createdWorkingBranch = workingBranch
         } else {
           console.warn(`[Agent Cloud] Failed to create working branch:`, branchResult.stderr)
         }
@@ -794,10 +793,7 @@ async function handleCreate(
               { timeoutMs: 10000 }
             )
             if (branchResult.exitCode === 0) {
-              activeSandboxes.set(sandboxKey, {
-                ...activeSandboxes.get(sandboxKey)!,
-                workingBranch
-              })
+              createdWorkingBranch = workingBranch
             }
           }
         }
@@ -807,7 +803,7 @@ async function handleCreate(
     }
   }
 
-  // Store sandbox entry
+  // Store sandbox entry with the working branch
   activeSandboxes.set(sandboxKey, {
     sandboxId,
     sandbox,
@@ -820,14 +816,11 @@ async function handleCreate(
       branch: config.repo.branch,
       cloned: repoCloned,
     } : undefined,
+    workingBranch: createdWorkingBranch,
     conversationHistory: []
   })
 
-  console.log(`[Agent Cloud] Sandbox created: ${sandboxId}`)
-
-  // Get the working branch from sandbox entry
-  const sandboxEntry = activeSandboxes.get(sandboxKey)
-  const workingBranch = sandboxEntry?.workingBranch
+  console.log(`[Agent Cloud] Sandbox created: ${sandboxId}, working branch: ${createdWorkingBranch || 'none'}`)
 
   return NextResponse.json({
     success: true,
@@ -840,7 +833,7 @@ async function handleCreate(
     messageCount: 0,
     mcpEnabled: true,
     mcpTools: githubToken ? ['tavily', 'playwright', 'github', 'filesystem'] : ['tavily', 'playwright', 'filesystem'],
-    workingBranch, // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
+    workingBranch: createdWorkingBranch, // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
       : 'Sandbox created with Vercel AI Gateway (MCP enabled)',
