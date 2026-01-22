@@ -252,14 +252,13 @@ export async function GET(request: NextRequest) {
         // Get the working branch for git workflow instructions
         const workingBranch = sandboxEntry!.workingBranch || 'main'
 
-        // System prompt for git workflow - commit, push, and create PR
+        // System prompt for git workflow - commit, push, and create PR using GitHub MCP
         const gitWorkflowPrompt = `
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
 - After making code changes, ALWAYS commit them with a clear message
 - After committing, push to the remote: git push -u origin ${workingBranch}
-- After pushing, create a pull request using: gh pr create --title "Your PR title" --body "Description of changes"
-- If gh is not authenticated, use: gh auth login --with-token <<< "$GITHUB_TOKEN" first
+- After pushing, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
 - Always provide meaningful commit messages and PR descriptions
 `.trim()
 
