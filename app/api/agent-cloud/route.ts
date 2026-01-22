@@ -639,21 +639,7 @@ async function handleCreate(
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
 
-  // Install Claude Code CLI in the sandbox
-  console.log(`[Agent Cloud] Installing Claude Code CLI...`)
-  try {
-    const installResult = await sandbox.commands.run(
-      'npm install -g @anthropic-ai/claude-code',
-      { timeoutMs: 120000 }
-    )
-    if (installResult.exitCode !== 0) {
-      console.warn(`[Agent Cloud] Claude Code install warning:`, installResult.stderr)
-    } else {
-      console.log(`[Agent Cloud] Claude Code CLI installed successfully`)
-    }
-  } catch (e) {
-    console.warn(`[Agent Cloud] Failed to install Claude Code CLI:`, e)
-  }
+  // Note: Claude Code CLI is pre-installed in the pipilot-agent template
 
   // Setup MCP configuration by writing mcp.json file directly
   // This is the working approach that was used before
