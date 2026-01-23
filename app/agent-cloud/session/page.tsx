@@ -292,7 +292,21 @@ User Request: ${currentPrompt}`
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to connect to agent')
+        const errorMsg = errorData.error || 'Failed to connect to agent'
+
+        // Auto-recreate sandbox if expired/not found (404) - only if not already a retry
+        if (!overrideSandboxId && response.status === 404 && (errorMsg.includes('not found') || errorMsg.includes('expired'))) {
+          console.log('[Agent Cloud] Sandbox expired (404), auto-recreating...')
+          const newSandboxId = await recreateSandbox()
+          if (newSandboxId) {
+            setIsLoading(false)
+            setIsStreaming(false)
+            runPrompt(currentPrompt, newSandboxId)
+            return
+          }
+        }
+
+        throw new Error(errorMsg)
       }
 
       const reader = response.body?.getReader()
@@ -638,9 +652,23 @@ User Request: ${currentPrompt}`
       }
     } catch (error) {
       console.error('Failed to run prompt:', error)
+      const errMsg = error instanceof Error ? error.message : 'Failed to run prompt'
+
+      // Auto-recreate if sandbox expired (catch-all safety net) - only if not already a retry
+      if (!overrideSandboxId && (errMsg.includes('not found') || errMsg.includes('expired') || errMsg.includes('Sandbox'))) {
+        console.log('[Agent Cloud] Sandbox error detected, attempting auto-recreation...')
+        const newSandboxId = await recreateSandbox()
+        if (newSandboxId) {
+          setIsLoading(false)
+          setIsStreaming(false)
+          runPrompt(currentPrompt, newSandboxId)
+          return
+        }
+      }
+
       setSessions(prev => prev.map(s =>
         s.id === sessionId
-          ? { ...s, lines: [...s.lines, { type: 'error' as const, content: error instanceof Error ? error.message : 'Failed to run prompt', timestamp: new Date() }] }
+          ? { ...s, lines: [...s.lines, { type: 'error' as const, content: errMsg, timestamp: new Date() }] }
           : s
       ))
       setIsLoading(false)
