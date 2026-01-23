@@ -319,6 +319,15 @@ if (process.env.MCP_GATEWAY_URL) {
     url: process.env.MCP_GATEWAY_URL
   };
 }
+if (process.env.GITHUB_TOKEN) {
+  mcpServers['github'] = {
+    type: 'http',
+    url: 'https://api.githubcopilot.com/mcp',
+    headers: {
+      'Authorization': 'Bearer ' + process.env.GITHUB_TOKEN
+    }
+  };
+}
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -336,9 +345,12 @@ try {
       systemPrompt: systemPromptArg || undefined,
       abortController,
       includePartialMessages: true,
+      permissionMode: 'bypassPermissions',
+      allowDangerouslySkipPermissions: true,
+      enableFileCheckpointing: true,
       ...(Object.keys(mcpServers).length > 0 ? {
         mcpServers,
-        allowedTools: ['mcp__tavily__*']
+        allowedTools: ['mcp__tavily__*', 'mcp__github__*']
       } : {})
     }
   })) {
