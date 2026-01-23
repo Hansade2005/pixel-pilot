@@ -32,7 +32,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
 import { createClient } from '@/lib/supabase/server'
-import { getDeploymentTokens } from '@/lib/cloud-sync'
+// getDeploymentTokens uses browser client - query user_settings directly with server client instead
 
 // Vercel AI Gateway configuration
 const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
@@ -372,7 +372,7 @@ try {
           if (block.type === 'tool_result') {
             let resultContent = '';
             if (Array.isArray(block.content)) {
-              const parts = block.content.map((c: any) => {
+              const parts = block.content.map((c) => {
                 if (c.type === 'text') return c.text;
                 return '[' + c.type + ']';
               });
@@ -790,8 +790,14 @@ async function handleCreate(
   let githubToken: string | undefined
   if (config?.repo) {
     try {
-      const tokens = await getDeploymentTokens(userId)
-      githubToken = tokens?.github
+      // Query user_settings directly using the server supabase client (which has auth context)
+      // Note: getDeploymentTokens uses a browser client that lacks auth context on the server
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('github_token')
+        .eq('user_id', userId)
+        .single()
+      githubToken = settings?.github_token || undefined
       console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
     } catch (e) {
       console.warn('[Agent Cloud] Failed to get GitHub token:', e)
