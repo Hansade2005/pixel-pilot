@@ -299,8 +299,15 @@ if (historyFileArg) {
   }
 }
 
-const messages = conversationHistory.map(msg => ({ role: msg.role, content: msg.content }));
-messages.push({ role: 'user', content: promptArg });
+let fullPrompt = '';
+if (conversationHistory.length > 0) {
+  const context = conversationHistory
+    .map(msg => \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${msg.content}\`)
+    .join('\\n\\n');
+  fullPrompt = \`Previous conversation:\\n\${context}\\n\\nCurrent request: \${promptArg}\`;
+} else {
+  fullPrompt = promptArg;
+}
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -310,10 +317,10 @@ process.on('SIGINT', () => abortController.abort());
 
 try {
   for await (const message of query({
-    messages,
-    systemPrompt: systemPromptArg || undefined,
-    abortController,
+    prompt: fullPrompt,
     options: {
+      systemPrompt: systemPromptArg || undefined,
+      abortController,
       maxTurns: 20
     }
   })) {
