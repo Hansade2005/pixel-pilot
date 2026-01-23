@@ -42,11 +42,10 @@ if (conversationHistory.length > 0) {
 
 // Configure MCP servers from environment variables
 const mcpServers = {};
-if (process.env.MCP_GATEWAY_URL && process.env.MCP_GATEWAY_TOKEN) {
-  mcpServers['e2b-mcp'] = {
+if (process.env.MCP_GATEWAY_URL) {
+  mcpServers['tavily'] = {
     type: 'http',
-    url: process.env.MCP_GATEWAY_URL,
-    headers: { 'Authorization': `Bearer ${process.env.MCP_GATEWAY_TOKEN}` }
+    url: process.env.MCP_GATEWAY_URL
   };
 }
 
@@ -68,7 +67,10 @@ try {
       systemPrompt: systemPromptArg || undefined,
       abortController,
       includePartialMessages: true,
-      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {})
+      ...(Object.keys(mcpServers).length > 0 ? {
+        mcpServers,
+        allowedTools: ['mcp__tavily__*']
+      } : {})
     }
   })) {
     // Handle SDK message types
