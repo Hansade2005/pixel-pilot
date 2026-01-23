@@ -185,7 +185,7 @@ function SessionPageInner() {
       setIsRecreating(false)
       return null
     }
-  }, [activeSession, sessionId, setSessions])
+  }, [activeSession, sessionId, setSessions, storedTokens])
 
   // Redirect if session not found
   useEffect(() => {
@@ -299,9 +299,20 @@ User Request: ${currentPrompt}`
           console.log('[Agent Cloud] Sandbox expired (404), auto-recreating...')
           const newSandboxId = await recreateSandbox()
           if (newSandboxId) {
+            // Build prompt with conversation history context for continuity
+            const historyLines = activeSession.lines
+              .filter(l => l.type === 'input' || l.type === 'output')
+              .slice(-10) // Last 10 exchanges for context (avoid token limits)
+            let contextPrompt = currentPrompt
+            if (historyLines.length > 0) {
+              const historyContext = historyLines
+                .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+                .join('\n\n')
+              contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
+            }
             setIsLoading(false)
             setIsStreaming(false)
-            runPrompt(currentPrompt, newSandboxId)
+            runPrompt(contextPrompt, newSandboxId)
             return
           }
         }
@@ -553,14 +564,24 @@ User Request: ${currentPrompt}`
           case 'error': {
             // Check if error is about sandbox expiration
             const errorMsg = data.message || ''
-            if (errorMsg.includes('not found') || errorMsg.includes('expired')) {
+            if (!overrideSandboxId && (errorMsg.includes('not found') || errorMsg.includes('expired'))) {
               console.log('Sandbox expired during stream, recreating...')
               reader.cancel()
               const newSandboxId = await recreateSandbox()
               if (newSandboxId) {
+                const historyLines = activeSession.lines
+                  .filter(l => l.type === 'input' || l.type === 'output')
+                  .slice(-10)
+                let contextPrompt = currentPrompt
+                if (historyLines.length > 0) {
+                  const historyContext = historyLines
+                    .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+                    .join('\n\n')
+                  contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
+                }
                 setIsLoading(false)
                 setIsStreaming(false)
-                runPrompt(currentPrompt, newSandboxId)
+                runPrompt(contextPrompt, newSandboxId)
               } else {
                 setIsLoading(false)
                 setIsStreaming(false)
@@ -629,13 +650,23 @@ User Request: ${currentPrompt}`
         console.error('[Agent Cloud] Streaming error:', streamError)
         
         // If we haven't received any data, this might be a connection issue - try recreating
-        if (!hasReceivedData) {
+        if (!hasReceivedData && !overrideSandboxId) {
           console.log('Connection failed without data, attempting to recreate sandbox...')
           const newSandboxId = await recreateSandbox()
           if (newSandboxId) {
+            const historyLines = activeSession.lines
+              .filter(l => l.type === 'input' || l.type === 'output')
+              .slice(-10)
+            let contextPrompt = currentPrompt
+            if (historyLines.length > 0) {
+              const historyContext = historyLines
+                .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+                .join('\n\n')
+              contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
+            }
             setIsLoading(false)
             setIsStreaming(false)
-            runPrompt(currentPrompt, newSandboxId)
+            runPrompt(contextPrompt, newSandboxId)
             return
           }
         }
@@ -659,9 +690,19 @@ User Request: ${currentPrompt}`
         console.log('[Agent Cloud] Sandbox error detected, attempting auto-recreation...')
         const newSandboxId = await recreateSandbox()
         if (newSandboxId) {
+          const historyLines = activeSession.lines
+            .filter(l => l.type === 'input' || l.type === 'output')
+            .slice(-10)
+          let contextPrompt = currentPrompt
+          if (historyLines.length > 0) {
+            const historyContext = historyLines
+              .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+              .join('\n\n')
+            contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
+          }
           setIsLoading(false)
           setIsStreaming(false)
-          runPrompt(currentPrompt, newSandboxId)
+          runPrompt(contextPrompt, newSandboxId)
           return
         }
       }
