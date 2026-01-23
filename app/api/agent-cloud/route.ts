@@ -791,17 +791,26 @@ async function handleCreate(
   if (config?.repo) {
     try {
       // Query user_settings directly using the server supabase client (which has auth context)
-      // Note: getDeploymentTokens uses a browser client that lacks auth context on the server
       const { data: settings } = await supabase
         .from('user_settings')
         .select('github_token')
         .eq('user_id', userId)
         .single()
       githubToken = settings?.github_token || undefined
-      console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
     } catch (e) {
-      console.warn('[Agent Cloud] Failed to get GitHub token:', e)
+      console.warn('[Agent Cloud] Failed to get GitHub token from DB:', e)
     }
+
+    // Fallback: use token passed from frontend via header
+    if (!githubToken) {
+      const headerToken = request.headers.get('X-GitHub-Token')
+      if (headerToken) {
+        githubToken = headerToken
+        console.log(`[Agent Cloud] Using GitHub token from client header (fallback)`)
+      }
+    }
+
+    console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
   }
 
   // Configure environment variables for Claude Code with Vercel AI Gateway

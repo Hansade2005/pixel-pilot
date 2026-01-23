@@ -113,9 +113,14 @@ function SessionPageInner() {
 
     try {
       // Create a new sandbox with same repo config
+      const recreateHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (storedTokens.github) {
+        recreateHeaders['X-GitHub-Token'] = storedTokens.github
+      }
+
       const response = await fetch('/api/agent-cloud', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: recreateHeaders,
         body: JSON.stringify({
           action: 'create',
           config: {
@@ -257,31 +262,20 @@ function SessionPageInner() {
     }
 
     try {
-      // Build prompt with GitHub context if token available
-      let enhancedPrompt = currentPrompt
-
-      // Pass GitHub token and repo info for auth cases
-      if (storedTokens.github && activeSession.repo) {
-        const githubContext = `
-[GitHub Context - Use this for any GitHub operations if needed]
-- Repository: ${activeSession.repo.full_name}
-- Branch: ${activeSession.repo.branch}
-- GitHub Token: ${storedTokens.github}
-- Clone URL: https://${storedTokens.github}@github.com/${activeSession.repo.full_name}.git
-
-User Request: ${currentPrompt}`
-        enhancedPrompt = githubContext
+      // Connect to the streaming endpoint using fetch with ReadableStreamDefaultReader
+      // Pass GitHub token via header for authenticated repo operations (clone, push, etc.)
+      const headers: Record<string, string> = {
+        'Accept': 'text/event-stream',
+      }
+      if (storedTokens.github) {
+        headers['X-GitHub-Token'] = storedTokens.github
       }
 
-      // Connect to the streaming endpoint using fetch with ReadableStreamDefaultReader
-      // This matches the preview panel pattern exactly for consistent streaming behavior
       const response = await fetch(
-        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`,
+        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(currentPrompt)}`,
         {
           method: 'GET',
-          headers: {
-            'Accept': 'text/event-stream',
-          },
+          headers,
         }
       )
 

@@ -351,9 +351,14 @@ function AgentCloudLayoutInner({
 
     setIsCreating(true)
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (storedTokens.github) {
+        headers['X-GitHub-Token'] = storedTokens.github
+      }
+
       const response = await fetch('/api/agent-cloud', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           action: 'create',
           config: {
