@@ -262,8 +262,19 @@ function SessionPageInner() {
     }
 
     try {
-      // Connect to the streaming endpoint using fetch with ReadableStreamDefaultReader
-      // Pass GitHub token via header for authenticated repo operations (clone, push, etc.)
+      // Build prompt with GitHub context so AI can perform repo operations (push, PR, etc.)
+      let enhancedPrompt = currentPrompt
+      if (storedTokens.github && activeSession.repo) {
+        enhancedPrompt = `[GitHub Context - Use this for any GitHub operations if needed]
+- Repository: ${activeSession.repo.full_name}
+- Branch: ${activeSession.repo.branch}
+- GitHub Token: ${storedTokens.github}
+- Clone URL: https://${storedTokens.github}@github.com/${activeSession.repo.full_name}.git
+
+User Request: ${currentPrompt}`
+      }
+
+      // Pass GitHub token via header as fallback for server-side clone auth
       const headers: Record<string, string> = {
         'Accept': 'text/event-stream',
       }
@@ -272,7 +283,7 @@ function SessionPageInner() {
       }
 
       const response = await fetch(
-        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(currentPrompt)}`,
+        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`,
         {
           method: 'GET',
           headers,
