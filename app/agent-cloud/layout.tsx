@@ -37,10 +37,23 @@ export interface TerminalLine {
   timestamp: Date
   meta?: {
     toolName?: string
+    toolId?: string
     fileName?: string
     additions?: number
     deletions?: number
     diffLines?: string[]
+    // Rich tool data
+    command?: string          // Bash command
+    description?: string      // Tool description
+    input?: Record<string, any>  // Full tool input
+    result?: string           // Tool result content
+    oldString?: string        // Edit old_string
+    newString?: string        // Edit new_string
+    fileContent?: string      // Write content (truncated)
+    pattern?: string          // Glob/Grep pattern
+    url?: string              // WebFetch URL
+    query?: string            // WebSearch query
+    isComplete?: boolean      // Whether tool has completed
   }
 }
 

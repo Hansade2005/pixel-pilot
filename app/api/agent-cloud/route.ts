@@ -364,6 +364,26 @@ try {
       }
       // Reset for next turn (multi-turn conversations)
       hasStreamedText = false;
+    } else if (message.type === 'user') {
+      // User messages contain tool_result blocks
+      const content = message.message?.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'tool_result') {
+            const resultContent = Array.isArray(block.content)
+              ? block.content.map((c: any) => c.type === 'text' ? c.text : `[${c.type}]`).join('\\n')
+              : typeof block.content === 'string'
+                ? block.content
+                : JSON.stringify(block.content);
+            console.log(JSON.stringify({
+              type: 'tool_result',
+              tool_use_id: block.tool_use_id,
+              result: resultContent?.substring(0, 2000) || '',
+              timestamp: Date.now()
+            }));
+          }
+        }
+      }
     } else if (message.type === 'result') {
       console.log(JSON.stringify({ type: 'result', subtype: message.subtype, result: message.result, cost: message.total_cost_usd, timestamp: Date.now() }));
     }
@@ -459,7 +479,7 @@ try {
                     send({
                       type: 'tool_result',
                       result: typeof message.result === 'string'
-                        ? message.result.substring(0, 500)
+                        ? message.result.substring(0, 2000)
                         : message.result,
                       timestamp: Date.now()
                     })
