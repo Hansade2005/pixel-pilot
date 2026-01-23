@@ -272,10 +272,10 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         // Base64 encode the system prompt for safe shell passing
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
-        // Use stream-json output format for structured messages
-        // --verbose is required when using --output-format stream-json with -p (print mode)
-        // Note: workingDirectory is handled by executeCommand, so we don't need cd here
-        const command = `echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
+        // Use stream-json output format for structured messages with tool visibility
+        // Removed -p (print mode) to enable full agent mode with real-time tool streaming
+        // --verbose shows detailed tool usage information
+        const command = `echo '${base64Prompt}' | base64 -d | claude --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
