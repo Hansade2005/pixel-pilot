@@ -266,9 +266,13 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         // Base64 encode the system prompt for safe shell passing
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
-        // Use stream-json output format for structured messages
-        // --verbose is required when using --output-format stream-json with -p (print mode)
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | claude -p --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)" 2>&1`
+        // Use stream-json output format for structured messages with FULL tool visibility
+        // Use stdbuf -oL to force LINE-BUFFERED output for real-time streaming
+        // Without stdbuf, Claude CLI buffers output and only sends when buffer is full
+        // NO -p flag! -p (print mode) suppresses tool events
+        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | stdbuf -oL -eL claude --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)"`
+
+        console.log(`[Agent Cloud] Executing command with stdbuf for real-time streaming`)
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
@@ -283,10 +287,14 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
         try {
           const result = await sandbox.commands.run(command, {
+            cwd: workDir,
             timeoutMs: 0, // No timeout
             onStdout: (data) => {
               if (isClosed) return
               fullOutput += data
+              
+              // Log raw data for debugging
+              console.log(`[Agent Cloud] 📤 Raw stdout chunk (${data.length} bytes):`, data.substring(0, 200))
 
               // Parse JSON lines from stream-json output
               jsonBuffer += data
@@ -298,6 +306,9 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
                 try {
                   const message = JSON.parse(line)
+                  
+                  // Log ALL parsed messages
+                  console.log(`[Agent Cloud] 📨 Parsed message type: ${message.type}`)
 
                   // Handle different message types from Claude CLI stream-json output
                   if (message.type === 'text') {
