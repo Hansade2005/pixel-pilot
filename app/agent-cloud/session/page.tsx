@@ -269,7 +269,7 @@ User Request: ${currentPrompt}`
       }
 
       // Helper function to process SSE message
-      const processMessage = (data: any) => {
+      const processMessage = async (data: any): Promise<boolean> => {
         switch (data.type) {
           case 'start':
             // Stream has started
@@ -385,7 +385,7 @@ User Request: ${currentPrompt}`
             setIsStreaming(false)
             return true // Signal to break out of stream loop
 
-          case 'error':
+          case 'error': {
             // Check if error is about sandbox expiration
             const errorMsg = data.message || ''
             if (errorMsg.includes('not found') || errorMsg.includes('expired')) {
@@ -411,6 +411,7 @@ User Request: ${currentPrompt}`
             setIsLoading(false)
             setIsStreaming(false)
             return true // Signal to break out of stream loop
+          }
         }
         return false // Continue processing
       }

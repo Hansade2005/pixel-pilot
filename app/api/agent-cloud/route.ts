@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Find sandbox entry by sandboxId
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
   let entryKey: string | undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
@@ -846,7 +846,7 @@ async function handleRun(
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -944,7 +944,7 @@ async function handlePlaywright(sandboxId: string, script: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1013,7 +1013,7 @@ async function handleCommit(sandboxId: string, message?: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1068,7 +1068,7 @@ async function handlePush(request: NextRequest, sandboxId: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1121,7 +1121,7 @@ async function handleDiff(sandboxId: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1268,7 +1268,7 @@ async function handleStatus(sandboxId: string) {
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
@@ -1353,7 +1353,7 @@ async function handleRestore(
   }
 
   // Find sandbox entry
-  let sandboxEntry: typeof activeSandboxes extends Map<string, infer V> ? V : never | undefined
+  let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
 
   for (const [key, entry] of activeSandboxes.entries()) {
     if (entry.sandboxId === sandboxId) {
