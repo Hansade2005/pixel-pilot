@@ -63,7 +63,7 @@ jobs:
         echo "Memory: ${{ inputs.memory_mb }}MB"
         echo ""
         echo "Features included:"
-        echo "  - Claude Code CLI (@anthropic-ai/claude-code)"
+        echo "  - Claude Agent SDK (@anthropic-ai/claude-agent-sdk)"
         echo "  - Playwright with Chromium browser"
         echo "  - Node.js 20 runtime"
         echo "  - pnpm package manager"

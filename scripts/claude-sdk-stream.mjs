@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Claude Code SDK streaming script for E2B sandbox
+ * Claude Agent SDK streaming script for E2B sandbox
  * Provides true token-by-token streaming via the SDK's query() function
  */
 
-import { query } from '@anthropic-ai/claude-code';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import { readFileSync } from 'fs';
 
 // Get arguments
@@ -50,44 +50,66 @@ process.on('SIGTERM', () => abortController.abort());
 process.on('SIGINT', () => abortController.abort());
 
 try {
-  // Use SDK query for real streaming
+  // Use Agent SDK query for real streaming
+  // includePartialMessages enables token-by-token streaming via stream_event messages
   for await (const message of query({
     prompt: fullPrompt,
     options: {
       systemPrompt: systemPromptArg || undefined,
       abortController,
-      maxTurns: 20
+      maxTurns: 20,
+      includePartialMessages: true
     }
   })) {
-    // Stream each message as SSE-compatible JSON
-    // The SDK returns messages incrementally including text deltas
-    
-    if (message.type === 'text') {
-      // Text content - stream it!
-      console.log(JSON.stringify({
-        type: 'text',
-        data: message.text || '',
-        timestamp: Date.now()
-      }));
-    } else if (message.type === 'tool_use') {
-      // Tool being invoked
-      console.log(JSON.stringify({
-        type: 'tool_use',
-        name: message.name,
-        input: message.input,
-        timestamp: Date.now()
-      }));
-    } else if (message.type === 'tool_result') {
-      // Tool execution result
-      console.log(JSON.stringify({
-        type: 'tool_result',
-        result: typeof message.result === 'string' 
-          ? message.result.substring(0, 500)
-          : message.result,
-        timestamp: Date.now()
-      }));
+    // Handle SDK message types
+    if (message.type === 'stream_event') {
+      // Real-time streaming events (token-by-token)
+      const event = message.event;
+      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        console.log(JSON.stringify({
+          type: 'text',
+          data: event.delta.text,
+          timestamp: Date.now()
+        }));
+      } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        console.log(JSON.stringify({
+          type: 'tool_use',
+          name: event.content_block.name,
+          input: {},
+          timestamp: Date.now()
+        }));
+      }
+    } else if (message.type === 'assistant') {
+      // Complete assistant message with content blocks
+      const content = message.message?.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'text' && block.text) {
+            console.log(JSON.stringify({
+              type: 'text',
+              data: block.text,
+              timestamp: Date.now()
+            }));
+          } else if (block.type === 'tool_use') {
+            console.log(JSON.stringify({
+              type: 'tool_use',
+              name: block.name,
+              input: block.input,
+              timestamp: Date.now()
+            }));
+          } else if (block.type === 'tool_result') {
+            console.log(JSON.stringify({
+              type: 'tool_result',
+              result: typeof block.content === 'string'
+                ? block.content.substring(0, 500)
+                : JSON.stringify(block.content).substring(0, 500),
+              timestamp: Date.now()
+            }));
+          }
+        }
+      }
     } else if (message.type === 'result') {
-      // Final result with cost
+      // Final result with cost and usage
       console.log(JSON.stringify({
         type: 'result',
         subtype: message.subtype,
@@ -95,26 +117,8 @@ try {
         cost: message.total_cost_usd,
         timestamp: Date.now()
       }));
-    } else if (message.type === 'content_block_delta') {
-      // Streaming text delta - this is the real-time streaming!
-      if (message.delta?.text) {
-        console.log(JSON.stringify({
-          type: 'text',
-          data: message.delta.text,
-          timestamp: Date.now()
-        }));
-      }
-    } else if (message.type === 'content_block_start') {
-      // Start of content block
-      if (message.content_block?.type === 'tool_use') {
-        console.log(JSON.stringify({
-          type: 'tool_use',
-          name: message.content_block.name,
-          input: {},
-          timestamp: Date.now()
-        }));
-      }
     }
+    // Skip 'user' and 'system' messages (context replay)
   }
 
   console.log(JSON.stringify({ type: 'complete', timestamp: Date.now() }));

@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
-import type { SDKMessage } from "@anthropic-ai/claude-code"
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 
 // SSE message types - includes SDK messages plus streaming-specific event types
 interface SSEMessage {

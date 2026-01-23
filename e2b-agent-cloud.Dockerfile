@@ -58,8 +58,8 @@ RUN apt-get update && apt-get install -y \
 RUN npm install -g npm@latest
 RUN npm install -g pnpm@9
 
-# Install Claude Code CLI globally
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude Agent SDK globally
+RUN npm install -g @anthropic-ai/claude-agent-sdk
 
 # Install Playwright globally (MCP servers will be run via npx)
 RUN npm install -g playwright

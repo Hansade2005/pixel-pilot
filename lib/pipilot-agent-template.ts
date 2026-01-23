@@ -2,7 +2,7 @@
  * PiPilot Agent Template
  *
  * A combined E2B sandbox template that includes:
- * - Claude Code CLI (@anthropic-ai/claude-code)
+ * - Claude Code CLI (@anthropic-ai/claude-agent-sdk)
  * - Playwright with Chromium for browser automation
  * - Vercel AI Gateway for unified AI routing
  *
@@ -57,7 +57,7 @@ export const templateDefinition = {
     { type: 'run', command: 'chmod a+rwX /app' },
 
     // Install Claude Code globally
-    { type: 'npmInstall', packages: ['@anthropic-ai/claude-code'], global: true },
+    { type: 'npmInstall', packages: ['@anthropic-ai/claude-agent-sdk'], global: true },
 
     // Setup user environment
     { type: 'setUser', user: 'user' },
