@@ -176,12 +176,12 @@ function SessionPageInner() {
   const [spinnerPhrase, setSpinnerPhrase] = useState(() => SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Rotate spinner phrase every 8 seconds while streaming
+  // Rotate spinner phrase every 5 seconds while streaming
   useEffect(() => {
     if (!isStreaming || isRecreating) return
     const interval = setInterval(() => {
       setSpinnerPhrase(SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
-    }, 8000)
+    }, 5000)
     return () => clearInterval(interval)
   }, [isStreaming, isRecreating])
 
