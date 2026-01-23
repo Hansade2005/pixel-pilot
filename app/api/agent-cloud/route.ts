@@ -32,7 +32,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Sandbox } from 'e2b'
 import { createClient } from '@/lib/supabase/server'
-import { getDeploymentTokens } from '@/lib/cloud-sync'
+// getDeploymentTokens uses browser client - query user_settings directly with server client instead
 
 // Vercel AI Gateway configuration
 const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
@@ -372,7 +372,7 @@ try {
           if (block.type === 'tool_result') {
             let resultContent = '';
             if (Array.isArray(block.content)) {
-              const parts = block.content.map((c: any) => {
+              const parts = block.content.map((c) => {
                 if (c.type === 'text') return c.text;
                 return '[' + c.type + ']';
               });
@@ -790,12 +790,27 @@ async function handleCreate(
   let githubToken: string | undefined
   if (config?.repo) {
     try {
-      const tokens = await getDeploymentTokens(userId)
-      githubToken = tokens?.github
-      console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
+      // Query user_settings directly using the server supabase client (which has auth context)
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('github_token')
+        .eq('user_id', userId)
+        .single()
+      githubToken = settings?.github_token || undefined
     } catch (e) {
-      console.warn('[Agent Cloud] Failed to get GitHub token:', e)
+      console.warn('[Agent Cloud] Failed to get GitHub token from DB:', e)
     }
+
+    // Fallback: use token passed from frontend via header
+    if (!githubToken) {
+      const headerToken = request.headers.get('X-GitHub-Token')
+      if (headerToken) {
+        githubToken = headerToken
+        console.log(`[Agent Cloud] Using GitHub token from client header (fallback)`)
+      }
+    }
+
+    console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
   }
 
   // Configure environment variables for Claude Code with Vercel AI Gateway
@@ -853,6 +868,38 @@ async function handleCreate(
   if (config?.repo) {
     try {
       console.log(`[Agent Cloud] Cloning repo: ${config.repo.full_name} (${config.repo.branch})`)
+
+      // Validate token and repo access before attempting clone
+      if (githubToken) {
+        try {
+          const repoCheckResponse = await fetch(
+            `https://api.github.com/repos/${config.repo.full_name}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'PiPilot-Agent-Cloud',
+              },
+            }
+          )
+
+          if (repoCheckResponse.ok) {
+            console.log(`[Agent Cloud] Token validated - repo accessible`)
+          } else if (repoCheckResponse.status === 401) {
+            console.warn(`[Agent Cloud] GitHub token expired/invalid (401) - falling back to public clone`)
+            githubToken = undefined
+          } else if (repoCheckResponse.status === 403) {
+            console.warn(`[Agent Cloud] GitHub token lacks repo access (403) - falling back to public clone`)
+            githubToken = undefined
+          } else if (repoCheckResponse.status === 404) {
+            console.warn(`[Agent Cloud] Repo not found or no access (404) - will attempt public clone`)
+            githubToken = undefined
+          }
+        } catch (checkError) {
+          console.warn(`[Agent Cloud] Token validation request failed:`, checkError)
+          // Continue with the token anyway - the clone might still work
+        }
+      }
 
       // Use authenticated URL for private repos, public URL for public repos
       const cloneUrl = githubToken
