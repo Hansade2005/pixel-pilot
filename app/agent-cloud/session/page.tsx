@@ -237,39 +237,36 @@ User Request: ${currentPrompt}`
       const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
-      let pendingUpdate = false
-      let lastUpdateTime = 0
+      let sseBuffer = '' // Buffer for incomplete SSE messages
 
-      // Throttled update function for smooth real-time rendering
-      const updateOutput = (newOutput: string) => {
-        fullOutput = newOutput
-        const now = Date.now()
-
-        // Throttle updates to every 16ms (60fps) for smooth rendering
-        if (!pendingUpdate && now - lastUpdateTime > 16) {
-          pendingUpdate = true
-          requestAnimationFrame(() => {
-            setSessions(prev => prev.map(s => {
-              if (s.id === sessionId) {
-                const lines = [...s.lines]
-                const lastLine = lines[lines.length - 1]
-                if (lastLine && lastLine.type === 'output') {
-                  lines[lines.length - 1] = { ...lastLine, content: fullOutput }
-                } else {
-                  lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
-                }
-                return { ...s, lines }
-              }
-              return s
-            }))
-            pendingUpdate = false
-            lastUpdateTime = Date.now()
-          })
-        }
+      // Direct update function - no throttling for real-time streaming
+      const updateOutput = (newText: string) => {
+        // Append new text to accumulated output
+        fullOutput += newText
+        
+        // Update UI immediately
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            const lines = [...s.lines]
+            const lastLine = lines[lines.length - 1]
+            if (lastLine && lastLine.type === 'output') {
+              // Update existing output line
+              lines[lines.length - 1] = { ...lastLine, content: fullOutput }
+            } else {
+              // Create new output line
+              lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
+            }
+            return { ...s, lines }
+          }
+          return s
+        }))
       }
 
       // Helper function to process SSE message
       const processMessage = async (data: any): Promise<boolean> => {
+        // Log all received message types for debugging
+        console.log('[Agent Cloud] Message received:', data.type, data.data?.substring?.(0, 50) || '')
+        
         switch (data.type) {
           case 'start':
             // Stream has started
@@ -285,13 +282,17 @@ User Request: ${currentPrompt}`
             break
 
           case 'text':
-            // Real-time text streaming from SDK
-            updateOutput(fullOutput + (data.data || ''))
+            // Real-time text streaming from SDK - append new text
+            if (data.data) {
+              updateOutput(data.data)
+            }
             break
 
           case 'stdout':
-            // Fallback raw output streaming
-            updateOutput(fullOutput + (data.data || ''))
+            // Fallback raw output streaming - append new text
+            if (data.data) {
+              updateOutput(data.data)
+            }
             break
 
           case 'tool_use':
@@ -334,13 +335,11 @@ User Request: ${currentPrompt}`
             break
 
           case 'result':
-            // Final SDK result
+            // Final SDK result - only log, don't duplicate output
             if (data.subtype === 'success') {
               console.log('[Agent Cloud] Generation complete, cost:', data.cost)
             }
-            if (data.result) {
-              updateOutput(fullOutput + '\n' + data.result)
-            }
+            // Don't append data.result - it duplicates the already-streamed text
             break
 
           case 'stderr':
@@ -416,7 +415,7 @@ User Request: ${currentPrompt}`
         return false // Continue processing
       }
 
-      // Stream reading loop (matches preview panel pattern exactly)
+      // Stream reading loop with proper SSE buffering
       try {
         while (true) {
           const { done, value } = await reader.read()
@@ -427,21 +426,34 @@ User Request: ${currentPrompt}`
 
           hasReceivedData = true
           const chunk = decoder.decode(value, { stream: true })
+          
+          // Add chunk to buffer for proper SSE parsing
+          sseBuffer += chunk
 
-          // Parse SSE format: "data: {...}\n\n"
-          if (chunk.includes('data: ')) {
-            const lines = chunk.split('\n')
+          // SSE messages are separated by double newlines
+          const messages = sseBuffer.split('\n\n')
+          // Keep the last potentially incomplete message in the buffer
+          sseBuffer = messages.pop() || ''
+
+          for (const message of messages) {
+            if (!message.trim()) continue
+            
+            // Each message can have multiple lines (data:, event:, id:, etc.)
+            const lines = message.split('\n')
             for (const line of lines) {
               if (line.startsWith('data: ')) {
+                const jsonStr = line.slice(6) // Remove "data: " prefix
+                if (jsonStr === '[DONE]') continue // Skip done marker
+                
                 try {
-                  const data = JSON.parse(line.slice(6)) // Remove "data: " prefix
+                  const data = JSON.parse(jsonStr)
                   const shouldBreak = await processMessage(data)
                   if (shouldBreak) {
                     reader.cancel()
                     return
                   }
                 } catch (e) {
-                  // Ignore parsing errors for non-JSON lines
+                  console.warn('[Agent Cloud] Failed to parse SSE data:', jsonStr.substring(0, 100))
                 }
               }
             }
