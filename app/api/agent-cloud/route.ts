@@ -277,7 +277,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
         // Step 1: Upload the streaming script to the sandbox first
         const scriptContent = `#!/usr/bin/env node
-import { query } from '@anthropic-ai/claude-code';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import { readFileSync } from 'fs';
 
 const promptArg = process.argv[2];
@@ -321,21 +321,30 @@ try {
     options: {
       systemPrompt: systemPromptArg || undefined,
       abortController,
-      maxTurns: 20
+      maxTurns: 20,
+      includePartialMessages: true
     }
   })) {
-    if (message.type === 'text') {
-      console.log(JSON.stringify({ type: 'text', data: message.text || '', timestamp: Date.now() }));
-    } else if (message.type === 'tool_use') {
-      console.log(JSON.stringify({ type: 'tool_use', name: message.name, input: message.input, timestamp: Date.now() }));
-    } else if (message.type === 'tool_result') {
-      console.log(JSON.stringify({ type: 'tool_result', result: typeof message.result === 'string' ? message.result.substring(0, 500) : message.result, timestamp: Date.now() }));
+    if (message.type === 'stream_event') {
+      const event = message.event;
+      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        console.log(JSON.stringify({ type: 'text', data: event.delta.text, timestamp: Date.now() }));
+      } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        console.log(JSON.stringify({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() }));
+      }
+    } else if (message.type === 'assistant') {
+      const content = message.message?.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'text' && block.text) {
+            console.log(JSON.stringify({ type: 'text', data: block.text, timestamp: Date.now() }));
+          } else if (block.type === 'tool_use') {
+            console.log(JSON.stringify({ type: 'tool_use', name: block.name, input: block.input, timestamp: Date.now() }));
+          }
+        }
+      }
     } else if (message.type === 'result') {
       console.log(JSON.stringify({ type: 'result', subtype: message.subtype, result: message.result, cost: message.total_cost_usd, timestamp: Date.now() }));
-    } else if (message.type === 'content_block_delta' && message.delta?.text) {
-      console.log(JSON.stringify({ type: 'text', data: message.delta.text, timestamp: Date.now() }));
-    } else if (message.type === 'content_block_start' && message.content_block?.type === 'tool_use') {
-      console.log(JSON.stringify({ type: 'tool_use', name: message.content_block.name, input: {}, timestamp: Date.now() }));
     }
   }
   console.log(JSON.stringify({ type: 'complete', timestamp: Date.now() }));
@@ -350,12 +359,12 @@ try {
 
         // Step 2: Build a single chained command that installs SDK (if needed) AND runs the script
         // This ensures the SDK is available in node_modules when the script executes
-        send({ type: 'log', message: 'Preparing Claude Code SDK...' })
+        send({ type: 'log', message: 'Preparing Claude Agent SDK...' })
         
         // Single chained command: init package.json if needed, install SDK, then run script
         // Environment variables will be passed via the env option in sandbox.commands.run()
         // Using && ensures each step must succeed before the next runs
-        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-code@1.0.39 && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
+        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-agent-sdk && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
 
         console.log(`[Agent Cloud] Executing chained install & run command`)
 
@@ -375,7 +384,7 @@ try {
             cwd: workDir,
             timeoutMs: 0, // No timeout
             envs: {
-              // Pass environment variables for Claude Code SDK
+              // Pass environment variables for Claude Agent SDK
               ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
               ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
               ANTHROPIC_API_KEY: '', // Must be empty
