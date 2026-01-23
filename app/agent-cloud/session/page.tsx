@@ -22,6 +22,7 @@ import {
   Eye,
   Plus,
   Minus,
+  Square,
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
@@ -62,6 +63,97 @@ interface SSEMessage {
   }
 }
 
+// Rotating thinking phrases - fun, entertaining sentences shown while AI streams
+const SPINNER_PHRASES = [
+  // Claude/AI specific
+  'Teaching Claude a new trick',
+  'Claude is in the zone right now',
+  'Warming up the neural networks',
+  'Untangling the attention layers',
+  'Asking Claude politely for the answer',
+  'Claude is reading the docs so you don\'t have to',
+  'Consulting the transformer spirits',
+  'Running through a few billion parameters',
+  'Claude is thinking really hard about this',
+  'Tokenizing your brilliance',
+  'Feeding tokens to the model',
+  'Claude is having a eureka moment',
+  'Navigating the latent space',
+  'Processing at the speed of thought',
+  'Claude just said "hold my tokens"',
+  // Coding/developer humor
+  'Converting caffeine into code',
+  'Debugging the universe, one line at a time',
+  'Looking for that missing semicolon',
+  'Compiling your dreams into reality',
+  'Refactoring the space-time continuum',
+  'Resolving dependencies... and existential crises',
+  'git commit -m "making magic happen"',
+  'npm install awesome-features',
+  'Pushing pixels into place',
+  'Writing code that writes code',
+  'Turning your words into working software',
+  'Deploying brilliance to production',
+  'Squashing bugs before they hatch',
+  'Crafting components with care',
+  'Optimizing for maximum awesomeness',
+  'Building something beautiful',
+  'Spinning up the dev server in my mind',
+  'Running prettier on the universe',
+  'Linting reality for errors',
+  'Hot-reloading your ideas',
+  // PiPilot/app building themed
+  'Your app is taking shape',
+  'Vibe coding in progress',
+  'Architecting your next big thing',
+  'Turning conversation into creation',
+  'From chat to code in seconds',
+  'Building at the speed of imagination',
+  'Making your app dreams come true',
+  'Shipping features, not excuses',
+  'Your personal dev team is on it',
+  'Crafting pixel-perfect solutions',
+  // Fun and witty
+  'Brewing fresh bytes just for you',
+  'Polishing the algorithms until they shine',
+  'Summoning the cloud wizards',
+  'Engaging the improbability drive',
+  'Channeling the Force... of good code',
+  'Calibrating the flux capacitor',
+  'Loading wit.exe... please stand by',
+  'Assembling the Avengers of code',
+  'Performing digital sorcery',
+  'Reticulating splines, as is tradition',
+  'Hold tight, genius at work',
+  'Cooking up something special',
+  'Mixing the secret sauce',
+  'Charging the creativity laser',
+  'Aligning the stars for your project',
+  'Making the hamsters run faster',
+  'This is where the magic happens',
+  'Working harder than a git merge on a Monday',
+  'Almost there... probably',
+  'Doing science, please wait',
+  'Training the code monkeys',
+  'Generating something you\'ll love',
+  'Sprinkling some AI magic dust',
+  'One moment, crafting perfection',
+  'Good things come to those who wait',
+  'The best code is worth waiting for',
+  'Patience... greatness is loading',
+  'Hang tight, this is gonna be good',
+  'Thinking outside the sandbox',
+  'Making bits and bytes dance',
+  'Orchestrating a symphony of code',
+  'Weaving logic into elegance',
+  'Conjuring solutions from thin air',
+  'Transmuting ideas into features',
+  'Distilling your vision into code',
+]
+
+// Max lines before truncation
+const MAX_LINES_COLLAPSED = 8
+
 function SessionPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -79,6 +171,18 @@ function SessionPageInner() {
   const [isRecreating, setIsRecreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
+  const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set())
+  const [spinnerPhrase, setSpinnerPhrase] = useState(() => SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Rotate spinner phrase every 3 seconds while streaming
+  useEffect(() => {
+    if (!isStreaming || isRecreating) return
+    const interval = setInterval(() => {
+      setSpinnerPhrase(SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [isStreaming, isRecreating])
 
   const toggleToolExpanded = (index: number) => {
     setExpandedTools(prev => {
@@ -242,6 +346,10 @@ function SessionPageInner() {
     setIsLoading(true)
     setIsStreaming(true)
 
+    // Create AbortController for this request
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     // Update session title if first message
     if (!overridePrompt && activeSession.lines.filter(l => l.type === 'input').length === 0) {
       setSessions(prev => prev.map(s =>
@@ -287,6 +395,7 @@ User Request: ${currentPrompt}`
         {
           method: 'GET',
           headers,
+          signal: controller.signal,
         }
       )
 
@@ -680,8 +789,23 @@ User Request: ${currentPrompt}`
         reader.releaseLock()
         setIsLoading(false)
         setIsStreaming(false)
+        abortControllerRef.current = null
       }
     } catch (error) {
+      // Handle user-initiated abort gracefully
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.log('[Agent Cloud] Request aborted by user')
+        setSessions(prev => prev.map(s =>
+          s.id === sessionId
+            ? { ...s, lines: [...s.lines, { type: 'system' as const, content: 'Agent stopped by user', timestamp: new Date() }] }
+            : s
+        ))
+        setIsLoading(false)
+        setIsStreaming(false)
+        abortControllerRef.current = null
+        return
+      }
+
       console.error('Failed to run prompt:', error)
       const errMsg = error instanceof Error ? error.message : 'Failed to run prompt'
 
@@ -702,6 +826,7 @@ User Request: ${currentPrompt}`
           }
           setIsLoading(false)
           setIsStreaming(false)
+          abortControllerRef.current = null
           runPrompt(contextPrompt, newSandboxId)
           return
         }
@@ -714,8 +839,17 @@ User Request: ${currentPrompt}`
       ))
       setIsLoading(false)
       setIsStreaming(false)
+      abortControllerRef.current = null
     }
   }, [activeSession, prompt, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
+
+  // Stop the running agent
+  const stopAgent = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+  }, [])
 
   // Auto-run pending prompt when session loads (must be after runPrompt is defined)
   useEffect(() => {
@@ -764,19 +898,44 @@ User Request: ${currentPrompt}`
           </div>
         )
 
-      case 'input':
+      case 'input': {
+        const inputLines = line.content.split('\n')
+        const isLong = inputLines.length > MAX_LINES_COLLAPSED
+        const isExpanded = expandedMessages.has(index)
+        const displayContent = isLong && !isExpanded
+          ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
+          : line.content
         return (
           <div key={index} className="flex items-start gap-3 py-4">
             <div className="h-7 w-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold">U</span>
             </div>
             <div className="flex-1 pt-0.5">
-              <p className="text-zinc-100 text-sm leading-relaxed">{line.content}</p>
+              <p className="text-zinc-100 text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+              {isLong && (
+                <button
+                  onClick={() => setExpandedMessages(prev => {
+                    const next = new Set(prev)
+                    if (next.has(index)) { next.delete(index) } else { next.add(index) }
+                    return next
+                  })}
+                  className="text-xs text-orange-400 hover:text-orange-300 mt-1 font-mono"
+                >
+                  {isExpanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
             </div>
           </div>
         )
+      }
 
-      case 'output':
+      case 'output': {
+        const outputLines = line.content.split('\n')
+        const isOutputLong = outputLines.length > MAX_LINES_COLLAPSED
+        const isOutputExpanded = expandedMessages.has(index)
+        const outputContent = isOutputLong && !isOutputExpanded
+          ? outputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
+          : line.content
         return (
           <div key={index} className="flex items-start gap-3 py-4 group">
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shrink-0">
@@ -786,9 +945,21 @@ User Request: ${currentPrompt}`
               <div className="relative">
                 <div className="prose prose-invert prose-sm max-w-none">
                   <Response className="text-zinc-300">
-                    {line.content}
+                    {outputContent}
                   </Response>
                 </div>
+                {isOutputLong && (
+                  <button
+                    onClick={() => setExpandedMessages(prev => {
+                      const next = new Set(prev)
+                      if (next.has(index)) { next.delete(index) } else { next.add(index) }
+                      return next
+                    })}
+                    className="text-xs text-orange-400 hover:text-orange-300 mt-1 font-mono"
+                  >
+                    {isOutputExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                )}
                 <button
                   onClick={() => copyToClipboard(line.content, `output-${index}`)}
                   className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded-md hover:bg-zinc-700"
@@ -803,6 +974,7 @@ User Request: ${currentPrompt}`
             </div>
           </div>
         )
+      }
 
       case 'error':
         return (
@@ -1019,7 +1191,7 @@ User Request: ${currentPrompt}`
           {isStreaming && !isRecreating && (
             <div className="flex items-center gap-2 py-3 text-orange-400">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm font-mono">Claude is working...</span>
+              <span className="text-sm font-mono">{spinnerPhrase}...</span>
             </div>
           )}
         </div>
@@ -1041,18 +1213,26 @@ User Request: ${currentPrompt}`
                 rows={1}
               />
               <div className="absolute bottom-2 right-2">
-                <Button
-                  onClick={() => runPrompt()}
-                  disabled={!prompt.trim() || isLoading || isRecreating}
-                  size="icon"
-                  className="h-8 w-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:bg-zinc-700"
-                >
-                  {isLoading || isRecreating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+                {isLoading || isRecreating ? (
+                  <Button
+                    onClick={stopAgent}
+                    size="icon"
+                    className="h-8 w-8 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white relative"
+                    title="Stop agent"
+                  >
+                    <Loader2 className="h-5 w-5 animate-spin text-zinc-400 absolute" />
+                    <Square className="h-2.5 w-2.5 fill-red-500 text-red-500 relative z-10" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => runPrompt()}
+                    disabled={!prompt.trim()}
+                    size="icon"
+                    className="h-8 w-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:bg-zinc-700"
+                  >
                     <ArrowUp className="h-4 w-4" />
-                  )}
-                </Button>
+                  </Button>
+                )}
               </div>
             </div>
           </div>

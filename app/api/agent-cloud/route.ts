@@ -223,6 +223,16 @@ export async function GET(request: NextRequest) {
 
   // Create a streaming response with real-time output (exactly like preview route)
   let isClosed = false
+  const sandboxRef = sandboxEntry!.sandbox
+
+  // Listen to client abort signal
+  request.signal.addEventListener('abort', () => {
+    if (!isClosed) {
+      isClosed = true
+      console.log('[Agent Cloud] Request aborted by client, killing agent process...')
+      sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
+    }
+  })
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -628,6 +638,13 @@ try {
         isClosed = true
         controller.close()
       }
+    },
+    cancel() {
+      // Called when client disconnects (aborts fetch)
+      isClosed = true
+      console.log('[Agent Cloud] Client disconnected, killing agent process...')
+      // Kill the claude-stream process in the sandbox
+      sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
     }
   })
 
