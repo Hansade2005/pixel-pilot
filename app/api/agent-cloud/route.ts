@@ -326,6 +326,9 @@ const abortController = new AbortController();
 process.on('SIGTERM', () => abortController.abort());
 process.on('SIGINT', () => abortController.abort());
 
+// Track if we've received streaming text deltas to avoid duplication from assistant messages
+let hasStreamedText = false;
+
 try {
   for await (const message of query({
     prompt: fullPrompt,
@@ -342,6 +345,7 @@ try {
     if (message.type === 'stream_event') {
       const event = message.event;
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        hasStreamedText = true;
         console.log(JSON.stringify({ type: 'text', data: event.delta.text, timestamp: Date.now() }));
       } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
         console.log(JSON.stringify({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() }));
@@ -350,13 +354,16 @@ try {
       const content = message.message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text) {
+          if (block.type === 'text' && block.text && !hasStreamedText) {
+            // Only emit text from assistant if we haven't already streamed it
             console.log(JSON.stringify({ type: 'text', data: block.text, timestamp: Date.now() }));
           } else if (block.type === 'tool_use') {
             console.log(JSON.stringify({ type: 'tool_use', name: block.name, input: block.input, timestamp: Date.now() }));
           }
         }
       }
+      // Reset for next turn (multi-turn conversations)
+      hasStreamedText = false;
     } else if (message.type === 'result') {
       console.log(JSON.stringify({ type: 'result', subtype: message.subtype, result: message.result, cost: message.total_cost_usd, timestamp: Date.now() }));
     }

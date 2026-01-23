@@ -58,6 +58,9 @@ const abortController = new AbortController();
 process.on('SIGTERM', () => abortController.abort());
 process.on('SIGINT', () => abortController.abort());
 
+// Track if we've received streaming text deltas to avoid duplication from assistant messages
+let hasStreamedText = false;
+
 try {
   // Use Agent SDK query for real streaming
   // includePartialMessages enables token-by-token streaming via stream_event messages
@@ -78,6 +81,7 @@ try {
       // Real-time streaming events (token-by-token)
       const event = message.event;
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        hasStreamedText = true;
         console.log(JSON.stringify({
           type: 'text',
           data: event.delta.text,
@@ -96,7 +100,8 @@ try {
       const content = message.message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text) {
+          if (block.type === 'text' && block.text && !hasStreamedText) {
+            // Only emit text from assistant if we haven't already streamed it
             console.log(JSON.stringify({
               type: 'text',
               data: block.text,
@@ -120,6 +125,8 @@ try {
           }
         }
       }
+      // Reset for next turn (multi-turn conversations)
+      hasStreamedText = false;
     } else if (message.type === 'result') {
       // Final result with cost and usage
       console.log(JSON.stringify({
