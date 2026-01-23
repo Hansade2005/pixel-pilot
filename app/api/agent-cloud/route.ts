@@ -980,7 +980,7 @@ async function handleCreate(
 
         // Configure git user
         await sandbox.commands.run(
-          `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
+          `cd ${PROJECT_DIR} && git config user.email "hello@pipilot.dev" && git config user.name "PiPilot Agent"`,
           { timeoutMs: 5000 }
         )
 
