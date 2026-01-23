@@ -29,17 +29,16 @@ if (historyFileArg) {
   }
 }
 
-// Build messages array from history
-const messages = conversationHistory.map(msg => ({
-  role: msg.role,
-  content: msg.content
-}));
-
-// Add the new user prompt
-messages.push({
-  role: 'user',
-  content: promptArg
-});
+// Build a single prompt string from history + current message
+let fullPrompt = '';
+if (conversationHistory.length > 0) {
+  const context = conversationHistory
+    .map(msg => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
+    .join('\n\n');
+  fullPrompt = `Previous conversation:\n${context}\n\nCurrent request: ${promptArg}`;
+} else {
+  fullPrompt = promptArg;
+}
 
 // Send start event
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
@@ -53,12 +52,11 @@ process.on('SIGINT', () => abortController.abort());
 try {
   // Use SDK query for real streaming
   for await (const message of query({
-    messages,
-    systemPrompt: systemPromptArg || undefined,
-    abortController,
+    prompt: fullPrompt,
     options: {
+      systemPrompt: systemPromptArg || undefined,
+      abortController,
       maxTurns: 20
-      // No allowedTools restriction - agent has access to all available tools
     }
   })) {
     // Stream each message as SSE-compatible JSON
