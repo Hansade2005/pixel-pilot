@@ -57,7 +57,6 @@ try {
     options: {
       systemPrompt: systemPromptArg || undefined,
       abortController,
-      maxTurns: 20,
       includePartialMessages: true
     }
   })) {

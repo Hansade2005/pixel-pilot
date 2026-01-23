@@ -321,7 +321,6 @@ try {
     options: {
       systemPrompt: systemPromptArg || undefined,
       abortController,
-      maxTurns: 20,
       includePartialMessages: true
     }
   })) {
@@ -371,6 +370,7 @@ try {
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
         let jsonBuffer = '' // Buffer for incomplete JSON lines
+        let sdkStarted = false // Track when SDK script starts (to filter install noise)
 
         // Start heartbeat to keep connection alive
         const heartbeatInterval = setInterval(() => {
@@ -415,7 +415,12 @@ try {
                     console.log(`[Agent Cloud] 📨 Parsed message type: ${message.type}`)
                   }
 
-                  // Handle different message types from Claude CLI stream-json output
+                  // Mark SDK as started when we receive the first message
+                  if (!sdkStarted && message.type === 'start') {
+                    sdkStarted = true
+                  }
+
+                  // Handle different message types from Agent SDK stream output
                   if (message.type === 'text') {
                     textContent += message.text || ''
                     send({ type: 'text', data: message.text, timestamp: Date.now() })
@@ -485,8 +490,9 @@ try {
                     console.log(`[Agent Cloud] Unknown message type: ${message.type}`, JSON.stringify(message).substring(0, 200))
                   }
                 } catch (parseErr) {
-                  // Not valid JSON, send as raw stdout (fallback for non-JSON output)
-                  if (line.trim()) {
+                  // Only forward non-JSON output after SDK has started
+                  // This filters out pnpm install progress/noise before the script runs
+                  if (sdkStarted && line.trim()) {
                     send({ type: 'stdout', data: line, timestamp: Date.now() })
                   }
                 }
