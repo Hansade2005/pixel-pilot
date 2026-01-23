@@ -22,6 +22,7 @@ import {
   Eye,
   Plus,
   Minus,
+  Square,
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
@@ -79,6 +80,7 @@ function SessionPageInner() {
   const [isRecreating, setIsRecreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const toggleToolExpanded = (index: number) => {
     setExpandedTools(prev => {
@@ -242,6 +244,10 @@ function SessionPageInner() {
     setIsLoading(true)
     setIsStreaming(true)
 
+    // Create AbortController for this request
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     // Update session title if first message
     if (!overridePrompt && activeSession.lines.filter(l => l.type === 'input').length === 0) {
       setSessions(prev => prev.map(s =>
@@ -287,6 +293,7 @@ User Request: ${currentPrompt}`
         {
           method: 'GET',
           headers,
+          signal: controller.signal,
         }
       )
 
@@ -680,8 +687,23 @@ User Request: ${currentPrompt}`
         reader.releaseLock()
         setIsLoading(false)
         setIsStreaming(false)
+        abortControllerRef.current = null
       }
     } catch (error) {
+      // Handle user-initiated abort gracefully
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.log('[Agent Cloud] Request aborted by user')
+        setSessions(prev => prev.map(s =>
+          s.id === sessionId
+            ? { ...s, lines: [...s.lines, { type: 'system' as const, content: 'Agent stopped by user', timestamp: new Date() }] }
+            : s
+        ))
+        setIsLoading(false)
+        setIsStreaming(false)
+        abortControllerRef.current = null
+        return
+      }
+
       console.error('Failed to run prompt:', error)
       const errMsg = error instanceof Error ? error.message : 'Failed to run prompt'
 
@@ -702,6 +724,7 @@ User Request: ${currentPrompt}`
           }
           setIsLoading(false)
           setIsStreaming(false)
+          abortControllerRef.current = null
           runPrompt(contextPrompt, newSandboxId)
           return
         }
@@ -714,8 +737,17 @@ User Request: ${currentPrompt}`
       ))
       setIsLoading(false)
       setIsStreaming(false)
+      abortControllerRef.current = null
     }
   }, [activeSession, prompt, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
+
+  // Stop the running agent
+  const stopAgent = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+  }, [])
 
   // Auto-run pending prompt when session loads (must be after runPrompt is defined)
   useEffect(() => {
@@ -1041,18 +1073,26 @@ User Request: ${currentPrompt}`
                 rows={1}
               />
               <div className="absolute bottom-2 right-2">
-                <Button
-                  onClick={() => runPrompt()}
-                  disabled={!prompt.trim() || isLoading || isRecreating}
-                  size="icon"
-                  className="h-8 w-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:bg-zinc-700"
-                >
-                  {isLoading || isRecreating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+                {isLoading || isRecreating ? (
+                  <Button
+                    onClick={stopAgent}
+                    size="icon"
+                    className="h-8 w-8 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white relative"
+                    title="Stop agent"
+                  >
+                    <Loader2 className="h-5 w-5 animate-spin text-zinc-400 absolute" />
+                    <Square className="h-2.5 w-2.5 fill-red-500 text-red-500 relative z-10" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => runPrompt()}
+                    disabled={!prompt.trim()}
+                    size="icon"
+                    className="h-8 w-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:bg-zinc-700"
+                  >
                     <ArrowUp className="h-4 w-4" />
-                  )}
-                </Button>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
