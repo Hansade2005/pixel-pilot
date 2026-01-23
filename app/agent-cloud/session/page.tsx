@@ -296,7 +296,7 @@ User Request: ${currentPrompt}`
 
           case 'tool_use':
             // Tool being used - show in UI with details
-            console.log('[Agent Cloud] Tool used:', data.name, data.input)
+            console.log('[Agent Cloud] 🔧 Tool used:', data.name, 'Input:', data.input)
             const toolName = data.name
             const input = data.input
             let toolDescription = `Using ${toolName}`

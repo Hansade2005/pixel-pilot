@@ -313,6 +313,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
                     textContent += message.text || ''
                     send({ type: 'text', data: message.text, timestamp: Date.now() })
                   } else if (message.type === 'tool_use') {
+                    console.log(`[Agent Cloud] 🔧 Tool use detected:`, { name: message.name, input: message.input })
                     send({
                       type: 'tool_use',
                       name: message.name,
@@ -320,6 +321,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
                       timestamp: Date.now()
                     })
                   } else if (message.type === 'tool_result') {
+                    console.log(`[Agent Cloud] ✅ Tool result:`, typeof message.result === 'string' ? message.result.substring(0, 100) : message.result)
                     send({
                       type: 'tool_result',
                       result: typeof message.result === 'string'
