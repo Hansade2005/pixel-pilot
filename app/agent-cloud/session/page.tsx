@@ -63,6 +63,24 @@ interface SSEMessage {
   }
 }
 
+// Rotating thinking phrases (inspired by Claude Code CLI)
+const SPINNER_PHRASES = [
+  'Accomplishing', 'Actualizing', 'Baking', 'Brewing', 'Calculating',
+  'Cerebrating', 'Churning', 'Clauding', 'Cogitating', 'Combobulating',
+  'Computing', 'Concocting', 'Conjuring', 'Considering', 'Contemplating',
+  'Cooking', 'Crafting', 'Creating', 'Crunching', 'Deliberating',
+  'Determining', 'Divining', 'Elucidating', 'Enchanting', 'Envisioning',
+  'Forging', 'Generating', 'Germinating', 'Hatching', 'Ideating',
+  'Imagining', 'Incubating', 'Inferring', 'Manifesting', 'Marinating',
+  'Mulling', 'Musing', 'Noodling', 'Percolating', 'Philosophising',
+  'Pondering', 'Pontificating', 'Processing', 'Puzzling', 'Ruminating',
+  'Scheming', 'Simmering', 'Synthesizing', 'Thinking', 'Tinkering',
+  'Transmuting', 'Unravelling', 'Vibing', 'Whirring', 'Wizarding', 'Working',
+]
+
+// Max lines before truncation
+const MAX_LINES_COLLAPSED = 8
+
 function SessionPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -80,7 +98,18 @@ function SessionPageInner() {
   const [isRecreating, setIsRecreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
+  const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set())
+  const [spinnerPhrase, setSpinnerPhrase] = useState(() => SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Rotate spinner phrase every 3 seconds while streaming
+  useEffect(() => {
+    if (!isStreaming || isRecreating) return
+    const interval = setInterval(() => {
+      setSpinnerPhrase(SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [isStreaming, isRecreating])
 
   const toggleToolExpanded = (index: number) => {
     setExpandedTools(prev => {
@@ -796,19 +825,44 @@ User Request: ${currentPrompt}`
           </div>
         )
 
-      case 'input':
+      case 'input': {
+        const inputLines = line.content.split('\n')
+        const isLong = inputLines.length > MAX_LINES_COLLAPSED
+        const isExpanded = expandedMessages.has(index)
+        const displayContent = isLong && !isExpanded
+          ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
+          : line.content
         return (
           <div key={index} className="flex items-start gap-3 py-4">
             <div className="h-7 w-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold">U</span>
             </div>
             <div className="flex-1 pt-0.5">
-              <p className="text-zinc-100 text-sm leading-relaxed">{line.content}</p>
+              <p className="text-zinc-100 text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+              {isLong && (
+                <button
+                  onClick={() => setExpandedMessages(prev => {
+                    const next = new Set(prev)
+                    if (next.has(index)) { next.delete(index) } else { next.add(index) }
+                    return next
+                  })}
+                  className="text-xs text-orange-400 hover:text-orange-300 mt-1 font-mono"
+                >
+                  {isExpanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
             </div>
           </div>
         )
+      }
 
-      case 'output':
+      case 'output': {
+        const outputLines = line.content.split('\n')
+        const isOutputLong = outputLines.length > MAX_LINES_COLLAPSED
+        const isOutputExpanded = expandedMessages.has(index)
+        const outputContent = isOutputLong && !isOutputExpanded
+          ? outputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
+          : line.content
         return (
           <div key={index} className="flex items-start gap-3 py-4 group">
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shrink-0">
@@ -818,9 +872,21 @@ User Request: ${currentPrompt}`
               <div className="relative">
                 <div className="prose prose-invert prose-sm max-w-none">
                   <Response className="text-zinc-300">
-                    {line.content}
+                    {outputContent}
                   </Response>
                 </div>
+                {isOutputLong && (
+                  <button
+                    onClick={() => setExpandedMessages(prev => {
+                      const next = new Set(prev)
+                      if (next.has(index)) { next.delete(index) } else { next.add(index) }
+                      return next
+                    })}
+                    className="text-xs text-orange-400 hover:text-orange-300 mt-1 font-mono"
+                  >
+                    {isOutputExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                )}
                 <button
                   onClick={() => copyToClipboard(line.content, `output-${index}`)}
                   className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded-md hover:bg-zinc-700"
@@ -835,6 +901,7 @@ User Request: ${currentPrompt}`
             </div>
           </div>
         )
+      }
 
       case 'error':
         return (
@@ -1051,7 +1118,7 @@ User Request: ${currentPrompt}`
           {isStreaming && !isRecreating && (
             <div className="flex items-center gap-2 py-3 text-orange-400">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm font-mono">Claude is working...</span>
+              <span className="text-sm font-mono">{spinnerPhrase}...</span>
             </div>
           )}
         </div>
