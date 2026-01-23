@@ -26,6 +26,7 @@
     "@ai-sdk/togetherai": "^1.0.11",
     "@ai-sdk/ui-utils": "^1.2.11",
     "@ai-sdk/xai": "^2.0.23",
+    "@anthropic-ai/claude-code": "^1.0.39",
     "@codesandbox/sandpack-react": "^2.20.0",
     "@dyad-sh/supabase-management-js": "^1.0.0",
     "@e2b/cli": "^2.2.4",

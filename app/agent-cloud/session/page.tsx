@@ -13,6 +13,42 @@ import {
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
+import type { SDKMessage } from "@anthropic-ai/claude-code"
+
+// SSE message types - includes SDK messages plus streaming-specific event types
+interface SSEMessage {
+  type: 'start' | 'log' | 'heartbeat' | 'text' | 'stdout' | 'tool_use' | 'tool_result' | 'result' | 'stderr' | 'complete' | 'error' | 'user' | 'system' | 'assistant' | 'content_block_delta' | 'content_block_start'
+  // SDK message fields
+  message?: any
+  session_id?: string
+  parent_tool_use_id?: string | null
+  total_cost_usd?: number
+  usage?: any
+  duration_ms?: number
+  duration_api_ms?: number
+  is_error?: boolean
+  num_turns?: number
+  // Streaming-specific fields
+  data?: string
+  name?: string
+  input?: any
+  result?: any
+  subtype?: 'success' | 'error' | 'error_max_turns' | 'error_during_execution' | 'init'
+  cost?: number
+  timestamp?: number
+  diffStats?: {
+    additions: number
+    deletions: number
+  }
+  messageCount?: number
+  delta?: {
+    text?: string
+  }
+  content_block?: {
+    type?: string
+    name?: string
+  }
+}
 
 function SessionPageInner() {
   const router = useRouter()
@@ -263,9 +299,11 @@ User Request: ${currentPrompt}`
       }
 
       // Helper function to process SSE message
-      const processMessage = async (data: any): Promise<boolean> => {
-        // Log all received message types for debugging
-        console.log('[Agent Cloud] Message received:', data.type, data.data?.substring?.(0, 50) || '')
+      const processMessage = async (data: SSEMessage): Promise<boolean> => {
+        // Only log meaningful message types
+        if (!['user', 'system', 'heartbeat'].includes(data.type)) {
+          console.log('[Agent Cloud] Message received:', data.type, data.data?.substring?.(0, 50) || '')
+        }
         
         switch (data.type) {
           case 'start':
@@ -278,7 +316,9 @@ User Request: ${currentPrompt}`
             break
 
           case 'heartbeat':
-            // Keep-alive message, just acknowledge
+          case 'user':
+          case 'system':
+            // Keep-alive and context messages - ignore silently
             break
 
           case 'text':
@@ -295,11 +335,11 @@ User Request: ${currentPrompt}`
             }
             break
 
-          case 'tool_use':
+          case 'tool_use': {
             // Tool being used - show in UI with details
             console.log('[Agent Cloud] Tool used:', data.name, data.input)
-            const toolName = data.name
-            const input = data.input
+            const toolName = data.name || 'Unknown'
+            const input = data.input || {}
             let toolDescription = `Using ${toolName}`
 
             // Create user-friendly descriptions for common tools
@@ -315,6 +355,10 @@ User Request: ${currentPrompt}`
               toolDescription = `Searching: ${input.pattern}`
             } else if (toolName === 'Grep' && input?.pattern) {
               toolDescription = `Grep: ${input.pattern}`
+            } else if (toolName === 'WebSearch' && input?.query) {
+              toolDescription = `Searching web: ${input.query.substring(0, 40)}${input.query.length > 40 ? '...' : ''}`
+            } else if (toolName === 'WebFetch' && input?.url) {
+              toolDescription = `Fetching: ${input.url}`
             }
 
             setSessions(prev => prev.map(s =>
@@ -328,6 +372,7 @@ User Request: ${currentPrompt}`
                 : s
             ))
             break
+          }
 
           case 'tool_result':
             // Tool result - log for debugging
@@ -345,7 +390,7 @@ User Request: ${currentPrompt}`
           case 'stderr':
             setSessions(prev => prev.map(s =>
               s.id === sessionId
-                ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.data, timestamp: new Date() }] }
+                ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.data || 'Error occurred', timestamp: new Date() }] }
                 : s
             ))
             break
@@ -372,8 +417,8 @@ User Request: ${currentPrompt}`
                   ? {
                       ...s,
                       stats: {
-                        additions: (s.stats?.additions || 0) + (data.diffStats.additions || 0),
-                        deletions: (s.stats?.deletions || 0) + (data.diffStats.deletions || 0)
+                        additions: (s.stats?.additions || 0) + (data.diffStats?.additions || 0),
+                        deletions: (s.stats?.deletions || 0) + (data.diffStats?.deletions || 0)
                       },
                       messageCount: data.messageCount
                     }
@@ -404,7 +449,7 @@ User Request: ${currentPrompt}`
 
             setSessions(prev => prev.map(s =>
               s.id === sessionId
-                ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.message, timestamp: new Date() }] }
+                ? { ...s, lines: [...s.lines, { type: 'error' as const, content: data.message || 'An error occurred', timestamp: new Date() }] }
                 : s
             ))
             setIsLoading(false)

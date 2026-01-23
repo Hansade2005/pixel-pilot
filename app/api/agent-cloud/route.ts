@@ -71,7 +71,7 @@ const activeSandboxes = new Map<string, {
 const SANDBOX_TIMEOUT = 30 * 60 * 1000
 
 // Working directory for cloned repos
-const PROJECT_DIR = '/home/user/project'
+const PROJECT_DIR = '/home/user/'
 
 // Conversation history file path in sandbox
 const HISTORY_FILE = '/home/user/.claude_history.json'
@@ -266,13 +266,102 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         // Base64 encode the system prompt for safe shell passing
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
-        // Use stream-json output format for structured messages with FULL tool visibility
-        // Use stdbuf -oL to force LINE-BUFFERED output for real-time streaming
-        // Without stdbuf, Claude CLI buffers output and only sends when buffer is full
-        // NO -p flag! -p (print mode) suppresses tool events
-        const command = `cd ${workDir} && echo '${base64Prompt}' | base64 -d | stdbuf -oL -eL claude --verbose --dangerously-skip-permissions --output-format stream-json --append-system-prompt "$(echo '${base64SystemPrompt}' | base64 -d)"`
+        // Step 1: Install Claude Code SDK in working directory if not already installed
+        console.log(`[Agent Cloud] Installing @anthropic-ai/claude-code SDK...`)
+        try {
+          const packageCheckCmd = `cd ${workDir} && [ -d node_modules/@anthropic-ai/claude-code ] && echo "installed" || echo "not_installed"`
+          const checkResult = await sandbox.commands.run(packageCheckCmd, { timeoutMs: 5000 })
+          
+          if (!checkResult.stdout?.includes('installed')) {
+            send({ type: 'log', message: 'Installing Claude Code SDK...' })
+            
+            // Initialize package.json if it doesn't exist and install SDK with pnpm
+            const installCmd = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm install --no-save @anthropic-ai/claude-code@1.0.39`
+            const installResult = await sandbox.commands.run(installCmd, { timeoutMs: 60000 })
+            
+            if (installResult.exitCode !== 0) {
+              throw new Error(`Failed to install SDK: ${installResult.stderr}`)
+            }
+            
+            console.log(`[Agent Cloud] SDK installed successfully`)
+          } else {
+            console.log(`[Agent Cloud] SDK already installed`)
+          }
+        } catch (installErr) {
+          console.error(`[Agent Cloud] SDK installation error:`, installErr)
+          send({ type: 'error', message: 'Failed to install Claude Code SDK' })
+        }
 
-        console.log(`[Agent Cloud] Executing command with stdbuf for real-time streaming`)
+        // Step 2: Upload the streaming script to the sandbox
+        const scriptContent = `#!/usr/bin/env node
+import { query } from '@anthropic-ai/claude-code';
+import { readFileSync } from 'fs';
+
+const promptArg = process.argv[2];
+const systemPromptArg = process.argv[3];
+const historyFileArg = process.argv[4];
+
+if (!promptArg) {
+  console.error('Usage: node script.mjs <prompt> [systemPrompt] [historyFile]');
+  process.exit(1);
+}
+
+let conversationHistory = [];
+if (historyFileArg) {
+  try {
+    const historyData = readFileSync(historyFileArg, 'utf-8');
+    conversationHistory = JSON.parse(historyData);
+  } catch (e) {
+    // Ignore
+  }
+}
+
+const messages = conversationHistory.map(msg => ({ role: msg.role, content: msg.content }));
+messages.push({ role: 'user', content: promptArg });
+
+console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
+
+const abortController = new AbortController();
+process.on('SIGTERM', () => abortController.abort());
+process.on('SIGINT', () => abortController.abort());
+
+try {
+  for await (const message of query({
+    messages,
+    systemPrompt: systemPromptArg || undefined,
+    abortController,
+    options: {
+      maxTurns: 20
+    }
+  })) {
+    if (message.type === 'text') {
+      console.log(JSON.stringify({ type: 'text', data: message.text || '', timestamp: Date.now() }));
+    } else if (message.type === 'tool_use') {
+      console.log(JSON.stringify({ type: 'tool_use', name: message.name, input: message.input, timestamp: Date.now() }));
+    } else if (message.type === 'tool_result') {
+      console.log(JSON.stringify({ type: 'tool_result', result: typeof message.result === 'string' ? message.result.substring(0, 500) : message.result, timestamp: Date.now() }));
+    } else if (message.type === 'result') {
+      console.log(JSON.stringify({ type: 'result', subtype: message.subtype, result: message.result, cost: message.total_cost_usd, timestamp: Date.now() }));
+    } else if (message.type === 'content_block_delta' && message.delta?.text) {
+      console.log(JSON.stringify({ type: 'text', data: message.delta.text, timestamp: Date.now() }));
+    } else if (message.type === 'content_block_start' && message.content_block?.type === 'tool_use') {
+      console.log(JSON.stringify({ type: 'tool_use', name: message.content_block.name, input: {}, timestamp: Date.now() }));
+    }
+  }
+  console.log(JSON.stringify({ type: 'complete', timestamp: Date.now() }));
+  process.exit(0);
+} catch (error) {
+  console.error(JSON.stringify({ type: 'error', message: error.message || String(error), timestamp: Date.now() }));
+  process.exit(1);
+}
+`
+        await sandbox.files.write(`${workDir}/claude-stream.mjs`, scriptContent)
+        console.log(`[Agent Cloud] Streaming script uploaded`)
+
+        // Step 3: Run the streaming script with Node.js
+        const command = `cd ${workDir} && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
+
+        console.log(`[Agent Cloud] Executing SDK streaming script`)
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
@@ -307,8 +396,10 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
                 try {
                   const message = JSON.parse(line)
                   
-                  // Log ALL parsed messages
-                  console.log(`[Agent Cloud] 📨 Parsed message type: ${message.type}`)
+                  // Log message types (skip noisy ones)
+                  if (!['user', 'system'].includes(message.type)) {
+                    console.log(`[Agent Cloud] 📨 Parsed message type: ${message.type}`)
+                  }
 
                   // Handle different message types from Claude CLI stream-json output
                   if (message.type === 'text') {
@@ -341,15 +432,43 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
                     // Extract text from assistant message content
                     const content = message.message?.content
                     if (Array.isArray(content)) {
-                      const textPart = content.find((c: any) => c.type === 'text')
-                      if (textPart?.text) {
-                        textContent += textPart.text
-                        send({ type: 'text', data: textPart.text, timestamp: Date.now() })
+                      for (const block of content) {
+                        if (block.type === 'text' && block.text) {
+                          textContent += block.text
+                          send({ type: 'text', data: block.text, timestamp: Date.now() })
+                        } else if (block.type === 'tool_use') {
+                          // Tool use within assistant message
+                          send({
+                            type: 'tool_use',
+                            name: block.name,
+                            input: block.input,
+                            timestamp: Date.now()
+                          })
+                        }
                       }
                     }
+                  } else if (message.type === 'content_block_delta') {
+                    // Streaming text delta (if available)
+                    if (message.delta?.text) {
+                      textContent += message.delta.text
+                      send({ type: 'text', data: message.delta.text, timestamp: Date.now() })
+                    }
+                  } else if (message.type === 'content_block_start') {
+                    // Start of a content block - could be text or tool_use
+                    if (message.content_block?.type === 'tool_use') {
+                      send({
+                        type: 'tool_use',
+                        name: message.content_block.name,
+                        input: {},
+                        timestamp: Date.now()
+                      })
+                    }
+                  } else if (['user', 'system'].includes(message.type)) {
+                    // Skip conversation history messages - don't send to frontend
+                    // These are just Claude loading context, not actual output
                   } else {
-                    // Send other message types as-is
-                    send({ type: message.type || 'unknown', ...message, timestamp: Date.now() })
+                    // Log unknown message types for debugging
+                    console.log(`[Agent Cloud] Unknown message type: ${message.type}`, JSON.stringify(message).substring(0, 200))
                   }
                 } catch (parseErr) {
                   // Not valid JSON, send as raw stdout (fallback for non-JSON output)
