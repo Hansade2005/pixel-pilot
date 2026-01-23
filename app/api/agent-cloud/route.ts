@@ -59,6 +59,9 @@ const activeSandboxes = new Map<string, {
     cloned: boolean
   }
   workingBranch?: string // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
+  // MCP gateway credentials from E2B
+  mcpGatewayUrl?: string
+  mcpGatewayToken?: string
   // Conversation history for memory persistence
   conversationHistory: Array<{
     role: 'user' | 'assistant'
@@ -309,6 +312,16 @@ if (conversationHistory.length > 0) {
   fullPrompt = promptArg;
 }
 
+// Configure MCP servers from environment variables
+const mcpServers = {};
+if (process.env.MCP_GATEWAY_URL && process.env.MCP_GATEWAY_TOKEN) {
+  mcpServers['e2b-mcp'] = {
+    type: 'http',
+    url: process.env.MCP_GATEWAY_URL,
+    headers: { 'Authorization': \`Bearer \${process.env.MCP_GATEWAY_TOKEN}\` }
+  };
+}
+
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
 const abortController = new AbortController();
@@ -321,7 +334,8 @@ try {
     options: {
       systemPrompt: systemPromptArg || undefined,
       abortController,
-      includePartialMessages: true
+      includePartialMessages: true,
+      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {})
     }
   })) {
     if (message.type === 'stream_event') {
@@ -391,6 +405,9 @@ try {
               ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
               ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
               ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+              // MCP gateway credentials (E2B built-in Tavily)
+              ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
+              ...(sandboxEntry!.mcpGatewayToken ? { MCP_GATEWAY_TOKEN: sandboxEntry!.mcpGatewayToken } : {}),
             },
             onStdout: (data) => {
               if (isClosed) return
@@ -776,7 +793,7 @@ async function handleCreate(
   console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
-  // Create sandbox (MCP will be configured via mcp.json file)
+  // Create sandbox with E2B's built-in MCP gateway (Tavily for web search)
   const sandbox = await Sandbox.create(template, {
     timeoutMs: 30 * 60 * 1000, // 30 minutes timeout
     envs,
@@ -785,54 +802,25 @@ async function handleCreate(
       repo: config?.repo?.full_name || 'default',
       model: selectedModel
     },
+    mcp: {
+      tavily: {
+        apiKey: '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'
+      }
+    }
   })
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
 
-  // Note: Claude Code CLI is pre-installed in the pipilot-agent template
-
-  // Setup MCP configuration by writing mcp.json file directly
-  // This is the working approach that was used before
-  console.log(`[Agent Cloud] Setting up MCP tools (Tavily, Playwright, GitHub)...`)
+  // Get MCP gateway credentials for the Agent SDK
+  let mcpGatewayUrl: string | undefined
+  let mcpGatewayToken: string | undefined
   try {
-    // Create .claude directory for MCP config
-    await sandbox.commands.run('mkdir -p /home/user/.claude', { timeoutMs: 5000 })
-
-    // Build MCP servers configuration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mcpServers: Record<string, any> = {
-      // Tavily HTTP MCP server for web search
-      tavily: {
-        type: "http",
-        url: "https://mcp.tavily.com/mcp/?tavilyApiKey=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"
-      },
-      // Playwright MCP server for browser automation
-      playwright: {
-        command: "npx",
-        args: ["@playwright/mcp@latest"]
-      }
-    }
-
-    // Add GitHub MCP if token is available (for GitHub operations)
-    if (githubToken) {
-      mcpServers.github = {
-        type: "http",
-        url: "https://api.githubcopilot.com/mcp",
-        headers: {
-          "Authorization": `Bearer ${githubToken}`
-        }
-      }
-      console.log(`[Agent Cloud] GitHub MCP configured with user token`)
-    } else {
-      console.log(`[Agent Cloud] GitHub MCP skipped (no token available)`)
-    }
-
-    const mcpConfig = JSON.stringify({ mcpServers }, null, 2)
-    await sandbox.files.write('/home/user/.claude/mcp.json', mcpConfig)
-    console.log(`[Agent Cloud] MCP tools configured successfully`)
+    mcpGatewayUrl = sandbox.getMcpUrl()
+    mcpGatewayToken = await sandbox.getMcpToken()
+    console.log(`[Agent Cloud] MCP gateway configured: ${mcpGatewayUrl}`)
   } catch (e) {
-    console.warn(`[Agent Cloud] Failed to setup MCP tools:`, e)
+    console.warn(`[Agent Cloud] Failed to get MCP gateway credentials:`, e)
   }
 
   // Track the working branch created for this session
@@ -943,6 +931,8 @@ async function handleCreate(
       cloned: repoCloned,
     } : undefined,
     workingBranch: createdWorkingBranch,
+    mcpGatewayUrl,
+    mcpGatewayToken,
     conversationHistory: []
   })
 
@@ -957,8 +947,8 @@ async function handleCreate(
     projectDir: repoCloned ? PROJECT_DIR : '/home/user',
     reconnected: false,
     messageCount: 0,
-    mcpEnabled: true,
-    mcpTools: githubToken ? ['tavily', 'puppeteer', 'github'] : ['tavily', 'puppeteer'],
+    mcpEnabled: !!mcpGatewayUrl,
+    mcpTools: ['tavily'],
     workingBranch: createdWorkingBranch, // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
     message: repoCloned
       ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`

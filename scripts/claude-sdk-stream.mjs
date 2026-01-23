@@ -40,6 +40,16 @@ if (conversationHistory.length > 0) {
   fullPrompt = promptArg;
 }
 
+// Configure MCP servers from environment variables
+const mcpServers = {};
+if (process.env.MCP_GATEWAY_URL && process.env.MCP_GATEWAY_TOKEN) {
+  mcpServers['e2b-mcp'] = {
+    type: 'http',
+    url: process.env.MCP_GATEWAY_URL,
+    headers: { 'Authorization': `Bearer ${process.env.MCP_GATEWAY_TOKEN}` }
+  };
+}
+
 // Send start event
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -57,7 +67,8 @@ try {
     options: {
       systemPrompt: systemPromptArg || undefined,
       abortController,
-      includePartialMessages: true
+      includePartialMessages: true,
+      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {})
     }
   })) {
     // Handle SDK message types
