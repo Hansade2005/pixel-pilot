@@ -301,19 +301,95 @@ User Request: ${currentPrompt}`
             const input = data.input
             let toolDescription = `Using ${toolName}`
 
-            // Create user-friendly descriptions for common tools
-            if (toolName === 'Write' && input?.file_path) {
-              toolDescription = `Creating ${input.file_path.split('/').pop()}`
-            } else if (toolName === 'Edit' && input?.file_path) {
-              toolDescription = `Editing ${input.file_path.split('/').pop()}`
-            } else if (toolName === 'Read' && input?.file_path) {
-              toolDescription = `Reading ${input.file_path.split('/').pop()}`
-            } else if (toolName === 'Bash' && input?.command) {
-              toolDescription = `Running: ${input.command.substring(0, 60)}${input.command.length > 60 ? '...' : ''}`
-            } else if (toolName === 'Glob' && input?.pattern) {
-              toolDescription = `Searching: ${input.pattern}`
-            } else if (toolName === 'Grep' && input?.pattern) {
-              toolDescription = `Grep: ${input.pattern}`
+            // Handle exact tool names from Claude Code CLI
+            switch (toolName) {
+              case 'Write':
+                toolDescription = input?.file_path 
+                  ? `✍️ Creating ${input.file_path.split('/').pop()}` 
+                  : '✍️ Writing file'
+                break
+              case 'Edit':
+                toolDescription = input?.file_path 
+                  ? `✏️ Editing ${input.file_path.split('/').pop()}` 
+                  : '✏️ Editing file'
+                break
+              case 'Read':
+                toolDescription = input?.file_path 
+                  ? `📖 Reading ${input.file_path.split('/').pop()}` 
+                  : '📖 Reading file'
+                break
+              case 'Bash':
+                toolDescription = input?.command 
+                  ? `⚡ ${input.command.substring(0, 60)}${input.command.length > 60 ? '...' : ''}` 
+                  : '⚡ Running command'
+                break
+              case 'Glob':
+                toolDescription = input?.pattern 
+                  ? `🔍 Searching: ${input.pattern}` 
+                  : '🔍 Pattern search'
+                break
+              case 'Grep':
+                toolDescription = input?.pattern 
+                  ? `🔎 Grep: ${input.pattern}` 
+                  : '🔎 Text search'
+                break
+              case 'WebSearch':
+                toolDescription = input?.query 
+                  ? `🌐 Searching: ${input.query.substring(0, 50)}${input.query.length > 50 ? '...' : ''}` 
+                  : '🌐 Web search'
+                break
+              case 'WebFetch':
+                toolDescription = input?.url 
+                  ? `🌐 Fetching: ${input.url.substring(0, 50)}${input.url.length > 50 ? '...' : ''}` 
+                  : '🌐 Fetching webpage'
+                break
+              case 'Task':
+                toolDescription = input?.subagent 
+                  ? `🤖 Launching ${input.subagent} agent` 
+                  : '🤖 Launching task'
+                break
+              case 'TaskOutput':
+                toolDescription = '📋 Getting task output'
+                break
+              case 'NotebookEdit':
+                toolDescription = input?.notebook_path 
+                  ? `📓 Editing ${input.notebook_path.split('/').pop()}` 
+                  : '📓 Editing notebook'
+                break
+              case 'TodoWrite':
+                toolDescription = '✅ Updating task list'
+                break
+              case 'EnterPlanMode':
+                toolDescription = '📝 Entering plan mode'
+                break
+              case 'ExitPlanMode':
+                toolDescription = '✓ Finalizing plan'
+                break
+              case 'KillShell':
+                toolDescription = '🛑 Stopping background process'
+                break
+              case 'AskUserQuestion':
+                toolDescription = input?.question 
+                  ? `❓ ${input.question.substring(0, 60)}${input.question.length > 60 ? '...' : ''}` 
+                  : '❓ Asking question'
+                break
+              case 'Skill':
+                toolDescription = input?.skill_name 
+                  ? `⚙️ Using skill: ${input.skill_name}` 
+                  : '⚙️ Executing skill'
+                break
+              default:
+                // Fallback for unknown tools
+                if (input) {
+                  const firstValue = Object.values(input)[0]
+                  if (typeof firstValue === 'string' && firstValue.length < 100) {
+                    toolDescription = `🔧 ${toolName}: ${firstValue.substring(0, 60)}${firstValue.length > 60 ? '...' : ''}`
+                  } else {
+                    toolDescription = `🔧 ${toolName}`
+                  }
+                } else {
+                  toolDescription = `🔧 ${toolName}`
+                }
             }
 
             setSessions(prev => prev.map(s =>
@@ -322,7 +398,7 @@ User Request: ${currentPrompt}`
                     type: 'tool' as const,
                     content: toolDescription,
                     timestamp: new Date(),
-                    meta: { toolName, fileName: input?.file_path }
+                    meta: { toolName, fileName: input?.file_path, input }
                   }] }
                 : s
             ))
