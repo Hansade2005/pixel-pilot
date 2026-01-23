@@ -266,33 +266,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
         // Base64 encode the system prompt for safe shell passing
         const base64SystemPrompt = Buffer.from(gitWorkflowPrompt, 'utf-8').toString('base64')
 
-        // Step 1: Install Claude Code SDK in working directory if not already installed
-        console.log(`[Agent Cloud] Installing @anthropic-ai/claude-code SDK...`)
-        try {
-          const packageCheckCmd = `cd ${workDir} && [ -d node_modules/@anthropic-ai/claude-code ] && echo "installed" || echo "not_installed"`
-          const checkResult = await sandbox.commands.run(packageCheckCmd, { timeoutMs: 5000 })
-          
-          if (!checkResult.stdout?.includes('installed')) {
-            send({ type: 'log', message: 'Installing Claude Code SDK...' })
-            
-            // Initialize package.json if it doesn't exist and install SDK with pnpm
-            const installCmd = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm install --no-save @anthropic-ai/claude-code@1.0.39`
-            const installResult = await sandbox.commands.run(installCmd, { timeoutMs: 60000 })
-            
-            if (installResult.exitCode !== 0) {
-              throw new Error(`Failed to install SDK: ${installResult.stderr}`)
-            }
-            
-            console.log(`[Agent Cloud] SDK installed successfully`)
-          } else {
-            console.log(`[Agent Cloud] SDK already installed`)
-          }
-        } catch (installErr) {
-          console.error(`[Agent Cloud] SDK installation error:`, installErr)
-          send({ type: 'error', message: 'Failed to install Claude Code SDK' })
-        }
-
-        // Step 2: Upload the streaming script to the sandbox
+        // Step 1: Upload the streaming script to the sandbox first
         const scriptContent = `#!/usr/bin/env node
 import { query } from '@anthropic-ai/claude-code';
 import { readFileSync } from 'fs';
@@ -358,10 +332,15 @@ try {
         await sandbox.files.write(`${workDir}/claude-stream.mjs`, scriptContent)
         console.log(`[Agent Cloud] Streaming script uploaded`)
 
-        // Step 3: Run the streaming script with Node.js
-        const command = `cd ${workDir} && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
+        // Step 2: Build a single chained command that installs SDK (if needed) AND runs the script
+        // This ensures the SDK is available in node_modules when the script executes
+        send({ type: 'log', message: 'Preparing Claude Code SDK...' })
+        
+        // Single chained command: init package.json if needed, install SDK, then run script
+        // Using && ensures each step must succeed before the next runs
+        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm install --no-save @anthropic-ai/claude-code@1.0.39 && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
 
-        console.log(`[Agent Cloud] Executing SDK streaming script`)
+        console.log(`[Agent Cloud] Executing chained install & run command`)
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
