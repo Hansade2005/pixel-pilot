@@ -345,12 +345,10 @@ try {
         // This ensures the SDK is available in node_modules when the script executes
         send({ type: 'log', message: 'Preparing Claude Code SDK...' })
         
-        // Set environment variables for the SDK to use Vercel AI Gateway
-        const envVars = `ANTHROPIC_BASE_URL="${AI_GATEWAY_BASE_URL}" ANTHROPIC_AUTH_TOKEN="${aiGatewayKey}" ANTHROPIC_API_KEY="" ANTHROPIC_DEFAULT_SONNET_MODEL="${AVAILABLE_MODELS.sonnet}" ANTHROPIC_DEFAULT_OPUS_MODEL="${AVAILABLE_MODELS.opus}" ANTHROPIC_DEFAULT_HAIKU_MODEL="${AVAILABLE_MODELS.haiku}"`
-        
-        // Single chained command: init package.json if needed, install SDK, then run script with env vars
+        // Single chained command: init package.json if needed, install SDK, then run script
+        // Environment variables will be passed via the env option in sandbox.commands.run()
         // Using && ensures each step must succeed before the next runs
-        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-code@1.0.39 && ${envVars} node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
+        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-code@1.0.39 && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
 
         console.log(`[Agent Cloud] Executing chained install & run command`)
 
@@ -369,6 +367,15 @@ try {
           const result = await sandbox.commands.run(command, {
             cwd: workDir,
             timeoutMs: 0, // No timeout
+            envs: {
+              // Pass environment variables for Claude Code SDK
+              ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
+              ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
+              ANTHROPIC_API_KEY: '', // Must be empty
+              ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
+              ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
+              ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+            },
             onStdout: (data) => {
               if (isClosed) return
               fullOutput += data
