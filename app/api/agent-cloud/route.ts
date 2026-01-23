@@ -869,6 +869,38 @@ async function handleCreate(
     try {
       console.log(`[Agent Cloud] Cloning repo: ${config.repo.full_name} (${config.repo.branch})`)
 
+      // Validate token and repo access before attempting clone
+      if (githubToken) {
+        try {
+          const repoCheckResponse = await fetch(
+            `https://api.github.com/repos/${config.repo.full_name}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'PiPilot-Agent-Cloud',
+              },
+            }
+          )
+
+          if (repoCheckResponse.ok) {
+            console.log(`[Agent Cloud] Token validated - repo accessible`)
+          } else if (repoCheckResponse.status === 401) {
+            console.warn(`[Agent Cloud] GitHub token expired/invalid (401) - falling back to public clone`)
+            githubToken = undefined
+          } else if (repoCheckResponse.status === 403) {
+            console.warn(`[Agent Cloud] GitHub token lacks repo access (403) - falling back to public clone`)
+            githubToken = undefined
+          } else if (repoCheckResponse.status === 404) {
+            console.warn(`[Agent Cloud] Repo not found or no access (404) - will attempt public clone`)
+            githubToken = undefined
+          }
+        } catch (checkError) {
+          console.warn(`[Agent Cloud] Token validation request failed:`, checkError)
+          // Continue with the token anyway - the clone might still work
+        }
+      }
+
       // Use authenticated URL for private repos, public URL for public repos
       const cloneUrl = githubToken
         ? `https://${githubToken}@github.com/${config.repo.full_name}.git`
