@@ -42,11 +42,10 @@ if (conversationHistory.length > 0) {
 
 // Configure MCP servers from environment variables
 const mcpServers = {};
-if (process.env.MCP_GATEWAY_URL && process.env.MCP_GATEWAY_TOKEN) {
-  mcpServers['e2b-mcp'] = {
+if (process.env.MCP_GATEWAY_URL) {
+  mcpServers['tavily'] = {
     type: 'http',
-    url: process.env.MCP_GATEWAY_URL,
-    headers: { 'Authorization': `Bearer ${process.env.MCP_GATEWAY_TOKEN}` }
+    url: process.env.MCP_GATEWAY_URL
   };
 }
 
@@ -59,6 +58,9 @@ const abortController = new AbortController();
 process.on('SIGTERM', () => abortController.abort());
 process.on('SIGINT', () => abortController.abort());
 
+// Track if we've received streaming text deltas to avoid duplication from assistant messages
+let hasStreamedText = false;
+
 try {
   // Use Agent SDK query for real streaming
   // includePartialMessages enables token-by-token streaming via stream_event messages
@@ -68,7 +70,10 @@ try {
       systemPrompt: systemPromptArg || undefined,
       abortController,
       includePartialMessages: true,
-      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {})
+      ...(Object.keys(mcpServers).length > 0 ? {
+        mcpServers,
+        allowedTools: ['mcp__tavily__*']
+      } : {})
     }
   })) {
     // Handle SDK message types
@@ -76,6 +81,7 @@ try {
       // Real-time streaming events (token-by-token)
       const event = message.event;
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        hasStreamedText = true;
         console.log(JSON.stringify({
           type: 'text',
           data: event.delta.text,
@@ -94,7 +100,8 @@ try {
       const content = message.message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text) {
+          if (block.type === 'text' && block.text && !hasStreamedText) {
+            // Only emit text from assistant if we haven't already streamed it
             console.log(JSON.stringify({
               type: 'text',
               data: block.text,
@@ -118,6 +125,8 @@ try {
           }
         }
       }
+      // Reset for next turn (multi-turn conversations)
+      hasStreamedText = false;
     } else if (message.type === 'result') {
       // Final result with cost and usage
       console.log(JSON.stringify({

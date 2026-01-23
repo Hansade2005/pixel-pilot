@@ -59,9 +59,8 @@ const activeSandboxes = new Map<string, {
     cloned: boolean
   }
   workingBranch?: string // The branch created for this session (e.g., pipilot-agent/fix-login-bug-a1b2)
-  // MCP gateway credentials from E2B
+  // MCP gateway URL (Tavily HTTP MCP)
   mcpGatewayUrl?: string
-  mcpGatewayToken?: string
   // Conversation history for memory persistence
   conversationHistory: Array<{
     role: 'user' | 'assistant'
@@ -314,11 +313,10 @@ if (conversationHistory.length > 0) {
 
 // Configure MCP servers from environment variables
 const mcpServers = {};
-if (process.env.MCP_GATEWAY_URL && process.env.MCP_GATEWAY_TOKEN) {
-  mcpServers['e2b-mcp'] = {
+if (process.env.MCP_GATEWAY_URL) {
+  mcpServers['tavily'] = {
     type: 'http',
-    url: process.env.MCP_GATEWAY_URL,
-    headers: { 'Authorization': \`Bearer \${process.env.MCP_GATEWAY_TOKEN}\` }
+    url: process.env.MCP_GATEWAY_URL
   };
 }
 
@@ -328,6 +326,9 @@ const abortController = new AbortController();
 process.on('SIGTERM', () => abortController.abort());
 process.on('SIGINT', () => abortController.abort());
 
+// Track if we've received streaming text deltas to avoid duplication from assistant messages
+let hasStreamedText = false;
+
 try {
   for await (const message of query({
     prompt: fullPrompt,
@@ -335,12 +336,16 @@ try {
       systemPrompt: systemPromptArg || undefined,
       abortController,
       includePartialMessages: true,
-      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {})
+      ...(Object.keys(mcpServers).length > 0 ? {
+        mcpServers,
+        allowedTools: ['mcp__tavily__*']
+      } : {})
     }
   })) {
     if (message.type === 'stream_event') {
       const event = message.event;
       if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        hasStreamedText = true;
         console.log(JSON.stringify({ type: 'text', data: event.delta.text, timestamp: Date.now() }));
       } else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
         console.log(JSON.stringify({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() }));
@@ -349,13 +354,16 @@ try {
       const content = message.message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text) {
+          if (block.type === 'text' && block.text && !hasStreamedText) {
+            // Only emit text from assistant if we haven't already streamed it
             console.log(JSON.stringify({ type: 'text', data: block.text, timestamp: Date.now() }));
           } else if (block.type === 'tool_use') {
             console.log(JSON.stringify({ type: 'tool_use', name: block.name, input: block.input, timestamp: Date.now() }));
           }
         }
       }
+      // Reset for next turn (multi-turn conversations)
+      hasStreamedText = false;
     } else if (message.type === 'result') {
       console.log(JSON.stringify({ type: 'result', subtype: message.subtype, result: message.result, cost: message.total_cost_usd, timestamp: Date.now() }));
     }
@@ -405,9 +413,8 @@ try {
               ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
               ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
               ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
-              // MCP gateway credentials (E2B built-in Tavily)
+              // MCP gateway - Tavily HTTP MCP for web search
               ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
-              ...(sandboxEntry!.mcpGatewayToken ? { MCP_GATEWAY_TOKEN: sandboxEntry!.mcpGatewayToken } : {}),
             },
             onStdout: (data) => {
               if (isClosed) return
@@ -439,8 +446,8 @@ try {
 
                   // Handle different message types from Agent SDK stream output
                   if (message.type === 'text') {
-                    textContent += message.text || ''
-                    send({ type: 'text', data: message.text, timestamp: Date.now() })
+                    textContent += message.data || ''
+                    send({ type: 'text', data: message.data, timestamp: Date.now() })
                   } else if (message.type === 'tool_use') {
                     send({
                       type: 'tool_use',
@@ -793,7 +800,7 @@ async function handleCreate(
   console.log(`[Agent Cloud] Using Vercel AI Gateway: ${AI_GATEWAY_BASE_URL}`)
   console.log(`[Agent Cloud] Default model: ${AVAILABLE_MODELS[selectedModel]}`)
 
-  // Create sandbox with E2B's built-in MCP gateway (Tavily for web search)
+  // Create sandbox (MCP is configured directly in Claude Agent SDK script)
   const sandbox = await Sandbox.create(template, {
     timeoutMs: 30 * 60 * 1000, // 30 minutes timeout
     envs,
@@ -801,27 +808,16 @@ async function handleCreate(
       userId,
       repo: config?.repo?.full_name || 'default',
       model: selectedModel
-    },
-    mcp: {
-      tavily: {
-        apiKey: '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'
-      }
     }
   })
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
 
-  // Get MCP gateway credentials for the Agent SDK
-  let mcpGatewayUrl: string | undefined
-  let mcpGatewayToken: string | undefined
-  try {
-    mcpGatewayUrl = sandbox.getMcpUrl()
-    mcpGatewayToken = await sandbox.getMcpToken()
-    console.log(`[Agent Cloud] MCP gateway configured: ${mcpGatewayUrl}`)
-  } catch (e) {
-    console.warn(`[Agent Cloud] Failed to get MCP gateway credentials:`, e)
-  }
+  // MCP is configured directly in the Claude Agent SDK script via mcpServers option
+  // Using Tavily HTTP MCP server for web search capabilities
+  const mcpGatewayUrl = 'https://mcp.tavily.com/mcp/?tavilyApiKey=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'
+  console.log(`[Agent Cloud] MCP gateway configured: Tavily HTTP MCP`)
 
   // Track the working branch created for this session
   let createdWorkingBranch: string | undefined
@@ -932,7 +928,6 @@ async function handleCreate(
     } : undefined,
     workingBranch: createdWorkingBranch,
     mcpGatewayUrl,
-    mcpGatewayToken,
     conversationHistory: []
   })
 
