@@ -340,25 +340,36 @@ User Request: ${currentPrompt}`
             console.log('[Agent Cloud] Tool used:', data.name, data.input)
             const toolName = data.name || 'Unknown'
             const input = data.input || {}
-            let toolDescription = `Using ${toolName}`
+            let toolDescription = ''
 
             // Create user-friendly descriptions for common tools
-            if (toolName === 'Write' && input?.file_path) {
-              toolDescription = `Creating ${input.file_path.split('/').pop()}`
+            // Prefer the AI-provided description when available
+            if (toolName === 'Bash') {
+              if (input?.description) {
+                toolDescription = input.description
+              } else if (input?.command) {
+                toolDescription = `$ ${input.command.substring(0, 80)}${input.command.length > 80 ? '...' : ''}`
+              } else {
+                toolDescription = 'Running command'
+              }
+            } else if (toolName === 'Write' && input?.file_path) {
+              toolDescription = `Creating ${input.file_path}`
             } else if (toolName === 'Edit' && input?.file_path) {
-              toolDescription = `Editing ${input.file_path.split('/').pop()}`
+              toolDescription = `Editing ${input.file_path}`
             } else if (toolName === 'Read' && input?.file_path) {
-              toolDescription = `Reading ${input.file_path.split('/').pop()}`
-            } else if (toolName === 'Bash' && input?.command) {
-              toolDescription = `Running: ${input.command.substring(0, 60)}${input.command.length > 60 ? '...' : ''}`
+              toolDescription = `Reading ${input.file_path}`
             } else if (toolName === 'Glob' && input?.pattern) {
-              toolDescription = `Searching: ${input.pattern}`
+              toolDescription = `Finding files: ${input.pattern}`
             } else if (toolName === 'Grep' && input?.pattern) {
-              toolDescription = `Grep: ${input.pattern}`
+              toolDescription = `Searching for: ${input.pattern}`
             } else if (toolName === 'WebSearch' && input?.query) {
-              toolDescription = `Searching web: ${input.query.substring(0, 40)}${input.query.length > 40 ? '...' : ''}`
+              toolDescription = `Searching: ${input.query.substring(0, 60)}${input.query.length > 60 ? '...' : ''}`
             } else if (toolName === 'WebFetch' && input?.url) {
-              toolDescription = `Fetching: ${input.url}`
+              toolDescription = `Fetching: ${input.url.substring(0, 60)}${input.url.length > 60 ? '...' : ''}`
+            } else if (toolName === 'Task' && input?.description) {
+              toolDescription = input.description
+            } else {
+              toolDescription = `Using ${toolName}`
             }
 
             setSessions(prev => prev.map(s =>
