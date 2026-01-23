@@ -370,15 +370,22 @@ try {
       if (Array.isArray(content)) {
         for (const block of content) {
           if (block.type === 'tool_result') {
-            const resultContent = Array.isArray(block.content)
-              ? block.content.map((c: any) => c.type === 'text' ? c.text : `[${c.type}]`).join('\\n')
-              : typeof block.content === 'string'
-                ? block.content
-                : JSON.stringify(block.content);
+            let resultContent = '';
+            if (Array.isArray(block.content)) {
+              const parts = block.content.map((c: any) => {
+                if (c.type === 'text') return c.text;
+                return '[' + c.type + ']';
+              });
+              resultContent = parts.join('\n');
+            } else if (typeof block.content === 'string') {
+              resultContent = block.content;
+            } else {
+              resultContent = JSON.stringify(block.content);
+            }
             console.log(JSON.stringify({
               type: 'tool_result',
               tool_use_id: block.tool_use_id,
-              result: resultContent?.substring(0, 2000) || '',
+              result: (resultContent || '').substring(0, 2000),
               timestamp: Date.now()
             }));
           }
