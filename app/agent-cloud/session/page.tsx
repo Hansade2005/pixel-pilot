@@ -10,6 +10,18 @@ import {
   Bot,
   Sparkles,
   ArrowUp,
+  Terminal,
+  FileEdit,
+  FileText,
+  FolderSearch,
+  Search,
+  Globe,
+  ChevronDown,
+  ChevronRight,
+  FileCode,
+  Eye,
+  Plus,
+  Minus,
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
@@ -66,6 +78,19 @@ function SessionPageInner() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isRecreating, setIsRecreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
+
+  const toggleToolExpanded = (index: number) => {
+    setExpandedTools(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -336,22 +361,17 @@ User Request: ${currentPrompt}`
             break
 
           case 'tool_use': {
-            // Tool being used - show in UI with details
+            // Tool being used - show in UI with rich details
             console.log('[Agent Cloud] Tool used:', data.name, data.input)
             const toolName = data.name || 'Unknown'
             const input = data.input || {}
+            const hasInput = Object.keys(input).length > 0
+
             let toolDescription = ''
 
             // Create user-friendly descriptions for common tools
-            // Prefer the AI-provided description when available
             if (toolName === 'Bash') {
-              if (input?.description) {
-                toolDescription = input.description
-              } else if (input?.command) {
-                toolDescription = `$ ${input.command.substring(0, 80)}${input.command.length > 80 ? '...' : ''}`
-              } else {
-                toolDescription = 'Running command'
-              }
+              toolDescription = input?.description || (input?.command ? `$ ${input.command.substring(0, 100)}` : 'Running command')
             } else if (toolName === 'Write' && input?.file_path) {
               toolDescription = `Creating ${input.file_path}`
             } else if (toolName === 'Edit' && input?.file_path) {
@@ -363,32 +383,103 @@ User Request: ${currentPrompt}`
             } else if (toolName === 'Grep' && input?.pattern) {
               toolDescription = `Searching for: ${input.pattern}`
             } else if (toolName === 'WebSearch' && input?.query) {
-              toolDescription = `Searching: ${input.query.substring(0, 60)}${input.query.length > 60 ? '...' : ''}`
+              toolDescription = `Searching: ${input.query.substring(0, 80)}`
             } else if (toolName === 'WebFetch' && input?.url) {
-              toolDescription = `Fetching: ${input.url.substring(0, 60)}${input.url.length > 60 ? '...' : ''}`
+              toolDescription = `Fetching: ${input.url.substring(0, 80)}`
             } else if (toolName === 'Task' && input?.description) {
               toolDescription = input.description
+            } else if (toolName === 'TodoWrite') {
+              toolDescription = 'Updating task list'
             } else {
               toolDescription = `Using ${toolName}`
             }
 
-            setSessions(prev => prev.map(s =>
-              s.id === sessionId
-                ? { ...s, lines: [...s.lines, {
-                    type: 'tool' as const,
-                    content: toolDescription,
-                    timestamp: new Date(),
-                    meta: { toolName, fileName: input?.file_path }
-                  }] }
-                : s
-            ))
+            const newMeta = {
+              toolName,
+              toolId: data.name + '_' + Date.now(),
+              fileName: input?.file_path,
+              description: input?.description,
+              command: toolName === 'Bash' ? input?.command : undefined,
+              input: input,
+              oldString: toolName === 'Edit' ? input?.old_string : undefined,
+              newString: toolName === 'Edit' ? input?.new_string : undefined,
+              fileContent: toolName === 'Write' ? input?.content?.substring(0, 500) : undefined,
+              pattern: (toolName === 'Glob' || toolName === 'Grep') ? input?.pattern : undefined,
+              url: toolName === 'WebFetch' ? input?.url : undefined,
+              query: toolName === 'WebSearch' ? input?.query : undefined,
+              isComplete: false,
+            }
+
+            setSessions(prev => prev.map(s => {
+              if (s.id !== sessionId) return s
+
+              const lines = [...s.lines]
+
+              // If this tool_use has input, check if there's a recent pending tool line
+              // with the same name but no input (from content_block_start). Update it instead.
+              if (hasInput) {
+                for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+                  if (
+                    lines[i].type === 'tool' &&
+                    lines[i].meta?.toolName === toolName &&
+                    !lines[i].meta?.command &&
+                    !lines[i].meta?.fileName &&
+                    !lines[i].meta?.isComplete
+                  ) {
+                    // Update existing tool line with full input details
+                    lines[i] = {
+                      ...lines[i],
+                      content: toolDescription,
+                      meta: newMeta,
+                    }
+                    return { ...s, lines }
+                  }
+                }
+              }
+
+              // Otherwise, add a new tool line
+              lines.push({
+                type: 'tool' as const,
+                content: toolDescription,
+                timestamp: new Date(),
+                meta: newMeta,
+              })
+              return { ...s, lines }
+            }))
             break
           }
 
-          case 'tool_result':
-            // Tool result - log for debugging
-            console.log('[Agent Cloud] Tool result:', data.result?.substring?.(0, 100) || data.result)
+          case 'tool_result': {
+            // Tool result - attach to the last tool line
+            const resultContent = typeof data.result === 'string'
+              ? data.result
+              : JSON.stringify(data.result, null, 2)
+            console.log('[Agent Cloud] Tool result:', resultContent?.substring?.(0, 100))
+
+            // Find the last tool line and attach the result
+            setSessions(prev => prev.map(s => {
+              if (s.id === sessionId) {
+                const lines = [...s.lines]
+                // Find last tool line that hasn't received a result yet
+                for (let i = lines.length - 1; i >= 0; i--) {
+                  if (lines[i].type === 'tool' && lines[i].meta && !lines[i].meta?.isComplete) {
+                    lines[i] = {
+                      ...lines[i],
+                      meta: {
+                        ...lines[i].meta,
+                        result: resultContent?.substring(0, 2000), // Cap at 2000 chars
+                        isComplete: true,
+                      }
+                    }
+                    break
+                  }
+                }
+                return { ...s, lines }
+              }
+              return s
+            }))
             break
+          }
 
           case 'result':
             // Final SDK result - only log, don't duplicate output
@@ -651,15 +742,177 @@ User Request: ${currentPrompt}`
           </div>
         )
 
-      case 'tool':
+      case 'tool': {
+        const meta = line.meta || {}
+        const toolName = meta.toolName || 'Tool'
+        const isExpanded = expandedTools.has(index)
+        const isComplete = meta.isComplete !== false
+
+        // Tool icon mapping
+        const getToolIcon = () => {
+          switch (toolName) {
+            case 'Bash': return <Terminal className="h-3 w-3" />
+            case 'Edit': return <FileEdit className="h-3 w-3" />
+            case 'Write': return <FileCode className="h-3 w-3" />
+            case 'Read': return <Eye className="h-3 w-3" />
+            case 'Glob': return <FolderSearch className="h-3 w-3" />
+            case 'Grep': return <Search className="h-3 w-3" />
+            case 'WebSearch': return <Globe className="h-3 w-3" />
+            case 'WebFetch': return <Globe className="h-3 w-3" />
+            case 'Task': return <Bot className="h-3 w-3" />
+            case 'TodoWrite': return <FileText className="h-3 w-3" />
+            default: return <Sparkles className="h-3 w-3" />
+          }
+        }
+
+        // Tool badge color
+        const getToolColor = () => {
+          switch (toolName) {
+            case 'Bash': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            case 'Edit': return 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+            case 'Write': return 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+            case 'Read': return 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+            case 'Glob': return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+            case 'Grep': return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+            case 'WebSearch': return 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
+            case 'WebFetch': return 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
+            case 'Task': return 'bg-orange-500/15 text-orange-400 border-orange-500/30'
+            default: return 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
+          }
+        }
+
+        // Check if this tool has expandable content
+        const hasExpandableContent = !!(meta.command || meta.result || meta.oldString || meta.newString || meta.fileContent)
+
         return (
-          <div key={index} className="flex items-center gap-2 text-sm text-zinc-500 py-1">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            <span className="font-mono text-xs">
-              {line.content}
-            </span>
+          <div key={index} className="py-1.5 ml-10">
+            <div
+              className={`rounded-lg border border-zinc-800/80 bg-zinc-900/50 overflow-hidden ${hasExpandableContent ? '' : ''}`}
+            >
+              {/* Tool header */}
+              <div
+                className={`flex items-center gap-2 px-3 py-2 ${hasExpandableContent ? 'cursor-pointer hover:bg-zinc-800/30' : ''}`}
+                onClick={() => hasExpandableContent && toggleToolExpanded(index)}
+              >
+                {/* Expand/collapse icon */}
+                {hasExpandableContent ? (
+                  isExpanded ? (
+                    <ChevronDown className="h-3 w-3 text-zinc-500 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 text-zinc-500 shrink-0" />
+                  )
+                ) : (
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${isComplete ? 'bg-blue-500' : 'bg-blue-500 animate-pulse'}`} />
+                )}
+
+                {/* Tool badge */}
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getToolColor()}`}>
+                  {getToolIcon()}
+                  {toolName}
+                </span>
+
+                {/* Description */}
+                <span className="text-xs text-zinc-400 truncate flex-1 font-mono">
+                  {meta.fileName || meta.description || line.content}
+                </span>
+
+                {/* Status indicator */}
+                {!isComplete && (
+                  <Loader2 className="h-3 w-3 animate-spin text-blue-400 shrink-0" />
+                )}
+              </div>
+
+              {/* Expanded content */}
+              {isExpanded && hasExpandableContent && (
+                <div className="border-t border-zinc-800/80">
+                  {/* Bash: Show command and output */}
+                  {toolName === 'Bash' && (
+                    <div className="text-xs font-mono">
+                      {meta.command && (
+                        <div className="px-3 py-2 bg-zinc-950/50 border-b border-zinc-800/50">
+                          <div className="flex items-center gap-1.5 text-emerald-400/80 mb-1">
+                            <span className="text-zinc-500">$</span>
+                            <span className="break-all whitespace-pre-wrap">{meta.command}</span>
+                          </div>
+                        </div>
+                      )}
+                      {meta.result && (
+                        <div className="px-3 py-2 text-zinc-400 max-h-60 overflow-y-auto">
+                          <pre className="whitespace-pre-wrap break-all text-[11px] leading-4">{meta.result}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Edit: Show diff */}
+                  {toolName === 'Edit' && (meta.oldString || meta.newString) && (
+                    <div className="text-xs font-mono">
+                      {meta.oldString && (
+                        <div className="px-3 py-2 bg-red-500/5 border-b border-zinc-800/50">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Minus className="h-3 w-3 text-red-400" />
+                            <span className="text-red-400/70 text-[10px]">old</span>
+                          </div>
+                          <pre className="whitespace-pre-wrap break-all text-red-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto">{meta.oldString}</pre>
+                        </div>
+                      )}
+                      {meta.newString && (
+                        <div className="px-3 py-2 bg-emerald-500/5">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Plus className="h-3 w-3 text-emerald-400" />
+                            <span className="text-emerald-400/70 text-[10px]">new</span>
+                          </div>
+                          <pre className="whitespace-pre-wrap break-all text-emerald-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto">{meta.newString}</pre>
+                        </div>
+                      )}
+                      {meta.result && (
+                        <div className="px-3 py-1.5 text-zinc-500 text-[10px] border-t border-zinc-800/50">
+                          {meta.result.includes('successfully') ? '✓ Applied' : meta.result.substring(0, 100)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Write: Show file content preview */}
+                  {toolName === 'Write' && meta.fileContent && (
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-60 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.fileContent}{meta.fileContent.length >= 500 ? '\n...' : ''}</pre>
+                    </div>
+                  )}
+
+                  {/* Read: Show result */}
+                  {toolName === 'Read' && meta.result && (
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-60 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    </div>
+                  )}
+
+                  {/* Glob/Grep: Show results */}
+                  {(toolName === 'Glob' || toolName === 'Grep') && meta.result && (
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    </div>
+                  )}
+
+                  {/* WebSearch/WebFetch: Show results */}
+                  {(toolName === 'WebSearch' || toolName === 'WebFetch') && meta.result && (
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    </div>
+                  )}
+
+                  {/* Generic: Show result for any other tool with a result */}
+                  {!['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'].includes(toolName) && meta.result && (
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )
+      }
 
       default:
         return null

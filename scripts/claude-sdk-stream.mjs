@@ -114,19 +114,31 @@ try {
               input: block.input,
               timestamp: Date.now()
             }));
-          } else if (block.type === 'tool_result') {
-            console.log(JSON.stringify({
-              type: 'tool_result',
-              result: typeof block.content === 'string'
-                ? block.content.substring(0, 500)
-                : JSON.stringify(block.content).substring(0, 500),
-              timestamp: Date.now()
-            }));
           }
         }
       }
       // Reset for next turn (multi-turn conversations)
       hasStreamedText = false;
+    } else if (message.type === 'user') {
+      // User messages contain tool_result blocks (from SDK's automatic tool execution)
+      const content = message.message?.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'tool_result') {
+            const resultContent = Array.isArray(block.content)
+              ? block.content.map(c => c.type === 'text' ? c.text : `[${c.type}]`).join('\n')
+              : typeof block.content === 'string'
+                ? block.content
+                : JSON.stringify(block.content);
+            console.log(JSON.stringify({
+              type: 'tool_result',
+              tool_use_id: block.tool_use_id,
+              result: resultContent?.substring(0, 2000) || '',
+              timestamp: Date.now()
+            }));
+          }
+        }
+      }
     } else if (message.type === 'result') {
       // Final result with cost and usage
       console.log(JSON.stringify({
@@ -137,7 +149,7 @@ try {
         timestamp: Date.now()
       }));
     }
-    // Skip 'user' and 'system' messages (context replay)
+    // Skip 'system' messages (context replay)
   }
 
   console.log(JSON.stringify({ type: 'complete', timestamp: Date.now() }));
