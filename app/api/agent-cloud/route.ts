@@ -376,7 +376,7 @@ try {
                 if (c.type === 'text') return c.text;
                 return '[' + c.type + ']';
               });
-              resultContent = parts.join('\n');
+              resultContent = parts.join('\\n');
             } else if (typeof block.content === 'string') {
               resultContent = block.content;
             } else {
