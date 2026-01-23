@@ -338,7 +338,7 @@ try {
         
         // Single chained command: init package.json if needed, install SDK, then run script
         // Using && ensures each step must succeed before the next runs
-        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm install --no-save @anthropic-ai/claude-code@1.0.39 && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
+        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-code@1.0.39 && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"`
 
         console.log(`[Agent Cloud] Executing chained install & run command`)
 
