@@ -914,8 +914,9 @@ async function handleCreate(
       }
 
       // Use authenticated URL for private repos, public URL for public repos
+      // Format: https://x-access-token:TOKEN@github.com/ works for all GitHub token types
       const cloneUrl = githubToken
-        ? `https://${githubToken}@github.com/${config.repo.full_name}.git`
+        ? `https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git`
         : `https://github.com/${config.repo.full_name}.git`
 
       console.log(`[Agent Cloud] Cloning with ${githubToken ? 'authenticated' : 'public'} URL`)
@@ -994,8 +995,42 @@ async function handleCreate(
           }
         }
       }
-    } catch (error) {
-      console.error(`[Agent Cloud] Failed to clone repo:`, error)
+    } catch (error: any) {
+      // Extract stderr from CommandExitError for better diagnostics
+      const stderr = error?.result?.stderr || error?.result?.stdout || ''
+      console.error(`[Agent Cloud] Failed to clone repo:`, error?.message || error)
+      if (stderr) {
+        console.error(`[Agent Cloud] Git stderr:`, stderr)
+      }
+
+      // If authenticated clone threw, try public clone as last resort
+      if (githubToken && !repoCloned) {
+        try {
+          console.log(`[Agent Cloud] Retrying clone with public URL after error...`)
+          const publicResult = await sandbox.commands.run(
+            `git clone --branch ${config.repo.branch} --single-branch --depth 50 https://github.com/${config.repo.full_name}.git ${PROJECT_DIR}`,
+            { timeoutMs: 180000 }
+          )
+          if (publicResult.exitCode === 0) {
+            repoCloned = true
+            console.log(`[Agent Cloud] Repo cloned with public URL (fallback)`)
+            const workingBranch = generateBranchName(config?.initialPrompt || 'agent-task')
+            await sandbox.commands.run(
+              `cd ${PROJECT_DIR} && git config user.email "agent@pipilot.dev" && git config user.name "PiPilot Agent"`,
+              { timeoutMs: 5000 }
+            )
+            const branchResult = await sandbox.commands.run(
+              `cd ${PROJECT_DIR} && git checkout -b ${workingBranch}`,
+              { timeoutMs: 10000 }
+            )
+            if (branchResult.exitCode === 0) {
+              createdWorkingBranch = workingBranch
+            }
+          }
+        } catch (fallbackError) {
+          console.error(`[Agent Cloud] Public clone fallback also failed:`, fallbackError)
+        }
+      }
     }
   }
 
