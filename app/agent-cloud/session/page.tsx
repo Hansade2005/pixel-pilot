@@ -23,6 +23,7 @@ import {
   Plus,
   Minus,
   Square,
+  RotateCw,
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
@@ -175,12 +176,12 @@ function SessionPageInner() {
   const [spinnerPhrase, setSpinnerPhrase] = useState(() => SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Rotate spinner phrase every 3 seconds while streaming
+  // Rotate spinner phrase every 8 seconds while streaming
   useEffect(() => {
     if (!isStreaming || isRecreating) return
     const interval = setInterval(() => {
       setSpinnerPhrase(SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
-    }, 3000)
+    }, 8000)
     return () => clearInterval(interval)
   }, [isStreaming, isRecreating])
 
@@ -906,7 +907,7 @@ User Request: ${currentPrompt}`
           ? inputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
           : line.content
         return (
-          <div key={index} className="flex items-start gap-3 py-4">
+          <div key={index} className="flex items-start gap-3 py-4 group">
             <div className="h-7 w-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
               <span className="text-xs font-semibold">U</span>
             </div>
@@ -925,17 +926,19 @@ User Request: ${currentPrompt}`
                 </button>
               )}
             </div>
+            <button
+              onClick={() => !isLoading && runPrompt(line.content)}
+              disabled={isLoading}
+              className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded-md hover:bg-zinc-700 disabled:opacity-30 shrink-0 mt-0.5"
+              title="Retry this prompt"
+            >
+              <RotateCw className="h-3.5 w-3.5 text-zinc-400" />
+            </button>
           </div>
         )
       }
 
-      case 'output': {
-        const outputLines = line.content.split('\n')
-        const isOutputLong = outputLines.length > MAX_LINES_COLLAPSED
-        const isOutputExpanded = expandedMessages.has(index)
-        const outputContent = isOutputLong && !isOutputExpanded
-          ? outputLines.slice(0, MAX_LINES_COLLAPSED).join('\n')
-          : line.content
+      case 'output':
         return (
           <div key={index} className="flex items-start gap-3 py-4 group">
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shrink-0">
@@ -945,21 +948,9 @@ User Request: ${currentPrompt}`
               <div className="relative">
                 <div className="prose prose-invert prose-sm max-w-none">
                   <Response className="text-zinc-300">
-                    {outputContent}
+                    {line.content}
                   </Response>
                 </div>
-                {isOutputLong && (
-                  <button
-                    onClick={() => setExpandedMessages(prev => {
-                      const next = new Set(prev)
-                      if (next.has(index)) { next.delete(index) } else { next.add(index) }
-                      return next
-                    })}
-                    className="text-xs text-orange-400 hover:text-orange-300 mt-1 font-mono"
-                  >
-                    {isOutputExpanded ? 'Show less' : 'Show more'}
-                  </button>
-                )}
                 <button
                   onClick={() => copyToClipboard(line.content, `output-${index}`)}
                   className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 rounded-md hover:bg-zinc-700"
@@ -974,7 +965,6 @@ User Request: ${currentPrompt}`
             </div>
           </div>
         )
-      }
 
       case 'error':
         return (
