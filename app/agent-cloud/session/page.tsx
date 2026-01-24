@@ -248,10 +248,14 @@ function SessionPageInner() {
           action: 'create',
           config: {
             model: activeSession.model || 'sonnet',
-            repo: activeSession.repo ? {
-              full_name: activeSession.repo.full_name,
-              branch: activeSession.repo.branch
-            } : undefined,
+            ...(activeSession.isNewProject ? {
+              newProject: { name: activeSession.newProjectName || 'project' },
+            } : {
+              repo: activeSession.repo ? {
+                full_name: activeSession.repo.full_name,
+                branch: activeSession.repo.branch
+              } : undefined,
+            }),
             initialPrompt: activeSession.title || activeSession.lines.find(l => l.type === 'input')?.content || 'resumed-session'
           }
         })
@@ -401,9 +405,31 @@ function SessionPageInner() {
     }
 
     try {
-      // Build prompt with GitHub context so AI can perform repo operations (push, PR, etc.)
+      // Build prompt with context for AI operations
       let enhancedPrompt = currentPrompt
-      if (storedTokens.github && activeSession.repo) {
+
+      if (activeSession.isNewProject && storedTokens.github) {
+        // New project mode: instruct AI to create repo and build from scratch
+        enhancedPrompt = `[New Project - Build From Scratch]
+You are building a brand new project from scratch. This is NOT an existing codebase.
+
+IMPORTANT SETUP INSTRUCTIONS (do this FIRST before writing any code):
+1. Use the GitHub MCP tool to create a new repository named "${activeSession.newProjectName}" on GitHub.
+   - Use the create_repository function with name: "${activeSession.newProjectName}"
+   - Make it a public repository unless the user specifies otherwise
+2. After the repo is created, run these commands to set up the remote:
+   git remote add origin https://x-access-token:${storedTokens.github}@github.com/USER/${activeSession.newProjectName}.git
+   (Replace USER with the authenticated GitHub username - you can get this from the GitHub MCP whoami or get_me tool)
+3. Build the project as requested by the user
+4. When done building, commit all changes and push to the remote:
+   git add -A && git commit -m "Initial commit: <brief description>" && git push -u origin main
+
+GitHub Token: ${storedTokens.github}
+Working Directory: /home/user/
+
+User Request: ${currentPrompt}`
+      } else if (storedTokens.github && activeSession.repo) {
+        // Existing repo mode
         enhancedPrompt = `[GitHub Context - Use this for any GitHub operations if needed]
 - Repository: ${activeSession.repo.full_name}
 - Branch: ${activeSession.repo.branch}
