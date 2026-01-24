@@ -24,6 +24,8 @@ import {
   Minus,
   Square,
   RotateCw,
+  Paperclip,
+  X,
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
 import { Response } from "@/components/ai-elements/response"
@@ -174,7 +176,9 @@ function SessionPageInner() {
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set())
   const [spinnerPhrase, setSpinnerPhrase] = useState(() => SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
+  const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
   const abortControllerRef = useRef<AbortController | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Rotate spinner phrase every 5 seconds while streaming
   useEffect(() => {
@@ -337,7 +341,7 @@ function SessionPageInner() {
     if (!activeSession || isLoading || isRecreating) return
 
     const currentPrompt = overridePrompt || prompt.trim()
-    if (!currentPrompt) return
+    if (!currentPrompt && attachedImages.length === 0) return
 
     const sandboxIdToUse = overrideSandboxId || activeSession.sandboxId
 
@@ -391,9 +395,16 @@ User Request: ${currentPrompt}`
         headers['X-GitHub-Token'] = storedTokens.github
       }
 
-      const response = await fetch(
-        `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}`,
-        {
+      // Upload images to sandbox if attached
+      let imagePaths: string[] = []
+      if (attachedImages.length > 0) {
+        imagePaths = await uploadImages(sandboxIdToUse, attachedImages)
+        setAttachedImages([])
+      }
+
+      const streamUrl = `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}${imagePaths.length > 0 ? `&images=${encodeURIComponent(JSON.stringify(imagePaths))}` : ''}`
+
+      const response = await fetch(streamUrl, {
           method: 'GET',
           headers,
           signal: controller.signal,
@@ -888,6 +899,37 @@ User Request: ${currentPrompt}`
     }
   }
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1]
+        setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
+      }
+      reader.readAsDataURL(file)
+    })
+    e.target.value = ''
+  }
+
+  const removeImage = (index: number) => {
+    setAttachedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Upload images to sandbox and return file paths
+  const uploadImages = async (sandboxId: string, images: typeof attachedImages): Promise<string[]> => {
+    const res = await fetch('/api/agent-cloud', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'upload-images', sandboxId, images: images.map(img => ({ data: img.data, type: img.type, name: img.name })) })
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.paths || []
+  }
+
   // Render message line
   const renderLine = (line: TerminalLine, index: number) => {
     switch (line.type) {
@@ -1192,6 +1234,26 @@ User Request: ${currentPrompt}`
         <div className="border-t border-zinc-800/50 p-4">
           <div className="max-w-3xl mx-auto">
             <div className="relative bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden focus-within:border-zinc-700 focus-within:ring-1 focus-within:ring-zinc-700/50 transition-all">
+              {/* Image previews */}
+              {attachedImages.length > 0 && (
+                <div className="flex gap-2 px-3 pt-3 flex-wrap">
+                  {attachedImages.map((img, i) => (
+                    <div key={i} className="relative group/img">
+                      <img
+                        src={`data:${img.type};base64,${img.data}`}
+                        alt={img.name}
+                        className="h-16 w-16 object-cover rounded-lg border border-zinc-700"
+                      />
+                      <button
+                        onClick={() => removeImage(i)}
+                        className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-zinc-700 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                      >
+                        <X className="h-2.5 w-2.5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 ref={inputRef}
                 value={prompt}
@@ -1202,6 +1264,24 @@ User Request: ${currentPrompt}`
                 className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 px-4 pt-3 pb-12 min-h-[44px] max-h-[120px] leading-6 overflow-y-auto"
                 rows={1}
               />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <div className="absolute bottom-2 left-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading || isRecreating}
+                  className="p-1.5 text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors"
+                  title="Attach image"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+              </div>
               <div className="absolute bottom-2 right-2">
                 {isLoading || isRecreating ? (
                   <Button
@@ -1216,7 +1296,7 @@ User Request: ${currentPrompt}`
                 ) : (
                   <Button
                     onClick={() => runPrompt()}
-                    disabled={!prompt.trim()}
+                    disabled={!prompt.trim() && attachedImages.length === 0}
                     size="icon"
                     className="h-8 w-8 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:bg-zinc-700"
                   >
