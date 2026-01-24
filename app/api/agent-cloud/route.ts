@@ -342,34 +342,43 @@ if (imagesFileArg) {
   }
 }
 
-let conversationHistory = [];
-if (historyFileArg) {
-  try {
-    const historyData = readFileSync(historyFileArg, 'utf-8');
-    conversationHistory = JSON.parse(historyData);
-  } catch (e) {
-    // Ignore
-  }
-}
-
-// Only keep last 6 message pairs (12 messages) to avoid bloating context
-const MAX_PAIRS = 6;
-const MAX_MSG_LENGTH = 800;
-const recentHistory = conversationHistory.slice(-(MAX_PAIRS * 2));
+// Check if prompt already contains embedded history (from recreated/expired session)
+// If so, skip file-based history to avoid duplication
+const hasEmbeddedHistory = promptArg.includes('[Conversation History') || promptArg.includes('[Current Request]');
 
 let fullPrompt = '';
-if (recentHistory.length > 0) {
-  const context = recentHistory
-    .map(msg => {
-      const content = msg.content.length > MAX_MSG_LENGTH
-        ? msg.content.slice(0, MAX_MSG_LENGTH) + '...[truncated]'
-        : msg.content;
-      return \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${content}\`;
-    })
-    .join('\\n\\n');
-  fullPrompt = \`Previous conversation:\\n\${context}\\n\\nCurrent request: \${promptArg}\`;
-} else {
+if (hasEmbeddedHistory) {
+  // Recreated sandbox: history is already in the prompt from the client
   fullPrompt = promptArg;
+} else {
+  // Normal flow: read history from file (limited to last 6 pairs, truncated)
+  let conversationHistory = [];
+  if (historyFileArg) {
+    try {
+      const historyData = readFileSync(historyFileArg, 'utf-8');
+      conversationHistory = JSON.parse(historyData);
+    } catch (e) {
+      // No history file yet (new project first message) - just use raw prompt
+    }
+  }
+
+  const MAX_PAIRS = 6;
+  const MAX_MSG_LENGTH = 800;
+  const recentHistory = conversationHistory.slice(-(MAX_PAIRS * 2));
+
+  if (recentHistory.length > 0) {
+    const context = recentHistory
+      .map(msg => {
+        const content = msg.content.length > MAX_MSG_LENGTH
+          ? msg.content.slice(0, MAX_MSG_LENGTH) + '...[truncated]'
+          : msg.content;
+        return \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${content}\`;
+      })
+      .join('\\n\\n');
+    fullPrompt = \`Previous conversation:\\n\${context}\\n\\nCurrent request: \${promptArg}\`;
+  } else {
+    fullPrompt = promptArg;
+  }
 }
 
 // Configure MCP servers from environment variables
@@ -1244,6 +1253,14 @@ async function handleCreate(
     mcpGatewayUrl,
     conversationHistory: []
   })
+
+  // Auto-provision empty conversation history file so the script can read/write immediately
+  try {
+    await sandbox.files.write(HISTORY_FILE, '[]')
+    console.log(`[Agent Cloud] History file provisioned at ${HISTORY_FILE}`)
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to provision history file:`, e)
+  }
 
   console.log(`[Agent Cloud] Sandbox created: ${sandboxId}, working branch: ${createdWorkingBranch || 'none'}`)
 
