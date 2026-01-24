@@ -236,6 +236,10 @@ export async function GET(request: NextRequest) {
       isClosed = true
       console.log('[Agent Cloud] Request aborted by client, killing agent process...')
       sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
+      // Clean up .temp folder on abort
+      if (imagePaths.length > 0) {
+        sandboxRef.commands.run(`rm -rf ${workDir}/.temp`, { timeoutMs: 5000 }).catch(() => {})
+      }
     }
   })
 
@@ -672,6 +676,11 @@ try {
             messageCount: sandboxEntry!.conversationHistory.length
           })
 
+          // Clean up .temp folder after stream completes
+          if (imagePaths.length > 0) {
+            sandbox.commands.run(`rm -rf ${workDir}/.temp`, { timeoutMs: 5000 }).catch(() => {})
+          }
+
         } catch (cmdError) {
           clearInterval(heartbeatInterval)
           throw cmdError
@@ -694,6 +703,10 @@ try {
       console.log('[Agent Cloud] Client disconnected, killing agent process...')
       // Kill the claude-stream process in the sandbox
       sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
+      // Clean up .temp folder on disconnect
+      if (imagePaths.length > 0) {
+        sandboxRef.commands.run(`rm -rf ${workDir}/.temp`, { timeoutMs: 5000 }).catch(() => {})
+      }
     }
   })
 
@@ -1636,7 +1649,7 @@ async function handleList(request: NextRequest) {
 }
 
 /**
- * Upload images to sandbox for multimodal input
+ * Upload images to sandbox .temp folder for multimodal input
  * Returns array of file paths where images were written
  */
 async function handleUploadImages(
@@ -1647,11 +1660,13 @@ async function handleUploadImages(
     return NextResponse.json({ error: 'sandboxId and images are required' }, { status: 400 })
   }
 
-  // Find sandbox
+  // Find sandbox and determine working directory
   let sandbox
+  let workDir = '/home/user'
   for (const [, entry] of activeSandboxes) {
     if (entry.sandboxId === sandboxId) {
       sandbox = entry.sandbox
+      workDir = entry.repo?.cloned ? PROJECT_DIR : '/home/user'
       break
     }
   }
@@ -1663,11 +1678,15 @@ async function handleUploadImages(
     }
   }
 
+  // Create .temp folder in working directory
+  const tempDir = `${workDir}/.temp`
+  await sandbox.commands.run(`mkdir -p ${tempDir}`, { timeoutMs: 5000 })
+
   const paths: string[] = []
   for (let i = 0; i < images.length; i++) {
     const img = images[i]
     const ext = img.type.split('/')[1] || 'png'
-    const filePath = `/tmp/upload-${Date.now()}-${i}.${ext}`
+    const filePath = `${tempDir}/upload-${Date.now()}-${i}.${ext}`
     const buffer = Buffer.from(img.data, 'base64')
     await sandbox.files.write(filePath, buffer)
     paths.push(filePath)
