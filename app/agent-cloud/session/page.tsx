@@ -212,14 +212,9 @@ function SessionPageInner() {
 
   // Redirect to new page if session was deleted (sessions loaded but ID not found)
   useEffect(() => {
-    if (sessionId && sessions.length >= 0 && !activeSession) {
-      // Small delay to avoid redirect during initial hydration
-      const timer = setTimeout(() => {
-        if (!sessions.find(s => s.id === sessionId)) {
-          router.push('/agent-cloud/new')
-        }
-      }, 200)
-      return () => clearTimeout(timer)
+    // Only check after sessions have been loaded (non-empty array means hydrated from localStorage)
+    if (sessionId && sessions.length > 0 && !activeSession) {
+      router.push('/agent-cloud/new')
     }
   }, [sessionId, sessions, activeSession, router])
 
@@ -775,19 +770,20 @@ User Request: ${currentPrompt}`
 
           for (const message of messages) {
             if (!message.trim()) continue
-            
+
             // Each message can have multiple lines (data:, event:, id:, etc.)
             const lines = message.split('\n')
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 const jsonStr = line.slice(6) // Remove "data: " prefix
                 if (jsonStr === '[DONE]') continue // Skip done marker
-                
+
                 try {
                   const data = JSON.parse(jsonStr)
                   const shouldBreak = await processMessage(data)
                   if (shouldBreak) {
-                    reader.cancel()
+                    // Stream completed normally - just exit the loop
+                    // Don't call reader.cancel() since the stream is done
                     return
                   }
                 } catch (e) {
@@ -828,7 +824,7 @@ User Request: ${currentPrompt}`
             : s
         ))
       } finally {
-        reader.releaseLock()
+        try { reader.releaseLock() } catch {}
         setIsLoading(false)
         setIsStreaming(false)
         abortControllerRef.current = null
