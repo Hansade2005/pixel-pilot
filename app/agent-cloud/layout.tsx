@@ -78,6 +78,7 @@ export interface Session {
   }
   messageCount?: number
   pendingPrompt?: string // Initial prompt to auto-send when session page loads
+  pendingImages?: Array<{ data: string; type: string; name: string }> // Images to attach when auto-sending
 }
 
 export interface Repository {
@@ -93,9 +94,9 @@ export interface Repository {
 
 // Available models
 export const MODELS = [
-  { id: 'sonnet', name: 'Default', provider: 'xAI', description: 'Grok Code Fast 1' },
+  { id: 'sonnet', name: 'Default', provider: 'Mistral', description: 'Devstral Small 2' },
   { id: 'opus', name: 'GLM 4.7', provider: 'ZAI', description: 'High quality responses' },
-  { id: 'haiku', name: 'Devstral', provider: 'Mistral', description: 'Quick tasks' },
+  { id: 'haiku', name: 'Grok', provider: 'xAI', description: 'Grok Code Fast 1' },
 ] as const
 
 // Context for sharing state across pages
@@ -118,7 +119,7 @@ interface AgentCloudContextType {
   isLoadingRepos: boolean
   isLoadingBranches: boolean
   loadBranches: (repoFullName: string) => Promise<void>
-  createSession: (initialPrompt: string) => Promise<Session | null>
+  createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => void
   isCreating: boolean
@@ -343,7 +344,7 @@ function AgentCloudLayoutInner({
   }, [])
 
   // Create session
-  const createSession = async (initialPrompt: string): Promise<Session | null> => {
+  const createSession = async (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>): Promise<Session | null> => {
     if (!selectedRepo) {
       toast.error('Please select a repository first')
       return null
@@ -402,6 +403,7 @@ function AgentCloudLayoutInner({
         stats: { additions: 0, deletions: 0 },
         messageCount: data.messageCount || 0,
         pendingPrompt: initialPrompt, // Store the initial prompt to auto-send
+        pendingImages: images && images.length > 0 ? images : undefined, // Store images to attach when auto-sending
         lines: reconnected ? [
           { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
           { type: 'system', content: `Repository: ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
