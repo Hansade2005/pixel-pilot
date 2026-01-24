@@ -293,20 +293,10 @@ async function doStreaming(
         send({ type: 'start', sandboxId })
         send({ type: 'log', message: 'Claude is thinking...' })
 
-        // Build conversation context for Claude
-        const conversationContext = sandboxEntry!.conversationHistory
-          .slice(-10) // Last 10 messages for context
-          .map(msg => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n')
-
-        // Create prompt with conversation history
-        const fullPrompt = conversationContext
-          ? `Previous conversation:\n${conversationContext}\n\nCurrent request: ${prompt}`
-          : prompt
-
         // Use base64 encoding to safely pass prompts containing any characters
         // This avoids shell escaping issues with single quotes, $, backticks, etc.
-        const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
+        // Note: Conversation history is handled by the script reading the history file
+        const base64Prompt = Buffer.from(prompt, 'utf-8').toString('base64')
 
         // Get the working branch for git workflow instructions
         const workingBranch = sandboxEntry!.workingBranch || 'main'
@@ -352,24 +342,43 @@ if (imagesFileArg) {
   }
 }
 
-let conversationHistory = [];
-if (historyFileArg) {
-  try {
-    const historyData = readFileSync(historyFileArg, 'utf-8');
-    conversationHistory = JSON.parse(historyData);
-  } catch (e) {
-    // Ignore
-  }
-}
+// Check if prompt already contains embedded history (from recreated/expired session)
+// If so, skip file-based history to avoid duplication
+const hasEmbeddedHistory = promptArg.includes('[Conversation History') || promptArg.includes('[Current Request]');
 
 let fullPrompt = '';
-if (conversationHistory.length > 0) {
-  const context = conversationHistory
-    .map(msg => \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${msg.content}\`)
-    .join('\\n\\n');
-  fullPrompt = \`Previous conversation:\\n\${context}\\n\\nCurrent request: \${promptArg}\`;
-} else {
+if (hasEmbeddedHistory) {
+  // Recreated sandbox: history is already in the prompt from the client
   fullPrompt = promptArg;
+} else {
+  // Normal flow: read history from file (limited to last 6 pairs, truncated)
+  let conversationHistory = [];
+  if (historyFileArg) {
+    try {
+      const historyData = readFileSync(historyFileArg, 'utf-8');
+      conversationHistory = JSON.parse(historyData);
+    } catch (e) {
+      // No history file yet (new project first message) - just use raw prompt
+    }
+  }
+
+  const MAX_PAIRS = 6;
+  const MAX_MSG_LENGTH = 800;
+  const recentHistory = conversationHistory.slice(-(MAX_PAIRS * 2));
+
+  if (recentHistory.length > 0) {
+    const context = recentHistory
+      .map(msg => {
+        const content = msg.content.length > MAX_MSG_LENGTH
+          ? msg.content.slice(0, MAX_MSG_LENGTH) + '...[truncated]'
+          : msg.content;
+        return \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${content}\`;
+      })
+      .join('\\n\\n');
+    fullPrompt = \`Previous conversation:\\n\${context}\\n\\nCurrent request: \${promptArg}\`;
+  } else {
+    fullPrompt = promptArg;
+  }
 }
 
 // Configure MCP servers from environment variables
@@ -1244,6 +1253,14 @@ async function handleCreate(
     mcpGatewayUrl,
     conversationHistory: []
   })
+
+  // Auto-provision empty conversation history file so the script can read/write immediately
+  try {
+    await sandbox.files.write(HISTORY_FILE, '[]')
+    console.log(`[Agent Cloud] History file provisioned at ${HISTORY_FILE}`)
+  } catch (e) {
+    console.warn(`[Agent Cloud] Failed to provision history file:`, e)
+  }
 
   console.log(`[Agent Cloud] Sandbox created: ${sandboxId}, working branch: ${createdWorkingBranch || 'none'}`)
 

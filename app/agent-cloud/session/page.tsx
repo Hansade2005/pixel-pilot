@@ -483,11 +483,11 @@ User Request: ${currentPrompt}`
             // Build prompt with conversation history context for continuity
             const historyLines = activeSession.lines
               .filter(l => l.type === 'input' || l.type === 'output')
-              .slice(-10) // Last 10 exchanges for context (avoid token limits)
+              .slice(-12) // Last 6 pairs (12 messages) for context
             let contextPrompt = currentPrompt
             if (historyLines.length > 0) {
               const historyContext = historyLines
-                .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+                .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.length > 800 ? l.content.substring(0, 800) + '...[truncated]' : l.content}`)
                 .join('\n\n')
               contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
             }
@@ -752,11 +752,11 @@ User Request: ${currentPrompt}`
               if (newSandboxId) {
                 const historyLines = activeSession.lines
                   .filter(l => l.type === 'input' || l.type === 'output')
-                  .slice(-10)
+                  .slice(-12)
                 let contextPrompt = currentPrompt
                 if (historyLines.length > 0) {
                   const historyContext = historyLines
-                    .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+                    .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.length > 800 ? l.content.substring(0, 800) + '...[truncated]' : l.content}`)
                     .join('\n\n')
                   contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
                 }
@@ -838,11 +838,11 @@ User Request: ${currentPrompt}`
           if (newSandboxId) {
             const historyLines = activeSession.lines
               .filter(l => l.type === 'input' || l.type === 'output')
-              .slice(-10)
+              .slice(-12)
             let contextPrompt = currentPrompt
             if (historyLines.length > 0) {
               const historyContext = historyLines
-                .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+                .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.length > 800 ? l.content.substring(0, 800) + '...[truncated]' : l.content}`)
                 .join('\n\n')
               contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
             }
@@ -889,11 +889,11 @@ User Request: ${currentPrompt}`
         if (newSandboxId) {
           const historyLines = activeSession.lines
             .filter(l => l.type === 'input' || l.type === 'output')
-            .slice(-10)
+            .slice(-12)
           let contextPrompt = currentPrompt
           if (historyLines.length > 0) {
             const historyContext = historyLines
-              .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.substring(0, 500)}`)
+              .map(l => `${l.type === 'input' ? 'User' : 'Assistant'}: ${l.content.length > 800 ? l.content.substring(0, 800) + '...[truncated]' : l.content}`)
               .join('\n\n')
             contextPrompt = `[Conversation History - This is a resumed session after reconnection]\n${historyContext}\n\n[Current Request]\n${currentPrompt}`
           }
