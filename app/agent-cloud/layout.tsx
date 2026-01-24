@@ -463,21 +463,15 @@ function AgentCloudLayoutInner({
   const deleteSession = (sessionId: string) => {
     // Check if we're deleting the active session BEFORE updating state
     const isDeletingActive = activeSessionId === sessionId
-    const remaining = sessions.filter(s => s.id !== sessionId)
 
     // Update sessions state
     setSessions(prev => prev.filter(s => s.id !== sessionId))
 
-    // If deleting the active session, redirect immediately
+    // If deleting the active session, always navigate to new page
     if (isDeletingActive) {
-      if (remaining.length > 0) {
-        setActiveSessionId(remaining[0].id)
-      } else {
-        // No sessions left - redirect to new session page immediately
-        router.push('/agent-cloud/new')
-        setActiveSessionIdState(null)
-        setMobileMenuOpen(false)
-      }
+      setActiveSessionIdState(null)
+      router.push('/agent-cloud/new')
+      setMobileMenuOpen(false)
     }
   }
 

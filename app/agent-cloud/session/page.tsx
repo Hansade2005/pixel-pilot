@@ -210,6 +210,19 @@ function SessionPageInner() {
   // Find the active session
   const activeSession = sessions.find(s => s.id === sessionId) || null
 
+  // Redirect to new page if session was deleted (sessions loaded but ID not found)
+  useEffect(() => {
+    if (sessionId && sessions.length >= 0 && !activeSession) {
+      // Small delay to avoid redirect during initial hydration
+      const timer = setTimeout(() => {
+        if (!sessions.find(s => s.id === sessionId)) {
+          router.push('/agent-cloud/new')
+        }
+      }, 200)
+      return () => clearTimeout(timer)
+    }
+  }, [sessionId, sessions, activeSession, router])
+
   // Only Devstral model supports image input
   const supportsImages = activeSession?.model?.includes('devstral') ?? false
 
