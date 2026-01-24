@@ -61,7 +61,7 @@ RUN npm install -g pnpm@9
 # Install Claude Agent SDK globally
 RUN npm install -g @anthropic-ai/claude-agent-sdk
 
-# Install Playwright globally (MCP servers will be run via npx)
+# Install Playwright globally
 RUN npm install -g playwright
 
 # Install CLI tools for connectors (available when user enables them)
@@ -75,24 +75,30 @@ RUN npm install -g vercel@latest \
 # Create a user with proper setup (matching E2B conventions)
 RUN useradd -m -s /bin/bash user
 
-# Create necessary directories with correct ownership
-RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/project /home/user/.claude /home/user/.cache/ms-playwright \
-    && chown -R user:user /home/user
+# Set up the working directory with proper permissions
+# All work happens in /home/user (our PROJECT_DIR)
+WORKDIR /home/user
 
-# Switch to user for Playwright browser installation
+# Initialize npm project and install Playwright for MCP access
+RUN npm init -y && npm install playwright
+
+# Install Playwright browsers with system dependencies (as root for full access)
+# PLAYWRIGHT_BROWSERS_PATH=0 installs browsers in node_modules (accessible by all users)
+RUN PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+# Create necessary directories
+RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/.claude
+
+# Give full permissions to the user on the working directory
+RUN chmod -R a+rwX /home/user && chown -R user:user /home/user
+
+# Switch to user for runtime
 USER user
 WORKDIR /home/user
 
-# MCP servers are added dynamically at runtime via the API
-# This ensures proper configuration with user-specific tokens (GitHub, etc.)
-
-# Install Playwright browsers as user (Chromium only to save space)
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/ms-playwright
-RUN npx playwright install chromium
-
 # Set environment variables
 ENV NODE_ENV=development
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 # Expose common development ports
 EXPOSE 3000 5173 8080

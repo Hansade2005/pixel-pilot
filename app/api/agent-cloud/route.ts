@@ -568,6 +568,8 @@ try {
               ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS.sonnet,
               ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
               ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+              // Playwright browser path (0 = use node_modules local install)
+              PLAYWRIGHT_BROWSERS_PATH: '0',
               // MCP gateway - Tavily HTTP MCP for web search
               ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
             },
