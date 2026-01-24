@@ -167,6 +167,7 @@ function SessionPageInner() {
     sessions,
     setSessions,
     storedTokens,
+    connectors,
   } = useAgentCloud()
 
   const [prompt, setPrompt] = useState('')
@@ -256,7 +257,15 @@ function SessionPageInner() {
                 branch: activeSession.repo.branch
               } : undefined,
             }),
-            initialPrompt: activeSession.title || activeSession.lines.find(l => l.type === 'input')?.content || 'resumed-session'
+            initialPrompt: activeSession.title || activeSession.lines.find(l => l.type === 'input')?.content || 'resumed-session',
+            connectors: connectors
+              .filter(c => c.enabled && c.fields.every(f => f.value.trim()))
+              .map(c => ({
+                id: c.id,
+                type: c.type,
+                mcpUrl: c.mcpUrl,
+                fields: Object.fromEntries(c.fields.map(f => [f.key, f.value]))
+              })),
           }
         })
       })

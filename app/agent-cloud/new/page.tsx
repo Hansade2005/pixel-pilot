@@ -402,7 +402,7 @@ export default function NewSessionPage() {
                     <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
                       <Github className="h-3.5 w-3.5" />
                       <span className="max-w-[100px] truncate">
-                        {selectedRepo ? selectedRepo.name : 'Select repo'}
+                        {selectedRepo ? selectedRepo.name.slice(0, 4) + '...' : 'Select repo'}
                       </span>
                       <ChevronDown className="h-3 w-3" />
                     </button>

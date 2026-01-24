@@ -17,6 +17,7 @@ import {
   Globe,
   GitBranch,
   ExternalLink,
+  Settings,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -95,6 +96,122 @@ export interface Repository {
   default_branch: string
 }
 
+// Connector configuration
+export type ConnectorType = 'mcp' | 'cli'
+
+export interface ConnectorConfig {
+  id: string
+  name: string
+  description: string
+  type: ConnectorType
+  enabled: boolean
+  // MCP-specific
+  mcpUrl?: string
+  // Config fields that user fills in
+  fields: Array<{
+    key: string
+    label: string
+    placeholder: string
+    value: string
+    type?: 'text' | 'password'
+  }>
+}
+
+// Default connectors available
+export const DEFAULT_CONNECTORS: ConnectorConfig[] = [
+  {
+    id: 'supabase',
+    name: 'Supabase',
+    description: 'Database, auth, and storage via Supabase MCP',
+    type: 'mcp',
+    enabled: false,
+    mcpUrl: 'https://mcp.supabase.com/mcp',
+    fields: [
+      { key: 'project_ref', label: 'Project Ref', placeholder: 'your-project-ref', value: '', type: 'text' },
+      { key: 'access_token', label: 'Access Token', placeholder: 'sbp_...', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'vercel',
+    name: 'Vercel',
+    description: 'Deploy and manage apps via Vercel CLI',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'token', label: 'Vercel Token', placeholder: 'your-vercel-token', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'netlify',
+    name: 'Netlify',
+    description: 'Deploy static sites via Netlify CLI',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'token', label: 'Netlify Auth Token', placeholder: 'your-netlify-token', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'npm',
+    name: 'npm',
+    description: 'Publish and manage npm packages',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'token', label: 'npm Auth Token', placeholder: 'npm_...', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'neon',
+    name: 'Neon',
+    description: 'Serverless Postgres via Neon CLI (neonctl)',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'api_key', label: 'Neon API Key', placeholder: 'your-neon-api-key', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'cloudflare',
+    name: 'Cloudflare',
+    description: 'Deploy Workers and Pages via Wrangler CLI',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'api_token', label: 'Cloudflare API Token', placeholder: 'your-cf-token', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'railway',
+    name: 'Railway',
+    description: 'Deploy apps and services via Railway CLI',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'token', label: 'Railway Token', placeholder: 'your-railway-token', value: '', type: 'password' },
+    ]
+  },
+  {
+    id: 'turso',
+    name: 'Turso',
+    description: 'SQLite edge databases via Turso CLI',
+    type: 'cli',
+    enabled: false,
+    fields: [
+      { key: 'token', label: 'Turso Auth Token', placeholder: 'your-turso-token', value: '', type: 'password' },
+    ]
+  },
+]
+
+// Default MCPs (always enabled, cannot be disabled)
+export const DEFAULT_MCPS = [
+  { id: 'tavily', name: 'Tavily', description: 'Web search' },
+  { id: 'playwright', name: 'Playwright', description: 'Browser automation' },
+  { id: 'github', name: 'GitHub', description: 'Repository operations' },
+  { id: 'context7', name: 'Context7', description: 'Documentation search' },
+  { id: 'sequential-thinking', name: 'Sequential Thinking', description: 'Structured reasoning' },
+]
+
 // Available models
 export const MODELS = [
   { id: 'sonnet', name: 'Default', provider: 'Mistral', description: 'Devstral Small 2' },
@@ -122,6 +239,8 @@ interface AgentCloudContextType {
   isLoadingRepos: boolean
   isLoadingBranches: boolean
   loadBranches: (repoFullName: string) => Promise<void>
+  connectors: ConnectorConfig[]
+  setConnectors: React.Dispatch<React.SetStateAction<ConnectorConfig[]>>
   createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => void
@@ -159,6 +278,9 @@ function AgentCloudLayoutInner({
 
   // Settings
   const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku'>('sonnet')
+
+  // Connectors state (persisted to localStorage)
+  const [connectors, setConnectors] = useState<ConnectorConfig[]>(DEFAULT_CONNECTORS)
 
   // Repository selection
   const [repos, setRepos] = useState<Repository[]>([])
@@ -209,6 +331,21 @@ function AgentCloudLayoutInner({
         if (parsed.settings) {
           setSelectedModel(parsed.settings.selectedModel || 'sonnet')
         }
+        if (parsed.connectors && Array.isArray(parsed.connectors)) {
+          // Merge saved connectors with defaults (in case new connectors were added)
+          const savedMap = new Map(parsed.connectors.map((c: ConnectorConfig) => [c.id, c]))
+          const merged = DEFAULT_CONNECTORS.map(dc => {
+            const saved = savedMap.get(dc.id)
+            if (saved) {
+              return { ...dc, enabled: saved.enabled, fields: dc.fields.map(f => {
+                const savedField = saved.fields?.find((sf: any) => sf.key === f.key)
+                return savedField ? { ...f, value: savedField.value } : f
+              })}
+            }
+            return dc
+          })
+          setConnectors(merged)
+        }
       }
     } catch (error) {
       console.error('Failed to load sessions:', error)
@@ -225,17 +362,22 @@ function AgentCloudLayoutInner({
     }
   }, [pathname, searchParams])
 
-  // Save sessions to localStorage
+  // Save sessions and connectors to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         sessions,
-        settings: { selectedModel }
+        settings: { selectedModel },
+        connectors: connectors.map(c => ({
+          id: c.id,
+          enabled: c.enabled,
+          fields: c.fields.map(f => ({ key: f.key, value: f.value }))
+        }))
       }))
     } catch (error) {
       console.error('Failed to save sessions:', error)
     }
-  }, [sessions, selectedModel])
+  }, [sessions, selectedModel, connectors])
 
   // Load stored deployment tokens
   const loadStoredTokens = async () => {
@@ -365,6 +507,16 @@ function AgentCloudLayoutInner({
         headers['X-GitHub-Token'] = storedTokens.github
       }
 
+      // Gather enabled connectors with their config values
+      const enabledConnectors = connectors
+        .filter(c => c.enabled && c.fields.every(f => f.value.trim()))
+        .map(c => ({
+          id: c.id,
+          type: c.type,
+          mcpUrl: c.mcpUrl,
+          fields: Object.fromEntries(c.fields.map(f => [f.key, f.value]))
+        }))
+
       const response = await fetch('/api/agent-cloud', {
         method: 'POST',
         headers,
@@ -380,7 +532,8 @@ function AgentCloudLayoutInner({
                 branch: selectedBranch
               },
             }),
-            initialPrompt // Pass the initial prompt for branch naming (first 4 words)
+            initialPrompt, // Pass the initial prompt for branch naming (first 4 words)
+            connectors: enabledConnectors.length > 0 ? enabledConnectors : undefined,
           }
         })
       })
@@ -587,14 +740,22 @@ function AgentCloudLayoutInner({
         </div>
       </div>
 
-      {/* New session button */}
-      <div className="p-4 border-t border-zinc-800/50">
+      {/* New session + Settings buttons */}
+      <div className="p-4 border-t border-zinc-800/50 space-y-2">
         <Button
           onClick={() => router.push('/agent-cloud/new')}
           className="w-full bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl h-10 font-medium"
         >
           <Plus className="h-4 w-4 mr-2" />
           New Session
+        </Button>
+        <Button
+          onClick={() => router.push('/agent-cloud/settings')}
+          variant="ghost"
+          className="w-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 rounded-xl h-9 font-medium text-sm"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Settings
         </Button>
       </div>
     </div>
@@ -618,6 +779,8 @@ function AgentCloudLayoutInner({
     isLoadingTokens,
     isLoadingRepos,
     isLoadingBranches,
+    connectors,
+    setConnectors,
     loadBranches,
     createSession,
     terminateSession,

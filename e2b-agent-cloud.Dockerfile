@@ -64,6 +64,14 @@ RUN npm install -g @anthropic-ai/claude-agent-sdk
 # Install Playwright globally (MCP servers will be run via npx)
 RUN npm install -g playwright
 
+# Install CLI tools for connectors (available when user enables them)
+RUN npm install -g vercel@latest \
+    netlify-cli@latest \
+    neonctl@latest \
+    wrangler@latest \
+    @railway/cli@latest \
+    turso@latest
+
 # Create a user with proper setup (matching E2B conventions)
 RUN useradd -m -s /bin/bash user
 
