@@ -293,20 +293,10 @@ async function doStreaming(
         send({ type: 'start', sandboxId })
         send({ type: 'log', message: 'Claude is thinking...' })
 
-        // Build conversation context for Claude
-        const conversationContext = sandboxEntry!.conversationHistory
-          .slice(-10) // Last 10 messages for context
-          .map(msg => `${msg.role === 'user' ? 'Human' : 'Assistant'}: ${msg.content}`)
-          .join('\n\n')
-
-        // Create prompt with conversation history
-        const fullPrompt = conversationContext
-          ? `Previous conversation:\n${conversationContext}\n\nCurrent request: ${prompt}`
-          : prompt
-
         // Use base64 encoding to safely pass prompts containing any characters
         // This avoids shell escaping issues with single quotes, $, backticks, etc.
-        const base64Prompt = Buffer.from(fullPrompt, 'utf-8').toString('base64')
+        // Note: Conversation history is handled by the script reading the history file
+        const base64Prompt = Buffer.from(prompt, 'utf-8').toString('base64')
 
         // Get the working branch for git workflow instructions
         const workingBranch = sandboxEntry!.workingBranch || 'main'
@@ -362,10 +352,20 @@ if (historyFileArg) {
   }
 }
 
+// Only keep last 6 message pairs (12 messages) to avoid bloating context
+const MAX_PAIRS = 6;
+const MAX_MSG_LENGTH = 800;
+const recentHistory = conversationHistory.slice(-(MAX_PAIRS * 2));
+
 let fullPrompt = '';
-if (conversationHistory.length > 0) {
-  const context = conversationHistory
-    .map(msg => \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${msg.content}\`)
+if (recentHistory.length > 0) {
+  const context = recentHistory
+    .map(msg => {
+      const content = msg.content.length > MAX_MSG_LENGTH
+        ? msg.content.slice(0, MAX_MSG_LENGTH) + '...[truncated]'
+        : msg.content;
+      return \`\${msg.role === 'user' ? 'Human' : 'Assistant'}: \${content}\`;
+    })
     .join('\\n\\n');
   fullPrompt = \`Previous conversation:\\n\${context}\\n\\nCurrent request: \${promptArg}\`;
 } else {
