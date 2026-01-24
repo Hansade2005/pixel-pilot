@@ -627,40 +627,27 @@ try {
                       timestamp: Date.now()
                     })
                   } else if (message.type === 'assistant') {
-                    // Extract text from assistant message content
+                    // The script already handles text extraction from assistant messages
+                    // with hasStreamedText deduplication, so we only forward tool_use blocks
+                    // that might not have been sent via stream_event
                     const content = message.message?.content
                     if (Array.isArray(content)) {
                       for (const block of content) {
                         if (block.type === 'text' && block.text) {
+                          // Only accumulate for history, don't send (already streamed via 'text' type)
                           textContent += block.text
-                          send({ type: 'text', data: block.text, timestamp: Date.now() })
-                        } else if (block.type === 'tool_use') {
-                          // Tool use within assistant message
-                          send({
-                            type: 'tool_use',
-                            name: block.name,
-                            input: block.input,
-                            timestamp: Date.now()
-                          })
                         }
                       }
                     }
                   } else if (message.type === 'content_block_delta') {
-                    // Streaming text delta (if available)
+                    // Already handled by the script's stream_event handler which emits 'text' type
+                    // Just accumulate for history
                     if (message.delta?.text) {
                       textContent += message.delta.text
-                      send({ type: 'text', data: message.delta.text, timestamp: Date.now() })
                     }
                   } else if (message.type === 'content_block_start') {
-                    // Start of a content block - could be text or tool_use
-                    if (message.content_block?.type === 'tool_use') {
-                      send({
-                        type: 'tool_use',
-                        name: message.content_block.name,
-                        input: {},
-                        timestamp: Date.now()
-                      })
-                    }
+                    // Already handled by the script's stream_event handler which emits 'tool_use' type
+                    // No action needed here
                   } else if (['user', 'system'].includes(message.type)) {
                     // Skip conversation history messages - don't send to frontend
                     // These are just Claude loading context, not actual output
