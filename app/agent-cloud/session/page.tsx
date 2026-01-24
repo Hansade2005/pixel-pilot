@@ -24,7 +24,8 @@ import {
   Minus,
   Square,
   RotateCw,
-  Paperclip,
+  ImageIcon,
+  Monitor,
   X,
 } from "lucide-react"
 import { useAgentCloud, type TerminalLine } from "../layout"
@@ -177,6 +178,8 @@ function SessionPageInner() {
   const [expandedMessages, setExpandedMessages] = useState<Set<number>>(new Set())
   const [spinnerPhrase, setSpinnerPhrase] = useState(() => SPINNER_PHRASES[Math.floor(Math.random() * SPINNER_PHRASES.length)])
   const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -366,14 +369,24 @@ function SessionPageInner() {
       ))
     }
 
-    // Add input line (skip only if this is a retry after sandbox recreation)
+    // Add input line with images (skip only if this is a retry after sandbox recreation)
     // overrideSandboxId is only provided during recreation retries
     if (!overrideSandboxId) {
       setSessions(prev => prev.map(s =>
         s.id === sessionId
-          ? { ...s, lines: [...s.lines, { type: 'input' as const, content: currentPrompt, timestamp: new Date() }] }
+          ? { ...s, lines: [...s.lines, {
+              type: 'input' as const,
+              content: currentPrompt,
+              timestamp: new Date(),
+              images: imagesToUse.length > 0 ? imagesToUse.map(img => ({ data: img.data, type: img.type })) : undefined,
+            }] }
           : s
       ))
+    }
+
+    // Clear attached images after storing them in the message
+    if (imagesToUse === attachedImages && attachedImages.length > 0) {
+      setAttachedImages([])
     }
 
     try {
@@ -391,24 +404,23 @@ User Request: ${currentPrompt}`
 
       // Pass GitHub token via header as fallback for server-side clone auth
       const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
         'Accept': 'text/event-stream',
       }
       if (storedTokens.github) {
         headers['X-GitHub-Token'] = storedTokens.github
       }
 
-      // Upload images to sandbox if attached
-      let imagePaths: string[] = []
-      if (imagesToUse.length > 0) {
-        imagePaths = await uploadImages(sandboxIdToUse, imagesToUse)
-        setAttachedImages([])
-      }
-
-      const streamUrl = `/api/agent-cloud?sandboxId=${encodeURIComponent(sandboxIdToUse)}&prompt=${encodeURIComponent(enhancedPrompt)}${imagePaths.length > 0 ? `&images=${encodeURIComponent(JSON.stringify(imagePaths))}` : ''}`
-
-      const response = await fetch(streamUrl, {
-          method: 'GET',
+      // Stream via POST with images included in body (single-step, no separate upload)
+      const response = await fetch('/api/agent-cloud', {
+          method: 'POST',
           headers,
+          body: JSON.stringify({
+            action: 'stream',
+            sandboxId: sandboxIdToUse,
+            prompt: enhancedPrompt,
+            images: imagesToUse.length > 0 ? imagesToUse : undefined,
+          }),
           signal: controller.signal,
         }
       )
@@ -939,16 +951,80 @@ User Request: ${currentPrompt}`
     setAttachedImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Upload images to sandbox and return file paths
-  const uploadImages = async (sandboxId: string, images: typeof attachedImages): Promise<string[]> => {
-    const res = await fetch('/api/agent-cloud', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'upload-images', sandboxId, images: images.map(img => ({ data: img.data, type: img.type, name: img.name })) })
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.paths || []
+  // Drag-and-drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const files = e.dataTransfer?.files
+    if (!files) return
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1]
+        setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Screen recording
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [isCapturing, setIsCapturing] = useState(false)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+
+  const handleScreenToggle = async () => {
+    if (isScreenSharing) {
+      // Stop screen sharing
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+      }
+      setIsScreenSharing(false)
+      return
+    }
+
+    try {
+      setIsCapturing(true)
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      mediaStreamRef.current = stream
+
+      // Capture a screenshot immediately
+      const video = document.createElement('video')
+      video.srcObject = stream
+      await video.play()
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')?.drawImage(video, 0, 0)
+      const base64 = canvas.toDataURL('image/png').split(',')[1]
+      setAttachedImages(prev => [...prev, { data: base64, type: 'image/png', name: `screenshot-${Date.now()}.png` }])
+
+      setIsScreenSharing(true)
+
+      // Listen for stream end (user clicks "Stop sharing" in browser)
+      stream.getVideoTracks()[0].onended = () => {
+        mediaStreamRef.current = null
+        setIsScreenSharing(false)
+      }
+    } catch {
+      // User cancelled screen selection
+    } finally {
+      setIsCapturing(false)
+    }
   }
 
   // Render message line
@@ -975,7 +1051,23 @@ User Request: ${currentPrompt}`
               <span className="text-xs font-semibold">U</span>
             </div>
             <div className="flex-1 pt-0.5">
-              <p className="text-zinc-100 text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+              {/* Display attached images */}
+              {line.images && line.images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {line.images.map((img, imgIdx) => (
+                    <img
+                      key={imgIdx}
+                      src={`data:${img.type};base64,${img.data}`}
+                      alt="Attached"
+                      className="max-w-[200px] max-h-[150px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-zinc-700"
+                      onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
+                    />
+                  ))}
+                </div>
+              )}
+              {line.content && (
+                <p className="text-zinc-100 text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+              )}
               {isLong && (
                 <button
                   onClick={() => setExpandedMessages(prev => {
@@ -1254,7 +1346,20 @@ User Request: ${currentPrompt}`
       {activeSession.status === 'active' && (
         <div className="border-t border-zinc-800/50 p-4">
           <div className="max-w-3xl mx-auto">
-            <div className="relative bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden focus-within:border-zinc-700 focus-within:ring-1 focus-within:ring-zinc-700/50 transition-all">
+            <div
+              className={`relative bg-zinc-900/50 border rounded-xl overflow-hidden focus-within:border-zinc-700 focus-within:ring-1 focus-within:ring-zinc-700/50 transition-all ${
+                isDragging ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-800'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {/* Drag overlay */}
+              {isDragging && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10 pointer-events-none">
+                  <div className="text-orange-400 text-sm font-medium">Drop images here</div>
+                </div>
+              )}
               {/* Image previews */}
               {attachedImages.length > 0 && (
                 <div className="flex gap-2 px-3 pt-3 flex-wrap">
@@ -1263,7 +1368,8 @@ User Request: ${currentPrompt}`
                       <img
                         src={`data:${img.type};base64,${img.data}`}
                         alt={img.name}
-                        className="h-16 w-16 object-cover rounded-lg border border-zinc-700"
+                        className="h-16 w-16 object-cover rounded-lg border border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
                       />
                       <button
                         onClick={() => removeImage(i)}
@@ -1294,14 +1400,28 @@ User Request: ${currentPrompt}`
                 onChange={handleImageSelect}
                 className="hidden"
               />
-              <div className="absolute bottom-2 left-2">
+              <div className="absolute bottom-2 left-2 flex items-center gap-1">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading || isRecreating}
                   className="p-1.5 text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors"
                   title="Attach image"
                 >
-                  <Paperclip className="h-4 w-4" />
+                  <ImageIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleScreenToggle}
+                  disabled={isCapturing || isLoading || isRecreating}
+                  className={`p-1.5 transition-colors disabled:opacity-40 ${
+                    isScreenSharing ? 'text-red-400 hover:text-red-300' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
+                >
+                  {isCapturing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Monitor className="h-4 w-4" />
+                  )}
                 </button>
               </div>
               <div className="absolute bottom-2 right-2">
@@ -1328,6 +1448,27 @@ User Request: ${currentPrompt}`
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Image preview dialog */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-colors"
+          >
+            <X className="h-5 w-5 text-white" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </>

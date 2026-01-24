@@ -35,6 +35,7 @@ export interface TerminalLine {
   type: 'input' | 'output' | 'error' | 'system' | 'file' | 'diff' | 'tool'
   content: string
   timestamp: Date
+  images?: Array<{ data: string; type: string }> // Attached images (base64 data URLs)
   meta?: {
     toolName?: string
     toolId?: string
