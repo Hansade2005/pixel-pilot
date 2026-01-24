@@ -407,6 +407,16 @@ mcpServers['sequential-thinking'] = {
   command: 'npx',
   args: ['-y', '@modelcontextprotocol/server-sequential-thinking']
 };
+// Supabase MCP (user-configured connector)
+if (process.env.SUPABASE_MCP_URL && process.env.SUPABASE_MCP_TOKEN) {
+  mcpServers['supabase'] = {
+    type: 'http',
+    url: process.env.SUPABASE_MCP_URL,
+    headers: {
+      'Authorization': 'Bearer ' + process.env.SUPABASE_MCP_TOKEN
+    }
+  };
+}
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -451,7 +461,7 @@ try {
       enableFileCheckpointing: true,
       ...(Object.keys(mcpServers).length > 0 ? {
         mcpServers,
-        allowedTools: ['mcp__tavily__*', 'mcp__github__*', 'mcp__playwright__*', 'mcp__context7__*', 'mcp__sequential-thinking__*']
+        allowedTools: Object.keys(mcpServers).map(k => 'mcp__' + k + '__*')
       } : {})
     }
   })) {
@@ -780,6 +790,12 @@ async function handleCreate(
       name: string // The repo name to create on GitHub
     }
     initialPrompt?: string // Used to generate branch name from first 4 words
+    connectors?: Array<{
+      id: string
+      type: 'mcp' | 'cli'
+      mcpUrl?: string
+      fields: Record<string, string>
+    }>
   }
 ) {
   // Cleanup old sandboxes first
@@ -974,6 +990,43 @@ async function handleCreate(
     envs.GH_TOKEN = githubToken
   }
 
+  // Add connector environment variables (CLI tokens and MCP configs)
+  if (config?.connectors) {
+    for (const connector of config.connectors) {
+      switch (connector.id) {
+        case 'vercel':
+          if (connector.fields.token) envs.VERCEL_TOKEN = connector.fields.token
+          break
+        case 'netlify':
+          if (connector.fields.token) envs.NETLIFY_AUTH_TOKEN = connector.fields.token
+          break
+        case 'npm':
+          if (connector.fields.token) envs.NPM_TOKEN = connector.fields.token
+          break
+        case 'neon':
+          if (connector.fields.api_key) envs.NEON_API_KEY = connector.fields.api_key
+          break
+        case 'cloudflare':
+          if (connector.fields.api_token) envs.CLOUDFLARE_API_TOKEN = connector.fields.api_token
+          break
+        case 'railway':
+          if (connector.fields.token) envs.RAILWAY_TOKEN = connector.fields.token
+          break
+        case 'turso':
+          if (connector.fields.token) envs.TURSO_AUTH_TOKEN = connector.fields.token
+          break
+        case 'supabase':
+          // Supabase MCP connector - store URL and token for script to pick up
+          if (connector.fields.project_ref && connector.fields.access_token) {
+            envs.SUPABASE_MCP_URL = `https://mcp.supabase.com/mcp?project_ref=${connector.fields.project_ref}`
+            envs.SUPABASE_MCP_TOKEN = connector.fields.access_token
+          }
+          break
+      }
+    }
+    console.log(`[Agent Cloud] Connectors configured: ${config.connectors.map(c => c.id).join(', ')}`)
+  }
+
   // Use our custom E2B template (pipilot-agent) which has Claude Code + Playwright pre-installed
   const template = config?.template || 'pipilot-agent'
   const selectedModel = config?.model || 'sonnet'
@@ -995,6 +1048,43 @@ async function handleCreate(
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
+
+  // Configure CLI connector auth files in the sandbox
+  if (config?.connectors) {
+    for (const connector of config.connectors) {
+      try {
+        switch (connector.id) {
+          case 'npm':
+            if (connector.fields.token) {
+              await sandbox.commands.run(
+                `echo "//registry.npmjs.org/:_authToken=${connector.fields.token}" > /home/user/.npmrc`,
+                { timeoutMs: 5000 }
+              )
+              console.log(`[Agent Cloud] npm auth configured`)
+            }
+            break
+          case 'neon':
+            if (connector.fields.api_key) {
+              // neonctl uses NEON_API_KEY env var (already set above)
+              console.log(`[Agent Cloud] Neon CLI configured via env`)
+            }
+            break
+          case 'turso':
+            if (connector.fields.token) {
+              // turso uses config file
+              await sandbox.commands.run(
+                `mkdir -p /home/user/.config/turso && echo '{"token":"${connector.fields.token}"}' > /home/user/.config/turso/config.json`,
+                { timeoutMs: 5000 }
+              )
+              console.log(`[Agent Cloud] Turso CLI configured`)
+            }
+            break
+        }
+      } catch (e) {
+        console.warn(`[Agent Cloud] Failed to configure ${connector.id}:`, e)
+      }
+    }
+  }
 
   // MCP is configured directly in the Claude Agent SDK script via mcpServers option
   // Using Tavily HTTP MCP for web search, Playwright MCP for browser automation
