@@ -287,6 +287,8 @@ export async function GET(request: NextRequest) {
         const gitWorkflowPrompt = `
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
+- BEFORE committing, ALWAYS configure git user: git config user.name "PiPilot" && git config user.email "hello@pipilot.dev"
+- Do NOT use git config user.name "Claude" or user.email "noreply@anthropic.com"
 - After making code changes, ALWAYS commit them with a clear message
 - After committing, push to the remote: git push -u origin ${workingBranch}
 - After pushing, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
