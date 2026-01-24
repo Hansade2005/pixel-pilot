@@ -39,9 +39,9 @@ const AI_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh'
 
 // Available models through Vercel AI Gateway
 const AVAILABLE_MODELS = {
-  sonnet: 'xai/grok-code-fast-1',      // Fast code generation
+  sonnet: 'mistral/devstral-small-2',   // Default - fast code generation
   opus: 'zai/glm-4.7',                  // High quality
-  haiku: 'mistral/devstral-small-2',   // Quick tasks
+  haiku: 'xai/grok-code-fast-1',        // Quick tasks
 } as const
 
 // Store active sandboxes with user association

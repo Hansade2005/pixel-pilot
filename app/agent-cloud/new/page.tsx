@@ -15,6 +15,8 @@ import {
   Circle,
   ArrowUp,
   Sparkles,
+  Paperclip,
+  X,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -47,7 +49,9 @@ export default function NewSessionPage() {
 
   const [prompt, setPrompt] = useState('')
   const [repoSearchQuery, setRepoSearchQuery] = useState('')
+  const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Filter repos by search
   const filteredRepos = repoSearchQuery
@@ -74,12 +78,53 @@ export default function NewSessionPage() {
     setRepoSearchQuery('')
   }
 
+  // Handle image file selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1]
+        setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
+      }
+      reader.readAsDataURL(file)
+    }
+    e.target.value = ''
+  }
+
+  // Handle paste for images
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (!file) continue
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1]
+          setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: `pasted-${Date.now()}.${file.type.split('/')[1]}` }])
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+  }
+
+  // Remove attached image
+  const removeImage = (index: number) => {
+    setAttachedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
   // Handle submit
   const handleSubmit = async () => {
-    if (!prompt.trim() || !selectedRepo || isCreating) return
+    if ((!prompt.trim() && attachedImages.length === 0) || !selectedRepo || isCreating) return
 
-    const session = await createSession(prompt.trim())
+    const session = await createSession(prompt.trim(), attachedImages.length > 0 ? attachedImages : undefined)
     if (session) {
+      setAttachedImages([])
       // Navigate to the new session
       router.push(`/agent-cloud/session?id=${session.id}`)
     }
@@ -109,6 +154,30 @@ export default function NewSessionPage() {
 
         {/* Chat input card */}
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+          {/* Image previews */}
+          {attachedImages.length > 0 && (
+            <div className="flex gap-2 px-4 pt-4 flex-wrap">
+              {attachedImages.map((img, i) => (
+                <div key={i} className="relative group/img">
+                  <img
+                    src={`data:${img.type};base64,${img.data}`}
+                    alt={img.name}
+                    className="h-16 w-16 object-cover rounded-lg border border-zinc-700"
+                  />
+                  <button
+                    onClick={() => removeImage(i)}
+                    className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-zinc-700 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                  <div className="absolute bottom-0.5 left-0.5 right-0.5 text-[8px] text-zinc-400 truncate bg-black/60 rounded px-0.5">
+                    {img.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Textarea */}
           <div className="p-4">
             <textarea
@@ -116,6 +185,7 @@ export default function NewSessionPage() {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Ask Claude to write code..."
               disabled={!selectedRepo || isCreating}
               className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 min-h-[56px] max-h-[200px] leading-6"
@@ -123,10 +193,30 @@ export default function NewSessionPage() {
             />
           </div>
 
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+
           {/* Bottom toolbar */}
           <div className="px-4 pb-4 flex items-center justify-between gap-4">
-            {/* Left - Repo/Branch/Model selectors */}
+            {/* Left - Attach/Repo/Branch/Model selectors */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Attach image button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!selectedRepo || isCreating}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
+                title="Attach image"
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+              </button>
+
               {/* Repo selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -266,7 +356,7 @@ export default function NewSessionPage() {
             {/* Right - Submit button */}
             <Button
               onClick={handleSubmit}
-              disabled={!prompt.trim() || !selectedRepo || isCreating}
+              disabled={(!prompt.trim() && attachedImages.length === 0) || !selectedRepo || isCreating}
               size="icon"
               className="h-9 w-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white shrink-0 disabled:opacity-40 disabled:bg-zinc-700"
             >

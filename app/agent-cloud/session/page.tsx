@@ -338,11 +338,12 @@ function SessionPageInner() {
   }
 
   // Run prompt with GitHub token passed to AI
-  const runPrompt = useCallback(async (overridePrompt?: string, overrideSandboxId?: string) => {
+  const runPrompt = useCallback(async (overridePrompt?: string, overrideSandboxId?: string, overrideImages?: Array<{ data: string; type: string; name: string }>) => {
     if (!activeSession || isLoading || isRecreating) return
 
+    const imagesToUse = overrideImages || attachedImages
     const currentPrompt = overridePrompt || prompt.trim()
-    if (!currentPrompt && attachedImages.length === 0) return
+    if (!currentPrompt && imagesToUse.length === 0) return
 
     const sandboxIdToUse = overrideSandboxId || activeSession.sandboxId
 
@@ -398,8 +399,8 @@ User Request: ${currentPrompt}`
 
       // Upload images to sandbox if attached
       let imagePaths: string[] = []
-      if (attachedImages.length > 0) {
-        imagePaths = await uploadImages(sandboxIdToUse, attachedImages)
+      if (imagesToUse.length > 0) {
+        imagePaths = await uploadImages(sandboxIdToUse, imagesToUse)
         setAttachedImages([])
       }
 
@@ -876,19 +877,20 @@ User Request: ${currentPrompt}`
       // Mark this session's pending prompt as processed
       pendingPromptProcessedRef.current.add(activeSession.id)
 
-      // Store the pending prompt before clearing
+      // Store the pending prompt and images before clearing
       const promptToRun = activeSession.pendingPrompt
+      const imagesToRun = activeSession.pendingImages
 
-      // Clear the pending prompt from the session
+      // Clear the pending prompt and images from the session
       setSessions(prev => prev.map(s =>
         s.id === sessionId
-          ? { ...s, pendingPrompt: undefined }
+          ? { ...s, pendingPrompt: undefined, pendingImages: undefined }
           : s
       ))
 
       // Run the prompt after a short delay to let the page render
       setTimeout(() => {
-        runPrompt(promptToRun)
+        runPrompt(promptToRun, undefined, imagesToRun)
       }, 150)
     }
   }, [activeSession?.pendingPrompt, activeSession?.id, isLoading, isRecreating, sessionId, setSessions, runPrompt])
@@ -897,6 +899,24 @@ User Request: ${currentPrompt}`
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       runPrompt()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const file = item.getAsFile()
+        if (!file) continue
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1]
+          setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: `pasted-${Date.now()}.${file.type.split('/')[1]}` }])
+        }
+        reader.readAsDataURL(file)
+      }
     }
   }
 
@@ -1260,6 +1280,7 @@ User Request: ${currentPrompt}`
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 placeholder={isRecreating ? "Reconnecting..." : "Reply to Claude..."}
                 disabled={isLoading || isRecreating}
                 className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 px-4 pt-3 pb-12 min-h-[44px] max-h-[120px] leading-6 overflow-y-auto"
