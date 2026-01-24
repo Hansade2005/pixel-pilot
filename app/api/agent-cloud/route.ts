@@ -389,6 +389,24 @@ if (process.env.GITHUB_TOKEN) {
     }
   };
 }
+// Playwright MCP for browser automation
+mcpServers['playwright'] = {
+  command: 'npx',
+  args: ['@playwright/mcp@latest']
+};
+// Context7 MCP for documentation search
+mcpServers['context7'] = {
+  type: 'http',
+  url: 'https://mcp.context7.com/mcp',
+  headers: {
+    CONTEXT7_API_KEY: 'ctx7sk-c1b4f8c7-a7a1-4646-b21b-fcd61160613b'
+  }
+};
+// Sequential Thinking MCP for structured reasoning
+mcpServers['sequential-thinking'] = {
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-sequential-thinking']
+};
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -433,7 +451,7 @@ try {
       enableFileCheckpointing: true,
       ...(Object.keys(mcpServers).length > 0 ? {
         mcpServers,
-        allowedTools: ['mcp__tavily__*', 'mcp__github__*']
+        allowedTools: ['mcp__tavily__*', 'mcp__github__*', 'mcp__playwright__*', 'mcp__context7__*', 'mcp__sequential-thinking__*']
       } : {})
     }
   })) {
@@ -758,6 +776,9 @@ async function handleCreate(
       full_name: string
       branch: string
     }
+    newProject?: {
+      name: string // The repo name to create on GitHub
+    }
     initialPrompt?: string // Used to generate branch name from first 4 words
   }
 ) {
@@ -789,7 +810,9 @@ async function handleCreate(
   // Create sandbox key for this user/repo combination
   const sandboxKey = config?.repo
     ? `${userId}-${config.repo.full_name}`
-    : `${userId}-default`
+    : config?.newProject
+      ? `${userId}-new-${config.newProject.name}`
+      : `${userId}-default`
 
   // Check if we already have an active sandbox for this user/repo
   const existingEntry = activeSandboxes.get(sandboxKey)
@@ -974,9 +997,9 @@ async function handleCreate(
   let repoCloned = false
 
   // MCP is configured directly in the Claude Agent SDK script via mcpServers option
-  // Using Tavily HTTP MCP server for web search capabilities
+  // Using Tavily HTTP MCP for web search, Playwright MCP for browser automation
   const mcpGatewayUrl = 'https://mcp.tavily.com/mcp/?tavilyApiKey=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'
-  console.log(`[Agent Cloud] MCP gateway configured: Tavily HTTP MCP`)
+  console.log(`[Agent Cloud] MCP gateway configured: Tavily, Playwright, GitHub, Context7, Sequential Thinking`)
 
   // Track the working branch created for this session
   let createdWorkingBranch: string | undefined
@@ -1107,6 +1130,24 @@ async function handleCreate(
     }
   }
 
+  // Handle new project mode (no repo to clone, just initialize git)
+  if (config?.newProject && !config?.repo) {
+    try {
+      console.log(`[Agent Cloud] New project mode: initializing ${config.newProject.name}`)
+
+      // Initialize git and configure user
+      await sandbox.commands.run(
+        `cd ${PROJECT_DIR} && git init && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
+        { timeoutMs: 10000 }
+      )
+
+      repoCloned = false // No clone, fresh project
+      console.log(`[Agent Cloud] Git initialized for new project: ${config.newProject.name}`)
+    } catch (error: any) {
+      console.error(`[Agent Cloud] New project git init error:`, error?.message || error)
+    }
+  }
+
   // Store sandbox entry with the working branch
   activeSandboxes.set(sandboxKey, {
     sandboxId,
@@ -1133,15 +1174,19 @@ async function handleCreate(
     model: AVAILABLE_MODELS[selectedModel],
     gateway: AI_GATEWAY_BASE_URL,
     repoCloned,
+    isNewProject: !!config?.newProject,
+    newProjectName: config?.newProject?.name,
     projectDir: repoCloned ? PROJECT_DIR : '/home/user',
     reconnected: false,
     messageCount: 0,
     mcpEnabled: !!mcpGatewayUrl,
-    mcpTools: ['tavily'],
-    workingBranch: createdWorkingBranch, // The branch created for this session (e.g., pipilot/fix-login-bug-a1b2)
-    message: repoCloned
-      ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
-      : 'Sandbox created with Vercel AI Gateway (MCP enabled)',
+    mcpTools: ['tavily', 'playwright', 'context7', 'sequential-thinking'],
+    workingBranch: createdWorkingBranch,
+    message: config?.newProject
+      ? `Sandbox created for new project: ${config.newProject.name} (MCP enabled)`
+      : repoCloned
+        ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
+        : 'Sandbox created with Vercel AI Gateway (MCP enabled)',
   })
 }
 

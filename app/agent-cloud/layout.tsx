@@ -80,6 +80,8 @@ export interface Session {
   messageCount?: number
   pendingPrompt?: string // Initial prompt to auto-send when session page loads
   pendingImages?: Array<{ data: string; type: string; name: string }> // Images to attach when auto-sending
+  isNewProject?: boolean // Whether this is a new project (built from scratch)
+  newProjectName?: string // The repo name for new project mode
 }
 
 export interface Repository {
@@ -120,7 +122,7 @@ interface AgentCloudContextType {
   isLoadingRepos: boolean
   isLoadingBranches: boolean
   loadBranches: (repoFullName: string) => Promise<void>
-  createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>) => Promise<Session | null>
+  createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => void
   isCreating: boolean
@@ -345,9 +347,14 @@ function AgentCloudLayoutInner({
   }, [])
 
   // Create session
-  const createSession = async (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>): Promise<Session | null> => {
-    if (!selectedRepo) {
+  const createSession = async (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }): Promise<Session | null> => {
+    if (!newProject && !selectedRepo) {
       toast.error('Please select a repository first')
+      return null
+    }
+
+    if (newProject && !storedTokens.github) {
+      toast.error('GitHub connection required for new projects')
       return null
     }
 
@@ -365,10 +372,14 @@ function AgentCloudLayoutInner({
           action: 'create',
           config: {
             model: selectedModel,
-            repo: {
-              full_name: selectedRepo.full_name,
-              branch: selectedBranch
-            },
+            ...(newProject ? {
+              newProject: { name: newProject.name },
+            } : {
+              repo: {
+                full_name: selectedRepo!.full_name,
+                branch: selectedBranch
+              },
+            }),
             initialPrompt // Pass the initial prompt for branch naming (first 4 words)
           }
         })
@@ -395,34 +406,42 @@ function AgentCloudLayoutInner({
         model: data.model,
         gateway: data.gateway,
         title: sessionTitle,
-        repo: {
-          name: selectedRepo.name,
-          full_name: selectedRepo.full_name,
-          branch: selectedBranch,
-        },
-        workingBranch, // Store the working branch for display
+        ...(newProject ? {} : {
+          repo: {
+            name: selectedRepo!.name,
+            full_name: selectedRepo!.full_name,
+            branch: selectedBranch,
+          },
+        }),
+        workingBranch,
         stats: { additions: 0, deletions: 0 },
         messageCount: data.messageCount || 0,
-        pendingPrompt: initialPrompt, // Store the initial prompt to auto-send
-        pendingImages: images && images.length > 0 ? images : undefined, // Store images to attach when auto-sending
-        lines: reconnected ? [
+        pendingPrompt: initialPrompt,
+        pendingImages: images && images.length > 0 ? images : undefined,
+        isNewProject: !!newProject,
+        newProjectName: newProject?.name,
+        lines: newProject ? [
+          { type: 'system', content: `New project: ${newProject.name}`, timestamp: new Date() },
+          { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily, Playwright, GitHub, Context7, Sequential Thinking`, timestamp: new Date() },
+        ] : reconnected ? [
           { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
-          { type: 'system', content: `Repository: ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          { type: 'system', content: `Repository: ${selectedRepo!.full_name} (${selectedBranch})`, timestamp: new Date() },
           ...(workingBranch ? [{ type: 'system' as const, content: `Working branch: ${workingBranch}`, timestamp: new Date() }] : []),
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily, Puppeteer, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily, Playwright, GitHub, Context7, Sequential Thinking`, timestamp: new Date() },
         ] : repoCloned ? [
-          { type: 'system', content: `Cloned ${selectedRepo.full_name} (${selectedBranch})`, timestamp: new Date() },
+          { type: 'system', content: `Cloned ${selectedRepo!.full_name} (${selectedBranch})`, timestamp: new Date() },
           { type: 'system', content: `Working branch: ${workingBranch || 'main'}`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily, Puppeteer, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily, Playwright, GitHub, Context7, Sequential Thinking`, timestamp: new Date() },
         ] : [
-          { type: 'system', content: `Failed to clone ${selectedRepo.full_name}`, timestamp: new Date() },
+          { type: 'system', content: `Failed to clone ${selectedRepo!.full_name}`, timestamp: new Date() },
         ]
       }
 
       setSessions(prev => [newSession, ...prev])
-      toast.success(reconnected ? `Reconnected` : repoCloned ? `Session created` : 'Session created')
+      toast.success(newProject ? 'New project session created' : reconnected ? `Reconnected` : repoCloned ? `Session created` : 'Session created')
 
       return newSession
     } catch (error) {
@@ -520,7 +539,7 @@ function AgentCloudLayoutInner({
                         {session.title || session.repo?.name || 'Untitled'}
                       </div>
                       <div className="text-xs text-zinc-500 flex items-center gap-1.5 mt-1 font-mono">
-                        <span>{session.repo?.name}</span>
+                        <span>{session.isNewProject ? session.newProjectName : session.repo?.name}</span>
                         <span className="text-zinc-700">·</span>
                         <span>{formatTime(session.createdAt)}</span>
                         {session.stats && (session.stats.additions > 0 || session.stats.deletions > 0) && (

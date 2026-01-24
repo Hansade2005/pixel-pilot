@@ -18,6 +18,7 @@ import {
   ImageIcon,
   Monitor,
   X,
+  Plus,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -54,6 +55,8 @@ export default function NewSessionPage() {
   const [prompt, setPrompt] = useState('')
   const [repoSearchQuery, setRepoSearchQuery] = useState('')
   const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
+  const [isNewProject, setIsNewProject] = useState(false)
+  const [projectName, setProjectName] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -204,13 +207,29 @@ export default function NewSessionPage() {
 
   // Handle submit
   const handleSubmit = async () => {
-    if ((!prompt.trim() && attachedImages.length === 0) || !selectedRepo || isCreating) return
+    if ((!prompt.trim() && attachedImages.length === 0) || isCreating) return
 
-    const session = await createSession(prompt.trim(), attachedImages.length > 0 ? attachedImages : undefined)
-    if (session) {
-      setAttachedImages([])
-      // Navigate to the new session
-      router.push(`/agent-cloud/session?id=${session.id}`)
+    if (isNewProject) {
+      // New project mode - requires GitHub connection and project name
+      if (!isConnected) return
+      if (!projectName.trim()) return
+      const session = await createSession(
+        prompt.trim(),
+        attachedImages.length > 0 ? attachedImages : undefined,
+        { name: projectName.trim() }
+      )
+      if (session) {
+        setAttachedImages([])
+        router.push(`/agent-cloud/session?id=${session.id}`)
+      }
+    } else {
+      // Existing repo mode
+      if (!selectedRepo) return
+      const session = await createSession(prompt.trim(), attachedImages.length > 0 ? attachedImages : undefined)
+      if (session) {
+        setAttachedImages([])
+        router.push(`/agent-cloud/session?id=${session.id}`)
+      }
     }
   }
 
@@ -235,6 +254,45 @@ export default function NewSessionPage() {
             Select a repository and describe what you want to build
           </p>
         </div>
+
+        {/* New Project Toggle */}
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setIsNewProject(!isNewProject)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+              isNewProject ? 'bg-orange-500' : 'bg-zinc-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                isNewProject ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`}
+            />
+          </button>
+          <span className="text-sm text-zinc-300 flex items-center gap-1.5">
+            <Plus className="h-3.5 w-3.5" />
+            New project
+          </span>
+          {isNewProject && !isConnected && (
+            <span className="text-xs text-red-400 ml-2">GitHub connection required</span>
+          )}
+        </div>
+
+        {/* Project name input (shown in new project mode) */}
+        {isNewProject && (
+          <div className="mb-4">
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value.replace(/[^a-zA-Z0-9-_]/g, '-'))}
+              placeholder="my-new-app"
+              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+            />
+            <p className="text-[11px] text-zinc-600 mt-1.5 px-1">
+              This will be the GitHub repository name
+            </p>
+          </div>
+        )}
 
         {/* Chat input card */}
         <div
@@ -284,8 +342,8 @@ export default function NewSessionPage() {
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Ask Claude to write code..."
-              disabled={!selectedRepo || isCreating}
+              placeholder={isNewProject ? "Describe the app you want to build..." : "Ask Claude to write code..."}
+              disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
               className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 min-h-[56px] max-h-[200px] leading-6"
               rows={2}
             />
@@ -310,7 +368,7 @@ export default function NewSessionPage() {
                 <>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={!selectedRepo || isCreating}
+                    disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
                     className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
                     title="Attach image"
                   >
@@ -320,7 +378,7 @@ export default function NewSessionPage() {
                   {/* Screen capture button */}
                   <button
                     onClick={handleScreenToggle}
-                    disabled={isCapturing || !selectedRepo || isCreating}
+                    disabled={isCapturing || (isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating))}
                     className={`flex items-center gap-1.5 text-xs transition-colors px-2.5 py-1.5 rounded-lg disabled:opacity-40 ${
                       isScreenSharing
                         ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
@@ -337,86 +395,88 @@ export default function NewSessionPage() {
                 </>
               )}
 
-              {/* Repo selector */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
-                    <Github className="h-3.5 w-3.5" />
-                    <span className="max-w-[100px] truncate">
-                      {selectedRepo ? selectedRepo.name : 'Select repo'}
-                    </span>
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-800 max-h-80 overflow-hidden">
-                  {isLoadingTokens || isLoadingRepos ? (
-                    <div className="p-4 text-center text-zinc-500 text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                      <span>Loading...</span>
-                    </div>
-                  ) : !isConnected ? (
-                    <div className="p-4 text-center text-zinc-500 text-sm">
-                      <Github className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                      <p className="mb-2">GitHub not connected</p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.location.href = '/workspace/deployment'}
-                        className="text-xs"
-                      >
-                        Connect GitHub
-                      </Button>
-                    </div>
-                  ) : repos.length === 0 ? (
-                    <div className="p-4 text-center text-zinc-500 text-sm">
-                      No repositories found
-                    </div>
-                  ) : (
-                    <>
-                      {/* Search */}
-                      <div className="p-2 border-b border-zinc-800">
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-                          <input
-                            type="text"
-                            placeholder="Search..."
-                            value={repoSearchQuery}
-                            onChange={(e) => setRepoSearchQuery(e.target.value)}
-                            className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md pl-8 pr-3 py-1.5 text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
-                          />
-                        </div>
+              {/* Repo selector (hidden in new project mode) */}
+              {!isNewProject && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
+                      <Github className="h-3.5 w-3.5" />
+                      <span className="max-w-[100px] truncate">
+                        {selectedRepo ? selectedRepo.name : 'Select repo'}
+                      </span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-72 bg-zinc-900 border-zinc-800 max-h-80 overflow-hidden">
+                    {isLoadingTokens || isLoadingRepos ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                        <span>Loading...</span>
                       </div>
-                      <div className="overflow-y-auto max-h-60">
-                        {filteredRepos.map(repo => (
-                          <DropdownMenuItem
-                            key={repo.id}
-                            onClick={() => selectRepo(repo)}
-                            className="flex items-center gap-2 cursor-pointer py-2.5"
-                          >
-                            <FolderGit2 className="h-4 w-4 text-zinc-500 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="truncate font-medium">{repo.name}</span>
-                                {repo.private && (
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                    private
-                                  </Badge>
+                    ) : !isConnected ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">
+                        <Github className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                        <p className="mb-2">GitHub not connected</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.location.href = '/workspace/deployment'}
+                          className="text-xs"
+                        >
+                          Connect GitHub
+                        </Button>
+                      </div>
+                    ) : repos.length === 0 ? (
+                      <div className="p-4 text-center text-zinc-500 text-sm">
+                        No repositories found
+                      </div>
+                    ) : (
+                      <>
+                        {/* Search */}
+                        <div className="p-2 border-b border-zinc-800">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+                            <input
+                              type="text"
+                              placeholder="Search..."
+                              value={repoSearchQuery}
+                              onChange={(e) => setRepoSearchQuery(e.target.value)}
+                              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md pl-8 pr-3 py-1.5 text-sm placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                            />
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto max-h-60">
+                          {filteredRepos.map(repo => (
+                            <DropdownMenuItem
+                              key={repo.id}
+                              onClick={() => selectRepo(repo)}
+                              className="flex items-center gap-2 cursor-pointer py-2.5"
+                            >
+                              <FolderGit2 className="h-4 w-4 text-zinc-500 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="truncate font-medium">{repo.name}</span>
+                                  {repo.private && (
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                      private
+                                    </Badge>
+                                  )}
+                                </div>
+                                {repo.description && (
+                                  <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
                                 )}
                               </div>
-                              {repo.description && (
-                                <div className="text-xs text-zinc-500 truncate">{repo.description}</div>
-                              )}
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                            </DropdownMenuItem>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
 
-              {/* Branch selector */}
-              {selectedRepo && (
+              {/* Branch selector (hidden in new project mode) */}
+              {!isNewProject && selectedRepo && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800">
@@ -476,7 +536,11 @@ export default function NewSessionPage() {
             {/* Right - Submit button */}
             <Button
               onClick={handleSubmit}
-              disabled={(!prompt.trim() && attachedImages.length === 0) || !selectedRepo || isCreating}
+              disabled={
+                (!prompt.trim() && attachedImages.length === 0) ||
+                (isNewProject ? (!isConnected || !projectName.trim()) : !selectedRepo) ||
+                isCreating
+              }
               size="icon"
               className="h-9 w-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white shrink-0 disabled:opacity-40 disabled:bg-zinc-700"
             >
