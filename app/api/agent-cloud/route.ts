@@ -134,8 +134,8 @@ export async function POST(request: NextRequest) {
       case 'restore':
         return handleRestore(body.sandboxId, body.conversationHistory)
 
-      case 'upload-images':
-        return handleUploadImages(body.sandboxId, body.images)
+      case 'stream':
+        return handleStreamPost(request, body.sandboxId, body.prompt || '', body.images || [])
 
       default:
         return NextResponse.json(
@@ -153,18 +153,46 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET endpoint for streaming output
- * Implements real-time streaming exactly like the preview route
+ * POST stream handler - streams with images passed as base64 in body
+ */
+async function handleStreamPost(
+  request: NextRequest,
+  sandboxId: string,
+  prompt: string,
+  images: Array<{ data: string; type: string; name: string }>
+): Promise<Response> {
+  return doStreaming(request, sandboxId, prompt, images)
+}
+
+/**
+ * GET endpoint for streaming output (text-only, no images)
  * Uses ReadableStream with SSE format: "data: {...}\n\n"
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const sandboxId = searchParams.get('sandboxId')
   const prompt = searchParams.get('prompt') || ''
-  const imagesParam = searchParams.get('images')
-  const imagePaths: string[] = imagesParam ? JSON.parse(imagesParam) : []
 
-  if (!sandboxId || (!prompt && imagePaths.length === 0)) {
+  if (!sandboxId || !prompt) {
+    return NextResponse.json(
+      { error: 'sandboxId and prompt are required for streaming' },
+      { status: 400 }
+    )
+  }
+
+  return doStreaming(request, sandboxId, prompt, [])
+}
+
+/**
+ * Shared streaming logic for both GET (text-only) and POST stream (with images)
+ */
+async function doStreaming(
+  request: NextRequest,
+  sandboxId: string,
+  prompt: string,
+  images: Array<{ data: string; type: string; name?: string }>
+): Promise<Response> {
+  if (!sandboxId || (!prompt && images.length === 0)) {
     return NextResponse.json(
       { error: 'sandboxId and prompt (or images) are required for streaming' },
       { status: 400 }
@@ -236,9 +264,9 @@ export async function GET(request: NextRequest) {
       isClosed = true
       console.log('[Agent Cloud] Request aborted by client, killing agent process...')
       sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
-      // Clean up .temp folder on abort
-      if (imagePaths.length > 0) {
-        sandboxRef.commands.run(`rm -rf ${workDir}/.temp`, { timeoutMs: 5000 }).catch(() => {})
+      // Clean up images file on abort
+      if (images.length > 0) {
+        sandboxRef.commands.run(`rm -f ${workDir}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
       }
     }
   })
@@ -306,20 +334,21 @@ import { readFileSync } from 'fs';
 const promptArg = process.argv[2];
 const systemPromptArg = process.argv[3];
 const historyFileArg = process.argv[4];
-const imagePathsArg = process.argv[5];
+const imagesFileArg = process.argv[5];
 
 if (!promptArg) {
-  console.error('Usage: node script.mjs <prompt> [systemPrompt] [historyFile] [imagePaths]');
+  console.error('Usage: node script.mjs <prompt> [systemPrompt] [historyFile] [imagesFile]');
   process.exit(1);
 }
 
-// Parse image paths if provided
-let imagePaths = [];
-if (imagePathsArg) {
+// Read images from JSON file if provided (contains array of {data, type})
+let imageData = [];
+if (imagesFileArg) {
   try {
-    imagePaths = JSON.parse(imagePathsArg);
+    const raw = readFileSync(imagesFileArg, 'utf-8');
+    imageData = JSON.parse(raw);
   } catch (e) {
-    // Ignore parse errors
+    // Ignore read/parse errors
   }
 }
 
@@ -369,22 +398,14 @@ process.on('SIGINT', () => abortController.abort());
 
 // Build prompt - use async generator for multimodal (images), string for text-only
 let promptInput;
-if (imagePaths.length > 0) {
+if (imageData.length > 0) {
   const gen = async function*() {
     const contentParts = [];
-    for (const imgPath of imagePaths) {
-      try {
-        const imgData = readFileSync(imgPath);
-        const base64 = imgData.toString('base64');
-        const ext = imgPath.split('.').pop() || 'png';
-        const mediaType = 'image/' + (ext === 'jpg' ? 'jpeg' : ext);
-        contentParts.push({
-          type: 'image',
-          source: { type: 'base64', media_type: mediaType, data: base64 }
-        });
-      } catch (e) {
-        // Skip unreadable images
-      }
+    for (const img of imageData) {
+      contentParts.push({
+        type: 'image',
+        source: { type: 'base64', media_type: img.type || 'image/png', data: img.data }
+      });
     }
     contentParts.push({ type: 'text', text: fullPrompt || 'What is in this image?' });
     yield {
@@ -483,12 +504,14 @@ try {
         // This ensures the SDK is available in node_modules when the script executes
         send({ type: 'log', message: 'Preparing Claude Agent SDK...' })
         
+        // Write images as JSON file if present (base64 data passed directly)
+        if (images.length > 0) {
+          const imagesJson = JSON.stringify(images.map(img => ({ data: img.data, type: img.type })))
+          await sandbox.files.write(`${workDir}/.images.json`, imagesJson)
+        }
+        const imageArg = images.length > 0 ? ` "${workDir}/.images.json"` : ''
+
         // Single chained command: init package.json if needed, install SDK, then run script
-        // Environment variables will be passed via the env option in sandbox.commands.run()
-        // Using && ensures each step must succeed before the next runs
-        // Pass image paths as base64-encoded JSON (5th arg) if present
-        const base64Images = imagePaths.length > 0 ? Buffer.from(JSON.stringify(imagePaths), 'utf-8').toString('base64') : ''
-        const imageArg = base64Images ? ` "$(echo '${base64Images}' | base64 -d)"` : ''
         const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-agent-sdk && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"${imageArg}`
 
         console.log(`[Agent Cloud] Executing chained install & run command`)
@@ -678,9 +701,9 @@ try {
             messageCount: sandboxEntry!.conversationHistory.length
           })
 
-          // Clean up .temp folder after stream completes
-          if (imagePaths.length > 0) {
-            sandbox.commands.run(`rm -rf ${workDir}/.temp`, { timeoutMs: 5000 }).catch(() => {})
+          // Clean up images file after stream completes
+          if (images.length > 0) {
+            sandbox.commands.run(`rm -f ${workDir}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
           }
 
         } catch (cmdError) {
@@ -705,9 +728,9 @@ try {
       console.log('[Agent Cloud] Client disconnected, killing agent process...')
       // Kill the claude-stream process in the sandbox
       sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
-      // Clean up .temp folder on disconnect
-      if (imagePaths.length > 0) {
-        sandboxRef.commands.run(`rm -rf ${workDir}/.temp`, { timeoutMs: 5000 }).catch(() => {})
+      // Clean up images file on disconnect
+      if (images.length > 0) {
+        sandboxRef.commands.run(`rm -f ${workDir}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
       }
     }
   })
@@ -995,58 +1018,40 @@ async function handleCreate(
         }
       }
 
-      // Try gh CLI first (uses GITHUB_TOKEN env var automatically), then git clone as fallback
+      // Clone repo into the working directory directly (not a subdirectory)
+      // Uses git init + fetch + checkout approach since the directory may not be empty
       let cloneSuccess = false
 
       if (githubToken) {
-        // Method 1: gh repo clone (most reliable with GitHub tokens)
+        // Method 1: git init + fetch with token (works in non-empty directories)
         try {
-          console.log(`[Agent Cloud] Attempting clone with gh CLI...`)
-          const ghResult = await sandbox.commands.run(
-            `gh repo clone ${config.repo.full_name} ${PROJECT_DIR} -- --branch ${config.repo.branch} --single-branch --depth 50`,
+          console.log(`[Agent Cloud] Cloning with token into ${PROJECT_DIR}...`)
+          const gitResult = await sandbox.commands.run(
+            `cd ${PROJECT_DIR} && git init && (git remote add origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
             { timeoutMs: 180000 }
           )
-          if (ghResult.exitCode === 0) {
+          if (gitResult.exitCode === 0) {
             cloneSuccess = true
-            console.log(`[Agent Cloud] Repo cloned successfully via gh CLI`)
+            console.log(`[Agent Cloud] Repo cloned successfully via git init + fetch`)
           } else {
-            console.warn(`[Agent Cloud] gh clone failed (exit ${ghResult.exitCode}):`, ghResult.stderr)
+            console.warn(`[Agent Cloud] git init+fetch failed:`, gitResult.stderr)
           }
-        } catch (ghError: any) {
-          console.warn(`[Agent Cloud] gh clone error:`, ghError?.result?.stderr || ghError?.message)
-        }
-
-        // Method 2: git clone with x-access-token URL
-        if (!cloneSuccess) {
-          try {
-            console.log(`[Agent Cloud] Falling back to git clone with token URL...`)
-            const gitResult = await sandbox.commands.run(
-              `git clone --branch ${config.repo.branch} --single-branch --depth 50 https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git ${PROJECT_DIR}`,
-              { timeoutMs: 180000 }
-            )
-            if (gitResult.exitCode === 0) {
-              cloneSuccess = true
-              console.log(`[Agent Cloud] Repo cloned successfully via git with token`)
-            } else {
-              console.warn(`[Agent Cloud] git token clone failed:`, gitResult.stderr)
-            }
-          } catch (gitError: any) {
-            console.warn(`[Agent Cloud] git token clone error:`, gitError?.result?.stderr || gitError?.message)
-          }
+        } catch (gitError: any) {
+          console.warn(`[Agent Cloud] git init+fetch error:`, gitError?.result?.stderr || gitError?.message)
         }
       }
 
-      // Method 3: Public clone (no auth)
+      // Method 2: Public clone (no auth, git init + fetch)
       if (!cloneSuccess) {
         try {
-          console.log(`[Agent Cloud] Attempting public clone...`)
+          console.log(`[Agent Cloud] Attempting public clone into ${PROJECT_DIR}...`)
           const publicResult = await sandbox.commands.run(
-            `git clone --branch ${config.repo.branch} --single-branch --depth 50 https://github.com/${config.repo.full_name}.git ${PROJECT_DIR}`,
+            `cd ${PROJECT_DIR} && git init && (git remote add origin https://github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
             { timeoutMs: 180000 }
           )
           if (publicResult.exitCode === 0) {
             cloneSuccess = true
-            console.log(`[Agent Cloud] Repo cloned successfully via public URL`)
+            console.log(`[Agent Cloud] Repo cloned successfully via public fetch`)
           } else {
             console.warn(`[Agent Cloud] Public clone failed:`, publicResult.stderr)
           }
@@ -1651,53 +1656,6 @@ async function handleList(request: NextRequest) {
 }
 
 /**
- * Upload images to sandbox .temp folder for multimodal input
- * Returns array of file paths where images were written
- */
-async function handleUploadImages(
-  sandboxId: string,
-  images: Array<{ data: string; type: string; name: string }>
-) {
-  if (!sandboxId || !images || images.length === 0) {
-    return NextResponse.json({ error: 'sandboxId and images are required' }, { status: 400 })
-  }
-
-  // Find sandbox and determine working directory
-  let sandbox
-  let workDir = '/home/user'
-  for (const [, entry] of activeSandboxes) {
-    if (entry.sandboxId === sandboxId) {
-      sandbox = entry.sandbox
-      workDir = entry.repo?.cloned ? PROJECT_DIR : '/home/user'
-      break
-    }
-  }
-  if (!sandbox) {
-    try {
-      sandbox = await Sandbox.connect(sandboxId)
-    } catch {
-      return NextResponse.json({ error: 'Sandbox not found' }, { status: 404 })
-    }
-  }
-
-  // Create .temp folder in working directory
-  const tempDir = `${workDir}/.temp`
-  await sandbox.commands.run(`mkdir -p ${tempDir}`, { timeoutMs: 5000 })
-
-  const paths: string[] = []
-  for (let i = 0; i < images.length; i++) {
-    const img = images[i]
-    const ext = img.type.split('/')[1] || 'png'
-    const filePath = `${tempDir}/upload-${Date.now()}-${i}.${ext}`
-    const buffer = Buffer.from(img.data, 'base64')
-    await sandbox.files.write(filePath, buffer)
-    paths.push(filePath)
-    console.log(`[Agent Cloud] Image uploaded: ${filePath} (${buffer.length} bytes)`)
-  }
-
-  return NextResponse.json({ paths })
-}
-
 /**
  * Restore conversation history to a sandbox
  * Used when recreating a sandbox after expiration

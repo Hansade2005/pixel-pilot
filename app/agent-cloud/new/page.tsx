@@ -15,7 +15,8 @@ import {
   Circle,
   ArrowUp,
   Sparkles,
-  Paperclip,
+  ImageIcon,
+  Monitor,
   X,
 } from "lucide-react"
 import {
@@ -46,6 +47,9 @@ export default function NewSessionPage() {
     setActiveSessionId,
     isCreating,
   } = useAgentCloud()
+
+  // Only Devstral model (sonnet slot) supports image input
+  const supportsImages = selectedModel === 'sonnet'
 
   const [prompt, setPrompt] = useState('')
   const [repoSearchQuery, setRepoSearchQuery] = useState('')
@@ -78,8 +82,9 @@ export default function NewSessionPage() {
     setRepoSearchQuery('')
   }
 
-  // Handle image file selection
+  // Handle image file selection (only for models that support images)
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!supportsImages) return
     const files = e.target.files
     if (!files) return
     for (const file of Array.from(files)) {
@@ -94,8 +99,9 @@ export default function NewSessionPage() {
     e.target.value = ''
   }
 
-  // Handle paste for images
+  // Handle paste for images (only for models that support images)
   const handlePaste = (e: React.ClipboardEvent) => {
+    if (!supportsImages) return
     const items = e.clipboardData?.items
     if (!items) return
     for (const item of Array.from(items)) {
@@ -116,6 +122,84 @@ export default function NewSessionPage() {
   // Remove attached image
   const removeImage = (index: number) => {
     setAttachedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Drag-and-drop handlers (only for models that support images)
+  const [isDragging, setIsDragging] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!supportsImages) return
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (!supportsImages) return
+    const files = e.dataTransfer?.files
+    if (!files) return
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1]
+        setAttachedImages(prev => [...prev, { data: base64, type: file.type, name: file.name }])
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Screen recording
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [isCapturing, setIsCapturing] = useState(false)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+
+  const handleScreenToggle = async () => {
+    if (isScreenSharing) {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+      }
+      setIsScreenSharing(false)
+      return
+    }
+
+    try {
+      setIsCapturing(true)
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      mediaStreamRef.current = stream
+
+      const video = document.createElement('video')
+      video.srcObject = stream
+      await video.play()
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')?.drawImage(video, 0, 0)
+      const base64 = canvas.toDataURL('image/png').split(',')[1]
+      setAttachedImages(prev => [...prev, { data: base64, type: 'image/png', name: `screenshot-${Date.now()}.png` }])
+
+      setIsScreenSharing(true)
+
+      stream.getVideoTracks()[0].onended = () => {
+        mediaStreamRef.current = null
+        setIsScreenSharing(false)
+      }
+    } catch {
+      // User cancelled screen selection
+    } finally {
+      setIsCapturing(false)
+    }
   }
 
   // Handle submit
@@ -153,7 +237,20 @@ export default function NewSessionPage() {
         </div>
 
         {/* Chat input card */}
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div
+          className={`relative bg-zinc-900/50 border rounded-2xl overflow-hidden transition-all ${
+            isDragging ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-800'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Drag overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 z-10 pointer-events-none rounded-2xl">
+              <div className="text-orange-400 text-sm font-medium">Drop images here</div>
+            </div>
+          )}
           {/* Image previews */}
           {attachedImages.length > 0 && (
             <div className="flex gap-2 px-4 pt-4 flex-wrap">
@@ -162,7 +259,8 @@ export default function NewSessionPage() {
                   <img
                     src={`data:${img.type};base64,${img.data}`}
                     alt={img.name}
-                    className="h-16 w-16 object-cover rounded-lg border border-zinc-700"
+                    className="h-16 w-16 object-cover rounded-lg border border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setPreviewImage(`data:${img.type};base64,${img.data}`)}
                   />
                   <button
                     onClick={() => removeImage(i)}
@@ -207,15 +305,37 @@ export default function NewSessionPage() {
           <div className="px-4 pb-4 flex items-center justify-between gap-4">
             {/* Left - Attach/Repo/Branch/Model selectors */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Attach image button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={!selectedRepo || isCreating}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
-                title="Attach image"
-              >
-                <Paperclip className="h-3.5 w-3.5" />
-              </button>
+              {/* Attach image button (only for models that support images) */}
+              {supportsImages && (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!selectedRepo || isCreating}
+                    className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
+                    title="Attach image"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" />
+                  </button>
+
+                  {/* Screen capture button */}
+                  <button
+                    onClick={handleScreenToggle}
+                    disabled={isCapturing || !selectedRepo || isCreating}
+                    className={`flex items-center gap-1.5 text-xs transition-colors px-2.5 py-1.5 rounded-lg disabled:opacity-40 ${
+                      isScreenSharing
+                        ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
+                        : 'text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-zinc-800'
+                    }`}
+                    title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
+                  >
+                    {isCapturing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Monitor className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </>
+              )}
 
               {/* Repo selector */}
               <DropdownMenu>
@@ -382,6 +502,27 @@ export default function NewSessionPage() {
           <span>for new line</span>
         </div>
       </div>
+
+      {/* Image preview dialog */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-colors"
+          >
+            <X className="h-5 w-5 text-white" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }
