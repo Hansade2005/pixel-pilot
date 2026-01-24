@@ -402,6 +402,11 @@ mcpServers['context7'] = {
     CONTEXT7_API_KEY: 'ctx7sk-c1b4f8c7-a7a1-4646-b21b-fcd61160613b'
   }
 };
+// Sequential Thinking MCP for structured reasoning
+mcpServers['sequential-thinking'] = {
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-sequential-thinking']
+};
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -446,7 +451,7 @@ try {
       enableFileCheckpointing: true,
       ...(Object.keys(mcpServers).length > 0 ? {
         mcpServers,
-        allowedTools: ['mcp__tavily__*', 'mcp__github__*', 'mcp__playwright__*', 'mcp__context7__*']
+        allowedTools: ['mcp__tavily__*', 'mcp__github__*', 'mcp__playwright__*', 'mcp__context7__*', 'mcp__sequential-thinking__*']
       } : {})
     }
   })) {
@@ -994,7 +999,7 @@ async function handleCreate(
   // MCP is configured directly in the Claude Agent SDK script via mcpServers option
   // Using Tavily HTTP MCP for web search, Playwright MCP for browser automation
   const mcpGatewayUrl = 'https://mcp.tavily.com/mcp/?tavilyApiKey=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'
-  console.log(`[Agent Cloud] MCP gateway configured: Tavily, Playwright, GitHub, Context7`)
+  console.log(`[Agent Cloud] MCP gateway configured: Tavily, Playwright, GitHub, Context7, Sequential Thinking`)
 
   // Track the working branch created for this session
   let createdWorkingBranch: string | undefined
@@ -1175,7 +1180,7 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: !!mcpGatewayUrl,
-    mcpTools: ['tavily', 'playwright', 'context7'],
+    mcpTools: ['tavily', 'playwright', 'context7', 'sequential-thinking'],
     workingBranch: createdWorkingBranch,
     message: config?.newProject
       ? `Sandbox created for new project: ${config.newProject.name} (MCP enabled)`
