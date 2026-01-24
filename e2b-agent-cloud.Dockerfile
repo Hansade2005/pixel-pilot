@@ -79,17 +79,34 @@ RUN useradd -m -s /bin/bash user
 # All work happens in /home/user (our PROJECT_DIR)
 WORKDIR /home/user
 
-# Initialize npm project and install Playwright for MCP access
+# Initialize npm project and install Playwright + CLI tools locally
+# This ensures they're accessible from the working directory without global path issues
 RUN npm init -y && npm install playwright
 
 # Install Playwright browsers with system dependencies (as root for full access)
 # PLAYWRIGHT_BROWSERS_PATH=0 installs browsers in node_modules (accessible by all users)
 RUN PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
-# Create necessary directories
-RUN mkdir -p /home/user/.npm /home/user/.cache /home/user/.claude
+# Pre-create all CLI config directories so tools don't fail on first write
+RUN mkdir -p \
+    /home/user/.npm \
+    /home/user/.cache \
+    /home/user/.claude \
+    /home/user/.vercel \
+    /home/user/.netlify \
+    /home/user/.wrangler \
+    /home/user/.railway \
+    /home/user/.config/turso \
+    /home/user/.config/neonctl \
+    /home/user/.config/configstore
 
-# Give full permissions to the user on the working directory
+# Set up CLI tool auth files with placeholder structure (tokens injected at runtime)
+RUN echo '{}' > /home/user/.vercel/credentials.json \
+    && echo '{}' > /home/user/.netlify/config.json \
+    && echo '{}' > /home/user/.config/turso/config.json
+
+# Give full permissions to the user on the entire working directory tree
+# This ensures all CLI tools can read/write their config without permission errors
 RUN chmod -R a+rwX /home/user && chown -R user:user /home/user
 
 # Switch to user for runtime
@@ -99,6 +116,8 @@ WORKDIR /home/user
 # Set environment variables
 ENV NODE_ENV=development
 ENV PLAYWRIGHT_BROWSERS_PATH=0
+# Ensure global npm binaries are in PATH for the user
+ENV PATH="/usr/local/lib/node_modules/.bin:$PATH"
 
 # Expose common development ports
 EXPOSE 3000 5173 8080
