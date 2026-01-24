@@ -1018,58 +1018,40 @@ async function handleCreate(
         }
       }
 
-      // Try gh CLI first (uses GITHUB_TOKEN env var automatically), then git clone as fallback
+      // Clone repo into the working directory directly (not a subdirectory)
+      // Uses git init + fetch + checkout approach since the directory may not be empty
       let cloneSuccess = false
 
       if (githubToken) {
-        // Method 1: gh repo clone (most reliable with GitHub tokens)
+        // Method 1: git init + fetch with token (works in non-empty directories)
         try {
-          console.log(`[Agent Cloud] Attempting clone with gh CLI...`)
-          const ghResult = await sandbox.commands.run(
-            `gh repo clone ${config.repo.full_name} ${PROJECT_DIR} -- --branch ${config.repo.branch} --single-branch --depth 50`,
+          console.log(`[Agent Cloud] Cloning with token into ${PROJECT_DIR}...`)
+          const gitResult = await sandbox.commands.run(
+            `cd ${PROJECT_DIR} && git init && (git remote add origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
             { timeoutMs: 180000 }
           )
-          if (ghResult.exitCode === 0) {
+          if (gitResult.exitCode === 0) {
             cloneSuccess = true
-            console.log(`[Agent Cloud] Repo cloned successfully via gh CLI`)
+            console.log(`[Agent Cloud] Repo cloned successfully via git init + fetch`)
           } else {
-            console.warn(`[Agent Cloud] gh clone failed (exit ${ghResult.exitCode}):`, ghResult.stderr)
+            console.warn(`[Agent Cloud] git init+fetch failed:`, gitResult.stderr)
           }
-        } catch (ghError: any) {
-          console.warn(`[Agent Cloud] gh clone error:`, ghError?.result?.stderr || ghError?.message)
-        }
-
-        // Method 2: git clone with x-access-token URL
-        if (!cloneSuccess) {
-          try {
-            console.log(`[Agent Cloud] Falling back to git clone with token URL...`)
-            const gitResult = await sandbox.commands.run(
-              `git clone --branch ${config.repo.branch} --single-branch --depth 50 https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git ${PROJECT_DIR}`,
-              { timeoutMs: 180000 }
-            )
-            if (gitResult.exitCode === 0) {
-              cloneSuccess = true
-              console.log(`[Agent Cloud] Repo cloned successfully via git with token`)
-            } else {
-              console.warn(`[Agent Cloud] git token clone failed:`, gitResult.stderr)
-            }
-          } catch (gitError: any) {
-            console.warn(`[Agent Cloud] git token clone error:`, gitError?.result?.stderr || gitError?.message)
-          }
+        } catch (gitError: any) {
+          console.warn(`[Agent Cloud] git init+fetch error:`, gitError?.result?.stderr || gitError?.message)
         }
       }
 
-      // Method 3: Public clone (no auth)
+      // Method 2: Public clone (no auth, git init + fetch)
       if (!cloneSuccess) {
         try {
-          console.log(`[Agent Cloud] Attempting public clone...`)
+          console.log(`[Agent Cloud] Attempting public clone into ${PROJECT_DIR}...`)
           const publicResult = await sandbox.commands.run(
-            `git clone --branch ${config.repo.branch} --single-branch --depth 50 https://github.com/${config.repo.full_name}.git ${PROJECT_DIR}`,
+            `cd ${PROJECT_DIR} && git init && (git remote add origin https://github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
             { timeoutMs: 180000 }
           )
           if (publicResult.exitCode === 0) {
             cloneSuccess = true
-            console.log(`[Agent Cloud] Repo cloned successfully via public URL`)
+            console.log(`[Agent Cloud] Repo cloned successfully via public fetch`)
           } else {
             console.warn(`[Agent Cloud] Public clone failed:`, publicResult.stderr)
           }
