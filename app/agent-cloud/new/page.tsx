@@ -48,6 +48,9 @@ export default function NewSessionPage() {
     isCreating,
   } = useAgentCloud()
 
+  // Only Devstral model (sonnet slot) supports image input
+  const supportsImages = selectedModel === 'sonnet'
+
   const [prompt, setPrompt] = useState('')
   const [repoSearchQuery, setRepoSearchQuery] = useState('')
   const [attachedImages, setAttachedImages] = useState<Array<{ data: string; type: string; name: string }>>([])
@@ -79,8 +82,9 @@ export default function NewSessionPage() {
     setRepoSearchQuery('')
   }
 
-  // Handle image file selection
+  // Handle image file selection (only for models that support images)
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!supportsImages) return
     const files = e.target.files
     if (!files) return
     for (const file of Array.from(files)) {
@@ -95,8 +99,9 @@ export default function NewSessionPage() {
     e.target.value = ''
   }
 
-  // Handle paste for images
+  // Handle paste for images (only for models that support images)
   const handlePaste = (e: React.ClipboardEvent) => {
+    if (!supportsImages) return
     const items = e.clipboardData?.items
     if (!items) return
     for (const item of Array.from(items)) {
@@ -119,11 +124,12 @@ export default function NewSessionPage() {
     setAttachedImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Drag-and-drop handlers
+  // Drag-and-drop handlers (only for models that support images)
   const [isDragging, setIsDragging] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (!supportsImages) return
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(true)
@@ -139,6 +145,7 @@ export default function NewSessionPage() {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
+    if (!supportsImages) return
     const files = e.dataTransfer?.files
     if (!files) return
     for (const file of Array.from(files)) {
@@ -298,33 +305,37 @@ export default function NewSessionPage() {
           <div className="px-4 pb-4 flex items-center justify-between gap-4">
             {/* Left - Attach/Repo/Branch/Model selectors */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Attach image button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={!selectedRepo || isCreating}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
-                title="Attach image"
-              >
-                <ImageIcon className="h-3.5 w-3.5" />
-              </button>
+              {/* Attach image button (only for models that support images) */}
+              {supportsImages && (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!selectedRepo || isCreating}
+                    className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors px-2.5 py-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 disabled:opacity-40"
+                    title="Attach image"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" />
+                  </button>
 
-              {/* Screen capture button */}
-              <button
-                onClick={handleScreenToggle}
-                disabled={isCapturing || !selectedRepo || isCreating}
-                className={`flex items-center gap-1.5 text-xs transition-colors px-2.5 py-1.5 rounded-lg disabled:opacity-40 ${
-                  isScreenSharing
-                    ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
-                    : 'text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-zinc-800'
-                }`}
-                title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
-              >
-                {isCapturing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Monitor className="h-3.5 w-3.5" />
-                )}
-              </button>
+                  {/* Screen capture button */}
+                  <button
+                    onClick={handleScreenToggle}
+                    disabled={isCapturing || !selectedRepo || isCreating}
+                    className={`flex items-center gap-1.5 text-xs transition-colors px-2.5 py-1.5 rounded-lg disabled:opacity-40 ${
+                      isScreenSharing
+                        ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
+                        : 'text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-zinc-800'
+                    }`}
+                    title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
+                  >
+                    {isCapturing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Monitor className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </>
+              )}
 
               {/* Repo selector */}
               <DropdownMenu>

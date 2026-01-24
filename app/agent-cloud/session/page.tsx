@@ -210,6 +210,9 @@ function SessionPageInner() {
   // Find the active session
   const activeSession = sessions.find(s => s.id === sessionId) || null
 
+  // Only Devstral model supports image input
+  const supportsImages = activeSession?.model?.includes('devstral') ?? false
+
   // Recreate sandbox with conversation history
   const recreateSandbox = useCallback(async (pendingPrompt?: string) => {
     if (!activeSession) return null
@@ -915,6 +918,7 @@ User Request: ${currentPrompt}`
   }
 
   const handlePaste = (e: React.ClipboardEvent) => {
+    if (!supportsImages) return
     const items = e.clipboardData?.items
     if (!items) return
     for (const item of Array.from(items)) {
@@ -951,8 +955,9 @@ User Request: ${currentPrompt}`
     setAttachedImages(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Drag-and-drop handlers
+  // Drag-and-drop handlers (only for models that support images)
   const handleDragOver = (e: React.DragEvent) => {
+    if (!supportsImages) return
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(true)
@@ -968,6 +973,7 @@ User Request: ${currentPrompt}`
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
+    if (!supportsImages) return
     const files = e.dataTransfer?.files
     if (!files) return
     for (const file of Array.from(files)) {
@@ -1401,28 +1407,32 @@ User Request: ${currentPrompt}`
                 className="hidden"
               />
               <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading || isRecreating}
-                  className="p-1.5 text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors"
-                  title="Attach image"
-                >
-                  <ImageIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={handleScreenToggle}
-                  disabled={isCapturing || isLoading || isRecreating}
-                  className={`p-1.5 transition-colors disabled:opacity-40 ${
-                    isScreenSharing ? 'text-red-400 hover:text-red-300' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                  title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
-                >
-                  {isCapturing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Monitor className="h-4 w-4" />
-                  )}
-                </button>
+                {supportsImages && (
+                  <>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isLoading || isRecreating}
+                      className="p-1.5 text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors"
+                      title="Attach image"
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={handleScreenToggle}
+                      disabled={isCapturing || isLoading || isRecreating}
+                      className={`p-1.5 transition-colors disabled:opacity-40 ${
+                        isScreenSharing ? 'text-red-400 hover:text-red-300' : 'text-zinc-500 hover:text-zinc-300'
+                      }`}
+                      title={isScreenSharing ? "Stop screen sharing" : "Capture screen"}
+                    >
+                      {isCapturing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Monitor className="h-4 w-4" />
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
               <div className="absolute bottom-2 right-2">
                 {isLoading || isRecreating ? (
