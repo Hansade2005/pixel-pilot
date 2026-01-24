@@ -237,7 +237,8 @@ function SessionPageInner() {
             repo: activeSession.repo ? {
               full_name: activeSession.repo.full_name,
               branch: activeSession.repo.branch
-            } : undefined
+            } : undefined,
+            initialPrompt: activeSession.title || activeSession.lines.find(l => l.type === 'input')?.content || 'resumed-session'
           }
         })
       })
