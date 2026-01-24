@@ -389,6 +389,11 @@ if (process.env.GITHUB_TOKEN) {
     }
   };
 }
+// Playwright MCP for browser automation
+mcpServers['playwright'] = {
+  command: 'npx',
+  args: ['@playwright/mcp@latest']
+};
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -433,7 +438,7 @@ try {
       enableFileCheckpointing: true,
       ...(Object.keys(mcpServers).length > 0 ? {
         mcpServers,
-        allowedTools: ['mcp__tavily__*', 'mcp__github__*']
+        allowedTools: ['mcp__tavily__*', 'mcp__github__*', 'mcp__playwright__*']
       } : {})
     }
   })) {
@@ -979,9 +984,9 @@ async function handleCreate(
   let repoCloned = false
 
   // MCP is configured directly in the Claude Agent SDK script via mcpServers option
-  // Using Tavily HTTP MCP server for web search capabilities
+  // Using Tavily HTTP MCP for web search, Playwright MCP for browser automation
   const mcpGatewayUrl = 'https://mcp.tavily.com/mcp/?tavilyApiKey=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'
-  console.log(`[Agent Cloud] MCP gateway configured: Tavily HTTP MCP`)
+  console.log(`[Agent Cloud] MCP gateway configured: Tavily, Playwright, GitHub`)
 
   // Track the working branch created for this session
   let createdWorkingBranch: string | undefined
@@ -1162,7 +1167,7 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: !!mcpGatewayUrl,
-    mcpTools: ['tavily'],
+    mcpTools: ['tavily', 'playwright'],
     workingBranch: createdWorkingBranch,
     message: config?.newProject
       ? `Sandbox created for new project: ${config.newProject.name} (MCP enabled)`

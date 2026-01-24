@@ -423,18 +423,18 @@ function AgentCloudLayoutInner({
         lines: newProject ? [
           { type: 'system', content: `New project: ${newProject.name}`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily, Puppeteer, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily, Playwright, GitHub`, timestamp: new Date() },
         ] : reconnected ? [
           { type: 'system', content: `Reconnected to existing sandbox`, timestamp: new Date() },
           { type: 'system', content: `Repository: ${selectedRepo!.full_name} (${selectedBranch})`, timestamp: new Date() },
           ...(workingBranch ? [{ type: 'system' as const, content: `Working branch: ${workingBranch}`, timestamp: new Date() }] : []),
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily, Puppeteer, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily, Playwright, GitHub`, timestamp: new Date() },
         ] : repoCloned ? [
           { type: 'system', content: `Cloned ${selectedRepo!.full_name} (${selectedBranch})`, timestamp: new Date() },
           { type: 'system', content: `Working branch: ${workingBranch || 'main'}`, timestamp: new Date() },
           { type: 'system', content: `Model: ${modelInfo?.name || data.model}`, timestamp: new Date() },
-          { type: 'system', content: `MCP Tools: Tavily, Puppeteer, GitHub`, timestamp: new Date() },
+          { type: 'system', content: `MCP Tools: Tavily, Playwright, GitHub`, timestamp: new Date() },
         ] : [
           { type: 'system', content: `Failed to clone ${selectedRepo!.full_name}`, timestamp: new Date() },
         ]
