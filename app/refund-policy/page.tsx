@@ -35,160 +35,152 @@ export default function RefundPolicyPage() {
             </p>
           </div>
 
+          {/* Important Notice */}
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 mb-8">
+            <p className="text-amber-400 font-semibold text-center">
+              All subscriptions are non-refundable once credits have been used.
+            </p>
+          </div>
+
           {/* Refund Policy Content */}
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-8 space-y-8">
             <section>
               <h2 className="text-2xl font-semibold text-white mb-4">1. Overview</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                At PiPilot, Inc., we want you to be completely satisfied with our AI-powered web application development platform. This Refund Policy outlines the circumstances under which we provide refunds for our subscription services.
+                At PiPilot (operated by Pixelways Solutions Inc.), we strive to provide excellent service. This Refund Policy outlines the specific circumstances under which refunds may be granted.
               </p>
               <p className="text-gray-300 leading-relaxed">
-                All refund requests are evaluated on a case-by-case basis and granted at the sole discretion of PiPilot, Inc.
+                <strong className="text-white">Please read this policy carefully before subscribing.</strong> By purchasing a subscription, you acknowledge and agree to these terms.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">2. Subscription Refunds</h2>
-              <h3 className="text-xl font-medium text-white mb-3">2.1 Monthly Subscriptions</h3>
+              <h2 className="text-2xl font-semibold text-white mb-4">2. Non-Refundable After Credit Usage</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                For monthly subscription plans, you may request a refund within 14 days of your initial payment or subscription renewal. Refunds will be prorated based on the unused portion of your billing cycle.
+                <strong className="text-white">All subscriptions become non-refundable once any credits have been used.</strong>
               </p>
-
-              <h3 className="text-xl font-medium text-white mb-3">2.2 Annual Subscriptions</h3>
               <p className="text-gray-300 leading-relaxed mb-4">
-                For annual subscription plans, you may request a refund within 30 days of your initial payment. Refunds will be prorated based on the unused portion of your billing cycle, minus any applicable early termination fees.
-              </p>
-
-              <h3 className="text-xl font-medium text-white mb-3">2.3 Enterprise Plans</h3>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                Enterprise subscription refunds are handled on a case-by-case basis. Please contact our sales team directly to discuss your specific circumstances and requirements.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">3. Eligible Refund Circumstances</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                Refunds may be considered in the following situations:
+                Credits are consumed immediately when you:
               </p>
               <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li><strong>Service Unavailability:</strong> Extended periods where the service is unavailable due to technical issues</li>
-                <li><strong>Billing Errors:</strong> Incorrect charges or duplicate billing</li>
-                <li><strong>Technical Issues:</strong> Significant functionality problems that prevent normal use of the service</li>
-                <li><strong>Account Issues:</strong> Problems with account setup or access that cannot be resolved</li>
-                <li><strong>Dissatisfaction:</strong> General dissatisfaction with the service within the refund window</li>
+                <li>Send messages to the AI assistant</li>
+                <li>Generate code or make changes to projects</li>
+                <li>Use any AI-powered features within the platform</li>
               </ul>
+              <p className="text-gray-300 leading-relaxed">
+                Once credits are consumed, the service has been rendered and refunds cannot be provided.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-white mb-4">3. 24-Hour Satisfaction Window</h2>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                If you are unsatisfied with PiPilot and meet <strong className="text-white">ALL</strong> of the following conditions, you may request a full refund:
+              </p>
+              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4 mb-4">
+                <li><strong>No credits used:</strong> You have not used any of your subscription credits</li>
+                <li><strong>Within 24 hours:</strong> Your request is made within 24 hours of your initial purchase</li>
+                <li><strong>First-time subscriber:</strong> This is your first paid subscription with PiPilot</li>
+              </ul>
+              <p className="text-gray-300 leading-relaxed">
+                To request a refund within this window, email <strong className="text-purple-400">support@pipilot.dev</strong> with your account email and reason for the refund.
+              </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-white mb-4">4. Non-Refundable Items</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                The following are generally not eligible for refunds:
+                The following are <strong className="text-white">NOT eligible for refunds under any circumstances:</strong>
               </p>
               <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>Credits or usage that have already been consumed</li>
-                <li>Third-party integrations or add-on services</li>
-                <li>Custom development work or consulting services</li>
-                <li>Refunds requested after the applicable refund period has expired</li>
-                <li>Accounts terminated due to violation of our Terms & Conditions</li>
+                <li>Subscriptions where any credits have been used</li>
+                <li>Refund requests made after the 24-hour window</li>
+                <li>Additional credit purchases (top-ups)</li>
+                <li>Subscription renewals (monthly or annual)</li>
+                <li>Accounts terminated for Terms of Service violations</li>
+                <li>Accounts involved in chargeback disputes</li>
               </ul>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">5. How to Request a Refund</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">5. Billing Errors</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                To request a refund, please follow these steps:
+                If you believe you were charged incorrectly (duplicate charges, wrong amount, etc.), please contact us immediately at <strong className="text-purple-400">support@pipilot.dev</strong>.
               </p>
-              <ol className="list-decimal list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>Contact our support team at support@pipilot.dev</li>
-                <li>Include your account email and subscription details</li>
-                <li>Provide a clear explanation of the reason for your refund request</li>
-                <li>Include any relevant screenshots or documentation</li>
+              <p className="text-gray-300 leading-relaxed">
+                We will investigate all billing error claims and correct any verified mistakes promptly.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-white mb-4">6. Subscription Cancellation</h2>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                You may cancel your subscription at any time. When you cancel:
+              </p>
+              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
+                <li>You retain access to your subscription benefits until the end of your current billing period</li>
+                <li>No refunds are provided for unused time or credits</li>
+                <li>Your account reverts to the free plan after the billing period ends</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-white mb-4 text-red-400">7. Chargeback Policy</h2>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+                <p className="text-red-400 font-semibold">
+                  IMPORTANT: Chargebacks on legitimate transactions will result in permanent account termination.
+                </p>
+              </div>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                Before initiating a chargeback, you <strong className="text-white">MUST</strong> contact us at support@pipilot.dev. We are committed to resolving any issues fairly.
+              </p>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                <strong className="text-white">Consequences of filing a chargeback on a legitimate transaction:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4 mb-4">
+                <li><strong>Immediate and permanent account termination</strong></li>
+                <li>Forfeiture of all unused credits and subscription time</li>
+                <li>Loss of all projects and data stored on our platform</li>
+                <li>Permanent ban from creating new accounts</li>
+                <li>We will dispute the chargeback with evidence of service delivery</li>
+                <li>Potential reporting to fraud prevention databases</li>
+                <li>Potential collection action through legal channels</li>
+              </ul>
+              <p className="text-gray-300 leading-relaxed">
+                <strong className="text-white">Unauthorized transactions:</strong> If your payment method was used without your authorization (e.g., stolen card, identity theft), please contact both us AND your bank immediately. We will work with you to investigate.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-white mb-4">8. How to Request a Refund</h2>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                If you believe you qualify for a refund under this policy:
+              </p>
+              <ol className="list-decimal list-inside text-gray-300 leading-relaxed space-y-2 ml-4 mb-4">
+                <li>Email <strong className="text-purple-400">support@pipilot.dev</strong></li>
+                <li>Include your account email address</li>
+                <li>Provide your reason for requesting a refund</li>
+                <li>Include your purchase date and amount</li>
               </ol>
               <p className="text-gray-300 leading-relaxed">
-                We will acknowledge your request within 24 hours and aim to process eligible refunds within 7-10 business days.
+                We will respond within 24 hours. Approved refunds are processed within 5-10 business days to your original payment method.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">6. Refund Processing</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                Once a refund is approved:
-              </p>
-              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>Refunds will be processed to your original payment method</li>
-                <li>Processing time varies by payment provider (typically 3-10 business days)</li>
-                <li>You will receive an email confirmation once the refund is processed</li>
-                <li>Your account will be adjusted to reflect the refund</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">7. Subscription Cancellation</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                Cancellation of your subscription does not automatically trigger a refund. If you cancel your subscription:
-              </p>
-              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>You will continue to have access to the service until the end of your current billing period</li>
-                <li>You can request a refund for the unused portion within the refund window</li>
-                <li>No refunds will be provided for partial months used</li>
-                <li>You can reactivate your subscription at any time</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">8. Credit Adjustments</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                In some cases, instead of a monetary refund, we may offer:
-              </p>
-              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>Account credits for future use</li>
-                <li>Extended subscription periods</li>
-                <li>Alternative service options</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">9. Free Trial Refunds</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                If you signed up for a free trial that automatically converts to a paid subscription:
-              </p>
-              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>You must cancel before the trial ends to avoid being charged</li>
-                <li>If you are accidentally charged, contact us immediately for a full refund</li>
-                <li>Free trial periods are clearly disclosed during signup</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">10. Chargebacks</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                If you initiate a chargeback through your bank or credit card company:
-              </p>
-              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>We will work with you to resolve the issue directly</li>
-                <li>Unilateral chargebacks may result in account suspension</li>
-                <li>We reserve the right to dispute chargebacks that violate this policy</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">11. Changes to This Policy</h2>
-              <p className="text-gray-300 leading-relaxed mb-4">
-                PiPilot reserves the right to modify this Refund Policy at any time. Changes will be effective immediately upon posting on our website.
-              </p>
+              <h2 className="text-2xl font-semibold text-white mb-4">9. Changes to This Policy</h2>
               <p className="text-gray-300 leading-relaxed">
-                We will notify users of significant changes via email or through our service notifications.
+                PiPilot reserves the right to modify this Refund Policy at any time. Changes are effective immediately upon posting. Continued use of the service after changes constitutes acceptance of the updated policy.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">12. Contact Information</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">10. Contact Information</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                If you have questions about this Refund Policy or need to request a refund, please contact us:
+                For refund inquiries or billing issues:
               </p>
               <div className="text-gray-300 leading-relaxed ml-4">
                 <p><strong>Email:</strong> support@pipilot.dev</p>
-                <p><strong>Subject:</strong> Refund Request</p>
                 <p><strong>Response Time:</strong> Within 24 hours</p>
               </div>
             </section>
