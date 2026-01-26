@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { CreditCard, Zap, ExternalLink, Loader2 } from "lucide-react"
+import { CreditCard, Zap, ExternalLink, Loader2, Mail, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { createClient } from "@/lib/supabase/client"
 
 interface PaymentProviderSelectorProps {
   plan: "creator" | "collaborate" | "scale"
@@ -26,8 +27,57 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [resendingEmail, setResendingEmail] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const checkEmailVerification = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserEmail(user.email || null)
+        // Check if email is confirmed - email_confirmed_at will be set if verified
+        setEmailVerified(!!user.email_confirmed_at)
+      }
+    }
+    checkEmailVerification()
+  }, [])
+
+  const handleResendVerification = async () => {
+    if (!userEmail) return
+
+    setResendingEmail(true)
+    setResendSuccess(false)
+
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: userEmail,
+      })
+
+      if (error) {
+        setError('Failed to resend verification email. Please try again.')
+      } else {
+        setResendSuccess(true)
+        setError(null)
+      }
+    } catch (err) {
+      setError('Failed to resend verification email. Please try again.')
+    } finally {
+      setResendingEmail(false)
+    }
+  }
 
   const handleSubscribe = async () => {
+    // Check email verification before proceeding
+    if (!emailVerified) {
+      setError('Please verify your email address before upgrading.')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -101,6 +151,47 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
 
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      {/* Email Verification Warning */}
+      {emailVerified === false && (
+        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-amber-500 mb-1">Email Verification Required</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                Please verify your email address before upgrading your plan. Check your inbox for a verification link sent to <strong>{userEmail}</strong>.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResendVerification}
+                  disabled={resendingEmail}
+                  className="border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                >
+                  {resendingEmail ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-3 w-3 mr-2" />
+                      Resend Verification Email
+                    </>
+                  )}
+                </Button>
+              </div>
+              {resendSuccess && (
+                <p className="text-xs text-green-500 mt-2">
+                  Verification email sent! Please check your inbox and spam folder.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-center">
         <h3 className="text-xl font-bold">{details.name}</h3>
         
@@ -188,11 +279,26 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
             Cancel
           </Button>
         )}
-        <Button onClick={handleSubscribe} className="flex-1" disabled={loading} size="sm">
+        <Button
+          onClick={handleSubscribe}
+          className="flex-1"
+          disabled={loading || emailVerified === false || emailVerified === null}
+          size="sm"
+        >
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               Processing...
+            </>
+          ) : emailVerified === null ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Checking...
+            </>
+          ) : emailVerified === false ? (
+            <>
+              <Mail className="h-4 w-4 mr-2" />
+              Verify Email to Continue
             </>
           ) : (
             <>

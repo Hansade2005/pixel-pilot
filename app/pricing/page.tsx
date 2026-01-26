@@ -474,6 +474,61 @@ export default function PricingPage() {
           )}
 
 
+          {/* Refund Policy Section */}
+          <div className="mb-16">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-4">Money-Back Guarantee</h2>
+                <p className="text-xl text-white/80">
+                  We want you to be completely satisfied with PiPilot
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-2xl p-8 backdrop-blur-sm">
+                <div className="grid md:grid-cols-3 gap-8 mb-8">
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-6 h-6 text-green-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Monthly Plans</h3>
+                    <p className="text-gray-300 text-sm">14-day refund window from initial payment or renewal</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-6 h-6 text-green-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Annual Plans</h3>
+                    <p className="text-gray-300 text-sm">30-day refund window from initial payment</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Check className="w-6 h-6 text-green-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Fast Processing</h3>
+                    <p className="text-gray-300 text-sm">Refunds processed within 7-10 business days</p>
+                  </div>
+                </div>
+
+                <div className="border-t border-green-500/20 pt-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-center sm:text-left">
+                      <p className="text-gray-300 text-sm">
+                        Need a refund? Contact us at <a href="mailto:support@pipilot.dev" className="text-green-400 hover:underline">support@pipilot.dev</a>
+                      </p>
+                    </div>
+                    <a
+                      href="/refund-policy"
+                      className="inline-flex items-center text-green-400 hover:text-green-300 font-medium text-sm transition-colors"
+                    >
+                      View Full Refund Policy
+                      <ChevronDown className="w-4 h-4 ml-1 -rotate-90" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* FAQ Section */}
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>

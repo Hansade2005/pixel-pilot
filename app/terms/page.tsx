@@ -101,7 +101,35 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">7. Content Ownership</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">7. Chargeback Policy</h2>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                We encourage all users to contact our support team at support@pipilot.dev before initiating a chargeback or dispute with your bank or credit card company. We are committed to resolving any issues promptly and fairly.
+              </p>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                <strong className="text-white">Chargeback Consequences:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4 mb-4">
+                <li><strong>Account Suspension:</strong> Initiating a chargeback without first contacting our support team will result in immediate suspension of your PiPilot account and all associated services.</li>
+                <li><strong>Service Termination:</strong> Unresolved chargebacks may result in permanent termination of your account and forfeiture of any unused credits or subscription time.</li>
+                <li><strong>Dispute Response:</strong> PiPilot reserves the right to dispute any chargeback that we believe to be fraudulent or in violation of these Terms.</li>
+                <li><strong>Collection Actions:</strong> In cases of fraudulent chargebacks, we reserve the right to pursue collection through appropriate legal channels and may report such activity to fraud prevention databases.</li>
+              </ul>
+              <p className="text-gray-300 leading-relaxed mb-4">
+                <strong className="text-white">Before Filing a Chargeback:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-300 leading-relaxed space-y-2 ml-4 mb-4">
+                <li>Contact our support team at support@pipilot.dev with your account email and description of the issue</li>
+                <li>Allow up to 24 hours for an initial response</li>
+                <li>Work with our team to resolve billing disputes, technical issues, or service concerns</li>
+                <li>Request a refund through proper channels if eligible under our Refund Policy</li>
+              </ul>
+              <p className="text-gray-300 leading-relaxed">
+                <strong className="text-white">Legitimate Chargebacks:</strong> We understand that chargebacks may be necessary in cases of unauthorized transactions or identity theft. If you believe your payment information was used without authorization, please contact us immediately and we will work with you to investigate and resolve the issue.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-white mb-4">8. Content Ownership</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
                 You retain all rights to the content and projects you create using PiPilot. All code, designs, and other materials generated through the Service belong to you.
               </p>
@@ -111,7 +139,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">8. Acceptable Use</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">9. Acceptable Use</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
                 You agree not to use the Service:
               </p>
@@ -128,7 +156,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">9. Termination</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">10. Termination</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
                 We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
               </p>
@@ -138,7 +166,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">10. Disclaimer</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">11. Disclaimer</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
                 The information on this website is provided on an "as is" basis. To the fullest extent permitted by law, PiPilot:
               </p>
@@ -150,28 +178,28 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">11. Limitation of Liability</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">12. Limitation of Liability</h2>
               <p className="text-gray-300 leading-relaxed">
                 In no event shall PiPilot, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the Service.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">12. Governing Law</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">13. Governing Law</h2>
               <p className="text-gray-300 leading-relaxed">
                 These Terms shall be interpreted and governed by the laws of the jurisdiction in which PiPilot operates, without regard to its conflict of law provisions.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">13. Changes to Terms</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">14. Changes to Terms</h2>
               <p className="text-gray-300 leading-relaxed">
                 We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will try to provide at least 30 days notice prior to any new terms taking effect.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-white mb-4">14. Contact Information</h2>
+              <h2 className="text-2xl font-semibold text-white mb-4">15. Contact Information</h2>
               <p className="text-gray-300 leading-relaxed">
                 If you have any questions about these Terms & Conditions, please contact us at support@pipilot.dev or through our support channels.
               </p>
