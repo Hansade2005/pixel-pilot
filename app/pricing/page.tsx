@@ -474,6 +474,69 @@ export default function PricingPage() {
           )}
 
 
+          {/* Refund Policy Section */}
+          <div className="mb-16">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-4">Refund Policy</h2>
+                <p className="text-xl text-white/80">
+                  Clear terms to ensure a fair experience for everyone
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-2xl p-8 backdrop-blur-sm">
+                <div className="space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                      <Info className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2">Non-Refundable After Use</h3>
+                      <p className="text-gray-300 text-sm">All subscriptions are <strong className="text-white">non-refundable once credits have been used</strong>. Credits are consumed immediately upon AI interactions.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-5 h-5 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2">24-Hour Satisfaction Window</h3>
+                      <p className="text-gray-300 text-sm">If you're unsatisfied and <strong className="text-white">have not used any credits</strong>, contact <a href="mailto:support@pipilot.dev" className="text-purple-400 hover:underline">support@pipilot.dev</a> within <strong className="text-white">24 hours</strong> of purchase for a full refund.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                      <Info className="w-5 h-5 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-2">Chargeback Policy</h3>
+                      <p className="text-gray-300 text-sm"><strong className="text-white">Chargebacks on legitimate transactions will result in permanent account termination.</strong> Please contact support first to resolve any billing issues.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-700/50 mt-6 pt-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-center sm:text-left">
+                      <p className="text-gray-400 text-sm">
+                        Questions? Contact <a href="mailto:support@pipilot.dev" className="text-purple-400 hover:underline">support@pipilot.dev</a>
+                      </p>
+                    </div>
+                    <a
+                      href="/refund-policy"
+                      className="inline-flex items-center text-purple-400 hover:text-purple-300 font-medium text-sm transition-colors"
+                    >
+                      View Full Refund Policy
+                      <ChevronDown className="w-4 h-4 ml-1 -rotate-90" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* FAQ Section */}
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>
