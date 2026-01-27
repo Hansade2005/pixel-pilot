@@ -423,7 +423,7 @@ export default function LandingPage() {
   const displayedTemplates = allFilteredTemplates.slice(templateStartIndex, templateStartIndex + templatesPerPage)
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden" style={{ fontFamily: '"Special Elite", system-ui' }}>
       {/* Enhanced Gradient Background */}
       <div className="absolute inset-0 lovable-gradient" />
       
