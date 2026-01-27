@@ -457,19 +457,61 @@ User Request: ${currentPrompt}`
         headers['X-GitHub-Token'] = storedTokens.github
       }
 
-      // Stream via POST with images included in body (single-step, no separate upload)
-      const response = await fetch('/api/agent-cloud', {
+      // Try direct E2B streaming first (bypasses Vercel timeout)
+      // This allows streams to run indefinitely without 5-minute timeout
+      let response: Response
+      let usingDirectStream = false
+
+      try {
+        // Step 1: Start the stream server in E2B and get the direct URL
+        console.log('[Agent Cloud] Starting direct E2B stream server...')
+        const streamServerResponse = await fetch('/api/agent-cloud', {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'stream',
+            action: 'start-stream-server',
             sandboxId: sandboxIdToUse,
-            prompt: enhancedPrompt,
-            images: imagesToUse.length > 0 ? imagesToUse : undefined,
           }),
-          signal: controller.signal,
+        })
+
+        if (streamServerResponse.ok) {
+          const { streamUrl } = await streamServerResponse.json()
+          console.log('[Agent Cloud] Direct stream URL:', streamUrl)
+
+          // Step 2: Connect directly to E2B for streaming (no Vercel proxy)
+          response = await fetch(`${streamUrl}/stream`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream',
+            },
+            body: JSON.stringify({
+              prompt: enhancedPrompt,
+              images: imagesToUse.length > 0 ? imagesToUse : undefined,
+            }),
+            signal: controller.signal,
+          })
+          usingDirectStream = true
+          console.log('[Agent Cloud] Using direct E2B streaming (no Vercel timeout)')
+        } else {
+          throw new Error('Failed to start stream server')
         }
-      )
+      } catch (directStreamError) {
+        // Fallback to proxied streaming through Vercel (has 5-min timeout)
+        console.log('[Agent Cloud] Direct stream failed, falling back to Vercel proxy:', directStreamError)
+        response = await fetch('/api/agent-cloud', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              action: 'stream',
+              sandboxId: sandboxIdToUse,
+              prompt: enhancedPrompt,
+              images: imagesToUse.length > 0 ? imagesToUse : undefined,
+            }),
+            signal: controller.signal,
+          }
+        )
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
