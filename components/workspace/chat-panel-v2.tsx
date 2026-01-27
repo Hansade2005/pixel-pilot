@@ -2267,10 +2267,16 @@ export function ChatPanelV2({
   // Save input to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (input.trim()) {
-        localStorage.setItem('chat-panel-input', input)
-      } else {
-        localStorage.removeItem('chat-panel-input')
+      try {
+        if (input.trim()) {
+          localStorage.setItem('chat-panel-input', input)
+        } else {
+          localStorage.removeItem('chat-panel-input')
+        }
+      } catch (error) {
+        // Handle QuotaExceededError - localStorage is full
+        // Silently fail as this is just for convenience/persistence
+        console.warn('Failed to save input to localStorage:', error)
       }
     }
   }, [input])
