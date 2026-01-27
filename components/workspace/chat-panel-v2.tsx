@@ -2267,10 +2267,16 @@ export function ChatPanelV2({
   // Save input to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (input.trim()) {
-        localStorage.setItem('chat-panel-input', input)
-      } else {
-        localStorage.removeItem('chat-panel-input')
+      try {
+        if (input.trim()) {
+          localStorage.setItem('chat-panel-input', input)
+        } else {
+          localStorage.removeItem('chat-panel-input')
+        }
+      } catch (error) {
+        // Handle QuotaExceededError - localStorage is full
+        // Silently fail as this is just for convenience/persistence
+        console.warn('Failed to save input to localStorage:', error)
       }
     }
   }, [input])
@@ -4409,7 +4415,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     )
 
                     if (supabaseConnectionCalls && supabaseConnectionCalls.length > 0) {
-                      console.log(`[ChatPanelV2][Render] Rendering ${supabaseConnectionCalls.length} Supabase connection card(s)`)
                       return (
                         <div className="space-y-4 mb-4">
                           {supabaseConnectionCalls.map((toolCall) => {
@@ -4442,7 +4447,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     )
 
                     if (continueBackendCalls && continueBackendCalls.length > 0) {
-                      console.log(`[ChatPanelV2][Render] Rendering ${continueBackendCalls.length} backend continuation card(s)`)
                       return (
                         <div className="space-y-4 mb-4">
                           {continueBackendCalls.map((toolCall) => {
@@ -4483,9 +4487,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       tc.toolName !== 'request_supabase_connection' &&
                       tc.toolName !== 'continue_backend_implementation'
                     )
-                    if (regularToolCalls && regularToolCalls.length > 0) {
-                      console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${regularToolCalls.length} operations for message ${message.id}`)
-                    }
                     return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
                         toolCalls={regularToolCalls}

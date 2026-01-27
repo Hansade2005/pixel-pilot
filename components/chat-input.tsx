@@ -178,10 +178,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Save prompt to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (prompt.trim()) {
-        localStorage.setItem('chat-input-prompt', prompt)
-      } else {
-        localStorage.removeItem('chat-input-prompt')
+      try {
+        if (prompt.trim()) {
+          localStorage.setItem('chat-input-prompt', prompt)
+        } else {
+          localStorage.removeItem('chat-input-prompt')
+        }
+      } catch (error) {
+        // Handle QuotaExceededError - localStorage is full
+        // Silently fail as this is just for convenience/persistence
+        console.warn('Failed to save prompt to localStorage:', error)
       }
     }
   }, [prompt])
