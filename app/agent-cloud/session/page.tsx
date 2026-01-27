@@ -551,7 +551,6 @@ User Request: ${currentPrompt}`
       const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
-      let hasReceivedTextEvent = false // Track if we've received 'text' type events
       let sseBuffer = '' // Buffer for incomplete SSE messages
 
       // Direct update function - no throttling for real-time streaming
@@ -605,27 +604,22 @@ User Request: ${currentPrompt}`
             break
 
           case 'content_block_delta':
-            // Anthropic streaming format - delta contains text chunks
-            if (data.delta?.text) {
-              hasReceivedTextEvent = true
-              updateOutput(data.delta.text)
-            }
+            // Server-side script already converts these to 'text' events
+            // This case is here for safety but shouldn't be reached from server
             break
 
           case 'text':
-            // Real-time text streaming from SDK - append new text
+            // Primary source: Server sends deduplicated text via 'text' events
+            // The server script uses hasStreamedText flag to prevent duplicates
             if (data.data) {
-              hasReceivedTextEvent = true
               updateOutput(data.data)
             }
             break
 
           case 'stdout':
-            // Fallback raw output streaming - only use if we haven't received 'text' events
-            // This prevents duplication when both text and stdout contain the same content
-            if (data.data && !hasReceivedTextEvent) {
-              updateOutput(data.data)
-            }
+            // Terminal output (install logs, non-JSON output)
+            // Server only sends this for non-JSON lines after SDK starts
+            // Don't display as response text - it's just terminal noise
             break
 
           case 'tool_use': {
