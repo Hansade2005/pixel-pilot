@@ -2151,7 +2151,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Agent Cloud] Installing stream server dependencies...`)
     await sandbox.commands.run(installCommand, {
       cwd: workDir,
-      timeoutMs: 60000
+      timeoutMs: 0 // No timeout - installation can take a while
     })
 
     // Start the server in background with environment variables
