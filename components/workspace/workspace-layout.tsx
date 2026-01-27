@@ -118,22 +118,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
 
   // Visual Editor save handler - applies style changes to source files
-  const handleVisualEditorSave = async (changes: { 
-    elementId: string; 
-    changes: StyleChange[]; 
+  const handleVisualEditorSave = async (changes: {
+    elementId: string;
+    changes: StyleChange[];
     sourceFile?: string;
     sourceLine?: number;
   }): Promise<boolean> => {
     try {
       if (!selectedProject || !changes.sourceFile) {
-        console.warn('[VisualEditor] Cannot save: no project or source file')
         return false
       }
 
       // Get the source file from storage
       const file = await storageManager.getFile(selectedProject.id, changes.sourceFile)
       if (!file) {
-        console.warn('[VisualEditor] Source file not found:', changes.sourceFile)
         toast({
           title: 'File not found',
           description: `Could not find ${changes.sourceFile}`,
@@ -143,8 +141,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
 
       // Generate the updated code using AI-powered editing
-      console.log('[VisualEditor] Generating code update with AI via API...');
-      
       const result = await generateFileUpdate(
         file.content,
         changes.elementId,
@@ -154,7 +150,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       );
 
       if (!result.success) {
-        console.error('[VisualEditor] Failed to update code:', result.error)
         toast({
           title: 'Update failed',
           description: result.error || 'Failed to apply style changes',
@@ -171,10 +166,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       // Trigger file explorer refresh
       setFileExplorerKey(prev => prev + 1)
-      
+
       // Dispatch files-changed event to notify other components
       window.dispatchEvent(new CustomEvent('files-changed', {
-        detail: { 
+        detail: {
           projectId: selectedProject.id,
           action: 'visual-edit',
           path: changes.sourceFile,
@@ -189,10 +184,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         description: `Updated ${changes.changes.length} style(s) in ${changes.sourceFile}`,
       })
 
-      console.log('[VisualEditor] Successfully saved changes to:', changes.sourceFile)
       return true
     } catch (error) {
-      console.error('[VisualEditor] Error saving changes:', error)
       toast({
         title: 'Save failed',
         description: 'An error occurred while saving changes',
@@ -206,17 +199,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const handleVisualEditorThemeSave = async (theme: { name: string; id: string }, cssContent: string): Promise<boolean> => {
     try {
       if (!selectedProject) {
-        console.warn('[VisualEditor] Cannot save theme: no project selected')
         return false
       }
 
       // Determine the CSS file path based on project type
-      // Next.js uses src/app/globals.css, Vite uses src/index.css
       const possiblePaths = [
         'src/app/globals.css',
         'app/globals.css',
         'src/index.css',
-        'src/globals.css', 
+        'src/globals.css',
         'src/App.css',
         'styles/globals.css',
       ]
@@ -234,7 +225,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
 
       if (!targetFile || !targetPath) {
-        console.warn('[VisualEditor] Could not find CSS file to update')
         toast({
           title: 'CSS file not found',
           description: 'Could not find globals.css or App.css in your project',
@@ -242,8 +232,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         })
         return false
       }
-
-      console.log('[VisualEditor] Saving theme to:', targetPath)
 
       // Save the CSS content to storage
       await storageManager.updateFile(selectedProject.id, targetPath, {
@@ -253,10 +241,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       // Trigger file explorer refresh
       setFileExplorerKey(prev => prev + 1)
-      
+
       // Dispatch files-changed event to notify other components
       window.dispatchEvent(new CustomEvent('files-changed', {
-        detail: { 
+        detail: {
           projectId: selectedProject.id,
           action: 'theme-update',
           path: targetPath,
@@ -271,10 +259,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         description: `"${theme.name}" theme saved to ${targetPath}`,
       })
 
-      console.log('[VisualEditor] Successfully saved theme to:', targetPath)
       return true
     } catch (error) {
-      console.error('[VisualEditor] Error saving theme:', error)
       toast({
         title: 'Theme save failed',
         description: 'An error occurred while saving the theme',
@@ -357,7 +343,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
     const handleAiStreamComplete = (event: CustomEvent) => {
       const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
-      console.log('[WorkspaceLayout] AI stream complete event received:', { shouldSwitchToPreview, shouldCreatePreview })
 
       if (shouldSwitchToPreview) {
         // Switch to preview tab
@@ -366,24 +351,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         if (isMobile) {
           setMobileTab('preview')
         }
-        console.log('[WorkspaceLayout] Switched to preview tab after AI streaming', { isMobile })
       }
 
       if (shouldCreatePreview) {
         // Trigger preview creation with a small delay to ensure tab switch is complete
         setTimeout(() => {
-          console.log('[WorkspaceLayout] Auto-creating preview after AI streaming')
           if (codePreviewRef.current) {
             codePreviewRef.current.createPreview()
           }
         }, 100)
       }
     }
-    
+
     // Handle opening file from search results or other sources
     const handleOpenFileInEditor = async (event: CustomEvent) => {
       const { filePath, lineNumber } = event.detail
-      console.log('[WorkspaceLayout] Opening file from event:', filePath, 'line:', lineNumber)
 
       if (!selectedProject || !filePath) return
 
@@ -400,7 +382,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           } else {
             setActiveTab('code')
           }
-          console.log('[WorkspaceLayout] File opened successfully:', file.name)
 
           // Dispatch event for code editor to scroll to line
           if (lineNumber) {
@@ -411,7 +392,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             }, 100)
           }
         } else {
-          console.warn('[WorkspaceLayout] File not found:', filePath)
           toast({
             title: 'File not found',
             description: `Could not find ${filePath}`,
@@ -419,7 +399,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           })
         }
       } catch (error) {
-        console.error('[WorkspaceLayout] Error opening file:', error)
+        // Error opening file - silently fail
       }
     }
 
@@ -447,48 +427,31 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const loadClientProjects = async () => {
       try {
         setIsLoadingProjects(true)
-        console.log('WorkspaceLayout: Starting to load projects from IndexedDB...')
 
         await storageManager.init()
-        console.log('WorkspaceLayout: Storage manager initialized')
 
         // Check if we're in a specific project workspace (has projectId in URL)
         const projectId = searchParams.get('projectId')
         const isDeletingProject = searchParams.get('deleting') === 'true'
         const isNewProject = searchParams.get('newProject') !== null
-        
-        // ✅ CRITICAL FIX: Skip auto-restore for newly created projects from chat-input
-        // Auto-restore clears ALL data and restores from backup, which would DELETE the new project's files!
-        if (isNewProject) {
-          console.log('🆕 WorkspaceLayout: NEW PROJECT detected from chat-input - SKIPPING auto-restore to preserve new project files')
-        }
-        
+
         // Only auto-restore when in a project workspace and not during deletion or creation
         if (projectId && !isDeletingProject && !justCreatedProject && !isNewProject) {
-          console.log('WorkspaceLayout: In project workspace, checking cloud sync for user:', user.id)
           const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
-          console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
 
           if (cloudSyncEnabled) {
             setIsAutoRestoring(true)
-            console.log('WorkspaceLayout: Auto-restore enabled for project workspace, attempting to restore latest backup...')
 
             try {
-              console.log('WorkspaceLayout: Calling restoreBackupFromCloud...')
               const restoreSuccess = await restoreBackupFromCloud(user.id)
-              console.log('WorkspaceLayout: restoreBackupFromCloud returned:', restoreSuccess)
 
               if (restoreSuccess) {
-                console.log('WorkspaceLayout: Successfully restored latest backup from cloud')
                 toast({
                   title: "Auto-restore completed",
                   description: "Your latest project data has been restored from the cloud.",
                 })
-              } else {
-                console.log('WorkspaceLayout: No backup found or restore failed, using local data')
               }
             } catch (restoreError) {
-              console.error('WorkspaceLayout: Error during auto-restore:', restoreError)
               toast({
                 title: "Auto-restore failed",
                 description: "Could not restore from cloud. Using local data.",
@@ -497,22 +460,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             } finally {
               setIsAutoRestoring(false)
             }
-          } else {
-            console.log('WorkspaceLayout: Cloud sync is disabled, skipping auto-restore')
           }
-        } else {
-          console.log('WorkspaceLayout: Not in project workspace or project is being deleted, skipping auto-restore')
         }
 
         const workspaces = await storageManager.getWorkspaces(user.id)
-        console.log('WorkspaceLayout: Loaded workspaces from IndexedDB:', workspaces?.length || 0)
-        console.log('WorkspaceLayout: Workspace details:', workspaces?.map(w => ({ id: w.id, name: w.name, slug: w.slug })))
-
         setClientProjects((prevProjects) => [...(prevProjects || []), ...(workspaces || [])])
       } catch (error) {
-        console.error('Error loading client projects:', error)
-        // Don't fall back to empty server-side projects
-        console.log('WorkspaceLayout: Failed to load from IndexedDB, keeping empty array')
         setClientProjects([])
       } finally {
         setIsLoadingProjects(false)
@@ -528,47 +481,32 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Handle project selection from URL params (both newProject and projectId)
   useEffect(() => {
     const projectId = searchParams.get('projectId') || searchParams.get('newProject')
-    console.log('WorkspaceLayout: Project selection effect - projectId:', projectId, 'clientProjects length:', clientProjects.length, 'isLoadingProjects:', isLoadingProjects)
 
     if (projectId && clientProjects.length > 0 && !isLoadingProjects) {
       const project = clientProjects.find(p => p.id === projectId)
       if (project) {
-        console.log('WorkspaceLayout: Setting project from URL params:', project.name, 'Project ID:', project.id)
-        
         // CRITICAL FIX: Verify this is a new project from chat-input and load its files explicitly
         const isNewProjectFromChatInput = searchParams.get('newProject') === projectId
         if (isNewProjectFromChatInput) {
-          console.log('🆕 New project from chat-input detected, loading files explicitly for:', projectId)
-          
-          // ✅ Set justCreatedProject flag to prevent auto-restore from deleting new files
+          // Set justCreatedProject flag to prevent auto-restore from deleting new files
           setJustCreatedProject(true)
-          
+
           // Clear the flag after 5 seconds (enough time for initial load)
           setTimeout(() => {
             setJustCreatedProject(false)
-            console.log('✅ Cleared justCreatedProject flag - auto-restore can now run on next visit')
           }, 5000)
-          
+
           // Load files explicitly for this new project to prevent contamination
           import('@/lib/storage-manager').then(({ storageManager }) => {
             storageManager.init().then(() => {
-              storageManager.getFiles(projectId).then(files => {
-                console.log(`✅ Loaded ${files.length} files for new project ${projectId}:`, files.map(f => f.path))
-                
-                // Verify files belong to correct workspace
-                const incorrectFiles = files.filter(f => f.workspaceId !== projectId)
-                if (incorrectFiles.length > 0) {
-                  console.error(`🚨 CONTAMINATION DETECTED: ${incorrectFiles.length} files belong to wrong workspace!`, incorrectFiles)
-                }
-              })
+              storageManager.getFiles(projectId)
             })
           })
         }
-        
+
         setSelectedProject(project)
 
         // Force file explorer refresh when selecting any project
-        console.log('WorkspaceLayout: Forcing file explorer refresh for selected project')
         setTimeout(() => {
           setFileExplorerKey(prev => prev + 1)
         }, 100)
@@ -609,7 +547,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         }, 5000)
       } else {
         // Project not found, might be a newly created project that's not loaded yet
-        console.log('WorkspaceLayout: Project not found in current projects, might be newly created')
       }
     }
   }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
@@ -617,12 +554,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Also reload when newProjectId changes (in case project was just created)
   useEffect(() => {
     if (newProjectId && typeof window !== 'undefined') {
-      console.log('WorkspaceLayout: newProjectId changed, reloading projects...')
       const reloadProjects = async () => {
         try {
           await storageManager.init()
           const workspaces = await storageManager.getWorkspaces(user.id)
-          console.log('WorkspaceLayout: Reloaded workspaces after newProjectId change:', workspaces?.length || 0)
 
           // Update client projects
           setClientProjects(workspaces || [])
@@ -630,31 +565,22 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           // Find and auto-select the new project if it exists
           const newProject = workspaces?.find(w => w.id === newProjectId)
           if (newProject) {
-            console.log('WorkspaceLayout: Auto-selecting newly created project:', newProject.name)
             setSelectedProject(newProject)
 
-        // Force file explorer refresh for newly created projects
-        console.log('WorkspaceLayout: Forcing file explorer refresh for new project')
-        setTimeout(() => {
-          setFileExplorerKey(prev => prev + 1)
-        }, 100)
+            // Force file explorer refresh for newly created projects
+            setTimeout(() => {
+              setFileExplorerKey(prev => prev + 1)
+            }, 100)
 
-            // ✅ CRITICAL FIX: DO NOT change URL parameters for new projects!
-            // Changing from newProject to projectId triggers a page reload which runs auto-restore
-            // Keep BOTH parameters to prevent contamination
-            const params = new URLSearchParams(searchParams.toString())
-            // DO NOT DELETE: params.delete('newProject') - THIS CAUSES CONTAMINATION!
             // Only add projectId if not already present
+            const params = new URLSearchParams(searchParams.toString())
             if (!params.get('projectId')) {
               params.set('projectId', newProjectId)
-              console.log('✅ Added projectId to URL while keeping newProject parameter')
               router.replace(`/workspace?${params.toString()}`)
-            } else {
-              console.log('✅ URL already has projectId, not changing URL to prevent reload')
             }
           }
         } catch (error) {
-          console.error('Error reloading projects:', error)
+          // Error reloading projects - silently fail
         }
       }
       reloadProjects()
@@ -665,31 +591,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const loadProjectFiles = async () => {
       if (selectedProject && typeof window !== 'undefined') {
         try {
-          console.log('WorkspaceLayout: Loading files for project:', selectedProject.name, 'ID:', selectedProject.id)
           await storageManager.init()
           const files = await storageManager.getFiles(selectedProject.id)
-          console.log('WorkspaceLayout: Loaded', files?.length || 0, 'files for project', selectedProject.id)
-          
+
           // CRITICAL FIX: Verify all files belong to the correct workspace
           const incorrectFiles = files.filter(f => f.workspaceId !== selectedProject.id)
           if (incorrectFiles.length > 0) {
-            console.error(`🚨 FILE CONTAMINATION DETECTED: ${incorrectFiles.length} files belong to different workspaces!`)
-            console.error('Contaminated files:', incorrectFiles.map(f => ({ 
-              path: f.path, 
-              belongsTo: f.workspaceId, 
-              shouldBe: selectedProject.id 
-            })))
-            
             // Filter out contaminated files
             const cleanFiles = files.filter(f => f.workspaceId === selectedProject.id)
-            console.log(`✅ Filtered to ${cleanFiles.length} correct files`)
             setProjectFiles(cleanFiles)
           } else {
-            console.log(`✅ All ${files.length} files verified to belong to workspace ${selectedProject.id}`)
             setProjectFiles(files || [])
           }
         } catch (error) {
-          console.error('WorkspaceLayout: Error loading project files:', error)
           setProjectFiles([])
         }
       } else {
@@ -718,7 +632,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     setIsCreating(true)
 
     try {
-      console.log('Creating new project:', newProjectName)
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const slug = newProjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -749,35 +662,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       if (workspace) {
         setSelectedProject(workspace)
         setSelectedFile(null)
-        
+
         // Update URL to reflect the new project
         const params = new URLSearchParams(searchParams.toString())
         params.set('projectId', workspace.id)
         router.push(`/workspace?${params.toString()}`)
-        
+
         // Prevent auto-restore for newly created project
         setJustCreatedProject(true)
-        
+
         // Trigger backup after project creation
         if (triggerInstantBackup) {
           await triggerInstantBackup('Project created')
         }
-        
+
         // Reset the flag after a short delay
         setTimeout(() => setJustCreatedProject(false), 2000)
       }
-      
+
       // Refresh projects list
       try {
         await storageManager.init()
         const workspaces = await storageManager.getWorkspaces(user.id)
         setClientProjects(workspaces || [])
-        console.log('WorkspaceLayout: Refreshed projects after creation:', workspaces?.length || 0)
       } catch (error) {
-        console.error('Error refreshing projects after creation:', error)
+        // Error refreshing projects - silently fail
       }
     } catch (error) {
-      console.error("Error creating project:", error)
+      // Error creating project - silently fail
     } finally {
       setIsCreating(false)
     }
@@ -786,7 +698,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Sync data from server if client has no projects
   useEffect(() => {
     if (clientProjects.length === 0 && newProjectId && typeof window !== 'undefined') {
-      console.log('WorkspaceLayout: No projects found, attempting to sync from server...')
       const syncFromServer = async () => {
         try {
           // Try to fetch from server API
@@ -794,12 +705,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           if (response.ok) {
             const data = await response.json()
             if (data.workspaces && data.workspaces.length > 0) {
-              console.log('WorkspaceLayout: Synced workspaces from server:', data.workspaces.length)
               setClientProjects(data.workspaces)
             }
           }
         } catch (error) {
-          console.error('Error syncing from server:', error)
+          // Error syncing from server - silently fail
         }
       }
       syncFromServer()
@@ -808,22 +718,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Handle new project selection and initial prompt
   React.useEffect(() => {
-    console.log('WorkspaceLayout useEffect - newProjectId:', newProjectId, 'clientProjects:', clientProjects.map(p => ({ id: p.id, name: p.name })))
-    
     if (newProjectId && clientProjects.length > 0) {
       const newProject = clientProjects.find(p => p.id === newProjectId)
-      console.log('Found new project:', newProject)
       if (newProject) {
         setSelectedProject(newProject)
       }
     }
-    // Removed auto project selection - no project will be auto-selected when projects exist
   }, [newProjectId, clientProjects])
-
-  // Debug selected project changes
-  React.useEffect(() => {
-    console.log('Selected project changed:', selectedProject)
-  }, [selectedProject])
 
   // Reset auto-open flag when projects are loaded
   React.useEffect(() => {
@@ -857,17 +758,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Listen for AI stream completion to trigger automatic backup
   React.useEffect(() => {
     const handleAIStreamComplete = async (event: Event) => {
-      const customEvent = event as CustomEvent
-      console.log('[WorkspaceLayout] AI stream completed, triggering automatic backup')
-      
       // Only backup if we have a selected project and user
       if (selectedProject && user?.id) {
         try {
-          // Trigger the backup function
           await handleBackupToCloud()
-          console.log('[WorkspaceLayout] Automatic backup completed after AI stream')
         } catch (error) {
-          console.error('[WorkspaceLayout] Automatic backup failed:', error)
           // Don't show error toast for automatic backups to avoid spam
         }
       }
@@ -875,7 +770,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
     if (typeof window !== 'undefined') {
       window.addEventListener('ai-stream-complete', handleAIStreamComplete)
-      
+
       return () => {
         window.removeEventListener('ai-stream-complete', handleAIStreamComplete)
       }
@@ -885,35 +780,32 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Clear chat function for mobile header
   const handleClearChat = async () => {
     if (!selectedProject) return
-    
+
     try {
-      console.log(`[WorkspaceLayout] Clearing chat for project ${selectedProject.id}`)
       await storageManager.init()
-      
+
       // Find and deactivate current session for this project
       const chatSessions = await storageManager.getChatSessions(selectedProject.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === selectedProject.id && session.isActive
       )
-      
+
       if (activeSession) {
         // Deactivate the current session instead of deleting (preserves history)
         await storageManager.updateChatSession(activeSession.id, {
           isActive: false,
           endedAt: new Date().toISOString()
         })
-        console.log(`[WorkspaceLayout] Deactivated session ${activeSession.id} for project ${selectedProject.id}`)
       }
-      
+
       toast({
         title: "Chat Cleared",
         description: `Chat history cleared for ${selectedProject.name}. Start a new conversation!`,
       })
-      
+
       // Force chat panel refresh by triggering a re-render
       window.dispatchEvent(new CustomEvent('chat-cleared', { detail: { projectId: selectedProject.id } }))
     } catch (error) {
-      console.error(`[WorkspaceLayout] Error clearing chat for project ${selectedProject?.id}:`, error)
       toast({
         title: "Error",
         description: "Failed to clear chat history. Please try again.",
@@ -933,7 +825,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         description: "Changes pushed to GitHub successfully!",
       })
     } catch (error) {
-      console.error('Error pushing to GitHub:', error)
       toast({
         title: "Error",
         description: "Failed to push changes to GitHub. Please try again.",
@@ -947,19 +838,18 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     if (!selectedProject || !user?.id) return
 
     setIsBackingUp(true)
-    
+
     try {
       const { uploadBackupToCloud } = await import('@/lib/cloud-sync')
       const success = await uploadBackupToCloud(user.id)
-      
+
       if (!success) throw new Error("Backup failed")
-      
+
       toast({
         title: "Backup Complete",
         description: "Project backed up to cloud successfully"
       })
     } catch (error: any) {
-      console.error("Error creating backup:", error)
       toast({
         title: "Backup Failed",
         description: error.message || "Failed to create backup",
@@ -1058,8 +948,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   await storageManager.init()
                   const workspaces = await storageManager.getWorkspaces(user.id)
                   setClientProjects(workspaces || [])
-                  console.log('WorkspaceLayout: Refreshed projects after creation:', workspaces?.length || 0)
-                  
+                                    
                   // Automatically select the newly created project
                   if (newProject) {
                     setSelectedProject(newProject)
@@ -1072,8 +961,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
                     router.push(`/workspace?${params.toString()}`)
                     
-                    console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
-                    
+                                        
                     // Prevent auto-restore for newly created project
                     setJustCreatedProject(true)
                     
@@ -1085,10 +973,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     // Reset the flag after a short delay
                     setTimeout(() => setJustCreatedProject(false), 2000)
                     
-                    console.log('WorkspaceLayout: Auto-selected new project:', newProject.name)
-                  }
+                                      }
                 } catch (error) {
-                  console.error('Error refreshing projects after creation:', error)
+                  // Error refreshing projects - silently fail
                 }
               }}
             />
@@ -1203,15 +1090,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                               projectFiles={projectFiles}
                               onSave={(file, content) => {
                                 // Update the file content in state if needed
-                                console.log("File saved:", file.name, content.length, "characters")
-
+                                
                                 // Refresh project files to update Monaco's extra libraries
                                 if (selectedProject) {
                                   storageManager.getFiles(selectedProject.id).then(files => {
                                     setProjectFiles(files || [])
-                                    console.log("Refreshed project files after save:", files?.length || 0, "files")
-                                  }).catch(error => {
-                                    console.error("Error refreshing project files:", error)
+                                                                      }).catch(error => {
+                                    // Error refreshing project files - silently fail
                                   })
                                 }
 
@@ -1220,8 +1105,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                                 // Force file explorer refresh to show updated content
                                 setFileExplorerKey(prev => prev + 1)
-                                console.log("File saved successfully, triggering file explorer refresh")
-                              }}
+                                                              }}
                             />
                           </div>
                         </ResizablePanel>
@@ -1282,8 +1166,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     await storageManager.init()
                     const workspaces = await storageManager.getWorkspaces(user.id)
                     setClientProjects(workspaces || [])
-                    console.log('WorkspaceLayout: Refreshed projects after creation:', workspaces?.length || 0)
-                    
+                                        
                     // Automatically select the newly created project
                     if (newProject) {
                       setSelectedProject(newProject)
@@ -1306,7 +1189,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       setTimeout(() => setJustCreatedProject(false), 2000)
                     }
                   } catch (error) {
-                    console.error('Error refreshing projects after creation:', error)
+                    // Error refreshing projects - silently fail
                   }
                 }}
                   recentProjects={[]}
@@ -1457,8 +1340,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
                           router.push(`/workspace?${params.toString()}`)
                           
-                          console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
-                          
+                                                    
                           // Prevent auto-restore for newly created project
                           setJustCreatedProject(true)
                           
@@ -1471,7 +1353,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           setTimeout(() => setJustCreatedProject(false), 2000)
                         }
                       } catch (error) {
-                        console.error('Error refreshing projects after creation:', error)
+                        // Error refreshing projects - silently fail
                       }
                     }}
                     onProjectDeleted={async (deletedProjectId) => {
@@ -1480,8 +1362,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         await storageManager.init()
                         const workspaces = await storageManager.getWorkspaces(user.id)
                         setClientProjects(workspaces || [])
-                        console.log('WorkspaceLayout: Refreshed projects after deletion:', workspaces?.length || 0)
-                        
+                                                
                         // If the deleted project was selected, navigate away from it
                         if (selectedProject?.id === deletedProjectId) {
                           const params = new URLSearchParams(searchParams.toString())
@@ -1492,7 +1373,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           setSidebarOpen(false)
                         }
                       } catch (error) {
-                        console.error('Error refreshing projects after deletion:', error)
+                        // Error refreshing projects - silently fail
                       }
                     }}
                     onProjectUpdated={async () => {
@@ -1501,9 +1382,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         await storageManager.init()
                         const workspaces = await storageManager.getWorkspaces(user.id)
                         setClientProjects(workspaces || [])
-                        console.log('WorkspaceLayout: Refreshed projects after update:', workspaces?.length || 0)
-                      } catch (error) {
-                        console.error('Error refreshing projects after update:', error)
+                                              } catch (error) {
+                        // Error refreshing projects - silently fail
                       }
                     }}
                     collapsed={false}
@@ -1657,7 +1537,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       setTimeout(() => setJustCreatedProject(false), 2000)
                     }
                   } catch (error) {
-                    console.error('Error refreshing projects after creation:', error)
+                    // Error refreshing projects - silently fail
                   }
                 }}
                 recentProjects={clientProjects.map(p => ({
@@ -1706,8 +1586,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <CodeEditor
                       file={selectedFile}
                       onSave={(file, content) => {
-                        console.log("File saved:", file.name, content.length, "characters")
-                        
+                                                
                         // Trigger instant cloud backup after file save
                         triggerInstantBackup(`Saved file: ${file.name}`)
                         
