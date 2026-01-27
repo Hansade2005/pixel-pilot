@@ -197,20 +197,6 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
     return `${minutes} minute${minutes !== 1 ? 's' : ''} ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`
   }
 
-  // Debug logging
-  console.log(`[MessageWithTools] Message ${message.id}:`, {
-    role: message.role,
-    hasReasoning,
-    reasoningLength: reasoningContent.length,
-    hasTools,
-    toolCount: toolInvocations.length,
-    hasResponse,
-    responseLength: responseContent.length,
-    isStreaming,
-    duration,
-    savedDuration
-  })
-
   // Dispatch events when tools complete
   useEffect(() => {
     if (!hasTools || !projectId) return
