@@ -75,7 +75,7 @@ body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-poppins);
+  --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   --font-mono: var(--font-mono);
 }
 
