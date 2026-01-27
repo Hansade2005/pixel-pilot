@@ -551,6 +551,7 @@ User Request: ${currentPrompt}`
       const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
+      let hasReceivedTextEvent = false // Track if we've received 'text' type events
       let sseBuffer = '' // Buffer for incomplete SSE messages
 
       // Direct update function - no throttling for real-time streaming
@@ -596,19 +597,33 @@ User Request: ${currentPrompt}`
           case 'heartbeat':
           case 'user':
           case 'system':
-            // Keep-alive and context messages - ignore silently
+          case 'assistant':
+          case 'content_block_start':
+            // Keep-alive, context messages, and block markers - ignore silently
+            // 'assistant' contains full message which would duplicate streamed text
+            // 'content_block_start' marks the beginning of a block, no content to show
+            break
+
+          case 'content_block_delta':
+            // Anthropic streaming format - delta contains text chunks
+            if (data.delta?.text) {
+              hasReceivedTextEvent = true
+              updateOutput(data.delta.text)
+            }
             break
 
           case 'text':
             // Real-time text streaming from SDK - append new text
             if (data.data) {
+              hasReceivedTextEvent = true
               updateOutput(data.data)
             }
             break
 
           case 'stdout':
-            // Fallback raw output streaming - append new text
-            if (data.data) {
+            // Fallback raw output streaming - only use if we haven't received 'text' events
+            // This prevents duplication when both text and stdout contain the same content
+            if (data.data && !hasReceivedTextEvent) {
               updateOutput(data.data)
             }
             break
