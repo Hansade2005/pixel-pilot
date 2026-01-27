@@ -551,7 +551,6 @@ User Request: ${currentPrompt}`
       const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
-      let primaryTextSource: 'text' | 'content_block_delta' | 'stdout' | null = null // Track which source we're using
       let sseBuffer = '' // Buffer for incomplete SSE messages
 
       // Direct update function - no throttling for real-time streaming
@@ -605,34 +604,22 @@ User Request: ${currentPrompt}`
             break
 
           case 'content_block_delta':
-            // Anthropic streaming format - delta contains text chunks
-            // Only use this source if it's the first or we're already using it
-            if (data.delta?.text) {
-              if (!primaryTextSource || primaryTextSource === 'content_block_delta') {
-                primaryTextSource = 'content_block_delta'
-                updateOutput(data.delta.text)
-              }
-            }
+            // Server-side script already converts these to 'text' events
+            // This case is here for safety but shouldn't be reached from server
             break
 
           case 'text':
-            // Real-time text streaming from SDK - append new text
-            // Only use this source if it's the first or we're already using it
+            // Primary source: Server sends deduplicated text via 'text' events
+            // The server script uses hasStreamedText flag to prevent duplicates
             if (data.data) {
-              if (!primaryTextSource || primaryTextSource === 'text') {
-                primaryTextSource = 'text'
-                updateOutput(data.data)
-              }
+              updateOutput(data.data)
             }
             break
 
           case 'stdout':
-            // Fallback raw output streaming - only use if no other text source is active
-            // This prevents duplication when multiple sources contain the same content
-            if (data.data && !primaryTextSource) {
-              primaryTextSource = 'stdout'
-              updateOutput(data.data)
-            }
+            // Terminal output (install logs, non-JSON output)
+            // Server only sends this for non-JSON lines after SDK starts
+            // Don't display as response text - it's just terminal noise
             break
 
           case 'tool_use': {
