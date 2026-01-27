@@ -22,7 +22,7 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
     )
 
     if (isLocalDataEmpty) {
-      console.log('uploadBackupToCloud: Local data appears empty, checking cloud backup...')
+      // Local data appears empty, checking cloud backup
 
       // Check if there's existing cloud backup
       const { data: existingBackup, error: fetchError } = await supabase
@@ -38,15 +38,10 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
           ))
 
         if (hasCloudData) {
-          console.log('uploadBackupToCloud: Cloud has data but local is empty - likely storage was cleared. Skipping backup to prevent data loss.')
-          console.log('uploadBackupToCloud: Consider restoring from cloud instead.')
-
-          // Optionally, we could automatically restore here, but let's be conservative and just skip
+          // Cloud has data but local is empty - likely storage was cleared. Skipping backup to prevent data loss.
           return false
         }
       }
-
-      console.log('uploadBackupToCloud: Both local and cloud data appear empty, proceeding with backup')
     }
 
     // Create backup filename with timestamp
@@ -65,12 +60,9 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
         // Extract filename from storage URL
         const oldFileName = existingBackup.storage_url.split('/').pop()
         if (oldFileName && oldFileName.startsWith('backup-')) {
-          console.log(`uploadBackupToCloud: Cleaning up old backup file: ${oldFileName}`)
           await supabase.storage.from('backups').remove([oldFileName])
-          console.log('uploadBackupToCloud: Old backup file deleted successfully')
         }
       } catch (cleanupError) {
-        console.warn('uploadBackupToCloud: Failed to cleanup old backup file:', cleanupError)
         // Continue with upload even if cleanup fails
       }
     }
@@ -78,8 +70,6 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
     // Convert data to JSON blob
     const jsonString = JSON.stringify(data, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
-
-    console.log(`uploadBackupToCloud: Uploading ${blob.size} bytes to storage`)
 
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -90,7 +80,6 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
       })
 
     if (uploadError) {
-      console.error('uploadBackupToCloud: Storage upload error:', uploadError)
       throw uploadError
     }
 
@@ -129,7 +118,6 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
         onConflict: 'user_id'
       })
 
-    console.log(`uploadBackupToCloud: Successfully uploaded backup to ${urlData.publicUrl}`)
     return true
   } catch (error) {
     console.error("Error uploading backup to cloud:", error)
@@ -143,29 +131,17 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
  */
 export async function smartBackupToCloud(userId: string): Promise<boolean> {
   try {
-    console.log('smartBackupToCloud: Starting smart backup for user:', userId)
-
     // Initialize storage manager
     await storageManager.init()
 
     // Export all data from IndexedDB
     const data = await storageManager.exportData()
-    console.log('smartBackupToCloud: Exported local data, checking emptiness...')
-
-    // Check if local data appears to be cleared
-    const tableCounts = Object.entries(data).map(([table, items]) => ({
-      table,
-      count: Array.isArray(items) ? items.length : 0
-    }))
-    console.log('smartBackupToCloud: Local data table counts:', tableCounts)
 
     const isLocalDataEmpty = Object.values(data).every((tableData: any) =>
       Array.isArray(tableData) && tableData.length === 0
     )
 
     if (isLocalDataEmpty) {
-      console.log('smartBackupToCloud: Local data appears empty, checking for cloud backup to restore...')
-
       // Check if there's existing cloud backup
       const { data: existingBackup, error: fetchError } = await supabase
         .from('user_backups')
@@ -173,45 +149,27 @@ export async function smartBackupToCloud(userId: string): Promise<boolean> {
         .eq('user_id', userId)
         .single()
 
-      if (fetchError) {
-        console.log('smartBackupToCloud: Error fetching cloud backup:', fetchError)
-      } else if (existingBackup?.backup_data || existingBackup?.storage_url) {
+      if (!fetchError && (existingBackup?.backup_data || existingBackup?.storage_url)) {
         let hasCloudData = false
 
         if (existingBackup.storage_url) {
-          // For storage-based backups, we assume they have data (can't check without downloading)
-          console.log('smartBackupToCloud: Found storage-based cloud backup')
+          // For storage-based backups, we assume they have data
           hasCloudData = true
         } else if (existingBackup.backup_data) {
           const cloudData = existingBackup.backup_data
-          const cloudTableCounts = Object.entries(cloudData).map(([table, items]) => ({
-            table,
-            count: Array.isArray(items) ? items.length : 0
-          }))
-          console.log('smartBackupToCloud: Cloud data table counts:', cloudTableCounts)
-
           hasCloudData = Object.values(cloudData).some((tableData: any) =>
             Array.isArray(tableData) && tableData.length > 0
           )
         }
 
         if (hasCloudData) {
-          console.log('smartBackupToCloud: Found cloud data, automatically restoring instead of backing up empty local data')
-          console.log('smartBackupToCloud: This prevents data loss when browser storage is cleared')
-          // Automatically restore from cloud
+          // Automatically restore from cloud to prevent data loss
           return await restoreBackupFromCloud(userId)
-        } else {
-          console.log('smartBackupToCloud: Cloud data is also empty, proceeding with empty backup')
         }
-      } else {
-        console.log('smartBackupToCloud: No cloud backup found, proceeding with empty backup')
       }
-    } else {
-      console.log('smartBackupToCloud: Local data is not empty, proceeding with normal backup')
     }
 
     // Normal backup process
-    console.log('smartBackupToCloud: Executing normal backup process')
     return await uploadBackupToCloud(userId)
   } catch (error) {
     console.error("Error in smart backup:", error)
@@ -222,8 +180,6 @@ export async function smartBackupToCloud(userId: string): Promise<boolean> {
  */
 export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
   try {
-    console.log("restoreBackupFromCloud: Starting restore for user:", userId)
-
     // Fetch the latest backup from Supabase
     const { data, error } = await supabase
       .from('user_backups')
@@ -231,14 +187,10 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       .eq('user_id', userId)
       .single()
 
-    console.log("restoreBackupFromCloud: Supabase backup query result - data:", !!data, "error:", error)
-
     if (error) {
-      console.error("restoreBackupFromCloud: Supabase error:", error)
       throw error
     }
     if (!data) {
-      console.log("restoreBackupFromCloud: No backup data found")
       return false
     }
 
@@ -246,8 +198,6 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
 
     // Handle new storage-based backups
     if (data.storage_url) {
-      console.log("restoreBackupFromCloud: Found storage-based backup, downloading from:", data.storage_url)
-
       try {
         const response = await fetch(data.storage_url)
         if (!response.ok) {
@@ -256,50 +206,37 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
 
         const jsonString = await response.text()
         backupData = JSON.parse(jsonString)
-        console.log("restoreBackupFromCloud: Successfully downloaded and parsed backup from storage")
       } catch (downloadError) {
-        console.error("restoreBackupFromCloud: Failed to download from storage:", downloadError)
         throw downloadError
       }
     }
     // Handle legacy JSONB backups
     else if (data.backup_data) {
-      console.log("restoreBackupFromCloud: Found legacy JSONB backup")
       backupData = data.backup_data
     }
     else {
-      console.log("restoreBackupFromCloud: No backup data available")
       return false
     }
-
-    console.log("restoreBackupFromCloud: Backup data keys:", Object.keys(backupData))
 
     // Initialize storage manager
     await storageManager.init()
 
     // Clear existing data
-    console.log("restoreBackupFromCloud: Clearing existing data")
     await storageManager.clearAll()
 
     // Import backup data to IndexedDB
-    // Import each table's data
     for (const [tableName, tableData] of Object.entries(backupData)) {
       if (Array.isArray(tableData) && tableData.length > 0) {
-        // Skip importing if the table doesn't exist in storage manager
         try {
-          // Check if the method exists before calling it
           if (typeof storageManager.importTable === 'function') {
             await storageManager.importTable(tableName, tableData)
-          } else {
-            console.warn(`importTable method not found on storageManager for table: ${tableName}`)
           }
         } catch (importError) {
-          console.warn(`Could not import table ${tableName}:`, importError)
+          // Skip tables that fail to import
         }
       }
     }
 
-    console.log("restoreBackupFromCloud: Restore completed successfully")
     return true
   } catch (error) {
     console.error("Error restoring backup from cloud:", error)
@@ -312,25 +249,18 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
  */
 export async function isCloudSyncEnabled(userId: string): Promise<boolean> {
   try {
-    console.log("isCloudSyncEnabled: Checking for user:", userId)
     const { data, error } = await supabase
       .from('user_settings')
       .select('cloud_sync_enabled')
       .eq('user_id', userId)
       .single()
 
-    console.log("isCloudSyncEnabled: Supabase response - data:", data, "error:", error)
-
     if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-      console.error("isCloudSyncEnabled: Supabase error:", error)
       throw error
     }
 
-    const result = data?.cloud_sync_enabled || false
-    console.log("isCloudSyncEnabled: Final result:", result)
-    return result
+    return data?.cloud_sync_enabled || false
   } catch (error) {
-    console.error("Error checking cloud sync status:", error)
     return false
   }
 }
@@ -808,11 +738,8 @@ export async function isSupabaseTokenExpired(userId: string): Promise<boolean> {
  */
 export async function refreshSupabaseToken(userId: string): Promise<boolean> {
   try {
-    console.log(`[TOKEN-REFRESH] Starting token refresh for user ${userId}`)
-
     const tokens = await getDeploymentTokens(userId)
     if (!tokens?.supabase_refresh_token) {
-      console.error('[TOKEN-REFRESH] No refresh token available')
       return false
     }
 
@@ -822,20 +749,16 @@ export async function refreshSupabaseToken(userId: string): Promise<boolean> {
     })
 
     if (error) {
-      console.error('[TOKEN-REFRESH] Edge function error:', error)
       return false
     }
 
     if (!data.success) {
-      console.error('[TOKEN-REFRESH] Token refresh failed:', data.message)
       return false
     }
 
-    console.log(`[TOKEN-REFRESH] Token refresh successful for user ${userId}`)
     return true
 
   } catch (error) {
-    console.error('[TOKEN-REFRESH] Unexpected error:', error)
     return false
   }
 }
@@ -849,11 +772,8 @@ export async function getValidSupabaseToken(userId: string): Promise<string | nu
     const isExpired = await isSupabaseTokenExpired(userId)
 
     if (isExpired) {
-      console.log('[TOKEN-MANAGER] Token expired or about to expire, attempting refresh')
       const refreshSuccess = await refreshSupabaseToken(userId)
-
       if (!refreshSuccess) {
-        console.error('[TOKEN-MANAGER] Token refresh failed')
         return null
       }
     }
@@ -863,7 +783,6 @@ export async function getValidSupabaseToken(userId: string): Promise<string | nu
     return tokens?.supabase || null
 
   } catch (error) {
-    console.error('[TOKEN-MANAGER] Error getting valid token:', error)
     return null
   }
 }
@@ -878,14 +797,12 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      console.error("No authenticated user found")
       return null
     }
 
     // Get a valid (potentially refreshed) access token
     return await getValidSupabaseToken(user.id)
   } catch (error) {
-    console.error("Error retrieving Supabase access token:", error)
     return null
   }
 }
@@ -909,8 +826,6 @@ export async function uploadLargePayload(
     const jsonString = JSON.stringify(data, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
 
-    console.log(`uploadLargePayload: Uploading ${blob.size} bytes (${payloadType}) to storage`)
-
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('temp-payloads') // Use dedicated bucket for temporary payloads
@@ -920,7 +835,6 @@ export async function uploadLargePayload(
       })
 
     if (uploadError) {
-      console.error('uploadLargePayload: Storage upload error:', uploadError)
       throw uploadError
     }
 
@@ -947,15 +861,10 @@ export async function uploadLargePayload(
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
       })
 
-    if (dbError) {
-      console.warn('uploadLargePayload: Failed to store metadata:', dbError)
-      // Don't fail the upload if metadata storage fails
-    }
+    // Don't fail the upload if metadata storage fails
 
-    console.log(`uploadLargePayload: Successfully uploaded ${payloadType} payload to ${urlData.publicUrl}`)
     return urlData.publicUrl
   } catch (error) {
-    console.error("Error uploading large payload:", error)
     return null
   }
 }
@@ -966,8 +875,6 @@ export async function uploadLargePayload(
  */
 export async function downloadLargePayload(storageUrl: string): Promise<any | null> {
   try {
-    console.log(`downloadLargePayload: Downloading payload from ${storageUrl}`)
-
     // Fetch the data from storage
     const response = await fetch(storageUrl)
     if (!response.ok) {
@@ -977,10 +884,8 @@ export async function downloadLargePayload(storageUrl: string): Promise<any | nu
     const jsonString = await response.text()
     const data = JSON.parse(jsonString)
 
-    console.log(`downloadLargePayload: Successfully downloaded and parsed payload (${jsonString.length} bytes)`)
     return data
   } catch (error) {
-    console.error("Error downloading large payload:", error)
     return null
   }
 }
@@ -994,21 +899,13 @@ export async function cleanupLargePayload(storageUrl: string): Promise<boolean> 
     // Extract filename from URL
     const filename = storageUrl.split('/').pop()
     if (!filename) {
-      console.warn('cleanupLargePayload: Could not extract filename from URL')
       return false
     }
-
-    console.log(`cleanupLargePayload: Cleaning up temporary payload: ${filename}`)
 
     // Delete from storage
     const { error: storageError } = await supabase.storage
       .from('temp-payloads')
       .remove([filename])
-
-    if (storageError) {
-      console.warn('cleanupLargePayload: Storage deletion error:', storageError)
-      // Don't fail if storage cleanup fails, but log it
-    }
 
     // Delete metadata from database
     const { error: dbError } = await supabase
@@ -1016,14 +913,8 @@ export async function cleanupLargePayload(storageUrl: string): Promise<boolean> 
       .delete()
       .eq('storage_url', storageUrl)
 
-    if (dbError) {
-      console.warn('cleanupLargePayload: Database cleanup error:', dbError)
-    }
-
-    console.log(`cleanupLargePayload: Successfully cleaned up payload: ${filename}`)
     return true
   } catch (error) {
-    console.error("Error cleaning up large payload:", error)
     return false
   }
 }
