@@ -1,9 +1,8 @@
 @import "tailwindcss";
 
-/* Josefin Slab font applied globally */
+/* Marmelad font applied globally */
 * {
-  font-family: "Josefin Slab", serif;
-  font-optical-sizing: auto;
+  font-family: "Marmelad", sans-serif;
 }
 
 :root {
@@ -29,7 +28,7 @@
   --radius: 0.5rem;
 
   /* Font definitions */
-  --font-sans: "Josefin Slab", serif;
+  --font-sans: "Marmelad", sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
   /* VS Code-style sidebar colors */
@@ -61,7 +60,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: "Josefin Slab", serif;
+  --font-sans: "Marmelad", sans-serif;
   --font-mono: var(--font-mono);
 }
 
@@ -90,7 +89,7 @@
     --ring: #3b82f6;
 
     /* Font definitions for dark theme */
-    --font-sans: "Josefin Slab", serif;
+    --font-sans: "Marmelad", sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
     /* VS Code-style sidebar colors for dark theme */
@@ -126,7 +125,7 @@
   --ring: #3b82f6;
 
   /* Font definitions for dark theme */
-  --font-sans: "Josefin Slab", serif;
+  --font-sans: "Marmelad", sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
   /* VS Code-style sidebar colors for dark theme */
