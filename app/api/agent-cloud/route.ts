@@ -310,6 +310,11 @@ async function doStreaming(
 
         // System prompt for git workflow - commit, push, and create PR using GitHub MCP
         const gitWorkflowPrompt = `
+IMPORTANT WORKING DIRECTORY:
+- Your working directory is: ${workDir}
+- ALWAYS cd to ${workDir} before running any commands
+- All project files are located in ${workDir}
+
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
 - BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
@@ -1996,8 +2001,13 @@ app.post('/stream', async (req, res) => {
       fullPrompt = 'Previous conversation:\\n' + context + '\\n\\nCurrent request: ' + prompt;
     }
 
-    // Git workflow system prompt
+    // Git workflow system prompt with working directory
     const gitWorkflowPrompt = customSystemPrompt || \`
+IMPORTANT WORKING DIRECTORY:
+- Your working directory is: \${WORK_DIR}
+- ALWAYS cd to \${WORK_DIR} before running any commands
+- All project files are located in \${WORK_DIR}
+
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: \${WORKING_BRANCH}
 - BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
