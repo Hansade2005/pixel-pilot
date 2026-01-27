@@ -34,16 +34,14 @@ export class FileLookupService {
     const handleFilesChanged = (e: CustomEvent) => {
       const detail = e.detail as { projectId: string; forceRefresh?: boolean };
       if (detail.projectId === this.projectId) {
-        console.log('[FileLookupService] Detected files changed event, refreshing files for @ command');
-        this.refreshFiles();
+                this.refreshFiles();
       }
     };
     
     window.addEventListener('files-changed', handleFilesChanged as EventListener);
     this.isListening = true;
     
-    console.log('[FileLookupService] File change listener setup complete');
-  }
+      }
 
   /**
    * Initialize the service with project files
@@ -67,9 +65,8 @@ export class FileLookupService {
       const { storageManager } = await import('./storage-manager');
       await storageManager.init();
       this.files = await storageManager.getFiles(this.projectId);
-      console.log(`[FileLookupService] Loaded ${this.files.length} files for project ${this.projectId}`);
-    } catch (error) {
-      console.error('[FileLookupService] Error refreshing files:', error);
+          } catch (error) {
+      // Error refreshing files - silently fail
       this.files = [];
     }
   }
@@ -247,8 +244,7 @@ export class FileLookupService {
    * Force refresh files (useful for manual refresh)
    */
   async forceRefresh(): Promise<void> {
-    console.log('[FileLookupService] Force refreshing files...');
-    await this.refreshFiles();
+        await this.refreshFiles();
   }
 
   /**

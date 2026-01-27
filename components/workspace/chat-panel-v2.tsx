@@ -60,12 +60,10 @@ async function compressProjectFiles(
   messagesToSend: any[],
   metadata: any
 ): Promise<ArrayBuffer> {
-  console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
-
+  
   // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
   const filteredFiles = filterUnwantedFiles(projectFiles)
-  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
-
+  
   // Create zip file data
   const zipData: Record<string, Uint8Array> = {}
 
@@ -90,12 +88,10 @@ async function compressProjectFiles(
 
   // Create zip file
   const zippedData = zipSync(zipData)
-  console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
-
+  
   // Compress with LZ4
   const compressedData = await compress(zippedData)
-  console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
-
+  
   // Convert Uint8Array to ArrayBuffer
   const arrayBuffer = new ArrayBuffer(compressedData.length)
   new Uint8Array(arrayBuffer).set(compressedData)
@@ -109,12 +105,10 @@ async function compressProjectFilesFallback(
   messagesToSend: any[],
   metadata: any
 ): Promise<ArrayBuffer> {
-  console.log(`[Compression] Starting fallback compression of ${projectFiles.length} files`)
-
+  
   // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
   const filteredFiles = filterUnwantedFiles(projectFiles)
-  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
-
+  
   // Create zip file data
   const zipData: Record<string, Uint8Array> = {}
 
@@ -138,12 +132,10 @@ async function compressProjectFilesFallback(
 
   // Create zip file
   const zippedData = zipSync(zipData)
-  console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
-
+  
   // Compress with LZ4
   const compressedData = await compress(zippedData)
-  console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
-
+  
   // Convert Uint8Array to ArrayBuffer
   const arrayBuffer = new ArrayBuffer(compressedData.length)
   new Uint8Array(arrayBuffer).set(compressedData)
@@ -2252,8 +2244,7 @@ export function ChatPanelV2({
     const handleFilesChanged = (e: CustomEvent) => {
       const detail = e.detail as { projectId: string; forceRefresh?: boolean }
       if (detail.projectId === project.id) {
-        console.log('[ChatPanelV2] Detected real-time file changes, refreshing project files...')
-        loadProjectFiles()
+                loadProjectFiles()
       }
     }
 
@@ -2291,8 +2282,7 @@ export function ChatPanelV2({
       // Get files from the lookup service
       const files = fileLookupServiceRef.current['files'] || []
       setProjectFiles(files)
-      console.log(`[ChatPanelV2] Loaded ${files.length} project files via FileLookupService for real-time sync`)
-    } catch (error) {
+          } catch (error) {
       console.error('[ChatPanelV2] Error loading files via FileLookupService:', error)
       // Fallback to direct storage manager
       try {
@@ -2390,8 +2380,7 @@ export function ChatPanelV2({
     if (!project?.id) return
 
     try {
-      console.log(`[ChatPanelV2] Loading messages for project ${project.id}`)
-      const { storageManager } = await import('@/lib/storage-manager')
+            const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
 
       // Get chat sessions for this user
@@ -2403,8 +2392,7 @@ export function ChatPanelV2({
       )
 
       if (activeSession) {
-        console.log(`[ChatPanelV2] Found active chat session: ${activeSession.id}`)
-        // Update the current session ID state
+                // Update the current session ID state
         setCurrentChatSessionId(activeSession.id)
 
         // Load messages for this session
@@ -2422,20 +2410,10 @@ export function ChatPanelV2({
             toolInvocations: msg.metadata?.toolInvocations || [],
             metadata: msg.metadata || {}
           }
-          console.log(`[ChatPanelV2] Loaded message ${msg.id}:`, {
-            role: msg.role,
-            hasReasoning: !!uiMessage.reasoning,
-            reasoningLength: uiMessage.reasoning.length,
-            hasTools: uiMessage.toolInvocations.length > 0,
-            toolCount: uiMessage.toolInvocations.length,
-            durationSeconds: msg.metadata?.durationSeconds,
-            metadataKeys: Object.keys(msg.metadata || {})
-          })
           return uiMessage
         })
 
-        console.log(`[ChatPanelV2] Loaded ${uiMessages.length} messages from database`)
-        setMessages(uiMessages)
+                setMessages(uiMessages)
 
         // Populate activeToolCalls for loaded messages
         const toolCallsMap = new Map<string, Array<{
@@ -2447,16 +2425,6 @@ export function ChatPanelV2({
 
         uiMessages.forEach((msg: any) => {
           if (msg.toolInvocations && msg.toolInvocations.length > 0) {
-            console.log(`[ChatPanelV2] Restoring tool pills for message ${msg.id}:`, {
-              toolCount: msg.toolInvocations.length,
-              tools: msg.toolInvocations.map((inv: any) => ({
-                name: inv.toolName,
-                state: inv.state,
-                hasResult: !!inv.result,
-                hasError: inv.result?.error
-              }))
-            })
-
             const toolCalls = msg.toolInvocations.map((inv: any) => {
               // Determine status based on state and result
               let status: 'executing' | 'completed' | 'failed' = 'completed' // Default to completed for loaded messages
@@ -2490,15 +2458,12 @@ export function ChatPanelV2({
               }
             })
 
-            console.log(`[ChatPanelV2] Setting ${toolCalls.length} tool pills for message ${msg.id}`)
             toolCallsMap.set(msg.id, toolCalls)
           }
         })
 
-        console.log(`[ChatPanelV2] Total messages with tool pills: ${toolCallsMap.size}`)
         setActiveToolCalls(toolCallsMap)
       } else {
-        console.log(`[ChatPanelV2] No active chat session found for project ${project.id}, starting fresh`)
         setMessages([])
         setActiveToolCalls(new Map())
       }
