@@ -74,6 +74,62 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const router = useRouter()
   const supabase = createClient()
 
+  // Typing placeholder state
+  const [typingPlaceholder, setTypingPlaceholder] = useState('')
+  const [placeholderIndex, setPlaceholderIndex] = useState(0)
+
+  const placeholderSuggestions = [
+    "Build an Expo language learning app with speech recognition, flashcards, and progress tracking",
+    "Create a modern portfolio website with dark mode and animations",
+    "Design a restaurant ordering app with real-time order tracking",
+    "Build a fitness tracker with workout plans and progress charts",
+    "Create an AI-powered note-taking app with smart organization",
+    "Design a social media dashboard with analytics and scheduling",
+    "Build a recipe finder app with ingredient-based search",
+    "Create a project management tool with kanban boards",
+    "Design an e-commerce store with cart and checkout flow",
+    "Build a weather app with location-based forecasts"
+  ]
+
+  // Typing effect for placeholder
+  useEffect(() => {
+    if (isGenerating || prompt) return // Don't animate when generating or when user has typed
+
+    let charIndex = 0
+    let isDeleting = false
+    let currentText = ''
+    const currentSuggestion = placeholderSuggestions[placeholderIndex]
+
+    const typeInterval = setInterval(() => {
+      if (!isDeleting) {
+        // Typing
+        currentText = currentSuggestion.slice(0, charIndex + 1)
+        setTypingPlaceholder(currentText)
+        charIndex++
+
+        if (charIndex === currentSuggestion.length) {
+          // Pause at end before deleting
+          setTimeout(() => {
+            isDeleting = true
+          }, 2000)
+        }
+      } else {
+        // Deleting
+        currentText = currentSuggestion.slice(0, charIndex - 1)
+        setTypingPlaceholder(currentText)
+        charIndex--
+
+        if (charIndex === 0) {
+          isDeleting = false
+          setPlaceholderIndex((prev) => (prev + 1) % placeholderSuggestions.length)
+          clearInterval(typeInterval)
+        }
+      }
+    }, isDeleting ? 30 : 50) // Faster deletion, slower typing
+
+    return () => clearInterval(typeInterval)
+  }, [placeholderIndex, isGenerating, prompt])
+
   // User state
   const [user, setUser] = useState<any>(null)
 
@@ -1127,7 +1183,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             <div className="relative">
               <textarea
                 ref={inputRef}
-                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
+                placeholder={isGenerating ? "PiPilot is working..." : typingPlaceholder || "Describe your app idea..."}
                 value={prompt}
                 onChange={(e) => {
                   setPrompt(e.target.value)
