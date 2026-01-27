@@ -59,6 +59,7 @@ const activeSandboxes = new Map<string, {
     cloned: boolean
   }
   workingBranch?: string // The branch created for this session (e.g., pipilot/fix-login-bug-a1b2)
+  workDir?: string // Actual working directory (e.g., /home/user/repo-name/)
   // MCP gateway URL (Tavily HTTP MCP)
   mcpGatewayUrl?: string
   // Conversation history for memory persistence
@@ -250,8 +251,8 @@ async function doStreaming(
     }
   }
 
-  // Determine working directory based on repo
-  const workDir = sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user'
+  // Use stored working directory or fallback
+  const workDir = sandboxEntry.workDir || '/home/user'
 
   // Add user message to conversation history
   sandboxEntry.conversationHistory.push({
@@ -644,24 +645,11 @@ try {
                       timestamp: Date.now()
                     })
                   } else if (message.type === 'assistant') {
-                    // The script already handles text extraction from assistant messages
-                    // with hasStreamedText deduplication, so we only forward tool_use blocks
-                    // that might not have been sent via stream_event
-                    const content = message.message?.content
-                    if (Array.isArray(content)) {
-                      for (const block of content) {
-                        if (block.type === 'text' && block.text) {
-                          // Only accumulate for history, don't send (already streamed via 'text' type)
-                          textContent += block.text
-                        }
-                      }
-                    }
+                    // Skip - text already accumulated via 'text' message type from the SDK script
+                    // Don't accumulate again to avoid duplicate text in history
                   } else if (message.type === 'content_block_delta') {
-                    // Already handled by the script's stream_event handler which emits 'text' type
-                    // Just accumulate for history
-                    if (message.delta?.text) {
-                      textContent += message.delta.text
-                    }
+                    // Skip - already handled by the SDK script which emits 'text' type
+                    // Don't accumulate again to avoid duplicate text
                   } else if (message.type === 'content_block_start') {
                     // Already handled by the script's stream_event handler which emits 'tool_use' type
                     // No action needed here
@@ -1052,6 +1040,7 @@ async function handleCreate(
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
+  let actualWorkDir = PROJECT_DIR // Will be updated to repo subfolder if cloning
 
   // Configure CLI connector auth files in the sandbox
   if (config?.connectors) {
@@ -1103,6 +1092,10 @@ async function handleCreate(
     try {
       console.log(`[Agent Cloud] Cloning repo: ${config.repo.full_name} (${config.repo.branch})`)
 
+      // Extract repo name for subfolder
+      const repoName = config.repo.full_name.split('/').pop() || 'project'
+      const repoDir = `${PROJECT_DIR}${repoName}`
+
       // Validate token and repo access before attempting clone
       if (githubToken) {
         try {
@@ -1135,21 +1128,23 @@ async function handleCreate(
         }
       }
 
-      // Clone repo into the working directory directly (not a subdirectory)
-      // Uses git init + fetch + checkout approach since the directory may not be empty
+      // Create the repo subdirectory and clone into it
+      await sandbox.commands.run(`mkdir -p ${repoDir}`, { timeoutMs: 5000 })
+
+      // Clone repo into the subdirectory
       let cloneSuccess = false
 
       if (githubToken) {
-        // Method 1: git init + fetch with token (works in non-empty directories)
+        // Method 1: git clone with token into subfolder
         try {
-          console.log(`[Agent Cloud] Cloning with token into ${PROJECT_DIR}...`)
+          console.log(`[Agent Cloud] Cloning with token into ${repoDir}...`)
           const gitResult = await sandbox.commands.run(
-            `cd ${PROJECT_DIR} && git init && (git remote add origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
+            `cd ${repoDir} && git init && (git remote add origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://x-access-token:${githubToken}@github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
             { timeoutMs: 180000 }
           )
           if (gitResult.exitCode === 0) {
             cloneSuccess = true
-            console.log(`[Agent Cloud] Repo cloned successfully via git init + fetch`)
+            console.log(`[Agent Cloud] Repo cloned successfully into ${repoDir}`)
           } else {
             console.warn(`[Agent Cloud] git init+fetch failed:`, gitResult.stderr)
           }
@@ -1161,14 +1156,14 @@ async function handleCreate(
       // Method 2: Public clone (no auth, git init + fetch)
       if (!cloneSuccess) {
         try {
-          console.log(`[Agent Cloud] Attempting public clone into ${PROJECT_DIR}...`)
+          console.log(`[Agent Cloud] Attempting public clone into ${repoDir}...`)
           const publicResult = await sandbox.commands.run(
-            `cd ${PROJECT_DIR} && git init && (git remote add origin https://github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
+            `cd ${repoDir} && git init && (git remote add origin https://github.com/${config.repo.full_name}.git 2>/dev/null || git remote set-url origin https://github.com/${config.repo.full_name}.git) && git fetch --depth 50 origin ${config.repo.branch} && git checkout -f ${config.repo.branch}`,
             { timeoutMs: 180000 }
           )
           if (publicResult.exitCode === 0) {
             cloneSuccess = true
-            console.log(`[Agent Cloud] Repo cloned successfully via public fetch`)
+            console.log(`[Agent Cloud] Repo cloned successfully into ${repoDir}`)
           } else {
             console.warn(`[Agent Cloud] Public clone failed:`, publicResult.stderr)
           }
@@ -1179,18 +1174,20 @@ async function handleCreate(
 
       if (cloneSuccess) {
         repoCloned = true
-        console.log(`[Agent Cloud] Repo cloned successfully`)
+        // Store the actual repo directory for later use
+        actualWorkDir = repoDir
+        console.log(`[Agent Cloud] Repo cloned successfully to ${repoDir}`)
 
         // Configure git user
         await sandbox.commands.run(
-          `cd ${PROJECT_DIR} && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
+          `cd ${repoDir} && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
           { timeoutMs: 5000 }
         )
 
         // Create a new working branch for Claude's changes using the prompt
         const workingBranch = generateBranchName(config?.initialPrompt || 'agent-task')
         const branchResult = await sandbox.commands.run(
-          `cd ${PROJECT_DIR} && git checkout -b ${workingBranch}`,
+          `cd ${repoDir} && git checkout -b ${workingBranch}`,
           { timeoutMs: 10000 }
         )
 
@@ -1205,7 +1202,7 @@ async function handleCreate(
         console.log(`[Agent Cloud] Checking for project dependencies...`)
         try {
           const depsResult = await sandbox.commands.run(
-            `cd ${PROJECT_DIR} && [ -f package.json ] && npm install || echo "No package.json"`,
+            `cd ${repoDir} && [ -f package.json ] && npm install || echo "No package.json"`,
             { timeoutMs: 180000 }
           )
           if (depsResult.stdout?.includes('No package.json')) {
@@ -1227,22 +1224,25 @@ async function handleCreate(
   // Handle new project mode (no repo to clone, just initialize git)
   if (config?.newProject && !config?.repo) {
     try {
-      console.log(`[Agent Cloud] New project mode: initializing ${config.newProject.name}`)
+      const projectName = config.newProject.name || 'new-project'
+      const projectDir = `${PROJECT_DIR}${projectName}`
+      console.log(`[Agent Cloud] New project mode: initializing ${projectName} in ${projectDir}`)
 
-      // Initialize git and configure user
+      // Create project directory and initialize git
       await sandbox.commands.run(
-        `cd ${PROJECT_DIR} && git init && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
+        `mkdir -p ${projectDir} && cd ${projectDir} && git init && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
         { timeoutMs: 10000 }
       )
 
+      actualWorkDir = projectDir
       repoCloned = false // No clone, fresh project
-      console.log(`[Agent Cloud] Git initialized for new project: ${config.newProject.name}`)
+      console.log(`[Agent Cloud] Git initialized for new project: ${projectName} in ${projectDir}`)
     } catch (error: any) {
       console.error(`[Agent Cloud] New project git init error:`, error?.message || error)
     }
   }
 
-  // Store sandbox entry with the working branch
+  // Store sandbox entry with the working branch and directory
   activeSandboxes.set(sandboxKey, {
     sandboxId,
     sandbox,
@@ -1256,6 +1256,7 @@ async function handleCreate(
       cloned: repoCloned,
     } : undefined,
     workingBranch: createdWorkingBranch,
+    workDir: actualWorkDir,
     mcpGatewayUrl,
     conversationHistory: []
   })
@@ -1278,7 +1279,7 @@ async function handleCreate(
     repoCloned,
     isNewProject: !!config?.newProject,
     newProjectName: config?.newProject?.name,
-    projectDir: repoCloned ? PROJECT_DIR : '/home/user',
+    projectDir: actualWorkDir,
     reconnected: false,
     messageCount: 0,
     mcpEnabled: !!mcpGatewayUrl,
@@ -1921,7 +1922,7 @@ async function handleStartStreamServer(request: NextRequest, sandboxId: string) 
   }
 
   const { sandbox } = sandboxEntry
-  const workDir = sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user'
+  const workDir = sandboxEntry.workDir || '/home/user'
   const workingBranch = sandboxEntry.workingBranch || 'main'
   const STREAM_SERVER_PORT = 3001
 
@@ -2069,17 +2070,16 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
             send({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() });
           }
         } else if (message.type === 'assistant') {
+          // Only process tool_use blocks here - text already streamed via stream_event
           const content = message.message?.content;
           if (Array.isArray(content)) {
             for (const block of content) {
-              if (block.type === 'text' && block.text && !hasStreamedText) {
-                textContent += block.text;
-                send({ type: 'text', data: block.text, timestamp: Date.now() });
-              } else if (block.type === 'tool_use') {
+              if (block.type === 'tool_use') {
                 send({ type: 'tool_use', name: block.name, input: block.input, timestamp: Date.now() });
               }
             }
           }
+          // Reset for next turn (multi-turn conversations)
           hasStreamedText = false;
         } else if (message.type === 'user') {
           const content = message.message?.content;
