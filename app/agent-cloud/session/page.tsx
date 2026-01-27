@@ -551,23 +551,34 @@ User Request: ${currentPrompt}`
       const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
+      let lastEventWasToolResult = false // Track if we need to start a new output message
       let sseBuffer = '' // Buffer for incomplete SSE messages
 
       // Direct update function - no throttling for real-time streaming
       const updateOutput = (newText: string) => {
-        // Append new text to accumulated output
+        // If last event was a tool_result, start a NEW output message
+        // This prevents text from accumulating across turns
+        if (lastEventWasToolResult) {
+          fullOutput = '' // Reset for new turn
+          lastEventWasToolResult = false
+        }
+
+        // Append new text to accumulated output for this turn
         fullOutput += newText
-        
+
         // Update UI immediately
         setSessions(prev => prev.map(s => {
           if (s.id === sessionId) {
             const lines = [...s.lines]
             const lastLine = lines[lines.length - 1]
-            if (lastLine && lastLine.type === 'output') {
-              // Update existing output line
+
+            // Only append to last output if it exists AND we're continuing the same turn
+            // If the last line is a tool, we need to create a new output line
+            if (lastLine && lastLine.type === 'output' && fullOutput.length > newText.length) {
+              // Update existing output line (same turn, accumulating)
               lines[lines.length - 1] = { ...lastLine, content: fullOutput }
             } else {
-              // Create new output line
+              // Create new output line (new turn after tool, or first output)
               lines.push({ type: 'output', content: fullOutput, timestamp: new Date() })
             }
             return { ...s, lines }
@@ -740,6 +751,9 @@ User Request: ${currentPrompt}`
               }
               return s
             }))
+
+            // Mark that next text should start a NEW output message (new turn)
+            lastEventWasToolResult = true
             break
           }
 
