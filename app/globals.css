@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('../public/fonts/OpenDyslexic-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* OpenDyslexic font with normal spacing */
+* {
+  font-family: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+/* Override OpenDyslexic's default spacing to match normal fonts */
+body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select {
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  font-feature-settings: normal !important;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -23,7 +43,7 @@
   --radius: 0.5rem;
 
   /* Font definitions */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
   /* VS Code-style sidebar colors */
@@ -84,7 +104,7 @@
     --ring: #3b82f6;
 
     /* Font definitions for dark theme */
-    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
     /* VS Code-style sidebar colors for dark theme */
