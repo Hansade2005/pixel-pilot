@@ -551,7 +551,7 @@ User Request: ${currentPrompt}`
       const decoder = new TextDecoder()
       let fullOutput = ''
       let hasReceivedData = false
-      let hasReceivedTextEvent = false // Track if we've received 'text' type events
+      let primaryTextSource: 'text' | 'content_block_delta' | 'stdout' | null = null // Track which source we're using
       let sseBuffer = '' // Buffer for incomplete SSE messages
 
       // Direct update function - no throttling for real-time streaming
@@ -606,24 +606,31 @@ User Request: ${currentPrompt}`
 
           case 'content_block_delta':
             // Anthropic streaming format - delta contains text chunks
+            // Only use this source if it's the first or we're already using it
             if (data.delta?.text) {
-              hasReceivedTextEvent = true
-              updateOutput(data.delta.text)
+              if (!primaryTextSource || primaryTextSource === 'content_block_delta') {
+                primaryTextSource = 'content_block_delta'
+                updateOutput(data.delta.text)
+              }
             }
             break
 
           case 'text':
             // Real-time text streaming from SDK - append new text
+            // Only use this source if it's the first or we're already using it
             if (data.data) {
-              hasReceivedTextEvent = true
-              updateOutput(data.data)
+              if (!primaryTextSource || primaryTextSource === 'text') {
+                primaryTextSource = 'text'
+                updateOutput(data.data)
+              }
             }
             break
 
           case 'stdout':
-            // Fallback raw output streaming - only use if we haven't received 'text' events
-            // This prevents duplication when both text and stdout contain the same content
-            if (data.data && !hasReceivedTextEvent) {
+            // Fallback raw output streaming - only use if no other text source is active
+            // This prevents duplication when multiple sources contain the same content
+            if (data.data && !primaryTextSource) {
+              primaryTextSource = 'stdout'
               updateOutput(data.data)
             }
             break
