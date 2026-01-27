@@ -43,7 +43,6 @@ export function useSupabaseToken(): UseSupabaseTokenReturn {
         setToken(null)
       }
     } catch (err) {
-      console.error('Error checking token status:', err)
       setError(err instanceof Error ? err.message : 'Unknown error')
       setIsExpired(true)
       setToken(null)
@@ -70,7 +69,6 @@ export function useSupabaseToken(): UseSupabaseTokenReturn {
         throw new Error('Failed to refresh token')
       }
     } catch (err) {
-      console.error('Error refreshing token:', err)
       setError(err instanceof Error ? err.message : 'Failed to refresh token')
       setIsExpired(true)
       setToken(null)
@@ -105,7 +103,6 @@ export function useSupabaseToken(): UseSupabaseTokenReturn {
   // Auto-refresh token if it's expired
   useEffect(() => {
     if (isExpired && !isLoading) {
-      console.log('[USE-SUPABASE-TOKEN] Token expired, attempting auto-refresh')
       refreshToken()
     }
   }, [isExpired, isLoading, refreshToken])

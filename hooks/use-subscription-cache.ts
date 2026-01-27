@@ -40,11 +40,10 @@ if (typeof window !== 'undefined') {
       if (age < CACHE_DURATION) {
         subscriptionCache = JSON.parse(cached)
         cacheTimestamp = parseInt(timestamp)
-        console.log('[SubscriptionCache] Loaded from session storage, age:', Math.round(age / 1000), 's')
       }
     }
   } catch (error) {
-    console.error('[SubscriptionCache] Error loading from session storage:', error)
+    // Silently fail - session storage errors are not critical
   }
 }
 
@@ -62,7 +61,6 @@ export function useSubscriptionCache(userId?: string) {
     // If we have valid cache, use it immediately
     const cacheAge = Date.now() - cacheTimestamp
     if (subscriptionCache && cacheAge < CACHE_DURATION) {
-      console.log('[SubscriptionCache] Using cached data, age:', Math.round(cacheAge / 1000), 's')
       setSubscription(subscriptionCache)
       setLoading(false)
       return
@@ -71,7 +69,6 @@ export function useSubscriptionCache(userId?: string) {
     // Otherwise fetch fresh data
     const fetchSubscription = async () => {
       if (isLoading) {
-        console.log('[SubscriptionCache] Already loading, waiting...')
         // Wait for existing load to complete
         const checkInterval = setInterval(() => {
           if (!isLoading && subscriptionCache) {
@@ -109,7 +106,6 @@ export function useSubscriptionCache(userId?: string) {
           .single()
 
         if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
-          console.error('[SubscriptionCache] Error fetching subscription:', error)
           isLoading = false
           setLoading(false)
           return
@@ -150,15 +146,13 @@ export function useSubscriptionCache(userId?: string) {
           sessionStorage.setItem(CACHE_KEY, JSON.stringify(subscriptionData))
           sessionStorage.setItem(CACHE_TIMESTAMP_KEY, cacheTimestamp.toString())
         } catch (error) {
-          console.error('[SubscriptionCache] Error saving to session storage:', error)
+          // Silently fail - session storage errors are not critical
         }
 
         setSubscription(subscriptionData)
-        console.log('[SubscriptionCache] Fetched fresh data, plan:', subscriptionData.plan)
 
         // Set up Realtime subscription (only once)
         if (!realtimeChannel) {
-          console.log('[SubscriptionCache] Setting up Realtime subscription')
           realtimeChannel = supabase
             .channel(`subscription:${userId}`)
             .on(
@@ -170,8 +164,6 @@ export function useSubscriptionCache(userId?: string) {
                 filter: `user_id=eq.${userId}`
               },
               (payload) => {
-                console.log('[SubscriptionCache] Realtime update received:', payload)
-
                 const updatedData = payload.new ? {
                   id: (payload.new as any).id,
                   user_id: (payload.new as any).user_id,
@@ -197,20 +189,18 @@ export function useSubscriptionCache(userId?: string) {
                     sessionStorage.setItem(CACHE_KEY, JSON.stringify(updatedData))
                     sessionStorage.setItem(CACHE_TIMESTAMP_KEY, cacheTimestamp.toString())
                   } catch (error) {
-                    console.error('[SubscriptionCache] Error saving to session storage:', error)
+                    // Silently fail - session storage errors are not critical
                   }
 
                   setSubscription(updatedData)
                 }
               }
             )
-            .subscribe((status) => {
-              console.log('[SubscriptionCache] Realtime status:', status)
-            })
+            .subscribe()
         }
 
       } catch (error) {
-        console.error('[SubscriptionCache] Unexpected error:', error)
+        // Silently fail - subscription fetch errors are not critical
       } finally {
         isLoading = false
         setLoading(false)
@@ -253,9 +243,7 @@ export function clearSubscriptionCache() {
       sessionStorage.removeItem(CACHE_KEY)
       sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
     } catch (error) {
-      console.error('[SubscriptionCache] Error clearing session storage:', error)
+      // Silently fail - session storage errors are not critical
     }
   }
-
-  console.log('[SubscriptionCache] Cache cleared')
 }
