@@ -1,23 +1,9 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: 'OpenDyslexic';
-  src: url('../public/fonts/OpenDyslexic-Regular.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* OpenDyslexic font with natural readable spacing */
+/* Josefin Slab font applied globally */
 * {
-  font-family: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-}
-
-/* Natural spacing optimized for OpenDyslexic readability */
-body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select, a, label, li {
-  letter-spacing: normal !important;
-  word-spacing: 0.05em !important;
-  line-height: 1.5 !important;
+  font-family: "Josefin Slab", serif;
+  font-optical-sizing: auto;
 }
 
 :root {
@@ -43,7 +29,7 @@ body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select, a, 
   --radius: 0.5rem;
 
   /* Font definitions */
-  --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-sans: "Josefin Slab", serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
   /* VS Code-style sidebar colors */
@@ -75,7 +61,7 @@ body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select, a, 
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-sans: "Josefin Slab", serif;
   --font-mono: var(--font-mono);
 }
 
@@ -104,7 +90,7 @@ body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select, a, 
     --ring: #3b82f6;
 
     /* Font definitions for dark theme */
-    --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --font-sans: "Josefin Slab", serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
     /* VS Code-style sidebar colors for dark theme */
@@ -140,7 +126,7 @@ body, p, div, span, h1, h2, h3, h4, h5, h6, button, input, textarea, select, a, 
   --ring: #3b82f6;
 
   /* Font definitions for dark theme */
-  --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-sans: "Josefin Slab", serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
 
   /* VS Code-style sidebar colors for dark theme */
