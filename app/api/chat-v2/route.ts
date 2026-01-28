@@ -2340,6 +2340,7 @@ export async function POST(req: Request) {
       aiMode,
       chatMode = 'agent', // Default to 'agent' mode, can be 'ask' for read-only
       continuationState, // New field for stream continuation
+      partialResponse, // Accumulated content before continuation (so AI knows where it left off)
       isInitialPrompt, // Flag indicating if this is an initial prompt for UI prototyping
       // toolResult // New field for client-side tool results - DISABLED
       supabaseAccessToken, // Supabase access token from client
@@ -3197,6 +3198,22 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
 
     // Add continuation instructions if this is a continuation request
     if (isContinuation) {
+      // Build context about what was already said
+      const hasPartialContent = partialResponse?.content && partialResponse.content.trim().length > 0
+      const hasPartialReasoning = partialResponse?.reasoning && partialResponse.reasoning.trim().length > 0
+
+      // Truncate partial content if too long (keep last 2000 chars for context)
+      const truncatedContent = hasPartialContent
+        ? (partialResponse.content.length > 2000
+            ? '...' + partialResponse.content.slice(-2000)
+            : partialResponse.content)
+        : ''
+      const truncatedReasoning = hasPartialReasoning
+        ? (partialResponse.reasoning.length > 1000
+            ? '...' + partialResponse.reasoning.slice(-1000)
+            : partialResponse.reasoning)
+        : ''
+
       systemPrompt += `
 
 ## 🔄 STREAM CONTINUATION MODE
@@ -3208,14 +3225,27 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
 - Continue your response seamlessly as if the interruption never happened
 - Do not repeat any content you already provided
 - Pick up exactly where your previous response ended
-
+${hasPartialReasoning ? `
+**Your previous reasoning (that was already shown to the user):**
+\`\`\`
+${truncatedReasoning}
+\`\`\`
+` : ''}
+${hasPartialContent ? `
+**Your previous response content (that was already shown to the user):**
+\`\`\`
+${truncatedContent}
+\`\`\`
+` : ''}
 **Instructions:**
-✅ Continue your response naturally
+✅ Continue your response naturally FROM WHERE YOU LEFT OFF
 ✅ Reference any completed tool results
 ✅ Maintain the same tone and style
-❌ Do not repeat previous content
+✅ Your next output will be APPENDED to the content above
+❌ Do NOT repeat any content shown above - the user already saw it
 ❌ Do not apologize for the interruption
-❌ Do not mention being a "continuation"`
+❌ Do not mention being a "continuation"
+❌ Do not restart your response - continue mid-sentence if needed`
     }
 
     // Get AI model

@@ -2004,6 +2004,7 @@ export function ChatPanelV2({
       setAbortController(continuationController)
 
       // Prepare continuation request payload
+      // Include accumulated content so AI knows where it left off and can continue seamlessly
       const continuationPayload = {
         messages: [], // Don't send messages - full history is in continuationState
         projectId: project.id,
@@ -2013,7 +2014,12 @@ export function ChatPanelV2({
         modelId: selectedModel,
         aiMode,
         chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
-        continuationState // Include the continuation state
+        continuationState, // Include the continuation state
+        // Include accumulated content so AI can continue from where it stopped
+        partialResponse: {
+          content: accumulatedContent,
+          reasoning: accumulatedReasoning
+        }
       }
 
       console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
