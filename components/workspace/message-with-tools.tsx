@@ -258,15 +258,20 @@ const InterleavedContent = ({
     return positionKey === 'reasoningPosition' ? tc.reasoningPosition : tc.textPosition
   }
 
-  // If no tool calls with positions, just render the content
-  const toolsWithPositions = toolCalls.filter(tc => typeof getPosition(tc) === 'number')
+  // Filter tool calls that have valid positions AND were called DURING the content
+  // (not after it was complete). Tools at position >= content.length were called after
+  // the content stream finished and should only appear in ToolActivityPanel, not inline.
+  const toolsWithValidPositions = toolCalls.filter(tc => {
+    const pos = getPosition(tc)
+    return typeof pos === 'number' && pos < content.length
+  })
 
-  if (toolsWithPositions.length === 0) {
+  if (toolsWithValidPositions.length === 0) {
     return <>{children(content)}</>
   }
 
   // Sort tool calls by position
-  const sortedTools = [...toolsWithPositions].sort((a, b) => (getPosition(a) || 0) - (getPosition(b) || 0))
+  const sortedTools = [...toolsWithValidPositions].sort((a, b) => (getPosition(a) || 0) - (getPosition(b) || 0))
 
   // Build segments: text chunks interleaved with tool pills
   const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
