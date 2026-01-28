@@ -2341,6 +2341,8 @@ export async function POST(req: Request) {
       chatMode = 'agent', // Default to 'agent' mode, can be 'ask' for read-only
       continuationState, // New field for stream continuation
       partialResponse, // Accumulated content before continuation (so AI knows where it left off)
+      isRecoveryContinuation, // Flag for auto-recovery from interrupted streams
+      previousToolResults: recoveryToolResults, // Tool results from interrupted stream
       isInitialPrompt, // Flag indicating if this is an initial prompt for UI prototyping
       // toolResult // New field for client-side tool results - DISABLED
       supabaseAccessToken, // Supabase access token from client
@@ -3271,6 +3273,74 @@ ${hasModifiedFiles ? '✅ Re-read modified files first to understand current sta
 ❌ Do not apologize for the interruption
 ❌ Do not mention being a "continuation"
 ❌ Do not restart your response - continue mid-sentence if needed`
+    }
+
+    // Add recovery continuation instructions if this is recovering from an interrupted stream
+    if (isRecoveryContinuation && partialResponse) {
+      const hasPartialContent = partialResponse?.content && partialResponse.content.trim().length > 0
+      const hasPartialReasoning = partialResponse?.reasoning && partialResponse.reasoning.trim().length > 0
+
+      // Truncate partial content if too long
+      const truncatedContent = hasPartialContent
+        ? (partialResponse.content.length > 2000
+            ? '...' + partialResponse.content.slice(-2000)
+            : partialResponse.content)
+        : ''
+      const truncatedReasoning = hasPartialReasoning
+        ? (partialResponse.reasoning.length > 1000
+            ? '...' + partialResponse.reasoning.slice(-1000)
+            : partialResponse.reasoning)
+        : ''
+
+      // Get modified files from recovery tool results
+      const modifiedFiles = new Set<string>()
+      for (const toolResult of (recoveryToolResults || [])) {
+        const toolName = toolResult.toolName || toolResult.name
+        const args = toolResult.args || toolResult.input || {}
+        if (toolName === 'write_file' && args.path) modifiedFiles.add(args.path)
+        else if (toolName === 'edit_file' && args.filePath) modifiedFiles.add(args.filePath)
+        else if (toolName === 'client_replace_string_in_file' && args.filePath) modifiedFiles.add(args.filePath)
+      }
+      const modifiedFilesList = Array.from(modifiedFiles)
+      const hasModifiedFiles = modifiedFilesList.length > 0
+
+      systemPrompt += `
+
+## 🔄 STREAM RECOVERY MODE
+**IMPORTANT**: The user's connection was interrupted (tab switch, page refresh, or network issue). Your previous response was partially received by the user. You must continue EXACTLY where you left off.
+
+**Recovery Context:**
+- ${(recoveryToolResults || []).length} tool operations were completed before interruption
+- User is now reconnected and waiting for you to continue
+- Your previous partial response is shown below - continue from where it ended
+${hasModifiedFiles ? `
+**Files modified before interruption (RE-READ these first):**
+${modifiedFilesList.map(f => `- ${f}`).join('\n')}
+
+⚠️ CRITICAL: Use read_file to check current state of these files before continuing.
+` : ''}
+${hasPartialReasoning ? `
+**Your previous reasoning (already shown to user):**
+\`\`\`
+${truncatedReasoning}
+\`\`\`
+` : ''}
+${hasPartialContent ? `
+**Your previous response (already shown to user):**
+\`\`\`
+${truncatedContent}
+\`\`\`
+` : ''}
+**Instructions:**
+✅ Continue EXACTLY where you left off - your output will be APPENDED
+✅ If you were mid-sentence, continue that sentence
+✅ If you were mid-code-block, continue that code
+${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : ''}
+❌ Do NOT repeat any content shown above
+❌ Do NOT restart your response or introduction
+❌ Do NOT mention the interruption to the user`
+
+      console.log('[Chat-V2] 🔄 Recovery continuation mode - continuing from interrupted stream')
     }
 
     // Get AI model
