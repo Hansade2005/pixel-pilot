@@ -3214,6 +3214,24 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
             : partialResponse.reasoning)
         : ''
 
+      // Extract files that were modified in previous turn (for AI to re-read and understand state)
+      const modifiedFiles = new Set<string>()
+      for (const toolResult of previousToolResults) {
+        const toolName = toolResult.toolName || toolResult.name
+        const args = toolResult.args || toolResult.input || {}
+
+        // Track files that were written or edited
+        if (toolName === 'write_file' && args.path) {
+          modifiedFiles.add(args.path)
+        } else if (toolName === 'edit_file' && args.filePath) {
+          modifiedFiles.add(args.filePath)
+        } else if (toolName === 'client_replace_string_in_file' && args.filePath) {
+          modifiedFiles.add(args.filePath)
+        }
+      }
+      const modifiedFilesList = Array.from(modifiedFiles)
+      const hasModifiedFiles = modifiedFilesList.length > 0
+
       systemPrompt += `
 
 ## 🔄 STREAM CONTINUATION MODE
@@ -3225,6 +3243,12 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
 - Continue your response seamlessly as if the interruption never happened
 - Do not repeat any content you already provided
 - Pick up exactly where your previous response ended
+${hasModifiedFiles ? `
+**Files modified in previous turn (RE-READ these to understand current state):**
+${modifiedFilesList.map(f => `- ${f}`).join('\n')}
+
+⚠️ CRITICAL: Before continuing, use read_file to check the current state of these files. This ensures you understand what changes were already made and can continue appropriately without duplicating edits or making conflicting changes.
+` : ''}
 ${hasPartialReasoning ? `
 **Your previous reasoning (that was already shown to the user):**
 \`\`\`
@@ -3239,6 +3263,7 @@ ${truncatedContent}
 ` : ''}
 **Instructions:**
 ✅ Continue your response naturally FROM WHERE YOU LEFT OFF
+${hasModifiedFiles ? '✅ Re-read modified files first to understand current state' : ''}
 ✅ Reference any completed tool results
 ✅ Maintain the same tone and style
 ✅ Your next output will be APPENDED to the content above
