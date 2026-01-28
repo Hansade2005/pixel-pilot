@@ -4,10 +4,19 @@ import React, { useEffect, useState } from 'react'
 import { Task, TaskTrigger, TaskContent, TaskItem } from '@/components/ai-elements/task'
 import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent, ChainOfThoughtStep } from '@/components/ai-elements/chain-of-thought'
 import { Response } from '@/components/ai-elements/response'
-import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye } from 'lucide-react'
+import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye, Zap, Database, Table, Code, Key, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { ContinueBackendCard } from './continue-backend-card'
+
+// Inline tool call type for inline pill display
+interface InlineToolCall {
+  toolName: string
+  toolCallId: string
+  input?: any
+  status: 'executing' | 'completed' | 'failed'
+  textPosition?: number // Character position in text when tool was called
+}
 
 // Message type compatible with AI SDK v5
 interface MessageWithToolsProps {
@@ -15,6 +24,7 @@ interface MessageWithToolsProps {
   projectId?: string
   isStreaming?: boolean
   onContinueToBackend?: (prompt: string) => void
+  inlineToolCalls?: InlineToolCall[] // Optional inline tool calls with positions
 }
 
 // Component for Simple Icon with fallback
@@ -128,7 +138,187 @@ const getFileIcon = (fileName: string) => {
   }
 }
 
-export function MessageWithTools({ message, projectId, isStreaming = false, onContinueToBackend }: MessageWithToolsProps) {
+// Inline Tool Pill Component for inline display within message content
+const InlineToolPill = ({ toolName, input, status = 'executing' }: {
+  toolName: string,
+  input?: any,
+  status?: 'executing' | 'completed' | 'failed'
+}) => {
+  const getToolIcon = (tool: string) => {
+    switch (tool) {
+      case 'write_file': return <FileText className="w-3.5 h-3.5" />
+      case 'edit_file':
+      case 'client_replace_string_in_file': return <Edit3 className="w-3.5 h-3.5" />
+      case 'read_file': return <Eye className="w-3.5 h-3.5" />
+      case 'list_files': return <FolderOpen className="w-3.5 h-3.5" />
+      case 'delete_file':
+      case 'delete_folder': return <X className="w-3.5 h-3.5" />
+      case 'add_package': return <Package className="w-3.5 h-3.5" />
+      case 'remove_package': return <PackageMinus className="w-3.5 h-3.5" />
+      case 'create_database': return <Database className="w-3.5 h-3.5" />
+      case 'create_table':
+      case 'supabase_create_table':
+      case 'list_tables':
+      case 'supabase_list_tables_rls': return <Table className="w-3.5 h-3.5" />
+      case 'query_database':
+      case 'supabase_execute_sql': return <Code className="w-3.5 h-3.5" />
+      case 'manipulate_table_data':
+      case 'supabase_insert_data':
+      case 'supabase_delete_data':
+      case 'read_table':
+      case 'supabase_read_table':
+      case 'delete_table':
+      case 'supabase_drop_table': return <Database className="w-3.5 h-3.5" />
+      case 'manage_api_keys':
+      case 'supabase_fetch_api_keys': return <Key className="w-3.5 h-3.5" />
+      case 'grep_search':
+      case 'semantic_code_navigator': return <Search className="w-3.5 h-3.5" />
+      case 'web_search':
+      case 'web_extract': return <Globe className="w-3.5 h-3.5" />
+      case 'check_dev_errors': return <Settings className="w-3.5 h-3.5" />
+      case 'generate_report': return <BarChart3 className="w-3.5 h-3.5" />
+      default: return <Zap className="w-3.5 h-3.5" />
+    }
+  }
+
+  const getToolLabel = (tool: string, args?: any) => {
+    switch (tool) {
+      case 'write_file': return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'edit_file': return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'client_replace_string_in_file': return `Replacing in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'delete_file': return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'delete_folder': return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
+      case 'read_file': return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'list_files': return 'Listing files'
+      case 'add_package': return `Adding ${args?.packageName || 'package'}`
+      case 'remove_package': return `Removing ${args?.packageName || 'package'}`
+      case 'create_database': return `Creating database "${args?.name || 'main'}"`
+      case 'create_table': return `Creating table "${args?.tableName || 'table'}"`
+      case 'supabase_create_table': return `Creating Supabase table "${args?.tableName || 'table'}"`
+      case 'query_database': return `Querying database`
+      case 'supabase_execute_sql': return `Executing SQL on Supabase`
+      case 'grep_search': return `Grep for "${args?.query || 'pattern'}"`
+      case 'semantic_code_navigator': return `Search codebase for "${args?.query || 'query'}"`
+      case 'web_search': return `Searching: ${args?.query || 'query'}`
+      case 'web_extract': return 'Extracting web content'
+      case 'check_dev_errors': return 'Checking for errors'
+      case 'generate_report': return 'Generating report'
+      default: return tool
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'executing': return 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
+      case 'completed': return 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400'
+      case 'failed': return 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+      default: return 'bg-muted/10 border-border text-muted-foreground'
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'executing': return <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      case 'completed': return <CheckCircle2 className="w-3.5 h-3.5" />
+      case 'failed': return <XCircle className="w-3.5 h-3.5" />
+      default: return null
+    }
+  }
+
+  return (
+    <div className={cn(
+      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border",
+      getStatusColor(status)
+    )}>
+      {getToolIcon(toolName)}
+      <span className="max-w-[200px] truncate">{getToolLabel(toolName, input)}</span>
+      {getStatusIcon(status)}
+    </div>
+  )
+}
+
+// Interleaved Content Component - Renders text with inline tool pills at correct positions
+const InterleavedContent = ({
+  content,
+  toolCalls,
+  isStreaming = false,
+  children
+}: {
+  content: string
+  toolCalls: InlineToolCall[]
+  isStreaming?: boolean
+  children: (text: string) => React.ReactNode
+}) => {
+  // If no tool calls with positions, just render the content
+  const toolsWithPositions = toolCalls.filter(tc => typeof tc.textPosition === 'number')
+
+  if (toolsWithPositions.length === 0) {
+    return <>{children(content)}</>
+  }
+
+  // Sort tool calls by position
+  const sortedTools = [...toolsWithPositions].sort((a, b) => (a.textPosition || 0) - (b.textPosition || 0))
+
+  // Build segments: text chunks interleaved with tool pills
+  const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
+  let lastPosition = 0
+
+  for (const tool of sortedTools) {
+    const position = tool.textPosition || 0
+
+    // Add text segment before this tool (if any)
+    if (position > lastPosition) {
+      const textSegment = content.slice(lastPosition, position)
+      if (textSegment) {
+        segments.push({ type: 'text', content: textSegment })
+      }
+    }
+
+    // Add the tool pill
+    segments.push({ type: 'tool', tool })
+    lastPosition = position
+  }
+
+  // Add remaining text after the last tool
+  if (lastPosition < content.length) {
+    segments.push({ type: 'text', content: content.slice(lastPosition) })
+  }
+
+  return (
+    <div className="interleaved-content space-y-2">
+      {segments.map((segment, index) => {
+        if (segment.type === 'text' && segment.content) {
+          return (
+            <div key={`text-${index}`}>
+              {children(segment.content)}
+            </div>
+          )
+        }
+        if (segment.type === 'tool' && segment.tool) {
+          return (
+            <div key={`tool-${segment.tool.toolCallId}`} className="my-2">
+              <InlineToolPill
+                toolName={segment.tool.toolName}
+                input={segment.tool.input}
+                status={segment.tool.status}
+              />
+            </div>
+          )
+        }
+        return null
+      })}
+      {/* Show streaming indicator after last tool if streaming and last tool is executing */}
+      {isStreaming && sortedTools.length > 0 && sortedTools[sortedTools.length - 1].status === 'executing' && (
+        <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span>Executing...</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function MessageWithTools({ message, projectId, isStreaming = false, onContinueToBackend, inlineToolCalls }: MessageWithToolsProps) {
   // In AI SDK v5, messages have different structure
   // Check for both possible tool structures
   const toolInvocations = (message as any).toolInvocations || []
@@ -393,16 +583,26 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
         </ChainOfThought>
       )}
 
-      {/* Render text content if present */}
+      {/* Render text content if present - with inline tool pills if available */}
       {hasResponse && (
         <div className={cn(
           'prose prose-sm dark:prose-invert max-w-none',
           'prose-pre:bg-muted prose-pre:text-foreground',
           'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded'
         )}>
-          <Response>
-            {responseContent}
-          </Response>
+          {inlineToolCalls && inlineToolCalls.length > 0 ? (
+            <InterleavedContent
+              content={responseContent}
+              toolCalls={inlineToolCalls}
+              isStreaming={isStreaming}
+            >
+              {(text) => <Response>{text}</Response>}
+            </InterleavedContent>
+          ) : (
+            <Response>
+              {responseContent}
+            </Response>
+          )}
         </div>
       )}
 
