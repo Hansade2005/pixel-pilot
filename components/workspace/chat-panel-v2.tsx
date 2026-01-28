@@ -1105,12 +1105,14 @@ export function ChatPanelV2({
 
   // Tool invocations tracking for inline pills
   // textPosition tracks where in the text stream the tool was called (for inline rendering)
+  // reasoningPosition tracks where in the reasoning stream the tool was called
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
     toolName: string
     toolCallId: string
     input?: any
     status: 'executing' | 'completed' | 'failed'
     textPosition?: number // Character position in text when tool was called
+    reasoningPosition?: number // Character position in reasoning when tool was called
   }>>>(new Map())
 
   // ABE Credit balance state
@@ -3700,12 +3702,14 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
       // Track tool calls locally during this stream to avoid React state race conditions
       // textPosition tracks where in the text stream the tool was called (for inline rendering)
+      // reasoningPosition tracks where in the reasoning stream the tool was called
       const localToolCalls: Array<{
         toolName: string
         toolCallId: string
         input: any
         status: 'executing' | 'completed' | 'failed'
         textPosition: number // Character position in text when tool was called
+        reasoningPosition: number // Character position in reasoning when tool was called
       }> = []
 
       while (true) {
@@ -3839,7 +3843,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 toolCallId: toolCall.toolCallId,
                 input: toolCall.args,
                 status: 'executing' as 'executing' | 'completed' | 'failed',
-                textPosition: accumulatedContent.length // Track where in text this tool was called
+                textPosition: accumulatedContent.length, // Track where in text this tool was called
+                reasoningPosition: accumulatedReasoning.length // Track where in reasoning this tool was called
               }
 
               localToolCalls.push(toolCallEntry)
@@ -4569,18 +4574,17 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     )
                   })()}
 
-                  {/* Fallback Tool Activity Panel - Only show for tools without textPosition (backward compatibility) */}
+                  {/* Tool Activity Panel - Always show for summary/tracking purposes */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Only show tools that don't have textPosition (not shown inline)
-                    const fallbackToolCalls = toolCalls?.filter(tc =>
+                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
+                    const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
-                      tc.toolName !== 'continue_backend_implementation' &&
-                      typeof tc.textPosition !== 'number'
+                      tc.toolName !== 'continue_backend_implementation'
                     )
-                    return fallbackToolCalls && fallbackToolCalls.length > 0 ? (
+                    return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
-                        toolCalls={fallbackToolCalls}
+                        toolCalls={regularToolCalls}
                         isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
                       />
                     ) : null
