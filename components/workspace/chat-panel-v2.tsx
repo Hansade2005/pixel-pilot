@@ -2039,11 +2039,14 @@ export function ChatPanelV2({
       let lineBuffer = ''
 
       // Track tool calls locally during continuation to avoid React state race conditions
+      // Include position tracking for inline pill display
       const continuationLocalToolCalls: Array<{
         toolName: string
         toolCallId: string
         input: any
         status: 'executing' | 'completed' | 'failed'
+        textPosition: number
+        reasoningPosition: number
       }> = []
 
       console.log('[ChatPanelV2][Continuation] 📥 Processing continuation stream')
@@ -2131,11 +2134,14 @@ export function ChatPanelV2({
               }
 
               // Track tool call inline with executing status (both local and state)
+              // Calculate positions relative to FULL content (original + continuation)
               const toolCallEntry = {
                 toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
                 input: toolCall.args,
-                status: 'executing' as 'executing' | 'completed' | 'failed'
+                status: 'executing' as 'executing' | 'completed' | 'failed',
+                textPosition: accumulatedContent.length + continuationAccumulatedContent.length,
+                reasoningPosition: accumulatedReasoning.length + continuationAccumulatedReasoning.length
               }
 
               continuationLocalToolCalls.push(toolCallEntry)
