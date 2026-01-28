@@ -865,6 +865,94 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   )
 }
 
+// Interleaved Content Component - Renders text with inline tool pills at correct positions
+// This mimics the session page's inline tool display behavior
+const InterleavedContent = ({
+  content,
+  toolCalls,
+  isStreaming = false,
+  renderContent
+}: {
+  content: string
+  toolCalls: Array<{
+    toolName: string
+    toolCallId: string
+    input?: any
+    status: 'executing' | 'completed' | 'failed'
+    textPosition?: number
+  }>
+  isStreaming?: boolean
+  renderContent: (text: string) => React.ReactNode
+}) => {
+  // If no tool calls with positions, just render the content
+  const toolsWithPositions = toolCalls.filter(tc => typeof tc.textPosition === 'number')
+
+  if (toolsWithPositions.length === 0) {
+    return <>{renderContent(content)}</>
+  }
+
+  // Sort tool calls by position
+  const sortedTools = [...toolsWithPositions].sort((a, b) => (a.textPosition || 0) - (b.textPosition || 0))
+
+  // Build segments: text chunks interleaved with tool pills
+  const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: typeof sortedTools[0] }> = []
+  let lastPosition = 0
+
+  for (const tool of sortedTools) {
+    const position = tool.textPosition || 0
+
+    // Add text segment before this tool (if any)
+    if (position > lastPosition) {
+      const textSegment = content.slice(lastPosition, position)
+      if (textSegment) {
+        segments.push({ type: 'text', content: textSegment })
+      }
+    }
+
+    // Add the tool pill
+    segments.push({ type: 'tool', tool })
+    lastPosition = position
+  }
+
+  // Add remaining text after the last tool
+  if (lastPosition < content.length) {
+    segments.push({ type: 'text', content: content.slice(lastPosition) })
+  }
+
+  return (
+    <div className="interleaved-content">
+      {segments.map((segment, index) => {
+        if (segment.type === 'text' && segment.content) {
+          return (
+            <div key={`text-${index}`} className="mb-2">
+              {renderContent(segment.content)}
+            </div>
+          )
+        }
+        if (segment.type === 'tool' && segment.tool) {
+          return (
+            <div key={`tool-${segment.tool.toolCallId}`} className="my-2">
+              <InlineToolPill
+                toolName={segment.tool.toolName}
+                input={segment.tool.input}
+                status={segment.tool.status}
+              />
+            </div>
+          )
+        }
+        return null
+      })}
+      {/* Show streaming indicator after last tool if streaming */}
+      {isStreaming && sortedTools.length > 0 && sortedTools[sortedTools.length - 1].status === 'executing' && (
+        <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span>Executing...</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Types
 interface AttachedFile {
   id: string
@@ -1016,11 +1104,13 @@ export function ChatPanelV2({
   const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
 
   // Tool invocations tracking for inline pills
+  // textPosition tracks where in the text stream the tool was called (for inline rendering)
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
     toolName: string
     toolCallId: string
     input?: any
     status: 'executing' | 'completed' | 'failed'
+    textPosition?: number // Character position in text when tool was called
   }>>>(new Map())
 
   // ABE Credit balance state
@@ -3609,11 +3699,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       let lineBuffer = '' // Buffer for incomplete lines across chunks
 
       // Track tool calls locally during this stream to avoid React state race conditions
+      // textPosition tracks where in the text stream the tool was called (for inline rendering)
       const localToolCalls: Array<{
         toolName: string
         toolCallId: string
         input: any
         status: 'executing' | 'completed' | 'failed'
+        textPosition: number // Character position in text when tool was called
       }> = []
 
       while (true) {
@@ -3746,7 +3838,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
                 input: toolCall.args,
-                status: 'executing' as 'executing' | 'completed' | 'failed'
+                status: 'executing' as 'executing' | 'completed' | 'failed',
+                textPosition: accumulatedContent.length // Track where in text this tool was called
               }
 
               localToolCalls.push(toolCallEntry)
@@ -4457,24 +4550,37 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     return null
                   })()}
 
-                  <MessageWithTools
-                    message={message}
-                    projectId={project?.id}
-                    isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
-                    onContinueToBackend={onContinueToBackend}
-                  />
-
-                  {/* Enhanced Tool Activity Panel - Show below message content */}
+                  {/* Pass inline tool calls with positions to MessageWithTools for inline rendering */}
                   {(() => {
-                    const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
-                    const regularToolCalls = toolCalls?.filter(tc =>
+                    const toolCalls = activeToolCalls.get(message.id) || []
+                    // Filter out tools with special rendering
+                    const inlineToolCalls = toolCalls.filter(tc =>
                       tc.toolName !== 'request_supabase_connection' &&
                       tc.toolName !== 'continue_backend_implementation'
                     )
-                    return regularToolCalls && regularToolCalls.length > 0 ? (
+                    return (
+                      <MessageWithTools
+                        message={message}
+                        projectId={project?.id}
+                        isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
+                        onContinueToBackend={onContinueToBackend}
+                        inlineToolCalls={inlineToolCalls}
+                      />
+                    )
+                  })()}
+
+                  {/* Fallback Tool Activity Panel - Only show for tools without textPosition (backward compatibility) */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    // Only show tools that don't have textPosition (not shown inline)
+                    const fallbackToolCalls = toolCalls?.filter(tc =>
+                      tc.toolName !== 'request_supabase_connection' &&
+                      tc.toolName !== 'continue_backend_implementation' &&
+                      typeof tc.textPosition !== 'number'
+                    )
+                    return fallbackToolCalls && fallbackToolCalls.length > 0 ? (
                       <ToolActivityPanel
-                        toolCalls={regularToolCalls}
+                        toolCalls={fallbackToolCalls}
                         isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
                       />
                     ) : null
