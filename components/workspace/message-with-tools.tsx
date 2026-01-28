@@ -610,19 +610,33 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
           'prose-pre:bg-muted prose-pre:text-foreground',
           'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded'
         )}>
-          {inlineToolCalls && inlineToolCalls.length > 0 ? (
-            <InterleavedContent
-              content={responseContent}
-              toolCalls={inlineToolCalls}
-              isStreaming={isStreaming}
-            >
-              {(text) => <Response>{text}</Response>}
-            </InterleavedContent>
-          ) : (
-            <Response>
-              {responseContent}
-            </Response>
-          )}
+          {(() => {
+            // Filter out tools that were called during reasoning (not during text streaming)
+            // Tools called during reasoning have reasoningPosition > 0 and textPosition = 0
+            const textStreamToolCalls = inlineToolCalls?.filter(tc => {
+              const textPos = tc.textPosition ?? 0
+              const reasoningPos = tc.reasoningPosition ?? 0
+              // Show tool in text content only if:
+              // 1. It was called during text streaming (textPosition > 0), OR
+              // 2. It was called before any content (both positions are 0)
+              // Don't show if called during reasoning (textPosition = 0 but reasoningPosition > 0)
+              return textPos > 0 || (textPos === 0 && reasoningPos === 0)
+            })
+
+            return textStreamToolCalls && textStreamToolCalls.length > 0 ? (
+              <InterleavedContent
+                content={responseContent}
+                toolCalls={textStreamToolCalls}
+                isStreaming={isStreaming}
+              >
+                {(text) => <Response>{text}</Response>}
+              </InterleavedContent>
+            ) : (
+              <Response>
+                {responseContent}
+              </Response>
+            )
+          })()}
         </div>
       )}
 
