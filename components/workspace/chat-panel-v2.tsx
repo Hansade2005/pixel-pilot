@@ -2031,6 +2031,13 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
+              // DEDUPLICATION: Check if this toolCallId already exists to prevent duplicates
+              const existingToolCall = continuationLocalToolCalls.find(tc => tc.toolCallId === toolCall.toolCallId)
+              if (existingToolCall) {
+                console.log('[ChatPanelV2][Continuation][ClientTool] Skipping duplicate tool call:', toolCall.toolCallId)
+                continue // Skip duplicate tool calls
+              }
+
               // Track tool call inline with executing status (both local and state)
               const toolCallEntry = {
                 toolName: toolCall.toolName,
@@ -2044,8 +2051,11 @@ export function ChatPanelV2({
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
                 const messageCalls = newMap.get(originalAssistantMessageId) || []
-                messageCalls.push(toolCallEntry)
-                newMap.set(originalAssistantMessageId, messageCalls)
+                // DEDUPLICATION: Check before adding to prevent duplicates
+                if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
+                  messageCalls.push(toolCallEntry)
+                  newMap.set(originalAssistantMessageId, messageCalls)
+                }
                 return newMap
               })
 
@@ -3725,6 +3735,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               })
 
               // Track tool call inline with executing status (both local and state)
+              // DEDUPLICATION: Check if this toolCallId already exists to prevent duplicates
+              const existingToolCall = localToolCalls.find(tc => tc.toolCallId === toolCall.toolCallId)
+              if (existingToolCall) {
+                console.log('[ChatPanelV2][ClientTool] Skipping duplicate tool call:', toolCall.toolCallId)
+                continue // Skip duplicate tool calls
+              }
+
               const toolCallEntry = {
                 toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
@@ -3733,15 +3750,18 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               }
 
               localToolCalls.push(toolCallEntry)
-              
+
               // Store in component state for handleStop access
               setStreamingToolCalls([...localToolCalls])
 
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
                 const messageCalls = newMap.get(assistantMessageId) || []
-                messageCalls.push(toolCallEntry)
-                newMap.set(assistantMessageId, messageCalls)
+                // DEDUPLICATION: Check before adding to prevent duplicates
+                if (!messageCalls.some(tc => tc.toolCallId === toolCall.toolCallId)) {
+                  messageCalls.push(toolCallEntry)
+                  newMap.set(assistantMessageId, messageCalls)
+                }
                 return newMap
               })
 
