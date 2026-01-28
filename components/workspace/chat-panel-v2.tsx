@@ -2357,11 +2357,11 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
-  // Check for interrupted streams on mount and offer recovery
+  // Check for interrupted streams on mount and auto-recover
   useEffect(() => {
     if (!project?.id || !currentChatSessionId) return
 
-    const checkForInterruptedStreams = async () => {
+    const checkAndAutoRecoverStreams = async () => {
       try {
         await streamRecoveryManager.init()
         // Also clean up old streams while we're at it
@@ -2374,9 +2374,11 @@ export function ChatPanelV2({
           // Get the most recent one for this chat session
           const relevantStream = interruptedStreams.find(s => s.chatSessionId === currentChatSessionId)
           if (relevantStream) {
-            console.log('[StreamRecovery] Found recoverable stream:', relevantStream.id)
-            setInterruptedStream(relevantStream)
-            setShowRecoveryDialog(true)
+            console.log('[StreamRecovery] 🔄 Auto-recovering interrupted stream:', relevantStream.id)
+            // Small delay to let the UI settle before starting recovery
+            setTimeout(() => {
+              handleRecoverStream(relevantStream)
+            }, 500)
           }
         }
       } catch (error) {
@@ -2384,7 +2386,7 @@ export function ChatPanelV2({
       }
     }
 
-    checkForInterruptedStreams()
+    checkAndAutoRecoverStreams()
   }, [project?.id, currentChatSessionId])
 
   // Handle visibility change and beforeunload for stream interruption
@@ -3061,73 +3063,339 @@ export function ChatPanelV2({
     }
   }
 
-  // Handle recovering an interrupted stream
-  const handleRecoverStream = async () => {
-    if (!interruptedStream || !project) return
+  // Handle recovering an interrupted stream - automatically continues from where it stopped
+  const handleRecoverStream = async (streamToRecover?: InterruptedStream) => {
+    const stream = streamToRecover || interruptedStream
+    if (!stream || !project) return
 
-    console.log('[StreamRecovery] Recovering stream:', interruptedStream.id)
+    console.log('[StreamRecovery] 🔄 Auto-recovering and continuing stream:', stream.id)
 
     try {
-      // Restore the partial message to the chat
+      // 1. Restore the partial message to the chat with streaming state
       const recoveredMessage = {
-        id: interruptedStream.id,
+        id: stream.id,
         role: 'assistant',
-        content: interruptedStream.accumulatedContent || '',
-        reasoning: interruptedStream.accumulatedReasoning,
+        content: stream.accumulatedContent || '',
+        reasoning: stream.accumulatedReasoning,
         metadata: {
-          reasoning: interruptedStream.accumulatedReasoning,
-          toolInvocations: interruptedStream.toolCalls,
-          hasToolCalls: interruptedStream.toolCalls.length > 0,
+          reasoning: stream.accumulatedReasoning,
+          toolInvocations: stream.toolCalls,
+          hasToolCalls: stream.toolCalls.length > 0,
           isRecovered: true,
-          interruptReason: interruptedStream.interruptReason
+          interruptReason: stream.interruptReason,
+          startTime: Date.now() // Reset start time for continuation timing
         }
       }
 
-      // Add to messages state
+      // Add/update message in state
       setMessages(prev => {
-        // Check if the message already exists
         const exists = prev.some(m => m.id === recoveredMessage.id)
         if (exists) {
-          // Update the existing message with recovered content
           return prev.map(m => m.id === recoveredMessage.id ? recoveredMessage : m)
         } else {
           return [...prev, recoveredMessage]
         }
       })
 
-      // Save the recovered partial message to database
-      await saveMessageToIndexedDB(recoveredMessage)
-
       // Restore tool calls state if any
-      if (interruptedStream.inlineToolCalls.length > 0) {
+      if (stream.inlineToolCalls.length > 0) {
         setActiveToolCalls(prev => {
           const newMap = new Map(prev)
-          newMap.set(interruptedStream.id, interruptedStream.inlineToolCalls)
+          newMap.set(stream.id, stream.inlineToolCalls)
           return newMap
         })
       }
 
-      // Mark as recovered
-      await streamRecoveryManager.markRecovered(interruptedStream.id)
+      // 2. Set streaming state to show loading indicator
+      setIsLoading(true)
+      setIsContinuationInProgress(true)
+      setContinuingMessageId(stream.id)
+      setStreamingMessageId(stream.id)
+      setStreamingContent(stream.accumulatedContent)
+      setStreamingReasoning(stream.accumulatedReasoning)
+      setStreamingToolCalls(stream.toolCalls)
+
+      // Track this as the current stream for interruption detection
+      currentStreamIdRef.current = stream.id
 
       // Clear the recovery state
       setInterruptedStream(null)
       setShowRecoveryDialog(false)
 
+      // Show recovery toast
       toast({
-        title: "Stream Recovered",
-        description: "Your previous response has been restored. You can continue the conversation.",
+        title: "Resuming response...",
+        description: "Continuing from where the AI left off.",
+        duration: 3000
       })
 
-      // Optionally auto-continue the stream
-      // setInput('Please continue where you left off')
-    } catch (error) {
-      console.error('[StreamRecovery] Error recovering stream:', error)
-      toast({
-        title: "Recovery Failed",
-        description: "Failed to recover the interrupted stream.",
-        variant: "destructive"
+      // 3. Create abort controller for continuation
+      const continuationController = new AbortController()
+      setAbortController(continuationController)
+
+      // 4. Build the continuation payload with partial response context
+      // We need to load recent messages for context
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Load recent messages for context
+      let recentMessages: any[] = []
+      if (currentChatSessionId) {
+        const allMessages = await storageManager.getMessages(currentChatSessionId)
+        recentMessages = allMessages.slice(-10).map((m: any) => ({
+          role: m.role,
+          content: m.content
+        }))
+      }
+
+      // Build file tree for context
+      const fileTree = await buildProjectFileTree()
+
+      // Get files for context
+      const files = projectFiles.map(f => ({
+        path: f.path,
+        name: f.name,
+        content: f.content,
+        fileType: f.fileType || f.type
+      }))
+
+      // Create continuation request with recovery context
+      const recoveryPayload = {
+        messages: recentMessages,
+        projectId: project.id,
+        project,
+        databaseId,
+        files,
+        fileTree,
+        modelId: selectedModel,
+        aiMode,
+        chatMode: isAskMode ? 'ask' : 'agent',
+        // Mark this as a recovery continuation
+        isRecoveryContinuation: true,
+        // Include the partial response so AI knows where to continue from
+        partialResponse: {
+          content: stream.accumulatedContent,
+          reasoning: stream.accumulatedReasoning
+        },
+        // Include info about tools that were called
+        previousToolResults: stream.toolCalls.map((tc: any) => ({
+          toolName: tc.toolName,
+          toolCallId: tc.toolCallId,
+          args: tc.input,
+          result: tc.status === 'completed' ? { success: true } : undefined
+        }))
+      }
+
+      console.log('[StreamRecovery] 📤 Sending recovery continuation request')
+
+      const response = await fetch('/api/chat-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recoveryPayload),
+        signal: continuationController.signal
       })
+
+      if (!response.ok) {
+        throw new Error('Recovery continuation request failed')
+      }
+
+      // 5. Handle the continuation stream - append to existing content
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let continuationContent = ''
+      let continuationReasoning = ''
+      let lineBuffer = ''
+
+      // Start with existing accumulated content
+      let fullContent = stream.accumulatedContent
+      let fullReasoning = stream.accumulatedReasoning
+
+      // Track continuation tool calls
+      const continuationToolCalls: Array<{
+        toolName: string
+        toolCallId: string
+        input: any
+        status: 'executing' | 'completed' | 'failed'
+        textPosition: number
+        reasoningPosition: number
+      }> = [...stream.toolCalls] // Start with existing tool calls
+
+      console.log('[StreamRecovery] 📥 Processing recovery continuation stream')
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          console.log('[StreamRecovery] ✅ Recovery continuation complete')
+          break
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop() || ''
+
+        const completeLines = lines.filter(line => line.trim())
+
+        for (const line of completeLines) {
+          try {
+            const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+            if (!jsonString || jsonString.startsWith(':')) continue
+
+            const parsed = JSON.parse(jsonString)
+
+            // Skip server-internal chunks
+            if (parsed.type === 'start-step' || parsed.type === 'reasoning-start') continue
+
+            if (parsed.type === 'text-delta' && parsed.text) {
+              // Filter tool result JSON
+              const trimmedText = parsed.text.trim()
+              const looksLikeToolResult = (
+                (trimmedText.startsWith('{') || trimmedText.startsWith('Assistant:')) &&
+                (trimmedText.includes('"success"') || trimmedText.includes('"toolCallId"') ||
+                  trimmedText.includes('"executionTimeMs"') || trimmedText.includes('"databaseId"'))
+              )
+
+              if (!looksLikeToolResult) {
+                continuationContent += parsed.text
+                fullContent = stream.accumulatedContent + continuationContent
+                setStreamingContent(fullContent)
+                setMessages(prev => prev.map(msg =>
+                  msg.id === stream.id
+                    ? { ...msg, content: fullContent, reasoning: fullReasoning }
+                    : msg
+                ))
+                // Update recovery progress
+                streamRecoveryManager.updateStreamProgress(stream.id, {
+                  accumulatedContent: fullContent,
+                  accumulatedReasoning: fullReasoning,
+                  toolCalls: continuationToolCalls,
+                  inlineToolCalls: continuationToolCalls
+                })
+              }
+            } else if (parsed.type === 'reasoning-delta' && parsed.text) {
+              continuationReasoning += parsed.text
+              fullReasoning = stream.accumulatedReasoning + continuationReasoning
+              setStreamingReasoning(fullReasoning)
+              setMessages(prev => prev.map(msg =>
+                msg.id === stream.id
+                  ? { ...msg, content: fullContent, reasoning: fullReasoning }
+                  : msg
+              ))
+              // Update recovery progress
+              streamRecoveryManager.updateStreamProgress(stream.id, {
+                accumulatedContent: fullContent,
+                accumulatedReasoning: fullReasoning,
+                toolCalls: continuationToolCalls,
+                inlineToolCalls: continuationToolCalls
+              })
+            } else if (parsed.type === 'tool-call') {
+              // Handle tool calls during continuation
+              const existingTool = continuationToolCalls.find(tc => tc.toolCallId === parsed.toolCallId)
+              if (!existingTool) {
+                const toolEntry = {
+                  toolName: parsed.toolName,
+                  toolCallId: parsed.toolCallId,
+                  input: parsed.input,
+                  status: 'executing' as const,
+                  textPosition: fullContent.length,
+                  reasoningPosition: fullReasoning.length
+                }
+                continuationToolCalls.push(toolEntry)
+                setStreamingToolCalls([...continuationToolCalls])
+                setActiveToolCalls(prev => {
+                  const newMap = new Map(prev)
+                  newMap.set(stream.id, [...continuationToolCalls])
+                  return newMap
+                })
+
+                // Execute client-side tools
+                const clientSideTools = [
+                  'write_file', 'edit_file', 'client_replace_string_in_file',
+                  'delete_file', 'delete_folder', 'add_package', 'remove_package',
+                  'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
+                  'create_database', 'request_supabase_connection'
+                ]
+
+                if (clientSideTools.includes(parsed.toolName)) {
+                  const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+                  try {
+                    await handleClientFileOperation(
+                      { toolName: parsed.toolName, toolCallId: parsed.toolCallId, args: parsed.input },
+                      project.id,
+                      databaseId || undefined
+                    )
+                    // Mark as completed
+                    const idx = continuationToolCalls.findIndex(tc => tc.toolCallId === parsed.toolCallId)
+                    if (idx !== -1) continuationToolCalls[idx].status = 'completed'
+                  } catch (error) {
+                    const idx = continuationToolCalls.findIndex(tc => tc.toolCallId === parsed.toolCallId)
+                    if (idx !== -1) continuationToolCalls[idx].status = 'failed'
+                  }
+                  setStreamingToolCalls([...continuationToolCalls])
+                }
+              }
+            } else if (parsed.type === 'tool-result') {
+              // Mark tool as completed
+              const idx = continuationToolCalls.findIndex(tc => tc.toolCallId === parsed.toolCallId)
+              if (idx !== -1) {
+                continuationToolCalls[idx].status = parsed.result?.error ? 'failed' : 'completed'
+                setStreamingToolCalls([...continuationToolCalls])
+              }
+            }
+          } catch (e) {
+            // Skip malformed JSON
+          }
+        }
+      }
+
+      // 6. Save the completed message
+      const finalMessage = {
+        id: stream.id,
+        role: 'assistant',
+        content: fullContent,
+        createdAt: new Date().toISOString(),
+        metadata: {
+          reasoning: fullReasoning,
+          toolInvocations: continuationToolCalls,
+          hasToolCalls: continuationToolCalls.length > 0,
+          wasRecovered: true
+        }
+      }
+      await saveMessageToIndexedDB(finalMessage)
+
+      // Mark stream as completed (removes from recovery)
+      await streamRecoveryManager.completeStream(stream.id)
+
+      console.log('[StreamRecovery] ✅ Recovery and continuation completed successfully')
+
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('[StreamRecovery] Recovery continuation aborted by user')
+      } else {
+        console.error('[StreamRecovery] Error during recovery continuation:', error)
+        toast({
+          title: "Recovery Failed",
+          description: "Could not continue the interrupted response. You can try sending a new message.",
+          variant: "destructive"
+        })
+        // Mark as recovered so we don't keep trying
+        if (stream) {
+          await streamRecoveryManager.markRecovered(stream.id)
+        }
+      }
+    } finally {
+      // Clear streaming state
+      currentStreamIdRef.current = null
+      setIsLoading(false)
+      setIsContinuationInProgress(false)
+      setContinuingMessageId(null)
+      setStreamingMessageId(null)
+      setStreamingContent('')
+      setStreamingReasoning('')
+      setStreamingToolCalls([])
+      setAbortController(null)
     }
   }
 
@@ -5627,65 +5895,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           onRemoveContext={handleRemoveSearchContext}
         />
 
-        {/* Stream Recovery Dialog */}
-        <AlertDialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
-          <AlertDialogContent className="bg-gray-900 border-yellow-500/30 z-[80]">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-yellow-400 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
-                Interrupted Response Found
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300">
-                {interruptedStream && (
-                  <>
-                    A previous AI response was interrupted
-                    {interruptedStream.interruptReason === 'tab_hidden' && ' when you switched tabs'}
-                    {interruptedStream.interruptReason === 'page_unload' && ' when you left the page'}
-                    {interruptedStream.interruptReason === 'network_error' && ' due to a network error'}
-                    . Would you like to recover the partial response?
-                  </>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            {interruptedStream && (
-              <div className="py-4 space-y-3">
-                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">Your message:</p>
-                  <p className="text-sm text-gray-200 line-clamp-2">
-                    {interruptedStream.userMessageContent.slice(0, 150)}
-                    {interruptedStream.userMessageContent.length > 150 && '...'}
-                  </p>
-                </div>
-                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">Partial response ({interruptedStream.accumulatedContent.length} chars):</p>
-                  <p className="text-sm text-gray-200 line-clamp-3">
-                    {interruptedStream.accumulatedContent.slice(0, 200) || '(reasoning in progress)'}
-                    {interruptedStream.accumulatedContent.length > 200 && '...'}
-                  </p>
-                  {interruptedStream.toolCalls.length > 0 && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      {interruptedStream.toolCalls.length} tool(s) were called
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-            <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel
-                onClick={handleDismissRecovery}
-                className="bg-gray-700 text-gray-300 hover:bg-gray-600 border-gray-600"
-              >
-                Dismiss
-              </AlertDialogCancel>
-              <Button
-                onClick={handleRecoverStream}
-                className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500"
-              >
-                Recover Response
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Stream Recovery - Auto-recovers on mount, no dialog needed */}
       </div>
     </div>
   )
