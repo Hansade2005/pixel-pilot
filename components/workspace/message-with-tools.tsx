@@ -16,6 +16,7 @@ interface InlineToolCall {
   input?: any
   status: 'executing' | 'completed' | 'failed'
   textPosition?: number // Character position in text when tool was called
+  reasoningPosition?: number // Character position in reasoning when tool was called
 }
 
 // Message type compatible with AI SDK v5
@@ -238,33 +239,41 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
 }
 
 // Interleaved Content Component - Renders text with inline tool pills at correct positions
+// positionKey specifies which position field to use: 'textPosition' or 'reasoningPosition'
 const InterleavedContent = ({
   content,
   toolCalls,
   isStreaming = false,
+  positionKey = 'textPosition',
   children
 }: {
   content: string
   toolCalls: InlineToolCall[]
   isStreaming?: boolean
+  positionKey?: 'textPosition' | 'reasoningPosition'
   children: (text: string) => React.ReactNode
 }) => {
+  // Get the position value based on the key
+  const getPosition = (tc: InlineToolCall): number | undefined => {
+    return positionKey === 'reasoningPosition' ? tc.reasoningPosition : tc.textPosition
+  }
+
   // If no tool calls with positions, just render the content
-  const toolsWithPositions = toolCalls.filter(tc => typeof tc.textPosition === 'number')
+  const toolsWithPositions = toolCalls.filter(tc => typeof getPosition(tc) === 'number')
 
   if (toolsWithPositions.length === 0) {
     return <>{children(content)}</>
   }
 
   // Sort tool calls by position
-  const sortedTools = [...toolsWithPositions].sort((a, b) => (a.textPosition || 0) - (b.textPosition || 0))
+  const sortedTools = [...toolsWithPositions].sort((a, b) => (getPosition(a) || 0) - (getPosition(b) || 0))
 
   // Build segments: text chunks interleaved with tool pills
   const segments: Array<{ type: 'text' | 'tool', content?: string, tool?: InlineToolCall }> = []
   let lastPosition = 0
 
   for (const tool of sortedTools) {
-    const position = tool.textPosition || 0
+    const position = getPosition(tool) || 0
 
     // Add text segment before this tool (if any)
     if (position > lastPosition) {
@@ -529,7 +538,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
             }
           </ChainOfThoughtHeader>
           <ChainOfThoughtContent>
-            {/* Reasoning step */}
+            {/* Reasoning step - with inline tool pills if available */}
             {hasReasoning && (
               <ChainOfThoughtStep
                 icon={BrainIcon}
@@ -546,13 +555,24 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
                   'prose-ul:text-muted-foreground',
                   'prose-ol:text-muted-foreground'
                 )}>
-                  <Response>
-                    {reasoningContent}
-                  </Response>
+                  {inlineToolCalls && inlineToolCalls.length > 0 ? (
+                    <InterleavedContent
+                      content={reasoningContent}
+                      toolCalls={inlineToolCalls}
+                      isStreaming={isStreaming}
+                      positionKey="reasoningPosition"
+                    >
+                      {(text) => <Response>{text}</Response>}
+                    </InterleavedContent>
+                  ) : (
+                    <Response>
+                      {reasoningContent}
+                    </Response>
+                  )}
                 </div>
               </ChainOfThoughtStep>
             )}
-            
+
             {/* Tool execution steps */}
            {/* {hasTools && toolInvocations?.map((tool: any) => {
               const ToolIcon = getToolIcon(tool.toolName)
