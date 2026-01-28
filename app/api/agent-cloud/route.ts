@@ -495,19 +495,16 @@ try {
         console.log(JSON.stringify({ type: 'tool_use', name: event.content_block.name, input: {}, timestamp: Date.now() }));
       }
     } else if (message.type === 'assistant') {
+      // IMPORTANT: Only process tool_use blocks here - text is already streamed via stream_event
+      // Do NOT emit text from assistant messages to avoid duplication in multi-turn conversations
       const content = message.message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'text' && block.text && !hasStreamedText) {
-            // Only emit text from assistant if we haven't already streamed it
-            console.log(JSON.stringify({ type: 'text', data: block.text, timestamp: Date.now() }));
-          } else if (block.type === 'tool_use') {
+          if (block.type === 'tool_use') {
             console.log(JSON.stringify({ type: 'tool_use', name: block.name, input: block.input, timestamp: Date.now() }));
           }
         }
       }
-      // Reset for next turn (multi-turn conversations)
-      hasStreamedText = false;
     } else if (message.type === 'user') {
       // User messages contain tool_result blocks
       const content = message.message?.content;
