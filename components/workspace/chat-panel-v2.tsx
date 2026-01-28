@@ -32,6 +32,7 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
+import { streamRecoveryManager, type InterruptedStream } from '@/lib/stream-recovery-manager'
 import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
@@ -1156,6 +1157,11 @@ export function ChatPanelV2({
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([])
   const [elapsedTime, setElapsedTime] = useState(0)
   const [currentChatSessionId, setCurrentChatSessionId] = useState<string | null>(null)
+
+  // Stream recovery state - for recovering interrupted streams
+  const [interruptedStream, setInterruptedStream] = useState<InterruptedStream | null>(null)
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false)
+  const currentStreamIdRef = useRef<string | null>(null) // Track current stream for visibility change handler
 
   // Branch dialog state
   const [showBranchDialog, setShowBranchDialog] = useState(false)
@@ -2351,6 +2357,81 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
+  // Check for interrupted streams on mount and offer recovery
+  useEffect(() => {
+    if (!project?.id || !currentChatSessionId) return
+
+    const checkForInterruptedStreams = async () => {
+      try {
+        await streamRecoveryManager.init()
+        // Also clean up old streams while we're at it
+        await streamRecoveryManager.cleanupOldStreams()
+
+        const interruptedStreams = await streamRecoveryManager.getInterruptedStreams(project.id)
+        console.log('[StreamRecovery] Found interrupted streams:', interruptedStreams.length)
+
+        if (interruptedStreams.length > 0) {
+          // Get the most recent one for this chat session
+          const relevantStream = interruptedStreams.find(s => s.chatSessionId === currentChatSessionId)
+          if (relevantStream) {
+            console.log('[StreamRecovery] Found recoverable stream:', relevantStream.id)
+            setInterruptedStream(relevantStream)
+            setShowRecoveryDialog(true)
+          }
+        }
+      } catch (error) {
+        console.error('[StreamRecovery] Error checking for interrupted streams:', error)
+      }
+    }
+
+    checkForInterruptedStreams()
+  }, [project?.id, currentChatSessionId])
+
+  // Handle visibility change and beforeunload for stream interruption
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityChange = async () => {
+      if (document.hidden && currentStreamIdRef.current && isLoading) {
+        console.log('[StreamRecovery] Tab hidden during streaming, marking as interrupted')
+        // Flush any pending updates immediately
+        await streamRecoveryManager.flushPendingUpdate()
+        await streamRecoveryManager.markInterrupted(currentStreamIdRef.current, 'tab_hidden')
+      }
+    }
+
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      if (currentStreamIdRef.current && isLoading) {
+        console.log('[StreamRecovery] Page unloading during streaming, marking as interrupted')
+        // Use sendBeacon pattern for reliable save before unload
+        await streamRecoveryManager.flushPendingUpdate()
+        await streamRecoveryManager.markInterrupted(currentStreamIdRef.current, 'page_unload')
+        // Show browser confirmation dialog
+        e.preventDefault()
+        e.returnValue = 'AI is still generating a response. Are you sure you want to leave?'
+        return e.returnValue
+      }
+    }
+
+    const handlePageHide = async () => {
+      if (currentStreamIdRef.current && isLoading) {
+        console.log('[StreamRecovery] Page hiding during streaming, marking as interrupted')
+        await streamRecoveryManager.flushPendingUpdate()
+        await streamRecoveryManager.markInterrupted(currentStreamIdRef.current, 'page_unload')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [isLoading])
+
   // Real-time file change listener for @ command and chat sync
   useEffect(() => {
     if (!project?.id || typeof window === 'undefined') return
@@ -2905,6 +2986,17 @@ export function ChatPanelV2({
       setIsLoading(false)
       setIsContinuationInProgress(false)
 
+      // Mark stream as user-aborted in recovery manager (won't show recovery prompt)
+      if (currentStreamIdRef.current) {
+        try {
+          await streamRecoveryManager.markUserAborted(currentStreamIdRef.current)
+          console.log('[StreamRecovery] Stream marked as user-aborted:', currentStreamIdRef.current)
+        } catch (error) {
+          console.error('[StreamRecovery] Error marking stream as user-aborted:', error)
+        }
+        currentStreamIdRef.current = null
+      }
+
       // Use accumulated streaming progress from component state
       const hasPartialContent = streamingContent.trim() || streamingReasoning.trim() || streamingToolCalls.length > 0
 
@@ -2967,6 +3059,92 @@ export function ChatPanelV2({
         })
       }
     }
+  }
+
+  // Handle recovering an interrupted stream
+  const handleRecoverStream = async () => {
+    if (!interruptedStream || !project) return
+
+    console.log('[StreamRecovery] Recovering stream:', interruptedStream.id)
+
+    try {
+      // Restore the partial message to the chat
+      const recoveredMessage = {
+        id: interruptedStream.id,
+        role: 'assistant',
+        content: interruptedStream.accumulatedContent || '',
+        reasoning: interruptedStream.accumulatedReasoning,
+        metadata: {
+          reasoning: interruptedStream.accumulatedReasoning,
+          toolInvocations: interruptedStream.toolCalls,
+          hasToolCalls: interruptedStream.toolCalls.length > 0,
+          isRecovered: true,
+          interruptReason: interruptedStream.interruptReason
+        }
+      }
+
+      // Add to messages state
+      setMessages(prev => {
+        // Check if the message already exists
+        const exists = prev.some(m => m.id === recoveredMessage.id)
+        if (exists) {
+          // Update the existing message with recovered content
+          return prev.map(m => m.id === recoveredMessage.id ? recoveredMessage : m)
+        } else {
+          return [...prev, recoveredMessage]
+        }
+      })
+
+      // Save the recovered partial message to database
+      await saveMessageToIndexedDB(recoveredMessage)
+
+      // Restore tool calls state if any
+      if (interruptedStream.inlineToolCalls.length > 0) {
+        setActiveToolCalls(prev => {
+          const newMap = new Map(prev)
+          newMap.set(interruptedStream.id, interruptedStream.inlineToolCalls)
+          return newMap
+        })
+      }
+
+      // Mark as recovered
+      await streamRecoveryManager.markRecovered(interruptedStream.id)
+
+      // Clear the recovery state
+      setInterruptedStream(null)
+      setShowRecoveryDialog(false)
+
+      toast({
+        title: "Stream Recovered",
+        description: "Your previous response has been restored. You can continue the conversation.",
+      })
+
+      // Optionally auto-continue the stream
+      // setInput('Please continue where you left off')
+    } catch (error) {
+      console.error('[StreamRecovery] Error recovering stream:', error)
+      toast({
+        title: "Recovery Failed",
+        description: "Failed to recover the interrupted stream.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Handle dismissing stream recovery (user doesn't want to recover)
+  const handleDismissRecovery = async () => {
+    if (!interruptedStream) return
+
+    console.log('[StreamRecovery] User dismissed recovery for stream:', interruptedStream.id)
+
+    try {
+      await streamRecoveryManager.dismissStream(interruptedStream.id)
+    } catch (error) {
+      console.error('[StreamRecovery] Error dismissing stream:', error)
+    }
+
+    setInterruptedStream(null)
+    setShowRecoveryDialog(false)
   }
 
   // Helper function to send a command as a chat message
@@ -3537,6 +3715,22 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
     setStreamingReasoning('')
     setStreamingToolCalls([])
 
+    // Start tracking this stream for recovery
+    currentStreamIdRef.current = assistantMessageId
+    try {
+      await streamRecoveryManager.init()
+      await streamRecoveryManager.startStream({
+        streamId: assistantMessageId,
+        projectId: project.id,
+        chatSessionId: currentChatSessionId || 'default',
+        userMessageId: userMessageId,
+        userMessageContent: displayContent
+      })
+      console.log('[StreamRecovery] Started tracking stream:', assistantMessageId)
+    } catch (error) {
+      console.error('[StreamRecovery] Error starting stream tracking:', error)
+    }
+
     console.log(`[ChatPanelV2] 🕐 Created assistant message with start time:`, {
       id: assistantMessageId,
       startTime: messageStartTime
@@ -3791,6 +3985,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
                       : msg
                   ))
+                  // Update stream recovery progress (debounced)
+                  streamRecoveryManager.updateStreamProgress(assistantMessageId, {
+                    accumulatedContent,
+                    accumulatedReasoning,
+                    toolCalls: localToolCalls,
+                    inlineToolCalls: localToolCalls
+                  })
                 } else {
                   console.log('[ChatPanelV2][Filter] Filtered out tool result JSON from text content:', trimmedText.substring(0, 100))
                 }
@@ -3805,6 +4006,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
                     : msg
                 ))
+                // Update stream recovery progress (debounced)
+                streamRecoveryManager.updateStreamProgress(assistantMessageId, {
+                  accumulatedContent,
+                  accumulatedReasoning,
+                  toolCalls: localToolCalls,
+                  inlineToolCalls: localToolCalls
+                })
               }
             } else if (parsed.type === 'continuation_signal') {
               // STREAM CONTINUATION: Handle automatic continuation request
@@ -4047,10 +4255,19 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           toolInvocationsData
         )
       }
+
+      // Mark stream as completed in recovery manager (removes from recovery)
+      try {
+        await streamRecoveryManager.completeStream(assistantMessageId)
+        console.log('[StreamRecovery] Stream completed successfully:', assistantMessageId)
+      } catch (error) {
+        console.error('[StreamRecovery] Error completing stream:', error)
+      }
     } catch (error: any) {
       if (error.name === 'AbortError') {
         // Request was aborted - don't remove message, handleStop already saved it
         console.log('[ChatPanelV2] Request aborted by user, partial message saved by handleStop')
+        // Note: handleStop already marks the stream as user_aborted
       } else {
         setError(error)
         // Remove the placeholder assistant message on error
@@ -4066,8 +4283,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         setStreamingContent('')
         setStreamingReasoning('')
         setStreamingToolCalls([])
+        // Mark stream as interrupted due to error
+        try {
+          await streamRecoveryManager.markInterrupted(assistantMessageId, 'network_error')
+        } catch (e) {
+          console.error('[StreamRecovery] Error marking stream as interrupted:', e)
+        }
       }
     } finally {
+      // Clear the current stream ref
+      currentStreamIdRef.current = null
       // Only turn off loading if continuation is not in progress
       if (!isContinuationInProgress) {
         setIsLoading(false)
@@ -5401,6 +5626,66 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           attachedContexts={attachedSearchContexts}
           onRemoveContext={handleRemoveSearchContext}
         />
+
+        {/* Stream Recovery Dialog */}
+        <AlertDialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+          <AlertDialogContent className="bg-gray-900 border-yellow-500/30 z-[80]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-yellow-400 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Interrupted Response Found
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                {interruptedStream && (
+                  <>
+                    A previous AI response was interrupted
+                    {interruptedStream.interruptReason === 'tab_hidden' && ' when you switched tabs'}
+                    {interruptedStream.interruptReason === 'page_unload' && ' when you left the page'}
+                    {interruptedStream.interruptReason === 'network_error' && ' due to a network error'}
+                    . Would you like to recover the partial response?
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {interruptedStream && (
+              <div className="py-4 space-y-3">
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+                  <p className="text-xs text-gray-400 mb-1">Your message:</p>
+                  <p className="text-sm text-gray-200 line-clamp-2">
+                    {interruptedStream.userMessageContent.slice(0, 150)}
+                    {interruptedStream.userMessageContent.length > 150 && '...'}
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+                  <p className="text-xs text-gray-400 mb-1">Partial response ({interruptedStream.accumulatedContent.length} chars):</p>
+                  <p className="text-sm text-gray-200 line-clamp-3">
+                    {interruptedStream.accumulatedContent.slice(0, 200) || '(reasoning in progress)'}
+                    {interruptedStream.accumulatedContent.length > 200 && '...'}
+                  </p>
+                  {interruptedStream.toolCalls.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      {interruptedStream.toolCalls.length} tool(s) were called
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel
+                onClick={handleDismissRecovery}
+                className="bg-gray-700 text-gray-300 hover:bg-gray-600 border-gray-600"
+              >
+                Dismiss
+              </AlertDialogCancel>
+              <Button
+                onClick={handleRecoverStream}
+                className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500"
+              >
+                Recover Response
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
