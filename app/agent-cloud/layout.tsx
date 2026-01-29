@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, createContext, useContext, useCallback, Suspense } from "react"
+import { useState, useEffect, createContext, useContext, useCallback, Suspense, useRef } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,8 +28,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { agentCloudStorage } from "@/lib/agent-cloud-storage"
 
-// Storage key for session persistence
+// Storage key for localStorage (used for migration only)
 const STORAGE_KEY = 'pipilot_agent_cloud_v3'
 
 export interface TerminalLine {
@@ -243,7 +244,7 @@ interface AgentCloudContextType {
   setConnectors: React.Dispatch<React.SetStateAction<ConnectorConfig[]>>
   createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
-  deleteSession: (sessionId: string) => void
+  deleteSession: (sessionId: string) => Promise<void>
   isCreating: boolean
 }
 
@@ -311,45 +312,71 @@ function AgentCloudLayoutInner({
     setMobileMenuOpen(false)
   }, [router])
 
-  // Load sessions from localStorage
+  // Track if initial load is complete
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false)
+  const [lastSavedLinesCount, setLastSavedLinesCount] = useState<Map<string, number>>(new Map())
+
+  // Load sessions from Supabase (with localStorage migration)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed.sessions) {
-          const loadedSessions = parsed.sessions.map((s: Session) => ({
-            ...s,
-            createdAt: new Date(s.createdAt),
-            lines: s.lines.map((line: TerminalLine) => ({
-              ...line,
-              timestamp: new Date(line.timestamp)
-            }))
-          }))
+    const loadData = async () => {
+      try {
+        // First, try to migrate any existing localStorage data
+        const hasLocalStorageData = localStorage.getItem(STORAGE_KEY)
+        if (hasLocalStorageData) {
+          console.log('[AgentCloud] Found localStorage data, migrating to Supabase...')
+          await agentCloudStorage.migrateFromLocalStorage(STORAGE_KEY)
+        }
+
+        // Load sessions from Supabase
+        const loadedSessions = await agentCloudStorage.loadSessions()
+        if (loadedSessions.length > 0) {
           setSessions(loadedSessions)
+          // Initialize lines count tracking
+          const countsMap = new Map<string, number>()
+          loadedSessions.forEach(s => countsMap.set(s.id, s.lines.length))
+          setLastSavedLinesCount(countsMap)
         }
-        if (parsed.settings) {
-          setSelectedModel(parsed.settings.selectedModel || 'sonnet')
-        }
-        if (parsed.connectors && Array.isArray(parsed.connectors)) {
-          // Merge saved connectors with defaults (in case new connectors were added)
-          const savedMap = new Map(parsed.connectors.map((c: ConnectorConfig) => [c.id, c]))
+
+        // Load connectors from Supabase
+        const savedConnectors = await agentCloudStorage.loadConnectors()
+        if (savedConnectors.size > 0) {
           const merged = DEFAULT_CONNECTORS.map(dc => {
-            const saved = savedMap.get(dc.id)
+            const saved = savedConnectors.get(dc.id)
             if (saved) {
-              return { ...dc, enabled: saved.enabled, fields: dc.fields.map(f => {
-                const savedField = saved.fields?.find((sf: any) => sf.key === f.key)
-                return savedField ? { ...f, value: savedField.value } : f
-              })}
+              return {
+                ...dc,
+                enabled: saved.enabled,
+                fields: dc.fields.map(f => ({
+                  ...f,
+                  value: saved.fields[f.key] || f.value
+                }))
+              }
             }
             return dc
           })
           setConnectors(merged)
         }
+
+        // Load model preference from localStorage (small, keep local)
+        try {
+          const storedSettings = localStorage.getItem('pipilot_agent_cloud_settings')
+          if (storedSettings) {
+            const settings = JSON.parse(storedSettings)
+            if (settings.selectedModel) {
+              setSelectedModel(settings.selectedModel)
+            }
+          }
+        } catch (e) {
+          // Ignore settings load error
+        }
+      } catch (error) {
+        console.error('[AgentCloud] Failed to load data:', error)
+      } finally {
+        setIsInitialLoadComplete(true)
       }
-    } catch (error) {
-      console.error('Failed to load sessions:', error)
     }
+
+    loadData()
   }, [])
 
   // Sync activeSessionId with URL on mount
@@ -362,22 +389,91 @@ function AgentCloudLayoutInner({
     }
   }, [pathname, searchParams])
 
-  // Save sessions and connectors to localStorage
+  // Save model preference to localStorage (small data, keep local for quick access)
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        sessions,
-        settings: { selectedModel },
-        connectors: connectors.map(c => ({
-          id: c.id,
-          enabled: c.enabled,
-          fields: c.fields.map(f => ({ key: f.key, value: f.value }))
-        }))
+      localStorage.setItem('pipilot_agent_cloud_settings', JSON.stringify({
+        selectedModel
       }))
     } catch (error) {
-      console.error('Failed to save sessions:', error)
+      // Ignore settings save error
     }
-  }, [sessions, selectedModel, connectors])
+  }, [selectedModel])
+
+  // Debounced save to Supabase for session updates
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingSessionUpdates = useRef<Set<string>>(new Set())
+
+  // Save sessions to Supabase (debounced, only saves changed sessions)
+  useEffect(() => {
+    if (!isInitialLoadComplete) return
+
+    // Mark sessions that need updating
+    sessions.forEach(session => {
+      const lastCount = lastSavedLinesCount.get(session.id) || 0
+      if (session.lines.length > lastCount) {
+        pendingSessionUpdates.current.add(session.id)
+      }
+    })
+
+    // Debounce saves to avoid too many DB calls
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      const sessionsToUpdate = Array.from(pendingSessionUpdates.current)
+      pendingSessionUpdates.current.clear()
+
+      for (const sessionId of sessionsToUpdate) {
+        const session = sessions.find(s => s.id === sessionId)
+        if (!session) continue
+
+        const lastCount = lastSavedLinesCount.get(sessionId) || 0
+        const newLines = session.lines.slice(lastCount)
+
+        if (newLines.length > 0) {
+          // Save new messages
+          const success = await agentCloudStorage.saveMessages(sessionId, session.lines, lastCount)
+          if (success) {
+            setLastSavedLinesCount(prev => {
+              const updated = new Map(prev)
+              updated.set(sessionId, session.lines.length)
+              return updated
+            })
+          }
+        }
+
+        // Also update session metadata
+        await agentCloudStorage.updateSession(session)
+      }
+    }, 1000) // 1 second debounce
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [sessions, isInitialLoadComplete])
+
+  // Save connectors to Supabase when they change
+  const connectorsInitialized = useRef(false)
+  useEffect(() => {
+    if (!isInitialLoadComplete) return
+
+    // Skip the first run (initial load)
+    if (!connectorsInitialized.current) {
+      connectorsInitialized.current = true
+      return
+    }
+
+    // Debounce connector saves
+    const timeoutId = setTimeout(async () => {
+      await agentCloudStorage.saveAllConnectors(connectors)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [connectors, isInitialLoadComplete])
 
   // Load stored deployment tokens
   const loadStoredTokens = async () => {
@@ -593,6 +689,17 @@ function AgentCloudLayoutInner({
         ]
       }
 
+      // Save to Supabase
+      const saved = await agentCloudStorage.createSession(newSession)
+      if (saved) {
+        // Track lines count for this session
+        setLastSavedLinesCount(prev => {
+          const updated = new Map(prev)
+          updated.set(newSession.id, newSession.lines.length)
+          return updated
+        })
+      }
+
       setSessions(prev => [newSession, ...prev])
       toast.success(newProject ? 'New project session created' : reconnected ? `Reconnected` : repoCloned ? `Session created` : 'Session created')
 
@@ -621,9 +728,15 @@ function AgentCloudLayoutInner({
         })
       })
 
+      // Update local state
       setSessions(prev => prev.map(s =>
         s.id === sessionId ? { ...s, status: 'terminated' } : s
       ))
+
+      // Update in Supabase
+      const updatedSession = { ...session, status: 'terminated' as const }
+      await agentCloudStorage.updateSession(updatedSession)
+
       toast.success('Session terminated')
     } catch (error) {
       console.error('Failed to terminate session:', error)
@@ -632,9 +745,19 @@ function AgentCloudLayoutInner({
   }
 
   // Delete session
-  const deleteSession = (sessionId: string) => {
+  const deleteSession = async (sessionId: string) => {
     // Check if we're deleting the active session BEFORE updating state
     const isDeletingActive = activeSessionId === sessionId
+
+    // Delete from Supabase
+    await agentCloudStorage.deleteSession(sessionId)
+
+    // Remove from lines count tracking
+    setLastSavedLinesCount(prev => {
+      const updated = new Map(prev)
+      updated.delete(sessionId)
+      return updated
+    })
 
     // Update sessions state
     setSessions(prev => prev.filter(s => s.id !== sessionId))
