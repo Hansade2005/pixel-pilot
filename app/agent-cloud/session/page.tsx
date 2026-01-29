@@ -1147,20 +1147,7 @@ User Request: ${currentPrompt}`
     }
   }, [isScreenSharing])
 
-  // Auto-resume screen sharing if coming from new page with sharing active
-  useEffect(() => {
-    const shouldResume = sessionStorage.getItem('agent-cloud-resume-sharing')
-    if (shouldResume === 'true') {
-      sessionStorage.removeItem('agent-cloud-resume-sharing')
-      // Small delay to let the page settle, then prompt for sharing
-      const timer = setTimeout(() => {
-        handleScreenToggle()
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [])
-
-  const handleScreenToggle = async () => {
+  const handleScreenToggle = useCallback(async () => {
     if (isScreenSharing) {
       // Stop screen sharing
       if (mediaStreamRef.current) {
@@ -1213,7 +1200,20 @@ User Request: ${currentPrompt}`
     } finally {
       setIsCapturing(false)
     }
-  }
+  }, [isScreenSharing])
+
+  // Auto-resume screen sharing if coming from new page with sharing active
+  useEffect(() => {
+    const shouldResume = sessionStorage.getItem('agent-cloud-resume-sharing')
+    if (shouldResume === 'true') {
+      sessionStorage.removeItem('agent-cloud-resume-sharing')
+      // Small delay to let the page settle, then prompt for sharing
+      const timer = setTimeout(() => {
+        handleScreenToggle()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [handleScreenToggle])
 
   // Render message line
   const renderLine = (line: TerminalLine, index: number) => {
