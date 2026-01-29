@@ -73,11 +73,57 @@ const activeSandboxes = new Map<string, {
 // Cleanup inactive sandboxes after 30 minutes (increased from 10)
 const SANDBOX_TIMEOUT = 30 * 60 * 1000
 
-// Working directory for cloned repos
-const PROJECT_DIR = '/home/user/'
+// System directory - for Claude SDK, scripts, temp files (NOT committed to git)
+const SYSTEM_DIR = '/home/user'
+
+// Project base directory - repos/projects go here as subfolders
+const PROJECT_BASE_DIR = '/home/user/project'
 
 // Conversation history file path in sandbox
 const HISTORY_FILE = '/home/user/.claude_history.json'
+
+// Default .gitignore template to prevent committing common artifacts
+const DEFAULT_GITIGNORE = `# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+`
 
 /**
  * Generate a branch name from the first 4 words of a prompt
@@ -273,7 +319,7 @@ async function doStreaming(
       sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
       // Clean up images file on abort
       if (images.length > 0) {
-        sandboxRef.commands.run(`rm -f ${workDir}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
+        sandboxRef.commands.run(`rm -f ${SYSTEM_DIR}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
       }
     }
   })
@@ -310,10 +356,13 @@ async function doStreaming(
 
         // System prompt for git workflow - commit, push, and create PR using GitHub MCP
         const gitWorkflowPrompt = `
-IMPORTANT WORKING DIRECTORY:
-- Your working directory is: ${workDir}
-- ALWAYS cd to ${workDir} before running any commands
-- All project files are located in ${workDir}
+CRITICAL PROJECT DIRECTORY INFORMATION:
+- PROJECT PATH: ${workDir}
+- This is where ALL project source code is located
+- ALWAYS cd to ${workDir} before running ANY commands (builds, installs, git, etc.)
+- NEVER run npm/pnpm install or create files in /home/user directly - that is the system directory
+- System tools and SDK are installed in /home/user (DO NOT modify this)
+- Your project files are ONLY in: ${workDir}
 
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
@@ -323,6 +372,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - After committing, push to the remote: git push -u origin ${workingBranch}
 - After pushing, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
 - Always provide meaningful commit messages and PR descriptions
+- A .gitignore file exists in the project to prevent committing node_modules and other artifacts
 `.trim()
 
         // Base64 encode the system prompt for safe shell passing
@@ -543,24 +593,25 @@ try {
   process.exit(1);
 }
 `
-        await sandbox.files.write(`${workDir}/claude-stream.mjs`, scriptContent)
-        console.log(`[Agent Cloud] Streaming script uploaded`)
+        // Write script to SYSTEM_DIR (not project dir) to avoid polluting project
+        await sandbox.files.write(`${SYSTEM_DIR}/claude-stream.mjs`, scriptContent)
+        console.log(`[Agent Cloud] Streaming script uploaded to ${SYSTEM_DIR}`)
 
         // Step 2: Build a single chained command that installs SDK (if needed) AND runs the script
-        // This ensures the SDK is available in node_modules when the script executes
+        // SDK and script are in SYSTEM_DIR, but Claude works on files in workDir (project)
         send({ type: 'log', message: 'Preparing Claude Agent SDK...' })
-        
-        // Write images as JSON file if present (base64 data passed directly)
+
+        // Write images as JSON file if present (in SYSTEM_DIR to avoid polluting project)
         if (images.length > 0) {
           const imagesJson = JSON.stringify(images.map(img => ({ data: img.data, type: img.type })))
-          await sandbox.files.write(`${workDir}/.images.json`, imagesJson)
+          await sandbox.files.write(`${SYSTEM_DIR}/.images.json`, imagesJson)
         }
-        const imageArg = images.length > 0 ? ` "${workDir}/.images.json"` : ''
+        const imageArg = images.length > 0 ? ` "${SYSTEM_DIR}/.images.json"` : ''
 
-        // Single chained command: init package.json if needed, install SDK, then run script
-        const command = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-agent-sdk && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"${imageArg}`
+        // Install SDK in SYSTEM_DIR, then run script (Claude works in workDir via --directory flag)
+        const command = `cd ${SYSTEM_DIR} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add @anthropic-ai/claude-agent-sdk && node claude-stream.mjs "$(echo '${base64Prompt}' | base64 -d)" "$(echo '${base64SystemPrompt}' | base64 -d)" "${HISTORY_FILE}"${imageArg}`
 
-        console.log(`[Agent Cloud] Executing chained install & run command`)
+        console.log(`[Agent Cloud] Executing chained install & run command (SDK in ${SYSTEM_DIR}, project in ${workDir})`)
 
         let fullOutput = ''
         let textContent = '' // Accumulate text for conversation history
@@ -576,7 +627,7 @@ try {
 
         try {
           const result = await sandbox.commands.run(command, {
-            cwd: workDir,
+            cwd: SYSTEM_DIR, // Run from system dir where SDK is installed
             timeoutMs: 0, // No timeout
             envs: {
               // Pass environment variables for Claude Agent SDK
@@ -702,7 +753,7 @@ try {
           if (sandboxEntry!.repo?.cloned) {
             try {
               const diffResult = await sandbox.commands.run(
-                `cd ${PROJECT_DIR} && git diff --shortstat`,
+                `cd ${workDir} && git diff --shortstat`,
                 { timeoutMs: 5000 }
               )
               const match = diffResult.stdout?.match(/(\d+) insertion.*?(\d+) deletion/)
@@ -725,7 +776,7 @@ try {
 
           // Clean up images file after stream completes
           if (images.length > 0) {
-            sandbox.commands.run(`rm -f ${workDir}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
+            sandbox.commands.run(`rm -f ${SYSTEM_DIR}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
           }
 
         } catch (cmdError) {
@@ -752,7 +803,7 @@ try {
       sandboxRef.commands.run('pkill -f claude-stream || true', { timeoutMs: 5000 }).catch(() => {})
       // Clean up images file on disconnect
       if (images.length > 0) {
-        sandboxRef.commands.run(`rm -f ${workDir}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
+        sandboxRef.commands.run(`rm -f ${SYSTEM_DIR}/.images.json`, { timeoutMs: 5000 }).catch(() => {})
       }
     }
   })
@@ -844,7 +895,7 @@ async function handleCreate(
         model: AVAILABLE_MODELS[existingEntry.model as keyof typeof AVAILABLE_MODELS || 'sonnet'],
         gateway: AI_GATEWAY_BASE_URL,
         repoCloned: existingEntry.repo?.cloned || false,
-        projectDir: existingEntry.repo?.cloned ? PROJECT_DIR : '/home/user',
+        projectDir: existingEntry.workDir || SYSTEM_DIR,
         reconnected: true,
         messageCount: existingEntry.conversationHistory.length,
         workingBranch: existingEntry.workingBranch, // Include working branch for header display
@@ -882,11 +933,23 @@ async function handleCreate(
           // No history file yet
         }
 
-        // Try to get the current working branch from the sandbox
+        // Try to get the current working branch and project directory from the sandbox
         let workingBranch: string | undefined
+        let detectedWorkDir: string | undefined
         try {
+          // First try to find where the project was cloned
+          const findResult = await sandbox.commands.run(
+            `ls -d ${PROJECT_BASE_DIR}/*/ 2>/dev/null | head -1`,
+            { timeoutMs: 5000 }
+          )
+          if (findResult.exitCode === 0 && findResult.stdout?.trim()) {
+            detectedWorkDir = findResult.stdout.trim().replace(/\/$/, '')
+            console.log(`[Agent Cloud] Detected project directory: ${detectedWorkDir}`)
+          }
+
+          const projectDir = detectedWorkDir || PROJECT_BASE_DIR
           const branchResult = await sandbox.commands.run(
-            `cd ${PROJECT_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null`,
+            `cd ${projectDir} && git rev-parse --abbrev-ref HEAD 2>/dev/null`,
             { timeoutMs: 5000 }
           )
           if (branchResult.exitCode === 0 && branchResult.stdout?.trim()) {
@@ -897,6 +960,7 @@ async function handleCreate(
           // Couldn't get branch, that's ok
         }
 
+        const reconnectedWorkDir = detectedWorkDir || PROJECT_BASE_DIR
         const entry = {
           sandboxId: existingSandbox.sandboxId,
           sandbox,
@@ -910,6 +974,7 @@ async function handleCreate(
             cloned: true // Assume cloned if sandbox exists
           } : undefined,
           workingBranch,
+          workDir: reconnectedWorkDir,
           conversationHistory
         }
 
@@ -921,7 +986,7 @@ async function handleCreate(
           model: AVAILABLE_MODELS[config?.model || 'sonnet'],
           gateway: AI_GATEWAY_BASE_URL,
           repoCloned: true,
-          projectDir: PROJECT_DIR,
+          projectDir: reconnectedWorkDir,
           reconnected: true,
           messageCount: conversationHistory.length,
           workingBranch, // Include working branch for header display
@@ -1042,7 +1107,11 @@ async function handleCreate(
 
   const sandboxId = sandbox.sandboxId
   let repoCloned = false
-  let actualWorkDir = PROJECT_DIR // Will be updated to repo subfolder if cloning
+  let actualWorkDir = SYSTEM_DIR // Will be updated to repo subfolder if cloning
+
+  // Create project base directory (separate from system dir)
+  await sandbox.commands.run(`mkdir -p ${PROJECT_BASE_DIR}`, { timeoutMs: 5000 })
+  console.log(`[Agent Cloud] Project base directory created: ${PROJECT_BASE_DIR}`)
 
   // Configure CLI connector auth files in the sandbox
   if (config?.connectors) {
@@ -1094,9 +1163,9 @@ async function handleCreate(
     try {
       console.log(`[Agent Cloud] Cloning repo: ${config.repo.full_name} (${config.repo.branch})`)
 
-      // Extract repo name for subfolder
+      // Extract repo name for subfolder under project base directory
       const repoName = config.repo.full_name.split('/').pop() || 'project'
-      const repoDir = `${PROJECT_DIR}${repoName}`
+      const repoDir = `${PROJECT_BASE_DIR}/${repoName}`
 
       // Validate token and repo access before attempting clone
       if (githubToken) {
@@ -1215,6 +1284,28 @@ async function handleCreate(
         } catch (e) {
           console.warn(`[Agent Cloud] Dependency installation warning:`, e)
         }
+
+        // Ensure .gitignore exists to prevent committing node_modules and artifacts
+        try {
+          const gitignoreCheck = await sandbox.commands.run(
+            `cd ${repoDir} && [ -f .gitignore ] && echo "exists" || echo "missing"`,
+            { timeoutMs: 5000 }
+          )
+          if (gitignoreCheck.stdout?.includes('missing')) {
+            // Create default .gitignore for new repos without one
+            await sandbox.files.write(`${repoDir}/.gitignore`, DEFAULT_GITIGNORE)
+            console.log(`[Agent Cloud] Created default .gitignore in ${repoDir}`)
+          } else {
+            // Append node_modules if not already in existing .gitignore
+            const appendResult = await sandbox.commands.run(
+              `cd ${repoDir} && grep -q "^node_modules" .gitignore || echo "node_modules/" >> .gitignore`,
+              { timeoutMs: 5000 }
+            )
+            console.log(`[Agent Cloud] Ensured node_modules is in .gitignore`)
+          }
+        } catch (e) {
+          console.warn(`[Agent Cloud] Failed to setup .gitignore:`, e)
+        }
       } else {
         console.error(`[Agent Cloud] All clone methods failed for ${config.repo.full_name}`)
       }
@@ -1227,7 +1318,7 @@ async function handleCreate(
   if (config?.newProject && !config?.repo) {
     try {
       const projectName = config.newProject.name || 'new-project'
-      const projectDir = `${PROJECT_DIR}${projectName}`
+      const projectDir = `${PROJECT_BASE_DIR}/${projectName}`
       console.log(`[Agent Cloud] New project mode: initializing ${projectName} in ${projectDir}`)
 
       // Create project directory and initialize git
@@ -1235,6 +1326,10 @@ async function handleCreate(
         `mkdir -p ${projectDir} && cd ${projectDir} && git init && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
         { timeoutMs: 10000 }
       )
+
+      // Create default .gitignore for new projects
+      await sandbox.files.write(`${projectDir}/.gitignore`, DEFAULT_GITIGNORE)
+      console.log(`[Agent Cloud] Created default .gitignore for new project`)
 
       actualWorkDir = projectDir
       repoCloned = false // No clone, fresh project
@@ -1346,9 +1441,8 @@ async function handleRun(
   const { sandbox } = sandboxEntry
   sandboxEntry.lastActivity = new Date()
 
-  // Use project dir if repo is cloned, otherwise use specified or default
-  const workDir = options?.workingDirectory ||
-    (sandboxEntry.repo?.cloned ? PROJECT_DIR : '/home/user')
+  // Use stored working directory, or specified, or default
+  const workDir = options?.workingDirectory || sandboxEntry.workDir || SYSTEM_DIR
 
   // Add to conversation history
   sandboxEntry.conversationHistory.push({
@@ -1508,10 +1602,11 @@ async function handleCommit(sandboxId: string, message?: string) {
   sandboxEntry.lastActivity = new Date()
 
   const commitMessage = message || 'Changes by PiPilot Agent'
+  const workDir = sandboxEntry.workDir || PROJECT_BASE_DIR
 
   // Add all changes and commit
   const result = await sandbox.commands.run(
-    `cd ${PROJECT_DIR} && git add -A && git commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
+    `cd ${workDir} && git add -A && git commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
     { timeoutMs: 30000 }
   )
 
@@ -1561,10 +1656,11 @@ async function handlePush(request: NextRequest, sandboxId: string) {
 
   const { sandbox, repo } = sandboxEntry
   sandboxEntry.lastActivity = new Date()
+  const workDir = sandboxEntry.workDir || PROJECT_BASE_DIR
 
   // Push to the same branch
   const result = await sandbox.commands.run(
-    `cd ${PROJECT_DIR} && git push origin ${repo.branch}`,
+    `cd ${workDir} && git push origin ${repo.branch}`,
     { timeoutMs: 60000 }
   )
 
@@ -1617,16 +1713,17 @@ async function handleDiff(sandboxId: string) {
 
   const { sandbox } = sandboxEntry
   sandboxEntry.lastActivity = new Date()
+  const workDir = sandboxEntry.workDir || PROJECT_BASE_DIR
 
   // Get diff stats
   const statsResult = await sandbox.commands.run(
-    `cd ${PROJECT_DIR} && git diff --shortstat`,
+    `cd ${workDir} && git diff --shortstat`,
     { timeoutMs: 5000 }
   )
 
   // Get changed files
   const filesResult = await sandbox.commands.run(
-    `cd ${PROJECT_DIR} && git diff --name-only`,
+    `cd ${workDir} && git diff --name-only`,
     { timeoutMs: 5000 }
   )
 
@@ -2000,16 +2097,20 @@ app.post('/stream', async (req, res) => {
 
     // Git workflow system prompt with working directory
     const gitWorkflowPrompt = customSystemPrompt || \`
-IMPORTANT WORKING DIRECTORY:
-- Your working directory is: \${WORK_DIR}
-- ALWAYS cd to \${WORK_DIR} before running any commands
-- All project files are located in \${WORK_DIR}
+CRITICAL PROJECT DIRECTORY INFORMATION:
+- PROJECT PATH: \${WORK_DIR}
+- This is where ALL project source code is located
+- ALWAYS cd to \${WORK_DIR} before running ANY commands (builds, installs, git, etc.)
+- NEVER run npm/pnpm install or create files in /home/user directly - that is the system directory
+- System tools and SDK are installed in /home/user (DO NOT modify this)
+- Your project files are ONLY in: \${WORK_DIR}
 
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: \${WORKING_BRANCH}
 - BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
 - After making code changes, ALWAYS commit them with a clear message
 - After committing, push to the remote: git push -u origin \${WORKING_BRANCH}
+- A .gitignore file exists in the project to prevent committing node_modules and other artifacts
 \`.trim();
 
     // Configure MCP servers
@@ -2148,24 +2249,24 @@ app.listen(PORT, '0.0.0.0', () => {
 `
 
   try {
-    // Upload the streaming server script
-    await sandbox.files.write(`${workDir}/stream-server.mjs`, streamServerScript)
-    console.log(`[Agent Cloud] Stream server script uploaded`)
+    // Upload the streaming server script to SYSTEM_DIR (not project dir)
+    await sandbox.files.write(`${SYSTEM_DIR}/stream-server.mjs`, streamServerScript)
+    console.log(`[Agent Cloud] Stream server script uploaded to ${SYSTEM_DIR}`)
 
-    // Install dependencies and start the server in background
-    const installCommand = `cd ${workDir} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add express cors @anthropic-ai/claude-agent-sdk 2>&1`
+    // Install dependencies in SYSTEM_DIR to avoid polluting project
+    const installCommand = `cd ${SYSTEM_DIR} && ([ -f package.json ] || echo '{"type":"module"}' > package.json) && pnpm add express cors @anthropic-ai/claude-agent-sdk 2>&1`
 
-    console.log(`[Agent Cloud] Installing stream server dependencies...`)
+    console.log(`[Agent Cloud] Installing stream server dependencies in ${SYSTEM_DIR}...`)
     await sandbox.commands.run(installCommand, {
-      cwd: workDir,
-      timeoutMs: 0 // No timeout - installation can take a while
+      cwd: SYSTEM_DIR,
+      timeoutMs: 0 // No timeout for pnpm install
     })
 
     // Start the server in background with environment variables
-    const startCommand = `cd ${workDir} && nohup node stream-server.mjs > /tmp/stream-server.log 2>&1 &`
+    const startCommand = `cd ${SYSTEM_DIR} && nohup node stream-server.mjs > /tmp/stream-server.log 2>&1 &`
 
     await sandbox.commands.run(startCommand, {
-      cwd: workDir,
+      cwd: SYSTEM_DIR,
       timeoutMs: 10000,
       envs: {
         ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
