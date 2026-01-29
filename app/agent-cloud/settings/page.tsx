@@ -79,9 +79,27 @@ export default function SettingsPage() {
     })
   }
 
+  // Track if settings have changed (for visual feedback)
+  const [isSaved, setIsSaved] = useState(false)
+
+  // Show saved indicator briefly when connectors change
+  useEffect(() => {
+    // Skip the initial render
+    const hasValues = connectors.some(c => c.enabled || c.fields.some(f => f.value))
+    if (hasValues) {
+      setIsSaved(true)
+      const timer = setTimeout(() => setIsSaved(false), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [connectors])
+
   // Save and show toast
   const handleSave = () => {
-    toast.success('Settings saved')
+    // Settings are auto-saved via layout's useEffect
+    // This button just provides explicit confirmation
+    setIsSaved(true)
+    toast.success('Settings saved successfully')
+    setTimeout(() => setIsSaved(false), 2000)
   }
 
   // Get enabled connector count
@@ -183,14 +201,24 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Save button */}
-        <div className="flex justify-end">
+        {/* Save button with visual feedback */}
+        <div className="flex items-center justify-end gap-3">
+          {isSaved && (
+            <span className="text-sm text-green-400 flex items-center gap-1 animate-in fade-in duration-200">
+              <Check className="h-4 w-4" />
+              Saved
+            </span>
+          )}
           <Button
             onClick={handleSave}
-            className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-6"
+            className={`rounded-xl px-6 transition-all duration-200 ${
+              isSaved
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-orange-500 hover:bg-orange-600'
+            } text-white`}
           >
             <Check className="h-4 w-4 mr-2" />
-            Save Settings
+            {isSaved ? 'Saved!' : 'Save Settings'}
           </Button>
         </div>
       </div>
