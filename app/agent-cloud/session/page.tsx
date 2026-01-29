@@ -979,7 +979,7 @@ User Request: ${currentPrompt}`
       setIsStreaming(false)
       abortControllerRef.current = null
     }
-  }, [activeSession, prompt, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
+  }, [activeSession, prompt, attachedImages, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
 
   // Stop the running agent
   const stopAgent = useCallback(() => {
