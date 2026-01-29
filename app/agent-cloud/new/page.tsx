@@ -209,6 +209,14 @@ export default function NewSessionPage() {
   const handleSubmit = async () => {
     if ((!prompt.trim() && attachedImages.length === 0) || isCreating) return
 
+    // If screen sharing is active, store flag so session page can resume it
+    if (isScreenSharing && mediaStreamRef.current) {
+      sessionStorage.setItem('agent-cloud-resume-sharing', 'true')
+      // Stop the stream before navigating (browser will require new permission anyway)
+      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current = null
+    }
+
     if (isNewProject) {
       // New project mode - requires GitHub connection and project name
       if (!isConnected) return
