@@ -2,10 +2,14 @@
  * Agent Cloud Supabase Storage
  *
  * Handles persistence of agent cloud sessions, messages, and connectors
- * using Supabase instead of localStorage to avoid quota limits.
+ * using an external Supabase project to avoid localStorage quota limits.
+ *
+ * Note: User auth comes from the main Supabase project, but storage
+ * is on a separate external project for scalability.
  */
 
 import { createClient } from '@/lib/supabase/client'
+import { createAgentCloudClient } from '@/lib/supabase/agent-cloud-client'
 import type { Session, TerminalLine, ConnectorConfig } from '@/app/agent-cloud/layout'
 
 // Database types
@@ -108,13 +112,16 @@ function sessionToDbSession(session: Session, userId: string): Omit<DbSession, '
 
 // Agent Cloud Storage class
 class AgentCloudStorage {
-  private supabase = createClient()
+  // Main auth client - used to get user ID
+  private authClient = createClient()
+  // External storage client - used for all storage operations
+  private storageClient = createAgentCloudClient()
 
   /**
-   * Get current user ID
+   * Get current user ID from main auth project
    */
   async getUserId(): Promise<string | null> {
-    const { data: { user } } = await this.supabase.auth.getUser()
+    const { data: { user } } = await this.authClient.auth.getUser()
     return user?.id || null
   }
 
@@ -127,7 +134,7 @@ class AgentCloudStorage {
 
     try {
       // Fetch sessions
-      const { data: dbSessions, error: sessionsError } = await this.supabase
+      const { data: dbSessions, error: sessionsError } = await this.storageClient
         .from('agent_cloud_sessions')
         .select('*')
         .eq('user_id', userId)
@@ -142,7 +149,7 @@ class AgentCloudStorage {
 
       // Fetch messages for all sessions
       const sessionIds = dbSessions.map(s => s.id)
-      const { data: dbMessages, error: messagesError } = await this.supabase
+      const { data: dbMessages, error: messagesError } = await this.storageClient
         .from('agent_cloud_messages')
         .select('*')
         .in('session_id', sessionIds)
@@ -156,7 +163,7 @@ class AgentCloudStorage {
       const messageIds = (dbMessages || []).map(m => m.id)
       let dbImages: DbMessageImage[] = []
       if (messageIds.length > 0) {
-        const { data: images, error: imagesError } = await this.supabase
+        const { data: images, error: imagesError } = await this.storageClient
           .from('agent_cloud_message_images')
           .select('*')
           .in('message_id', messageIds)
@@ -217,7 +224,7 @@ class AgentCloudStorage {
     try {
       const dbSession = sessionToDbSession(session, userId)
 
-      const { error: sessionError } = await this.supabase
+      const { error: sessionError } = await this.storageClient
         .from('agent_cloud_sessions')
         .insert(dbSession)
 
@@ -246,7 +253,7 @@ class AgentCloudStorage {
     if (!userId) return false
 
     try {
-      const { error } = await this.supabase
+      const { error } = await this.storageClient
         .from('agent_cloud_sessions')
         .update({
           status: session.status,
@@ -279,7 +286,7 @@ class AgentCloudStorage {
     if (!userId) return false
 
     try {
-      const { error } = await this.supabase
+      const { error } = await this.storageClient
         .from('agent_cloud_sessions')
         .delete()
         .eq('id', sessionId)
@@ -318,7 +325,7 @@ class AgentCloudStorage {
         meta: line.meta || null,
       }))
 
-      const { data: insertedMessages, error: messagesError } = await this.supabase
+      const { data: insertedMessages, error: messagesError } = await this.storageClient
         .from('agent_cloud_messages')
         .insert(messages)
         .select('id')
@@ -345,7 +352,7 @@ class AgentCloudStorage {
         })
 
         if (imagesToInsert.length > 0) {
-          const { error: imagesError } = await this.supabase
+          const { error: imagesError } = await this.storageClient
             .from('agent_cloud_message_images')
             .insert(imagesToInsert)
 
@@ -370,7 +377,7 @@ class AgentCloudStorage {
     if (!userId) return false
 
     try {
-      const { data: insertedMessage, error: messageError } = await this.supabase
+      const { data: insertedMessage, error: messageError } = await this.storageClient
         .from('agent_cloud_messages')
         .insert({
           session_id: sessionId,
@@ -395,7 +402,7 @@ class AgentCloudStorage {
           mime_type: img.type,
         }))
 
-        const { error: imagesError } = await this.supabase
+        const { error: imagesError } = await this.storageClient
           .from('agent_cloud_message_images')
           .insert(imagesToInsert)
 
@@ -419,7 +426,7 @@ class AgentCloudStorage {
     if (!userId) return new Map()
 
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.storageClient
         .from('agent_cloud_connectors')
         .select('*')
         .eq('user_id', userId)
@@ -452,7 +459,7 @@ class AgentCloudStorage {
     if (!userId) return false
 
     try {
-      const { error } = await this.supabase
+      const { error } = await this.storageClient
         .from('agent_cloud_connectors')
         .upsert({
           user_id: userId,
@@ -495,7 +502,7 @@ class AgentCloudStorage {
 
       if (connectorsToSave.length === 0) return true
 
-      const { error } = await this.supabase
+      const { error } = await this.storageClient
         .from('agent_cloud_connectors')
         .upsert(connectorsToSave, {
           onConflict: 'user_id,connector_id',
@@ -540,7 +547,7 @@ class AgentCloudStorage {
           }
 
           // Check if session already exists in Supabase
-          const { data: existing } = await this.supabase
+          const { data: existing } = await this.storageClient
             .from('agent_cloud_sessions')
             .select('id')
             .eq('id', session.id)
