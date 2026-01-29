@@ -469,6 +469,43 @@ function SessionPageInner() {
       // Build prompt with context for AI operations
       let enhancedPrompt = currentPrompt
 
+      // Build connector context - tell AI what tools/CLIs are available
+      const enabledConnectors = connectors.filter(c => c.enabled && c.fields.every(f => f.value.trim()))
+      let connectorContext = ''
+
+      if (enabledConnectors.length > 0) {
+        const connectorDescriptions = enabledConnectors.map(c => {
+          switch (c.id) {
+            case 'neon':
+              return `- **Neon CLI (neonctl)**: Serverless Postgres database management. Your NEON_API_KEY is configured. Use \`neonctl\` commands to create databases, branches, run SQL, etc. Example: \`neonctl projects list\`, \`neonctl databases create\``
+            case 'vercel':
+              return `- **Vercel CLI**: Deploy and manage apps on Vercel. Your VERCEL_TOKEN is configured. Use \`vercel\` commands. Example: \`vercel deploy\`, \`vercel env\``
+            case 'netlify':
+              return `- **Netlify CLI**: Deploy static sites. Your NETLIFY_AUTH_TOKEN is configured. Use \`netlify\` commands. Example: \`netlify deploy\`, \`netlify sites:list\``
+            case 'npm':
+              return `- **npm**: Publish packages. Your NPM_TOKEN is configured in ~/.npmrc. You can publish packages with \`npm publish\``
+            case 'cloudflare':
+              return `- **Cloudflare Wrangler**: Deploy Workers and Pages. Your CLOUDFLARE_API_TOKEN is configured. Use \`wrangler\` commands. Example: \`wrangler deploy\`, \`wrangler pages\``
+            case 'railway':
+              return `- **Railway CLI**: Deploy apps on Railway. Your RAILWAY_TOKEN is configured. Use \`railway\` commands. Example: \`railway deploy\`, \`railway up\``
+            case 'turso':
+              return `- **Turso CLI**: SQLite edge databases. Your auth token is configured. Use \`turso\` commands. Example: \`turso db create\`, \`turso db shell\``
+            case 'supabase':
+              return `- **Supabase MCP**: Database, auth, and storage via Supabase. Your project is connected. Use Supabase MCP tools for database operations.`
+            default:
+              return `- **${c.name}**: Configured and ready to use`
+          }
+        })
+
+        connectorContext = `
+
+[Available Tools & Services]
+The following CLI tools and services are configured and authenticated - you can use them directly:
+${connectorDescriptions.join('\n')}
+
+`
+      }
+
       if (activeSession.isNewProject && storedTokens.github) {
         // New project mode: instruct AI to create repo and build from scratch
         enhancedPrompt = `[New Project - Build From Scratch]
@@ -487,7 +524,7 @@ IMPORTANT SETUP INSTRUCTIONS (do this FIRST before writing any code):
 
 GitHub Token: ${storedTokens.github}
 Working Directory: /home/user/
-
+${connectorContext}
 User Request: ${currentPrompt}`
       } else if (storedTokens.github && activeSession.repo) {
         // Existing repo mode
@@ -496,7 +533,11 @@ User Request: ${currentPrompt}`
 - Branch: ${activeSession.repo.branch}
 - GitHub Token: ${storedTokens.github}
 - Clone URL: https://${storedTokens.github}@github.com/${activeSession.repo.full_name}.git
-
+${connectorContext}
+User Request: ${currentPrompt}`
+      } else if (connectorContext) {
+        // No GitHub but has connectors
+        enhancedPrompt = `${connectorContext}
 User Request: ${currentPrompt}`
       }
 
