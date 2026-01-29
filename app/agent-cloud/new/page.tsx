@@ -350,7 +350,7 @@ export default function NewSessionPage() {
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={isNewProject ? "Describe the app you want to build..." : "Ask Claude to write code..."}
+              placeholder={isNewProject ? "Describe the app you want to build..." : "Ask PiPilot to write code..."}
               disabled={isNewProject ? (!isConnected || !projectName.trim() || isCreating) : (!selectedRepo || isCreating)}
               className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 min-h-[56px] max-h-[200px] leading-6"
               rows={2}

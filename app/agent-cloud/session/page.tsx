@@ -1577,7 +1577,7 @@ User Request: ${currentPrompt}`
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                placeholder={isRecreating ? "Reconnecting..." : "Reply to Claude..."}
+                placeholder={isRecreating ? "Reconnecting..." : "Reply to PiPilot..."}
                 disabled={isLoading || isRecreating}
                 className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 px-4 pt-3 pb-12 min-h-[44px] max-h-[120px] leading-6 overflow-y-auto"
                 rows={1}
