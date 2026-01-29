@@ -184,6 +184,46 @@ function SessionPageInner() {
   const abortControllerRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Screen recording state and refs - must be defined before runPrompt which uses them
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [isCapturing, setIsCapturing] = useState(false)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const videoElementRef = useRef<HTMLVideoElement | null>(null)
+
+  // Helper: Capture current frame from active screen share stream
+  // Must be defined before runPrompt which uses it
+  const captureCurrentFrame = useCallback(async (): Promise<{ data: string; type: string; name: string } | null> => {
+    if (!mediaStreamRef.current || !isScreenSharing) return null
+
+    try {
+      // Use existing video element or create one
+      let video = videoElementRef.current
+      if (!video) {
+        video = document.createElement('video')
+        video.srcObject = mediaStreamRef.current
+        video.muted = true
+        videoElementRef.current = video
+        await video.play()
+      }
+
+      // Capture current frame
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')?.drawImage(video, 0, 0)
+      const base64 = canvas.toDataURL('image/png').split(',')[1]
+
+      return {
+        data: base64,
+        type: 'image/png',
+        name: `screen-${Date.now()}.png`
+      }
+    } catch (error) {
+      console.error('[Screen Capture] Failed to capture frame:', error)
+      return null
+    }
+  }, [isScreenSharing])
+
   // Rotate spinner phrase every 5 seconds while streaming
   useEffect(() => {
     if (!isStreaming || isRecreating) return
@@ -1108,45 +1148,7 @@ User Request: ${currentPrompt}`
     }
   }
 
-  // Screen recording
-  const [isScreenSharing, setIsScreenSharing] = useState(false)
-  const [isCapturing, setIsCapturing] = useState(false)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
-  const videoElementRef = useRef<HTMLVideoElement | null>(null)
-
-  // Helper: Capture current frame from active screen share stream
-  const captureCurrentFrame = useCallback(async (): Promise<{ data: string; type: string; name: string } | null> => {
-    if (!mediaStreamRef.current || !isScreenSharing) return null
-
-    try {
-      // Use existing video element or create one
-      let video = videoElementRef.current
-      if (!video) {
-        video = document.createElement('video')
-        video.srcObject = mediaStreamRef.current
-        video.muted = true
-        videoElementRef.current = video
-        await video.play()
-      }
-
-      // Capture current frame
-      const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      canvas.getContext('2d')?.drawImage(video, 0, 0)
-      const base64 = canvas.toDataURL('image/png').split(',')[1]
-
-      return {
-        data: base64,
-        type: 'image/png',
-        name: `screen-${Date.now()}.png`
-      }
-    } catch (error) {
-      console.error('[Screen Capture] Failed to capture frame:', error)
-      return null
-    }
-  }, [isScreenSharing])
-
+  // Screen toggle handler (state and captureCurrentFrame are defined earlier)
   const handleScreenToggle = useCallback(async () => {
     if (isScreenSharing) {
       // Stop screen sharing
@@ -1575,7 +1577,7 @@ User Request: ${currentPrompt}`
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                placeholder={isRecreating ? "Reconnecting..." : "Reply to Claude..."}
+                placeholder={isRecreating ? "Reconnecting..." : "Reply to PiPilot..."}
                 disabled={isLoading || isRecreating}
                 className="w-full bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder:text-zinc-500 px-4 pt-3 pb-12 min-h-[44px] max-h-[120px] leading-6 overflow-y-auto"
                 rows={1}

@@ -815,7 +815,7 @@ function AgentCloudLayoutInner({
             </button>
 
             <div className="flex items-center gap-2.5">
-              <span className="font-semibold text-lg tracking-tight">Claude Code</span>
+              <span className="font-semibold text-lg tracking-tight">PiPilot Code</span>
               <Badge className="text-[10px] bg-zinc-800 text-zinc-400 font-normal border-0 px-2">
                 Research preview
               </Badge>

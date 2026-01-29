@@ -44,7 +44,7 @@ export const PremiumChatInput = forwardRef<HTMLTextAreaElement, PremiumChatInput
       value,
       onChange,
       onSubmit,
-      placeholder = "Ask Claude to write code...",
+      placeholder = "Ask PiPilot to write code...",
       disabled = false,
       isLoading = false,
       autoFocus = false,
