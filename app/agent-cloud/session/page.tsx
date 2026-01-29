@@ -368,7 +368,19 @@ function SessionPageInner() {
   const runPrompt = useCallback(async (overridePrompt?: string, overrideSandboxId?: string, overrideImages?: Array<{ data: string; type: string; name: string }>) => {
     if (!activeSession || isLoading || isRecreating) return
 
-    const imagesToUse = overrideImages || attachedImages
+    // If screen sharing is active and no override images, capture fresh frame
+    // This ensures we always get the current view (including any scrolling)
+    let imagesToUse = overrideImages || attachedImages
+    if (!overrideImages && isScreenSharing && mediaStreamRef.current) {
+      const freshFrame = await captureCurrentFrame()
+      if (freshFrame) {
+        // Replace any existing screen captures with the fresh one
+        const nonScreenImages = attachedImages.filter(img => !img.name.startsWith('screen-') && !img.name.startsWith('screenshot-'))
+        imagesToUse = [...nonScreenImages, freshFrame]
+        console.log('[Screen Capture] Captured fresh frame before sending')
+      }
+    }
+
     const currentPrompt = overridePrompt || prompt.trim()
     if (!currentPrompt && imagesToUse.length === 0) return
 
@@ -979,7 +991,7 @@ User Request: ${currentPrompt}`
       setIsStreaming(false)
       abortControllerRef.current = null
     }
-  }, [activeSession, prompt, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox])
+  }, [activeSession, prompt, attachedImages, isLoading, isRecreating, sessionId, setSessions, storedTokens, recreateSandbox, isScreenSharing, captureCurrentFrame])
 
   // Stop the running agent
   const stopAgent = useCallback(() => {
@@ -1100,6 +1112,53 @@ User Request: ${currentPrompt}`
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isCapturing, setIsCapturing] = useState(false)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const videoElementRef = useRef<HTMLVideoElement | null>(null)
+
+  // Helper: Capture current frame from active screen share stream
+  const captureCurrentFrame = useCallback(async (): Promise<{ data: string; type: string; name: string } | null> => {
+    if (!mediaStreamRef.current || !isScreenSharing) return null
+
+    try {
+      // Use existing video element or create one
+      let video = videoElementRef.current
+      if (!video) {
+        video = document.createElement('video')
+        video.srcObject = mediaStreamRef.current
+        video.muted = true
+        videoElementRef.current = video
+        await video.play()
+      }
+
+      // Capture current frame
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')?.drawImage(video, 0, 0)
+      const base64 = canvas.toDataURL('image/png').split(',')[1]
+
+      return {
+        data: base64,
+        type: 'image/png',
+        name: `screen-${Date.now()}.png`
+      }
+    } catch (error) {
+      console.error('[Screen Capture] Failed to capture frame:', error)
+      return null
+    }
+  }, [isScreenSharing])
+
+  // Auto-resume screen sharing if coming from new page with sharing active
+  useEffect(() => {
+    const shouldResume = sessionStorage.getItem('agent-cloud-resume-sharing')
+    if (shouldResume === 'true') {
+      sessionStorage.removeItem('agent-cloud-resume-sharing')
+      // Small delay to let the page settle, then prompt for sharing
+      const timer = setTimeout(() => {
+        handleScreenToggle()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [])
 
   const handleScreenToggle = async () => {
     if (isScreenSharing) {
@@ -1107,6 +1166,11 @@ User Request: ${currentPrompt}`
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop())
         mediaStreamRef.current = null
+      }
+      if (videoElementRef.current) {
+        videoElementRef.current.pause()
+        videoElementRef.current.srcObject = null
+        videoElementRef.current = null
       }
       setIsScreenSharing(false)
       return
@@ -1117,10 +1181,14 @@ User Request: ${currentPrompt}`
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
       mediaStreamRef.current = stream
 
-      // Capture a screenshot immediately
+      // Create persistent video element for continuous capture
       const video = document.createElement('video')
       video.srcObject = stream
+      video.muted = true
+      videoElementRef.current = video
       await video.play()
+
+      // Capture initial screenshot
       const canvas = document.createElement('canvas')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
@@ -1132,6 +1200,11 @@ User Request: ${currentPrompt}`
 
       // Listen for stream end (user clicks "Stop sharing" in browser)
       stream.getVideoTracks()[0].onended = () => {
+        if (videoElementRef.current) {
+          videoElementRef.current.pause()
+          videoElementRef.current.srcObject = null
+          videoElementRef.current = null
+        }
         mediaStreamRef.current = null
         setIsScreenSharing(false)
       }
