@@ -82,6 +82,49 @@ const PROJECT_BASE_DIR = '/home/user/project'
 // Conversation history file path in sandbox
 const HISTORY_FILE = '/home/user/.claude_history.json'
 
+// Default .gitignore template to prevent committing common artifacts
+const DEFAULT_GITIGNORE = `# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+`
+
 /**
  * Generate a branch name from the first 4 words of a prompt
  * Example: "fix the login bug in auth" -> "pipilot/fix-the-login-a1b2"
@@ -313,10 +356,13 @@ async function doStreaming(
 
         // System prompt for git workflow - commit, push, and create PR using GitHub MCP
         const gitWorkflowPrompt = `
-IMPORTANT WORKING DIRECTORY:
-- Your working directory is: ${workDir}
-- ALWAYS cd to ${workDir} before running any commands
-- All project files are located in ${workDir}
+CRITICAL PROJECT DIRECTORY INFORMATION:
+- PROJECT PATH: ${workDir}
+- This is where ALL project source code is located
+- ALWAYS cd to ${workDir} before running ANY commands (builds, installs, git, etc.)
+- NEVER run npm/pnpm install or create files in /home/user directly - that is the system directory
+- System tools and SDK are installed in /home/user (DO NOT modify this)
+- Your project files are ONLY in: ${workDir}
 
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: ${workingBranch}
@@ -326,6 +372,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - After committing, push to the remote: git push -u origin ${workingBranch}
 - After pushing, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
 - Always provide meaningful commit messages and PR descriptions
+- A .gitignore file exists in the project to prevent committing node_modules and other artifacts
 `.trim()
 
         // Base64 encode the system prompt for safe shell passing
@@ -1237,6 +1284,28 @@ async function handleCreate(
         } catch (e) {
           console.warn(`[Agent Cloud] Dependency installation warning:`, e)
         }
+
+        // Ensure .gitignore exists to prevent committing node_modules and artifacts
+        try {
+          const gitignoreCheck = await sandbox.commands.run(
+            `cd ${repoDir} && [ -f .gitignore ] && echo "exists" || echo "missing"`,
+            { timeoutMs: 5000 }
+          )
+          if (gitignoreCheck.stdout?.includes('missing')) {
+            // Create default .gitignore for new repos without one
+            await sandbox.files.write(`${repoDir}/.gitignore`, DEFAULT_GITIGNORE)
+            console.log(`[Agent Cloud] Created default .gitignore in ${repoDir}`)
+          } else {
+            // Append node_modules if not already in existing .gitignore
+            const appendResult = await sandbox.commands.run(
+              `cd ${repoDir} && grep -q "^node_modules" .gitignore || echo "node_modules/" >> .gitignore`,
+              { timeoutMs: 5000 }
+            )
+            console.log(`[Agent Cloud] Ensured node_modules is in .gitignore`)
+          }
+        } catch (e) {
+          console.warn(`[Agent Cloud] Failed to setup .gitignore:`, e)
+        }
       } else {
         console.error(`[Agent Cloud] All clone methods failed for ${config.repo.full_name}`)
       }
@@ -1257,6 +1326,10 @@ async function handleCreate(
         `mkdir -p ${projectDir} && cd ${projectDir} && git init && git config user.email "hello@pipilot.dev" && git config user.name "pipilot-swe-bot"`,
         { timeoutMs: 10000 }
       )
+
+      // Create default .gitignore for new projects
+      await sandbox.files.write(`${projectDir}/.gitignore`, DEFAULT_GITIGNORE)
+      console.log(`[Agent Cloud] Created default .gitignore for new project`)
 
       actualWorkDir = projectDir
       repoCloned = false // No clone, fresh project
@@ -2024,16 +2097,20 @@ app.post('/stream', async (req, res) => {
 
     // Git workflow system prompt with working directory
     const gitWorkflowPrompt = customSystemPrompt || \`
-IMPORTANT WORKING DIRECTORY:
-- Your working directory is: \${WORK_DIR}
-- ALWAYS cd to \${WORK_DIR} before running any commands
-- All project files are located in \${WORK_DIR}
+CRITICAL PROJECT DIRECTORY INFORMATION:
+- PROJECT PATH: \${WORK_DIR}
+- This is where ALL project source code is located
+- ALWAYS cd to \${WORK_DIR} before running ANY commands (builds, installs, git, etc.)
+- NEVER run npm/pnpm install or create files in /home/user directly - that is the system directory
+- System tools and SDK are installed in /home/user (DO NOT modify this)
+- Your project files are ONLY in: \${WORK_DIR}
 
 IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 - You are working on branch: \${WORKING_BRANCH}
 - BEFORE committing, ALWAYS configure git user: git config user.name "pipilot-swe-bot" && git config user.email "hello@pipilot.dev"
 - After making code changes, ALWAYS commit them with a clear message
 - After committing, push to the remote: git push -u origin \${WORKING_BRANCH}
+- A .gitignore file exists in the project to prevent committing node_modules and other artifacts
 \`.trim();
 
     // Configure MCP servers
