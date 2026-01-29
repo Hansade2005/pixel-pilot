@@ -689,9 +689,13 @@ function AgentCloudLayoutInner({
         ]
       }
 
-      // Save to Supabase
+      // Save to Supabase - only proceed if save succeeds
       const saved = await agentCloudStorage.createSession(newSession)
-      if (saved) {
+      if (!saved) {
+        console.error('[AgentCloud] Failed to save session to Supabase')
+        // Still add to local state but warn user
+        toast.warning('Session created locally but cloud sync failed')
+      } else {
         // Track lines count for this session
         setLastSavedLinesCount(prev => {
           const updated = new Map(prev)

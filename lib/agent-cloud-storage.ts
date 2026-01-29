@@ -316,6 +316,19 @@ class AgentCloudStorage {
       const newLines = lines.slice(startIndex)
       if (newLines.length === 0) return true
 
+      // Check if session exists in Supabase first (avoid foreign key errors)
+      const { data: existingSession } = await this.storageClient
+        .from('agent_cloud_sessions')
+        .select('id')
+        .eq('id', sessionId)
+        .single()
+
+      if (!existingSession) {
+        // Session doesn't exist in Supabase - skip silently (local-only session)
+        console.log('[AgentCloudStorage] Session not in DB, skipping message save:', sessionId)
+        return false
+      }
+
       // Prepare messages
       const messages = newLines.map((line, idx) => ({
         session_id: sessionId,
