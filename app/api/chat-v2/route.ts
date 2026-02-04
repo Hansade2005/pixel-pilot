@@ -108,6 +108,24 @@ TOOLSET MASTERY
   • Authentication/Authorization Backend
 
 ═══════════════════════════════════════════════════════════════
+MANDATORY: PLAN BEFORE YOU BUILD
+═══════════════════════════════════════════════════════════════
+
+ALWAYS plan first before writing any code. When a user asks you to build something, your FIRST response must be a clear implementation plan — NOT code. This shows the user you understand their request and gives them confidence.
+
+Your planning response MUST include:
+1. Acknowledge the request — restate what you're building in your own words
+2. Design direction — describe the visual style, color palette, typography, and UI inspiration
+3. Feature breakdown — list all the features/pages you'll implement (V1 scope)
+4. Architecture notes — mention the tech approach (modular components, mock data for missing APIs, responsive layout)
+5. Build order — state what you'll build first and the sequence
+
+Then AFTER the plan, immediately start implementing — don't wait for user confirmation. Plan and build in the same turn.
+
+NEVER jump straight into writing files without explaining what you're building first.
+NEVER write 1-2 files and declare "your app is ready!" — build the COMPLETE app.
+
+═══════════════════════════════════════════════════════════════
 ELITE WORKFLOW PROTOCOL
 ═══════════════════════════════════════════════════════════════
 
@@ -2855,7 +2873,48 @@ When building fresh apps, remember you're working with templates that need updat
 - Integrate PiPilot authentication and storage features using the REST API
 - Test thoroughly (happy/edge/error/performance cases)
 - Polish for production-readiness and virality
-Begin with a concise checklist  use check box emojis filled and unfilled. 
+
+═══════════════════════════════════════════════════════════════
+MANDATORY: PLAN BEFORE YOU BUILD
+═══════════════════════════════════════════════════════════════
+
+**ALWAYS plan first before writing any code.** When a user asks you to build something, your FIRST response must be a clear implementation plan — NOT code. This shows the user you understand their request and gives them confidence.
+
+Your planning response MUST include:
+1. **Acknowledge the request** — restate what you're building in your own words
+2. **Design direction** — describe the visual style, color palette, typography, and UI inspiration
+3. **Feature breakdown** — list all the features/pages you'll implement (V1 scope)
+4. **Architecture notes** — mention the tech approach (e.g., modular components, mock data for missing APIs, responsive layout)
+5. **Build order** — state what you'll build first and the logical sequence
+
+Example of a GOOD planning response:
+\`\`\`
+User: "Build me a complete Uber clone with trip integration but no API key for now"
+
+Good response: "I'll build a complete Uber clone with a sleek, modern dark design inspired by Uber's aesthetic. The app will have a modular architecture ready for API integration.
+
+Design inspiration: Uber's signature black UI with white text and green accents, clean typography, smooth animations, and map-centric interface.
+
+V1 Features:
+- Home screen with pickup/destination input
+- Ride type selection (UberX, Comfort, XL, etc.)
+- Mock map view (ready for real map API)
+- Driver matching animation
+- Trip tracking UI
+- Ride history
+- Profile page
+
+Design system: Dark theme, white text, vibrant green accents (#00D26A), smooth framer-motion animations, clean Inter font.
+
+Let me build this step by step, starting with the design system, then components."
+\`\`\`
+
+Then AFTER the plan, immediately start implementing — don't wait for user confirmation. Plan and build in the same turn.
+
+**BAD behavior (NEVER do this):**
+- Jumping straight into writing files without explaining what you're building
+- Writing 1-2 files and declaring "your app is ready!"
+- Giving a vague plan like "I'll build the app now" with no specifics
 
 ═══════════════════════════════════════════════════════════════
 DEFENSIVE CODE SAFETY RULES (Vite, Next.js, Expo)
@@ -3196,6 +3255,21 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
     if (isExpoProject) {
       systemPrompt = getExpoSystemPrompt(projectContext)
       console.log('[Chat-V2] Using specialized Expo SDK 54 system prompt')
+    }
+
+    // Inform the AI which integrations are NOT configured so it doesn't attempt them
+    const unavailableServices: string[] = []
+    if (!stripeApiKey) unavailableServices.push('Stripe (no API key connected)')
+    if (!supabaseAccessToken || !supabaseProjectDetails) unavailableServices.push('Supabase remote project (not connected)')
+    if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use create_database first if the user needs one)')
+    if (!process.env.E2B_API_KEY) unavailableServices.push('Node Machine / terminal (E2B not configured)')
+
+    if (unavailableServices.length > 0 && chatMode !== 'ask') {
+      systemPrompt += `\n\n## Unavailable Integrations
+The following services are NOT currently connected for this project. Do NOT attempt to use their tools or suggest them as if they work. If the user asks for these, explain they need to connect/configure them first in project settings:
+${unavailableServices.map(s => `- ${s}`).join('\n')}
+
+IMPORTANT: Focus on what you CAN do. Build the application fully using the tools available to you (file operations, code generation, web search, etc.). Do NOT stop early or declare the app "complete" just because some integrations are unavailable. Write all the code, create all the files, and implement the full feature set the user requested.`
     }
 
     // Add continuation instructions if this is a continuation request
@@ -10329,8 +10403,55 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       )
       console.log('[Chat-V2] UI initial prompt detected - using limited toolset:', uiInitialPromptTools)
     } else {
-      // Agent mode: all tools
-      toolsToUse = allTools
+      // Agent mode: start with all tools, then remove tools whose required keys/config are missing
+      // This prevents the AI from wasting steps calling tools that will always fail
+      const unavailableTools: string[] = []
+
+      // Stripe tools require stripeApiKey from the client
+      if (!stripeApiKey) {
+        const stripeTools = [
+          'stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product',
+          'stripe_list_prices', 'stripe_create_price', 'stripe_update_price',
+          'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer',
+          'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges',
+          'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription',
+          'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon',
+          'stripe_create_refund', 'stripe_search'
+        ]
+        unavailableTools.push(...stripeTools)
+      }
+
+      // Remote Supabase tools require supabaseAccessToken and supabaseProjectDetails
+      if (!supabaseAccessToken || !supabaseProjectDetails) {
+        const supabaseRemoteTools = [
+          'supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data',
+          'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls'
+        ]
+        unavailableTools.push(...supabaseRemoteTools)
+      }
+
+      // PiPilot database tools require databaseId
+      if (!databaseId) {
+        const dbTools = [
+          'create_table', 'query_database', 'manipulate_table_data', 'manage_api_keys',
+          'list_tables', 'read_table', 'delete_table'
+        ]
+        unavailableTools.push(...dbTools)
+      }
+
+      // node_machine requires E2B_API_KEY
+      if (!process.env.E2B_API_KEY) {
+        unavailableTools.push('node_machine')
+      }
+
+      if (unavailableTools.length > 0) {
+        toolsToUse = Object.fromEntries(
+          Object.entries(allTools).filter(([toolName]) => !unavailableTools.includes(toolName))
+        )
+        console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools (missing keys/config):`, unavailableTools)
+      } else {
+        toolsToUse = allTools
+      }
     }
 
     // Stream with AI SDK native tools
