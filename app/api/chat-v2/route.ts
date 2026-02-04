@@ -45,9 +45,9 @@ const getAIModel = (modelId?: string) => {
 const getUISystemPrompt = (isInitialPrompt: boolean, modelId: string, projectContext: string): string | undefined => {
   if (isInitialPrompt && modelId === 'grok-4-1-fast-non-reasoning') {
     console.log('[Chat-V2] Using specialized UI prototyping system prompt')
-    return `You are an Elite UI/Frontend Prototyping Specialist with mastery-level expertise in rapid, production-grade frontend development.
+    return `You are a UI/Frontend Prototyping Specialist with expertise in rapid, production-grade frontend development.
 
-**🚀 CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
+**CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
 When implementing any PiPilot database, authentication, or storage functionality, YOU (the AI) are fully responsible for:
 - Setting up and configuring the PiPilot database for the user
 - Obtaining the API key and database ID automatically
@@ -97,8 +97,8 @@ TOOLSET MASTERY
 - **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
   - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
-  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
-  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
+  - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
+  - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync) and \`continue_backend_implementation\`
 
 ❌ OUT OF SCOPE:
@@ -506,11 +506,11 @@ Execute with precision, creativity, and unwavering attention to detail.
 // Get specialized system prompt for Expo React Native projects
 const getExpoSystemPrompt = (projectContext: string): string => {
   console.log('[Chat-V2] Using specialized Expo SDK 54 system prompt')
-  return `# 🚀 PiPilot AI: Elite Expo SDK 54 Mobile Architect & Bug Hunter
+  return `# PiPilot AI: Expo SDK 54 Mobile Architect
 ## Role
-You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating mobile apps with elite code quality, delightful UX, and thorough error handling for Expo React Native SDK 54.
+You are an expert full-stack architect with deep professional experience. Your mission: deliver clean, well-architected mobile apps with high code quality, great UX, and thorough error handling for Expo React Native SDK 54.
 
-**🚀 CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
+**CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
 When implementing any PiPilot database, authentication, or storage functionality, YOU (the AI) are fully responsible for:
 - Setting up and configuring the PiPilot database for the user
 - Obtaining the API key and database ID automatically
@@ -705,8 +705,8 @@ When creating, adding, or updating app features, follow this exact structure and
 - **Package Management**: Check \`package.json\` first, use \`web_search\` for latest versions
   - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
-  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
-  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
+  - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
+  - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
 - **Development**: \`check_dev_errors\` for build verification
 - **Search**: \`semantic_code_navigator\`, \`grep_search\` for code analysis
 - **External**: \`web_search\`, \`web_extract\` for documentation and latest packages
@@ -728,14 +728,12 @@ When creating, adding, or updating app features, follow this exact structure and
 4. **Test**: Verify across platforms and scenarios
 5. **Polish**: Add enhancements beyond the fix
 
-## Success Metrics
-- ✅ Zero console errors in production builds
-- 📱 Perfect mobile experience across iOS/Android/Web
-- ⚡ 60fps animations and smooth scrolling
-- 🏆 App Store-ready with all native features working
-- 🚀 Viral features and delightful UX that users love
-
-Remember: You're creating mobile magic! Every feature should set new benchmarks for mobile app excellence. Build legendary things! 🚀📱✨`
+## Quality Standards
+- Zero console errors in production builds
+- Responsive mobile experience across iOS/Android/Web
+- Smooth 60fps animations and scrolling
+- App Store-ready with all native features working
+- Production-ready code with proper error handling`
 }
 
 // Add timeout utility function at the top level
@@ -1909,115 +1907,6 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
       }
 
-      case 'add_package': {
-        const { name: packageNames, version = 'latest', isDev = false } = input
-
-        // Ensure packageNames is always an array
-        let names: string[]
-        if (Array.isArray(packageNames)) {
-          names = packageNames
-        } else {
-          // Handle comma-separated strings or JSON array strings
-          const nameStr = packageNames.trim()
-          if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
-            // Try to parse as JSON array
-            try {
-              const parsed = JSON.parse(nameStr)
-              names = Array.isArray(parsed) ? parsed : [nameStr]
-            } catch {
-              names = [nameStr]
-            }
-          } else if (nameStr.includes(',')) {
-            // Split comma-separated values
-            names = nameStr.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-          } else {
-            names = [nameStr]
-          }
-        }
-
-        // Get package.json from memory or create if it doesn't exist
-        let packageFile = sessionFiles.get('package.json')
-        let packageJson: any = {}
-
-        if (!packageFile) {
-          // Create a basic package.json
-          packageJson = {
-            name: "ai-generated-project",
-            version: "1.0.0",
-            description: "AI-generated project",
-            main: "index.js",
-            scripts: {
-              test: "echo \"Error: no test specified\" && exit 1"
-            },
-            keywords: [],
-            author: "",
-            license: "ISC"
-          }
-          // Create the file in memory
-          packageFile = {
-            workspaceId: projectId,
-            name: 'package.json',
-            path: 'package.json',
-            content: JSON.stringify(packageJson, null, 2),
-            fileType: 'json',
-            type: 'json',
-            size: JSON.stringify(packageJson, null, 2).length,
-            isDirectory: false
-          }
-          sessionFiles.set('package.json', packageFile)
-        } else {
-          packageJson = JSON.parse(packageFile.content || '{}')
-        }
-
-        const depType = isDev ? 'devDependencies' : 'dependencies'
-
-        // Initialize dependency section if it doesn't exist
-        if (!packageJson[depType]) {
-          packageJson[depType] = {}
-        }
-
-        // Add all packages
-        const addedPackages: string[] = []
-        const packageVersions: Record<string, string> = {}
-
-        for (const packageName of names) {
-          let packageVersion: string;
-
-          if (version === 'latest') {
-            // Keep 'latest' as-is for npm/yarn to resolve
-            packageVersion = 'latest';
-          } else if (version && typeof version === 'string') {
-            // Use the exact version passed by AI (could be "1.2.3", "^1.2.3", "~1.2.3", etc.)
-            packageVersion = version;
-          } else {
-            // Fallback to latest if version is invalid
-            packageVersion = 'latest';
-          }
-
-          packageJson[depType][packageName] = packageVersion;
-          addedPackages.push(packageName);
-          packageVersions[packageName] = packageVersion;
-        }
-
-        // Update package.json in memory
-        const updatedContent = JSON.stringify(packageJson, null, 2)
-        packageFile.content = updatedContent
-        packageFile.size = updatedContent.length
-
-        return {
-          success: true,
-          action: 'packages_added',
-          packages: addedPackages,
-          packageVersions,
-          requestedVersion: version,
-          dependencyType: depType,
-          path: 'package.json',
-          content: updatedContent,
-          message: `Packages ${addedPackages.join(', ')} added to ${depType} successfully`,
-          toolCallId
-        }
-      }
-
       case 'remove_package': {
         const { name: packageNames, isDev = false } = input
 
@@ -2698,7 +2587,7 @@ export async function POST(req: Request) {
       console.log('[Chat-V2] Detected Expo project, will use specialized Expo system prompt')
     }
 
-    // Get conversation history for context (last 5 message pairs) - Enhanced format for better AI context
+    // Get conversation history for context (last 10 messages) - Enhanced format for better AI context
     let conversationSummaryContext = ''
     try {
       // Ensure messages is an array before using slice
@@ -2823,13 +2712,13 @@ You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering que
 ## Philosophy
 In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
 
-Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and educational! 🌟
+Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
 ` : `
-# 🚀 PiPilot AI: Elite Web Architect & Bug Hunter
+# PiPilot AI: Web Architect
 ## Role
-You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating products with elite code quality, delightful UX, and thorough error handling.
+You are an expert full-stack architect with deep professional experience. Your mission: deliver clean, well-architected web applications with high code quality, great UX, and thorough error handling.
 
-**🚀 CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
+**CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
 When implementing any PiPilot database, authentication, or storage functionality, YOU (the AI) are fully responsible for:
 - Setting up and configuring the PiPilot database for the user
 - Obtaining the API key and database ID automatically
@@ -2959,8 +2848,8 @@ Each time you are buiding anything that requires images , you should always use 
 - **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
   - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
-  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
-  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
+  - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
+  - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
 - **PiPilot DB (REST API Database)**: \`create_database\`, \`create_table\`, \`list_tables\`, \`read_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
   - _These manage DATA in PiPilot's server-side REST API database (NOT IndexedDB)_
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
@@ -3141,7 +3030,7 @@ _Note_:
 - **Product Hunt Ready** 🏆: Add viral features, gamification, sharing
 - **Complete Ecosystem** 🌐: Build onboarding, retention, and full flows
 
-Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and uplifting! 🌟
+Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
 ## 🎨 Design Quality Requirements
 - **Build Checks**: For Vite projects, always use the check dev errors tool to run in build mode  after changes to verify compilation
 - **Color Combinations**: Use harmonious color palettes (avoid clashing colors like red/green for text)
@@ -3233,14 +3122,12 @@ const { theme, setTheme } = useTheme();
 - ⛔ NEVER use LaTeX math formatting like \boxed{} or similar academic response patterns
 - ✅ Always respond directly and professionally without exposing your thinking process
 - 🔄 **CRITICAL**: If the \`edit_file\` tool fails more than 3 times consecutively on the same file, immediately switch to using the \`client_replace_string_in_file\` tool (preferred) or \`write_file\` tool to **recreate the entire file** with all the new changes incorporated. Do not continue trying to use \`edit_file\` on a problematic file.
-## 🏅 Success Metrics
-- ✨ Flawless operation across all devices
-- 🎨 UI so beautiful, users share screenshots
-- 😊 Indispensable features
-- 🚫 Zero console errors, smooth performance
-- 🐛 Bugs fixed with user experience improvements
-- 👍 Featured on Product Hunt, viral traction
-_Remember: You’re not just coding—you’re creating digital magic! Every feature, pixel, and product should set new benchmarks. Build legendary things! 🚀✨🎉_
+## Quality Standards
+- Responsive design that works across all screen sizes
+- Clean, consistent UI following the project's design system
+- Zero console errors, smooth performance
+- Bugs fixed thoroughly with root cause analysis
+- Production-ready code with proper error handling
 
 `
 
@@ -10385,7 +10272,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
-      'web_search', 'web_extract', 'remove_package', 'add_package',
+      'web_search', 'web_extract', 'remove_package',
       'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
       'delete_file', 'read_file', 'write_file'
     ]

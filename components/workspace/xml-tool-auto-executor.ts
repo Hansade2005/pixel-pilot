@@ -46,7 +46,7 @@ class XMLToolAutoExecutor {
     const validCommands = [
       'pilotwrite', 'pilotedit', 'pilotdelete',
       'write_file', 'edit_file', 'delete_file', 'delete_folder',
-      'execute_sql', 'add_package', 'remove_package'
+      'execute_sql', 'remove_package'
     ]
     return validCommands.includes(toolCall.command)
   }
@@ -718,44 +718,6 @@ class XMLToolAutoExecutor {
           
           return { message: `Folder ${toolCall.path} deleted successfully (${deletedCount} files removed)` }
 
-        case 'add_package':
-          if (!toolCall.args.name) {
-            throw new Error('add_package requires name parameter')
-          }
-          
-          const packageName = toolCall.args.name
-          const packageVersion = toolCall.args.version || 'latest'
-          const isDev = toolCall.args.isDev || false
-          
-          // Read current package.json
-          const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
-          if (!packageJsonFile) {
-            throw new Error('package.json not found')
-          }
-          
-          const packageJson = JSON.parse(packageJsonFile.content)
-          
-          // Add package to dependencies or devDependencies
-          const depType = isDev ? 'devDependencies' : 'dependencies'
-          if (!packageJson[depType]) {
-            packageJson[depType] = {}
-          }
-          packageJson[depType][packageName] = packageVersion
-          
-          // Update package.json
-          await storageManager.updateFile(projectId, 'package.json', { 
-            content: JSON.stringify(packageJson, null, 2) 
-          })
-          
-          // Emit files-changed event
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('files-changed', {
-              detail: { projectId: this.options.projectId }
-            }))
-          }
-          
-          return { message: `Package ${packageName}@${packageVersion} added to ${depType} successfully` }
-
         case 'remove_package':
           if (!toolCall.args.name) {
             throw new Error('remove_package requires name parameter')
@@ -872,7 +834,7 @@ class XMLToolAutoExecutor {
     return jsonTools.map(tool => ({
       id: tool.id,
       name: tool.tool || tool.name || 'unknown',
-      command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'add_package' | 'remove_package',
+      command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'remove_package',
       path: tool.path || '',
       content: tool.content || '',
       args: tool.args,

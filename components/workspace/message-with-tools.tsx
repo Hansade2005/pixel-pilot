@@ -154,7 +154,6 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'list_files': return <FolderOpen className="w-3.5 h-3.5" />
       case 'delete_file':
       case 'delete_folder': return <X className="w-3.5 h-3.5" />
-      case 'add_package': return <Package className="w-3.5 h-3.5" />
       case 'remove_package': return <PackageMinus className="w-3.5 h-3.5" />
       case 'create_database': return <Database className="w-3.5 h-3.5" />
       case 'create_table':
@@ -191,7 +190,6 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'delete_folder': return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
       case 'read_file': return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files': return 'Listing files'
-      case 'add_package': return `Adding ${args?.packageName || 'package'}`
       case 'remove_package': return `Removing ${args?.packageName || 'package'}`
       case 'create_database': return `Creating database "${args?.name || 'main'}"`
       case 'create_table': return `Creating table "${args?.tableName || 'table'}"`
@@ -258,8 +256,8 @@ const InterleavedContent = ({
     return positionKey === 'reasoningPosition' ? tc.reasoningPosition : tc.textPosition
   }
 
-  // If no tool calls with positions, just render the content
-  const toolsWithPositions = toolCalls.filter(tc => typeof getPosition(tc) === 'number')
+  // Filter out failed tool calls (consistent with ToolPanel activity display) and require positions
+  const toolsWithPositions = toolCalls.filter(tc => tc.status !== 'failed' && typeof getPosition(tc) === 'number')
 
   if (toolsWithPositions.length === 0) {
     return <>{children(content)}</>
@@ -441,7 +439,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
         }
 
         // Dispatch files-changed event for package operations
-        if (['add_package', 'remove_package'].includes(toolInvocation.toolName)) {
+        if (['remove_package'].includes(toolInvocation.toolName)) {
           window.dispatchEvent(new CustomEvent('files-changed', {
             detail: {
               projectId: projectId,
@@ -465,7 +463,6 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
       case 'delete_folder': return X
       case 'read_file': return Eye
       case 'list_files': return FolderOpen
-      case 'add_package': return Package
       case 'remove_package': return PackageMinus
       case 'grep_search':
       case 'semantic_code_navigator': return Search
@@ -489,8 +486,6 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
         return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files':
         return 'Listing files'
-      case 'add_package':
-        return `Adding ${args?.packageName || 'package'}`
       case 'remove_package':
         return `Removing ${args?.packageName || 'package'}`
       case 'grep_search':
@@ -614,6 +609,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
             // Filter out tools that were called during reasoning (not during text streaming)
             // Tools called during reasoning have reasoningPosition > 0 and textPosition = 0
             const textStreamToolCalls = inlineToolCalls?.filter(tc => {
+              // Filter out failed tools (consistent with ToolPanel activity display)
+              if (tc.status === 'failed') return false
               const textPos = tc.textPosition ?? 0
               const reasoningPos = tc.reasoningPosition ?? 0
               // Show tool in text content only if:
