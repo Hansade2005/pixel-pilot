@@ -118,6 +118,7 @@ interface CodePreviewPanelProps {
   onApplyTheme?: (theme: Theme, cssContent: string) => Promise<boolean>;
   onTagToChat?: (component: { id: string; tagName: string; sourceFile?: string; sourceLine?: number; className: string; textContent?: string }) => void;
   onPublish?: () => void;
+  isAIStreaming?: boolean;
 }
 
 export interface CodePreviewPanelRef {
@@ -847,7 +848,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish, isAIStreaming = false }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -870,7 +871,6 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
   const [isExpoProject, setIsExpoProject] = useState(false)
-  const [isAIStreaming, setIsAIStreaming] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
   const [backgroundProcess, setBackgroundProcess] = useState<{
@@ -984,16 +984,6 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
   }, [consoleOutput, browserLogs, processLogs, isConsoleOpen])
-
-  // Listen for AI streaming state from chat panel
-  useEffect(() => {
-    const handleAIStreaming = (e: Event) => {
-      const detail = (e as CustomEvent).detail
-      setIsAIStreaming(detail?.isStreaming ?? false)
-    }
-    window.addEventListener('ai-streaming-state', handleAIStreaming)
-    return () => window.removeEventListener('ai-streaming-state', handleAIStreaming)
-  }, [])
 
   // Set up iframe message listener for browser logs
   useEffect(() => {
