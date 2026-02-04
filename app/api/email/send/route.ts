@@ -1,19 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-// Zeptomail SMTP Configuration (Zoho's transactional email service)
-const SMTP_CONFIG = {
+// Primary: Zeptomail SMTP Configuration (Zoho's transactional email service)
+const PRIMARY_SMTP_CONFIG = {
   host: 'smtp.zeptomail.com',
   port: 587,
-  secure: false, // true for 465, false for 587
+  secure: false,
   auth: {
     user: 'emailapikey',
     pass: 'wSsVR60krkLzB6Yrzzz8dbhryw4HUVulHBgo0VfyvyP8SKqU8cc8khDJAgfxSKMdFzY7FmFAobkgnx8F2mEHhtskw11TWSiF9mqRe1U4J3x17qnvhDzDWW9UlhKIKogLwAxpk2FpEMol+g=='
   }
 };
 
-// Create reusable transporter object using SMTP transport
-const transporter = nodemailer.createTransport(SMTP_CONFIG);
+// Fallback: Zoho Mail SMTP Configuration
+const FALLBACK_SMTP_CONFIG = {
+  host: 'smtp.zoho.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: 'hello@pipilot.dev',
+    pass: 'Bamenda@5'
+  }
+};
+
+// Create reusable transporters
+const primaryTransporter = nodemailer.createTransport(PRIMARY_SMTP_CONFIG);
+const fallbackTransporter = nodemailer.createTransport(FALLBACK_SMTP_CONFIG);
 
 interface EmailRequest {
   to: string | string[];
@@ -70,13 +82,29 @@ export async function POST(request: NextRequest) {
       attachments: body.attachments
     };
 
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
+    // Try primary (Zeptomail) first, fall back to Zoho SMTP on failure
+    let info;
+    let usedFallback = false;
+
+    try {
+      info = await primaryTransporter.sendMail(mailOptions);
+    } catch (primaryError: any) {
+      console.warn('Primary SMTP (Zeptomail) failed, trying fallback (Zoho):', {
+        error: primaryError.message,
+        code: primaryError.code,
+        timestamp: new Date().toISOString()
+      });
+
+      // Retry with fallback transporter
+      info = await fallbackTransporter.sendMail(mailOptions);
+      usedFallback = true;
+    }
 
     console.log('Email sent successfully:', {
       messageId: info.messageId,
       to: body.to,
       subject: body.subject,
+      provider: usedFallback ? 'zoho-fallback' : 'zeptomail-primary',
       timestamp: new Date().toISOString()
     });
 
@@ -87,11 +115,12 @@ export async function POST(request: NextRequest) {
       envelope: info.envelope,
       accepted: info.accepted,
       rejected: info.rejected,
-      pending: info.pending
+      pending: info.pending,
+      provider: usedFallback ? 'fallback' : 'primary'
     });
 
   } catch (error: any) {
-    console.error('Email sending error:', {
+    console.error('Email sending error (both providers failed):', {
       error: error.message,
       code: error.code,
       command: error.command,
