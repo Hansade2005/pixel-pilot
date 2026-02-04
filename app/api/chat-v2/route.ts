@@ -3198,6 +3198,21 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
       console.log('[Chat-V2] Using specialized Expo SDK 54 system prompt')
     }
 
+    // Inform the AI which integrations are NOT configured so it doesn't attempt them
+    const unavailableServices: string[] = []
+    if (!stripeApiKey) unavailableServices.push('Stripe (no API key connected)')
+    if (!supabaseAccessToken || !supabaseProjectDetails) unavailableServices.push('Supabase remote project (not connected)')
+    if (!databaseId) unavailableServices.push('PiPilot Database (no database created yet - use create_database first if the user needs one)')
+    if (!process.env.E2B_API_KEY) unavailableServices.push('Node Machine / terminal (E2B not configured)')
+
+    if (unavailableServices.length > 0 && chatMode !== 'ask') {
+      systemPrompt += `\n\n## Unavailable Integrations
+The following services are NOT currently connected for this project. Do NOT attempt to use their tools or suggest them as if they work. If the user asks for these, explain they need to connect/configure them first in project settings:
+${unavailableServices.map(s => `- ${s}`).join('\n')}
+
+IMPORTANT: Focus on what you CAN do. Build the application fully using the tools available to you (file operations, code generation, web search, etc.). Do NOT stop early or declare the app "complete" just because some integrations are unavailable. Write all the code, create all the files, and implement the full feature set the user requested.`
+    }
+
     // Add continuation instructions if this is a continuation request
     if (isContinuation) {
       // Build context about what was already said
@@ -10329,8 +10344,55 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       )
       console.log('[Chat-V2] UI initial prompt detected - using limited toolset:', uiInitialPromptTools)
     } else {
-      // Agent mode: all tools
-      toolsToUse = allTools
+      // Agent mode: start with all tools, then remove tools whose required keys/config are missing
+      // This prevents the AI from wasting steps calling tools that will always fail
+      const unavailableTools: string[] = []
+
+      // Stripe tools require stripeApiKey from the client
+      if (!stripeApiKey) {
+        const stripeTools = [
+          'stripe_validate_key', 'stripe_list_products', 'stripe_create_product', 'stripe_update_product', 'stripe_delete_product',
+          'stripe_list_prices', 'stripe_create_price', 'stripe_update_price',
+          'stripe_list_customers', 'stripe_create_customer', 'stripe_update_customer', 'stripe_delete_customer',
+          'stripe_create_payment_intent', 'stripe_update_payment_intent', 'stripe_cancel_payment_intent', 'stripe_list_charges',
+          'stripe_list_subscriptions', 'stripe_update_subscription', 'stripe_cancel_subscription',
+          'stripe_list_coupons', 'stripe_create_coupon', 'stripe_update_coupon', 'stripe_delete_coupon',
+          'stripe_create_refund', 'stripe_search'
+        ]
+        unavailableTools.push(...stripeTools)
+      }
+
+      // Remote Supabase tools require supabaseAccessToken and supabaseProjectDetails
+      if (!supabaseAccessToken || !supabaseProjectDetails) {
+        const supabaseRemoteTools = [
+          'supabase_fetch_api_keys', 'supabase_create_table', 'supabase_insert_data', 'supabase_delete_data',
+          'supabase_read_table', 'supabase_drop_table', 'supabase_execute_sql', 'supabase_list_tables_rls'
+        ]
+        unavailableTools.push(...supabaseRemoteTools)
+      }
+
+      // PiPilot database tools require databaseId
+      if (!databaseId) {
+        const dbTools = [
+          'create_table', 'query_database', 'manipulate_table_data', 'manage_api_keys',
+          'list_tables', 'read_table', 'delete_table'
+        ]
+        unavailableTools.push(...dbTools)
+      }
+
+      // node_machine requires E2B_API_KEY
+      if (!process.env.E2B_API_KEY) {
+        unavailableTools.push('node_machine')
+      }
+
+      if (unavailableTools.length > 0) {
+        toolsToUse = Object.fromEntries(
+          Object.entries(allTools).filter(([toolName]) => !unavailableTools.includes(toolName))
+        )
+        console.log(`[Chat-V2] Agent mode - filtered out ${unavailableTools.length} unavailable tools (missing keys/config):`, unavailableTools)
+      } else {
+        toolsToUse = allTools
+      }
     }
 
     // Stream with AI SDK native tools
