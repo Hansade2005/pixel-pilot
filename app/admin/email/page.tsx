@@ -22,18 +22,14 @@ import {
   Send,
   X,
   ArrowLeft,
-  Star,
   CheckCircle,
   Loader2,
   User,
   Sparkles,
   Eye,
-  Code,
-  Wand2,
-  RefreshCw
+  Code
 } from "lucide-react"
 import {
-  sendEmail,
   sendMarketingEmail,
   sendTransactionalEmail
 } from "@/lib/email-client"
@@ -548,73 +544,6 @@ export default function AdminEmailPage() {
                   </TabsContent>
                 </Tabs>
               </div>
-
-              {/* AI Generator */}
-              {showAIGenerator && (
-                <div className="px-4 pb-4 border-t">
-                  <div className="space-y-4 pt-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium">AI Email Assistant</span>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Prompt</label>
-                        <Textarea
-                          placeholder="Describe the email you want to generate..."
-                          value={aiPrompt}
-                          onChange={(e) => setAiPrompt(e.target.value)}
-                          rows={3}
-                          className="resize-none"
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleAIGenerate}
-                          disabled={isGenerating || !aiPrompt.trim()}
-                          size="sm"
-                          className="flex-1"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Wand2 className="h-4 w-4 mr-2" />
-                              Generate
-                            </>
-                          )}
-                        </Button>
-
-                        <Button
-                          onClick={handleAIContentApply}
-                          disabled={!aiContent && !aiHtml}
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          Apply to Content
-                        </Button>
-                      </div>
-
-                      {aiContent && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Generated Content</label>
-                          <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800 max-h-[200px] overflow-auto">
-                            <div className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
-                              {aiContent}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Actions */}
               <div className="bg-muted px-4 py-3 flex items-center justify-between border-t">
