@@ -29,7 +29,10 @@ import {
   MessageSquare,
   Globe,
   Share2,
-  ChevronRight
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Pause
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
@@ -201,70 +204,142 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
   disabled: boolean;
 }) {
   const [activeCard, setActiveCard] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(true)
 
-  // Auto-rotate cards every 4 seconds
+  // Auto-rotate cards
   useEffect(() => {
+    if (!isPlaying) return
     const interval = setInterval(() => {
       setActiveCard(prev => (prev + 1) % FEATURE_CARDS.length)
     }, 4000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isPlaying])
+
+  const goPrev = () => setActiveCard(prev => (prev - 1 + FEATURE_CARDS.length) % FEATURE_CARDS.length)
+  const goNext = () => setActiveCard(prev => (prev + 1) % FEATURE_CARDS.length)
 
   const card = FEATURE_CARDS[activeCard]
   const CardIcon = card.icon
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-background to-muted/20 overflow-y-auto">
-      <div className="w-full max-w-md">
-        {/* Rotating Feature Card */}
-        <div className="relative mx-auto mb-6">
-          <div
-            className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
-          >
-            {/* Card header */}
-            <div className="px-5 pt-5 pb-3 flex items-start gap-3">
-              <div className={`p-2.5 rounded-xl bg-background/80 shadow-sm ${card.accent}`}>
-                <CardIcon className="h-6 w-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-base leading-tight">{card.title}</h4>
-                <p className="text-sm text-muted-foreground mt-1 leading-snug">
-                  {card.description}
-                </p>
-              </div>
-            </div>
+      <div className="w-full max-w-lg">
+        {/* Card row: dots | card | nav buttons */}
+        <div className="flex items-center gap-3 mb-6">
+          {/* Left: vertical dot indicators */}
+          <div className="hidden sm:flex flex-col items-center gap-1.5 py-2">
+            {FEATURE_CARDS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveCard(i)}
+                className={`rounded-full transition-all duration-300 ${
+                  i === activeCard
+                    ? 'w-2 h-5 bg-primary'
+                    : 'w-2 h-2 bg-muted-foreground/25 hover:bg-muted-foreground/50'
+                }`}
+              />
+            ))}
+          </div>
 
-            {/* Detail items */}
-            <div className="px-5 pb-5">
-              <div className="grid grid-cols-2 gap-2">
-                {card.details.map((detail, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/60 border border-border/50"
-                    style={{ animationDelay: `${i * 100}ms` }}
-                  >
-                    <ChevronRight className={`h-3 w-3 flex-shrink-0 ${card.accent}`} />
-                    <span className="text-xs text-foreground/80 truncate">{detail}</span>
-                  </div>
-                ))}
+          {/* Center: feature card */}
+          <div className="flex-1 min-w-0">
+            <div
+              className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
+            >
+              {/* Card header */}
+              <div className="px-5 pt-5 pb-3 flex items-start gap-3">
+                <div className={`p-2.5 rounded-xl bg-background/80 shadow-sm ${card.accent}`}>
+                  <CardIcon className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-base leading-tight">{card.title}</h4>
+                  <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                    {card.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Detail items */}
+              <div className="px-5 pb-5">
+                <div className="grid grid-cols-2 gap-2">
+                  {card.details.map((detail, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/60 border border-border/50"
+                    >
+                      <ChevronRight className={`h-3 w-3 flex-shrink-0 ${card.accent}`} />
+                      <span className="text-xs text-foreground/80 truncate">{detail}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Right: prev / play-pause / next buttons */}
+          <div className="hidden sm:flex flex-col items-center gap-1.5">
+            <button
+              onClick={goPrev}
+              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+            >
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+            >
+              {isPlaying ? (
+                <Pause className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <Play className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
+              )}
+            </button>
+            <button
+              onClick={goNext}
+              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+            >
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
-        {/* Dot indicators */}
-        <div className="flex justify-center gap-1.5 mb-5">
-          {FEATURE_CARDS.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveCard(i)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === activeCard
-                  ? 'w-6 bg-primary'
-                  : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-              }`}
-            />
-          ))}
+        {/* Mobile: horizontal dots + nav (visible only on small screens) */}
+        <div className="flex sm:hidden items-center justify-center gap-3 mb-5">
+          <button
+            onClick={goPrev}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
+          >
+            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            {FEATURE_CARDS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveCard(i)}
+                className={`rounded-full transition-all duration-300 ${
+                  i === activeCard
+                    ? 'w-5 h-1.5 bg-primary'
+                    : 'w-1.5 h-1.5 bg-muted-foreground/25 hover:bg-muted-foreground/50'
+                }`}
+              />
+            ))}
+          </div>
+          <button
+            onClick={() => setIsPlaying(!isPlaying)}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
+          >
+            {isPlaying ? (
+              <Pause className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <Play className="h-3 w-3 text-muted-foreground ml-0.5" />
+            )}
+          </button>
+          <button
+            onClick={goNext}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
+          >
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
         </div>
 
         {/* Title + CTA */}
