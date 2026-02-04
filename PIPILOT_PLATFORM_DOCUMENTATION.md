@@ -58,7 +58,6 @@ PiPilot is a revolutionary AI-powered app development platform that enables user
 - `remove_package` - Package management for dependencies
 
 **Package Management:**
-- `add_package` - Install npm packages with version management
 - `remove_package` - Uninstall dependencies safely
 - `check_dev_errors` - Build verification for JavaScript/TypeScript projects
 

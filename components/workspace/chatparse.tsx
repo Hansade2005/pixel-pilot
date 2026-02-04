@@ -1185,7 +1185,7 @@ export function ChatPanelV2({
                         await storageManager.deleteFile(project.id, fileOp.path)
                         console.log(`[ChatPanelV2][DataStream] Deleted file: ${fileOp.path}`)
                         operationsApplied++
-                      } else if ((fileOp.type === 'add_package' || fileOp.type === 'remove_package') && fileOp.path === 'package.json' && fileOp.content) {
+                      } else if ((fileOp.type === 'remove_package') && fileOp.path === 'package.json' && fileOp.content) {
                         // Update package.json for package operations
                         await storageManager.updateFile(project.id, 'package.json', {
                           content: fileOp.content,

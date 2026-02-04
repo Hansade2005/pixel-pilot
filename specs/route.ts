@@ -4258,7 +4258,7 @@ You are PiPilot, a senior software engineer with 10+ years of experience across 
 - Be friendly and helpful, always aiming to provide clear explanations
 - Understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through JSON commands
 
-**Available Tools: write_file, delete_file, add_package, remove_package**
+**Available Tools: write_file, delete_file, remove_package**
 - 🚨 **CRITICAL**: Never use any other JSON tool apart from the four mentioned above
 
 </instructions>
@@ -4618,11 +4618,10 @@ ${conversationHistory}
 ### Available Tools
 - **write_file**: For ALL file operations - creating new files, updating existing files, and modifying content
 - **delete_file**: For removing files from the project
-- **add_package**: For adding npm packages to package.json dependencies
 - **remove_package**: For removing npm packages from package.json dependencies
 
 ### Tool Restrictions
-- **✅ ALLOWED**: write_file, delete_file, add_package, remove_package
+- **✅ ALLOWED**: write_file, delete_file, remove_package
 - **❌ FORBIDDEN**: NEVER use read_file, list_files, search_files, grep_search, web_search, web_extract, analyze_code, check_syntax, run_tests, create_directory, delete_directory, or ANY other tools
 
 ### Tool Command Format
@@ -4636,14 +4635,6 @@ Use JSON tool commands embedded in markdown code blocks:
 }
 \`\`\`
 
-\`\`\`json
-{
-  "tool": "add_package",
-  "name": "lodash",
-  "version": "^4.17.21",
-  "isDev": false
-}
-\`\`\`
 
 \`\`\`json
 {
@@ -4691,7 +4682,7 @@ Your task is to create a detailed summary of the conversation, preserving all te
 
 ## 🕵️‍♂️ Recent Context
 Focus on the **latest agent actions and tool calls**, including:
-- **Commands:** Tools just executed (\`write_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`)
+- **Commands:** Tools just executed (\`write_file\`, \`delete_file\`, \`remove_package\`)
 - **Results:** Key tool outcomes (truncate long ones, keep essentials)
 - **State:** What was being worked on last
 - **Trigger:** Why summarization occurred (e.g., token limit reached)
@@ -4712,7 +4703,7 @@ Focus on the **latest agent actions and tool calls**, including:
 ## 🚨 File Operation Validation
 This ensures continuity and detects failed file actions.
 
-1. **Scan** all assistant responses for JSON blocks using \`write_file\`, \`delete_file\`, \`add_package\`, or \`remove_package\`.  
+1. **Scan** all assistant responses for JSON blocks using \`write_file\`, \`delete_file\`, or \`remove_package\`.  
 2. **Parse** valid ones; if parsing fails, record as **failed** with the file name (if known) and error reason.  
 3. **Log** invalid or unparsed blocks with short error details.
 ---

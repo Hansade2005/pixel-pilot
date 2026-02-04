@@ -97,8 +97,8 @@ TOOLSET MASTERY
 - **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
   - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
-  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
-  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
+  - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
+  - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync) and \`continue_backend_implementation\`
 
 ❌ OUT OF SCOPE:
@@ -705,8 +705,8 @@ When creating, adding, or updating app features, follow this exact structure and
 - **Package Management**: Check \`package.json\` first, use \`web_search\` for latest versions
   - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
-  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
-  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
+  - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
+  - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
 - **Development**: \`check_dev_errors\` for build verification
 - **Search**: \`semantic_code_navigator\`, \`grep_search\` for code analysis
 - **External**: \`web_search\`, \`web_extract\` for documentation and latest packages
@@ -1907,115 +1907,6 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
       }
 
-      case 'add_package': {
-        const { name: packageNames, version = 'latest', isDev = false } = input
-
-        // Ensure packageNames is always an array
-        let names: string[]
-        if (Array.isArray(packageNames)) {
-          names = packageNames
-        } else {
-          // Handle comma-separated strings or JSON array strings
-          const nameStr = packageNames.trim()
-          if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
-            // Try to parse as JSON array
-            try {
-              const parsed = JSON.parse(nameStr)
-              names = Array.isArray(parsed) ? parsed : [nameStr]
-            } catch {
-              names = [nameStr]
-            }
-          } else if (nameStr.includes(',')) {
-            // Split comma-separated values
-            names = nameStr.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-          } else {
-            names = [nameStr]
-          }
-        }
-
-        // Get package.json from memory or create if it doesn't exist
-        let packageFile = sessionFiles.get('package.json')
-        let packageJson: any = {}
-
-        if (!packageFile) {
-          // Create a basic package.json
-          packageJson = {
-            name: "ai-generated-project",
-            version: "1.0.0",
-            description: "AI-generated project",
-            main: "index.js",
-            scripts: {
-              test: "echo \"Error: no test specified\" && exit 1"
-            },
-            keywords: [],
-            author: "",
-            license: "ISC"
-          }
-          // Create the file in memory
-          packageFile = {
-            workspaceId: projectId,
-            name: 'package.json',
-            path: 'package.json',
-            content: JSON.stringify(packageJson, null, 2),
-            fileType: 'json',
-            type: 'json',
-            size: JSON.stringify(packageJson, null, 2).length,
-            isDirectory: false
-          }
-          sessionFiles.set('package.json', packageFile)
-        } else {
-          packageJson = JSON.parse(packageFile.content || '{}')
-        }
-
-        const depType = isDev ? 'devDependencies' : 'dependencies'
-
-        // Initialize dependency section if it doesn't exist
-        if (!packageJson[depType]) {
-          packageJson[depType] = {}
-        }
-
-        // Add all packages
-        const addedPackages: string[] = []
-        const packageVersions: Record<string, string> = {}
-
-        for (const packageName of names) {
-          let packageVersion: string;
-
-          if (version === 'latest') {
-            // Keep 'latest' as-is for npm/yarn to resolve
-            packageVersion = 'latest';
-          } else if (version && typeof version === 'string') {
-            // Use the exact version passed by AI (could be "1.2.3", "^1.2.3", "~1.2.3", etc.)
-            packageVersion = version;
-          } else {
-            // Fallback to latest if version is invalid
-            packageVersion = 'latest';
-          }
-
-          packageJson[depType][packageName] = packageVersion;
-          addedPackages.push(packageName);
-          packageVersions[packageName] = packageVersion;
-        }
-
-        // Update package.json in memory
-        const updatedContent = JSON.stringify(packageJson, null, 2)
-        packageFile.content = updatedContent
-        packageFile.size = updatedContent.length
-
-        return {
-          success: true,
-          action: 'packages_added',
-          packages: addedPackages,
-          packageVersions,
-          requestedVersion: version,
-          dependencyType: depType,
-          path: 'package.json',
-          content: updatedContent,
-          message: `Packages ${addedPackages.join(', ')} added to ${depType} successfully`,
-          toolCallId
-        }
-      }
-
       case 'remove_package': {
         const { name: packageNames, isDev = false } = input
 
@@ -2957,8 +2848,8 @@ Each time you are buiding anything that requires images , you should always use 
 - **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
   - **🚫 STRICT RULE: NEVER USE node_machine FOR PACKAGE INSTALLATION**
   - **The \`node_machine\` tool is ABSOLUTELY FORBIDDEN for running npm install, yarn install, or any package installation commands**
-  - **If you need to install packages, EDIT package.json DIRECTLY ONLY - NO EXCEPTIONS**
-  - **VIOLATION WILL BREAK THE SYSTEM - Always edit package.json manually**
+  - **To add packages**: Use \`client_replace_string_in_file\` to update the dependencies/devDependencies section of \`package.json\`. Read the file first, then replace the relevant JSON section with the new packages included.
+  - **VIOLATION WILL BREAK THE SYSTEM - Never run npm/yarn install, always edit package.json directly**
 - **PiPilot DB (REST API Database)**: \`create_database\`, \`create_table\`, \`list_tables\`, \`read_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
   - _These manage DATA in PiPilot's server-side REST API database (NOT IndexedDB)_
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
@@ -3575,21 +3466,6 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
 
       // CLIENT-SIDE TOOL: Executed on frontend for package.json management
-      add_package: tool({
-        description: 'Add one or more npm packages to package.json. Use this tool to install dependencies. This tool manages PROJECT FILES in client-side storage (NOT PiPilot DB database).',
-        inputSchema: z.object({
-          name: z.union([
-            z.string().describe('The package name to add or comma-separated names (e.g., "lodash, axios")'),
-            z.array(z.string()).describe('Array of package names to add')
-          ]).describe('Package name(s) to add'),
-          version: z.string().optional().describe('Package version (default: "latest")'),
-          isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
-        }),
-        execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
-          return await constructToolResult('add_package', input, projectId, toolCallId)
-        }
-      }),
-
       remove_package: tool({
         description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies. This tool manages PROJECT FILES in client-side storage (NOT PiPilot DB database).',
         inputSchema: z.object({
@@ -10396,7 +10272,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract']
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
-      'web_search', 'web_extract', 'remove_package', 'add_package',
+      'web_search', 'web_extract', 'remove_package',
       'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
       'delete_file', 'read_file', 'write_file'
     ]

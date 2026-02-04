@@ -61,7 +61,7 @@ export class JsonToolParser {
     'write_file', 'edit_file', 'delete_file',
     'read_file', 'list_files', 'create_directory',
     'pilotwrite', 'pilotedit', 'pilotdelete',
-    'add_package', 'remove_package'
+    'remove_package'
   ]
   private repairEngine = new SchemaAwareJSONRepairEngine()
 

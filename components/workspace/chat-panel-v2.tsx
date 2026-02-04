@@ -362,7 +362,7 @@ const ToolActivityPanel = ({
       'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
       return '💾 Database Operations'
     }
-    if (['add_package', 'remove_package'].includes(toolName)) {
+    if (['remove_package'].includes(toolName)) {
       return '📦 Package Management'
     }
     if (['web_search', 'web_extract'].includes(toolName)) {
@@ -392,8 +392,6 @@ const ToolActivityPanel = ({
         return <X className="w-3.5 h-3.5" />
       case 'delete_folder':
         return <X className="w-3.5 h-3.5" />
-      case 'add_package':
-        return <Package className="w-3.5 h-3.5" />
       case 'remove_package':
         return <PackageMinus className="w-3.5 h-3.5" />
       case 'create_database':
@@ -451,8 +449,6 @@ const ToolActivityPanel = ({
         return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files':
         return 'Listing files'
-      case 'add_package':
-        return `Adding ${args?.packageName || 'package'}`
       case 'remove_package':
         return `Removing ${args?.packageName || 'package'}`
       case 'create_database':
@@ -716,8 +712,6 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return <X className="w-3.5 h-3.5" />
       case 'delete_folder':
         return <X className="w-3.5 h-3.5" />
-      case 'add_package':
-        return <Package className="w-3.5 h-3.5" />
       case 'remove_package':
         return <PackageMinus className="w-3.5 h-3.5" />
       case 'create_database':
@@ -775,8 +769,6 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files':
         return 'Listing files'
-      case 'add_package':
-        return `Adding ${args?.packageName || 'package'}`
       case 'remove_package':
         return `Removing ${args?.packageName || 'package'}`
       case 'create_database':
@@ -1097,6 +1089,7 @@ export function ChatPanelV2({
   const [isLoading, setIsLoading] = useState(false)
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
+  const isContinuationInProgressRef = useRef(false)
 
   // Broadcast AI streaming state to other panels (e.g. preview panel)
   useEffect(() => {
@@ -2184,7 +2177,6 @@ export function ChatPanelV2({
                 'client_replace_string_in_file',
                 'delete_file',
                 'delete_folder',
-                'add_package',
                 'remove_package',
                 'read_file',
                 'list_files',
@@ -2349,6 +2341,7 @@ export function ChatPanelV2({
       setIsLoading(false)
       setAbortController(null)
       setContinuingMessageId(null) // Clear continuing state
+      isContinuationInProgressRef.current = false
       setIsContinuationInProgress(false) // Clear continuation flag
     }
   }
@@ -2886,8 +2879,7 @@ export function ChatPanelV2({
                 'edit_file', 
                 'client_replace_string_in_file',
                 'delete_file',
-                'delete_folder', 
-                'add_package', 
+                'delete_folder',
                 'remove_package',
                 'read_file',
                 'list_files',
@@ -3003,6 +2995,7 @@ export function ChatPanelV2({
       abortController.abort()
       setAbortController(null)
       setIsLoading(false)
+      isContinuationInProgressRef.current = false
       setIsContinuationInProgress(false)
 
       // Mark stream as user-aborted in recovery manager (won't show recovery prompt)
@@ -3330,7 +3323,7 @@ export function ChatPanelV2({
                 // Execute client-side tools
                 const clientSideTools = [
                   'write_file', 'edit_file', 'client_replace_string_in_file',
-                  'delete_file', 'delete_folder', 'add_package', 'remove_package',
+                  'delete_file', 'delete_folder', 'remove_package',
                   'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
                   'create_database', 'request_supabase_connection'
                 ]
@@ -3406,6 +3399,7 @@ export function ChatPanelV2({
       // Clear streaming state
       currentStreamIdRef.current = null
       setIsLoading(false)
+      isContinuationInProgressRef.current = false
       setIsContinuationInProgress(false)
       setContinuingMessageId(null)
       setStreamingMessageId(null)
@@ -4304,6 +4298,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               console.log('[ChatPanelV2][Continuation] 🔄 Received continuation signal:', parsed.continuationState?.continuationToken)
 
               // Mark that continuation is in progress to keep loading active
+              // Use ref for synchronous access in finally block (state is async)
+              isContinuationInProgressRef.current = true
               setIsContinuationInProgress(true)
 
               // Show continuation message to user
@@ -4375,7 +4371,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 'client_replace_string_in_file',
                 'delete_file',
                 'delete_folder',
-                'add_package',
                 'remove_package',
                 'read_file',
                 'list_files',
@@ -4596,7 +4591,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Clear the current stream ref
       currentStreamIdRef.current = null
       // Only turn off loading if continuation is not in progress
-      if (!isContinuationInProgress) {
+      // Use ref for synchronous check (state may not have updated yet)
+      if (!isContinuationInProgressRef.current) {
         setIsLoading(false)
       }
       setAbortController(null)

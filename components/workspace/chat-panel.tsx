@@ -372,15 +372,15 @@ function sanitizeStreamingContent(content: string): string {
     .replace(/```xml\s*([\s\S]*?)```/g, '$1')
     .replace(/```([\s\S]*?)```/g, (match, content) => {
       // Only remove code blocks that contain XML tags
-      if (/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)/.test(content)) {
+      if (/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|remove_package)/.test(content)) {
         console.log('[SANITIZER] Removing code block wrapper around XML content')
         return content
       }
       return match
     })
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|remove_package)[^>]*>[\s\S]*?<\/\1>/gi, '')
     // Remove self-closing XML tool tags
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)[^>]*\/>/gi, '')
+    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|remove_package)[^>]*\/>/gi, '')
     // Clean up multiple newlines
     .replace(/\n\n\n+/g, '\n\n')
     // Remove leading/trailing whitespace
@@ -513,7 +513,7 @@ export interface XMLToolCall {
   startTime?: number
   endTime?: number
   // Additional properties for pill rendering
-  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'delete_folder' | 'execute_sql' | 'add_package' | 'remove_package'
+  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'delete_folder' | 'execute_sql' | 'remove_package'
   path?: string
   content?: string
 }
@@ -600,7 +600,7 @@ const JSONToolPill = ({
       }
 
       // For package tools, we don't need a path
-      const needsPath = !['add_package', 'remove_package'].includes(toolCall.tool)
+      const needsPath = !['remove_package'].includes(toolCall.tool)
       if (needsPath && !toolCall.path) {
         return
       }
@@ -632,58 +632,16 @@ const JSONToolPill = ({
         let result: any
         
         // For package tools, use the global queue to prevent race conditions
-        if (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package') {
+        if (toolCall.tool === 'remove_package') {
           console.log(`[JSONToolPill] Adding ${toolCall.tool} to execution queue`)
-          
+
           await packageToolQueue.add(async () => {
             console.log(`[JSONToolPill] Executing queued ${toolCall.tool}:`, toolCall.args)
-            
+
             // Package tool execution logic goes here
             let packageResult: any
-            
-            if (toolCall.tool === 'add_package') {
-              console.log('[JSONToolPill] Executing add_package:', toolCall.args)
 
-              // Read current package.json
-              const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
-              if (!packageJsonFile) {
-                throw new Error('package.json not found')
-              }
-              
-              const packageJson = JSON.parse(packageJsonFile.content)
-              console.log('[JSONToolPill] Current package.json dependencies:', Object.keys(packageJson.dependencies || {}))
-              console.log('[JSONToolPill] Current package.json devDependencies:', Object.keys(packageJson.devDependencies || {}))
-              
-              // Add package to dependencies or devDependencies
-              const depType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
-              console.log('[JSONToolPill] Adding to depType:', depType, 'package:', toolCall.args.name)
-              if (!packageJson[depType]) {
-                packageJson[depType] = {}
-              }
-              packageJson[depType][toolCall.args.name] = toolCall.args.version || 'latest'
-              
-              console.log('[JSONToolPill] Updated package.json:', {
-                dependencies: Object.keys(packageJson.dependencies || {}),
-                devDependencies: Object.keys(packageJson.devDependencies || {})
-              })
-              
-              // Update package.json
-              const updatedFile = await storageManager.updateFile(projectId, 'package.json', { 
-                content: JSON.stringify(packageJson, null, 2) 
-              })
-              
-              console.log('[JSONToolPill] Package added successfully:', toolCall.args.name, 'to', depType)
-              console.log('[JSONToolPill] File update result:', updatedFile ? 'success' : 'failed')
-              
-              packageResult = { 
-                message: `Package ${toolCall.args.name} added to ${depType} successfully`, 
-                action: 'package_added',
-                package: toolCall.args.name,
-                version: toolCall.args.version || 'latest',
-                dependencyType: depType
-              }
-              triggerAutoBackup(`Tool added package: ${toolCall.args.name}`)
-            } else if (toolCall.tool === 'remove_package') {
+            if (toolCall.tool === 'remove_package') {
               console.log('[JSONToolPill] Executing remove_package:', toolCall.args)
 
               // Read current package.json
@@ -878,7 +836,6 @@ const JSONToolPill = ({
       case 'pilotedit': return Edit3
       case 'delete_file': 
       case 'pilotdelete': return X
-      case 'add_package': return Package
       case 'remove_package': return PackageMinus
       default: return Wrench
     }
@@ -893,7 +850,6 @@ const JSONToolPill = ({
       case 'delete_file': 
       case 'pilotdelete': return 'Deleted'
       case 'delete_folder': return 'Deleted'
-      case 'add_package': return 'Added'
       case 'remove_package': return 'Removed'
       default: return 'Executed'
     }
@@ -908,14 +864,13 @@ const JSONToolPill = ({
       case 'delete_file': 
       case 'pilotdelete': return 'File Deleted'
       case 'delete_folder': return 'Folder Deleted'
-      case 'add_package': return 'Package Added'
       case 'remove_package': return 'Package Removed'
       default: return 'Tool Executed'
     }
   }
 
   const isSuccess = executionStatus !== 'failed'
-  const fileName = toolCall.tool === 'add_package' || toolCall.tool === 'remove_package' 
+  const fileName = toolCall.tool === 'remove_package'
     ? toolCall.args?.name || 'unknown-package'
     : toolCall.path 
       ? (toolCall.path.split('/').pop() || toolCall.path) 
@@ -1052,7 +1007,6 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
       case 'pilotwrite': return FileText
       case 'pilotedit': return Edit3
       case 'pilotdelete': return X
-      case 'add_package': return Package
       case 'remove_package': return PackageMinus
       default: return Wrench
     }
@@ -1063,7 +1017,6 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
       case 'pilotwrite': return 'Created'
       case 'pilotedit': return 'Modified'
       case 'pilotdelete': return 'Deleted'
-      case 'add_package': return 'Added'
       case 'remove_package': return 'Removed'
       default: return 'Executed'
     }
@@ -1074,7 +1027,6 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
       case 'pilotwrite': return 'File Created'
       case 'pilotedit': return 'File Modified'
       case 'pilotdelete': return 'File Deleted'
-      case 'add_package': return 'Package Added'
       case 'remove_package': return 'Package Removed'
       default: return 'Tool Executed'
     }
@@ -1211,7 +1163,7 @@ function validateXMLToolCall(toolCall: XMLToolCall): boolean {
   }
   
   // Ensure command is valid
-  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete', 'write_file', 'edit_file', 'delete_file', 'delete_folder', 'add_package', 'remove_package']
+  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete', 'write_file', 'edit_file', 'delete_file', 'delete_folder', 'remove_package']
   if (toolCall.command && !validCommands.includes(toolCall.command)) {
     return false
   }
@@ -2052,7 +2004,7 @@ function detectXMLTools(content: string): XMLToolCall[] {
   const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
     id: tool.id,
     name: tool.name || tool.tool,
-    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'add_package' | 'remove_package',
+    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'remove_package',
     path: tool.path,
     content: tool.content,
     args: tool.args,
@@ -2216,7 +2168,7 @@ function cleanXMLToolTags(content: string): string {
   })
   
   // Also remove any remaining XML tool tags that might have been missed
-  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)[^>]*>[\s\S]*?<\/\1>/g
+  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|remove_package)[^>]*>[\s\S]*?<\/\1>/g
   cleaned = cleaned.replace(xmlTagRegex, '')
   
   // Clean up extra whitespace and newlines
@@ -7421,7 +7373,7 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
                                           }
                                           
                                           // If still no match, create a synthetic tool call from the JSON
-                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content || parsed.tool === 'add_package' || parsed.tool === 'remove_package')) {
+                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content || parsed.tool === 'remove_package')) {
                                             matchingTool = {
                                               id: `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                                               tool: parsed.tool,
