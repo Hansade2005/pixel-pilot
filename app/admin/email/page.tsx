@@ -27,7 +27,9 @@ import {
   User,
   Sparkles,
   Eye,
-  Code
+  Code,
+  Wand2,
+  RefreshCw
 } from "lucide-react"
 import {
   sendMarketingEmail,
@@ -38,6 +40,7 @@ import {
   type EmailTemplate
 } from "@/lib/email-templates"
 import FloatingAIEmailGenerator from "@/components/FloatingAIEmailGenerator"
+import { generateEmailContent } from "@/lib/ai-email-generator"
 
 interface UserData {
   id: string
@@ -71,6 +74,12 @@ export default function AdminEmailPage() {
   const [emailType, setEmailType] = useState('notification')
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
   const [activeTab, setActiveTab] = useState<"compose" | "preview">("compose")
+
+  // AI Generator states
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [aiContent, setAiContent] = useState('')
+  const [aiHtml, setAiHtml] = useState('')
 
   const { toast } = useToast()
   const router = useRouter()
@@ -167,14 +176,57 @@ export default function AdminEmailPage() {
     setSelectedTemplate(null)
     setShowAIGenerator(false)
     setActiveTab("compose")
+    setAiPrompt('')
+    setAiContent('')
+    setAiHtml('')
   }
 
-  const handleAIContentApply = (aiSubject: string, aiContent: string, aiHtml?: string) => {
+  const handleAIContentApply = (aiSubject: string, aiContentText: string, aiHtmlText?: string) => {
     if (aiSubject && !subject) {
       setSubject(aiSubject)
     }
-    setContent(aiContent)
+    setContent(aiContentText)
+    if (aiHtmlText) setHtml(aiHtmlText)
+  }
+
+  const handleAIGenerate = async () => {
+    if (!aiPrompt.trim()) return
+    setIsGenerating(true)
+    try {
+      const result = await generateEmailContent({
+        type: emailType as any,
+        context: aiPrompt,
+        tone: 'professional',
+        length: 'medium',
+        recipientType: recipients.length > 1 ? 'group' : 'individual'
+      })
+      setAiContent(result.content)
+      setAiHtml(result.html)
+      if (result.subject && !subject) {
+        setSubject(result.subject)
+      }
+      toast({
+        title: "Email generated",
+        description: "AI content is ready. Click 'Apply to Content' to use it.",
+      })
+    } catch (error) {
+      toast({
+        title: "Generation failed",
+        description: error instanceof Error ? error.message : "Failed to generate email",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const applyAIContent = () => {
+    if (aiContent) setContent(aiContent)
     if (aiHtml) setHtml(aiHtml)
+    toast({
+      title: "Content applied",
+      description: "AI-generated content has been applied to your email.",
+    })
   }
 
   const applyTemplate = (template: EmailTemplate) => {
@@ -544,6 +596,73 @@ export default function AdminEmailPage() {
                   </TabsContent>
                 </Tabs>
               </div>
+
+              {/* AI Generator */}
+              {showAIGenerator && (
+                <div className="px-4 pb-4 border-t">
+                  <div className="space-y-4 pt-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm font-medium">AI Email Assistant</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Prompt</label>
+                        <Textarea
+                          placeholder="Describe the email you want to generate..."
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          rows={3}
+                          className="resize-none"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleAIGenerate}
+                          disabled={isGenerating || !aiPrompt.trim()}
+                          size="sm"
+                          className="flex-1"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="h-4 w-4 mr-2" />
+                              Generate
+                            </>
+                          )}
+                        </Button>
+
+                        <Button
+                          onClick={applyAIContent}
+                          disabled={!aiContent && !aiHtml}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          Apply to Content
+                        </Button>
+                      </div>
+
+                      {aiContent && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Generated Content</label>
+                          <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800 max-h-[200px] overflow-auto">
+                            <div className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+                              {aiContent}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="bg-muted px-4 py-3 flex items-center justify-between border-t">
