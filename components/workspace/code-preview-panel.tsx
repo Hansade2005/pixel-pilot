@@ -179,11 +179,11 @@ const FEATURE_CARDS = [
   },
   {
     icon: Share2,
-    title: "Clone & Templates",
-    description: "Publish your project as a template for others. Clone any template to kickstart new projects.",
+    title: "Project Actions",
+    description: "Hover any project card to clone, publish as a paid or free template, or delete. Manage projects effortlessly.",
     color: "from-pink-500/20 to-pink-600/10",
     accent: "text-pink-500",
-    details: ["Publish as template", "Template marketplace", "Project cloning", "Earn from templates"]
+    details: ["Clone project", "Publish as template", "Template marketplace", "Set pricing ($0-$999)"]
   },
   {
     icon: Palette,
