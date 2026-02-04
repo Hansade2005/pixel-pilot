@@ -581,49 +581,73 @@ const CARD_DEMOS = [
 
 // ── AI Responding View ───────────────────────────────────────────────
 
-const AI_WITTY_MESSAGES = [
-  "Teaching pixels to dance...",
-  "Convincing the code to cooperate...",
-  "Brewing some fresh components...",
-  "Negotiating with the semicolons...",
-  "Summoning the right variables...",
-  "Polishing your UI to perfection...",
-  "Asking the divs to align nicely...",
-  "Refactoring reality, one line at a time...",
-  "The AI is in the zone, do not disturb...",
-  "Turning caffeine into code...",
-  "Making your app dreams come true...",
-  "Running on pure imagination...",
-  "Deploying creativity at scale...",
-  "Calculating the meaning of null...",
-  "Whispering sweet nothings to the compiler...",
-  "Untangling the spaghetti before you see it...",
-  "Building Rome, but faster...",
-  "Your future users will thank you for waiting...",
-  "Great things take a few seconds...",
-  "Ctrl+Z won't undo how good this is about to be...",
-  "Hot-reloading brilliance...",
-  "The bugs never stood a chance...",
-  "Reticulating splines, obviously...",
-  "Making the internet a slightly better place...",
-  "This is going to look amazing, trust me...",
-  "PiPilot is cooking something special...",
-  "Optimizing for vibes and performance...",
-  "Stacking divs like a pro...",
-  "Generating code that even linters love...",
-  "Almost there... jk, still working on it...",
-  "Writing code so clean it sparkles...",
-  "This is the AI equivalent of a deep breath...",
-  "Composing your masterpiece, note by note...",
-  "If code grew on trees, we'd still do it faster...",
-  "Zero bugs detected so far... fingers crossed...",
-]
+function getWittyMessages(projectName?: string) {
+  const name = projectName || "your app"
 
-function AIRespondingView() {
+  return [
+    // Project-specific
+    `Making ${name} the best thing on the internet...`,
+    `${name} is about to level up...`,
+    `Giving ${name} that pixel-perfect touch...`,
+    `${name} deserves this glow-up...`,
+    `Crafting the next version of ${name}...`,
+    `${name} won't know what hit it...`,
+    `Pouring love into every line of ${name}...`,
+    `${name} is getting the VIP treatment...`,
+    `Plotting world domination for ${name}...`,
+    `${name}'s users are going to love this...`,
+
+    // Hans the mentor
+    "Channeling Hans's wisdom on this one...",
+    "Hans would approve of this approach...",
+    "Running it by Hans in my head... yep, looks good.",
+    "Hans didn't build PiPilot for us to write ugly code...",
+    "WWHD - What Would Hans Do?",
+    "Hans says ship it, so we ship it.",
+    "Learning from the best... thanks Hans.",
+    "Hans's vision, AI's execution...",
+    "Somewhere, Hans is nodding approvingly...",
+    "Built different, just like Hans intended.",
+
+    // Dev humor
+    "Teaching pixels to dance...",
+    "Convincing the code to cooperate...",
+    "Negotiating with the semicolons...",
+    "Asking the divs to align nicely...",
+    "Refactoring reality, one line at a time...",
+    "Calculating the meaning of null...",
+    "Whispering sweet nothings to the compiler...",
+    "Untangling the spaghetti before you see it...",
+    "Ctrl+Z won't undo how good this is about to be...",
+    "The bugs never stood a chance...",
+    "Reticulating splines, obviously...",
+    "Stacking divs like a pro...",
+    "Generating code that even linters love...",
+    "Almost there... jk, still working on it...",
+    "Zero bugs detected so far... fingers crossed...",
+
+    // Motivational
+    "Great things take a few seconds...",
+    "Your future users will thank you for waiting...",
+    "This is going to look amazing, trust me...",
+    "Making the internet a slightly better place...",
+    "Building Rome, but faster...",
+    "Hot-reloading brilliance...",
+    "PiPilot is cooking something special...",
+    "Deploying creativity at scale...",
+    "Writing code so clean it sparkles...",
+    "If code grew on trees, we'd still do it faster...",
+  ]
+}
+
+function AIRespondingView({ projectName }: { projectName?: string }) {
+  const messages = getWittyMessages(projectName)
   const [messageIndex, setMessageIndex] = useState(() =>
-    Math.floor(Math.random() * AI_WITTY_MESSAGES.length)
+    Math.floor(Math.random() * messages.length)
   )
   const [fade, setFade] = useState(true)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -631,9 +655,8 @@ function AIRespondingView() {
       setTimeout(() => {
         setMessageIndex(prev => {
           let next = prev
-          // Avoid repeating the same message
           while (next === prev) {
-            next = Math.floor(Math.random() * AI_WITTY_MESSAGES.length)
+            next = Math.floor(Math.random() * messagesRef.current.length)
           }
           return next
         })
@@ -668,7 +691,7 @@ function AIRespondingView() {
               fade ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            {AI_WITTY_MESSAGES[messageIndex]}
+            {messagesRef.current[messageIndex]}
           </p>
         </div>
       </div>
@@ -2478,7 +2501,7 @@ export default function TodoApp() {
                   />
                 )
               ) : isAIStreaming ? (
-                <AIRespondingView />
+                <AIRespondingView projectName={project?.name} />
               ) : (
                 <PreviewEmptyState
                   projectName={project?.name}
