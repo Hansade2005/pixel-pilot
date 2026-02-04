@@ -1658,20 +1658,35 @@ export default function TodoApp() {
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
               {preview.isLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <div className="relative w-24 h-24 mx-auto mb-6">
-                      <div className="absolute inset-0 rounded-full border-4 border-muted animate-ping"></div>
-                      <div className="absolute inset-2 rounded-full border-4 border-primary animate-pulse"></div>
-                      <div className="absolute inset-4 rounded-full border-t-4 border-accent animate-spin"></div>
-                      <div className="absolute inset-8 rounded-full bg-accent animate-pulse"></div>
+                <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30">
+                  <div className="text-center p-8 max-w-md">
+                    {/* Rocket GIF */}
+                    <div className="w-32 h-32 mx-auto mb-6">
+                      <img
+                        src="https://cdn.dribbble.com/userupload/21318302/file/original-0ae476e7023bfad18297f22527125cb2.gif"
+                        alt="Launching preview"
+                        className="w-full h-full object-contain"
+                      />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">
-                      {truncateMessage(currentLog, 40)}
+                    <h3 className="text-lg font-semibold mb-1">
+                      {truncateMessage(currentLog, 50)}
                     </h3>
                     <p className="text-muted-foreground text-sm mb-4">
-                      This may take a few moments
+                      Launching your app preview
                     </p>
+                    {/* Progress log trail */}
+                    <div className="mt-4 max-h-[120px] overflow-y-auto rounded-lg bg-muted/50 border border-border p-3 text-left">
+                      {consoleOutput.slice(-5).map((log, i) => (
+                        <p key={i} className="text-xs text-muted-foreground font-mono truncate leading-5">
+                          {log.replace(/^\[\d{1,2}:\d{2}:\d{2} (?:AM|PM)\] [^\s]+ \[[A-Z]+\] /, '')}
+                        </p>
+                      ))}
+                      {consoleOutput.length === 0 && (
+                        <p className="text-xs text-muted-foreground font-mono leading-5">
+                          Initializing...
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : preview.url ? (
@@ -1748,15 +1763,47 @@ export default function TodoApp() {
                   />
                 )
               ) : (
-                <div className="h-full flex items-center justify-center p-8">
-                  <div className="text-center">
-                    <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
-                    <p className="text-muted-foreground mb-4">Click "Start Preview" to see your app running</p>
+                <div className="h-full flex items-center justify-center p-6 bg-gradient-to-b from-background to-muted/20">
+                  <div className="text-center max-w-lg w-full">
+                    {/* Preview mockup card */}
+                    <div className="relative mx-auto mb-6 rounded-xl border border-border bg-card shadow-lg overflow-hidden max-w-sm">
+                      {/* Fake browser chrome */}
+                      <div className="flex items-center gap-1.5 px-3 py-2 bg-muted border-b border-border">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
+                        <div className="flex-1 mx-2 h-5 rounded bg-background/60 flex items-center justify-center">
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {project?.name ? `${project.name.toLowerCase().replace(/\s+/g, '-')}.pipilot.dev` : 'your-app.pipilot.dev'}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Fake page content skeleton */}
+                      <div className="p-4 space-y-3 min-h-[160px]">
+                        <div className="h-4 w-3/4 rounded bg-muted animate-pulse"></div>
+                        <div className="h-3 w-full rounded bg-muted/60 animate-pulse delay-75"></div>
+                        <div className="h-3 w-5/6 rounded bg-muted/60 animate-pulse delay-100"></div>
+                        <div className="mt-4 flex gap-2">
+                          <div className="h-8 w-20 rounded-md bg-primary/20 animate-pulse delay-150"></div>
+                          <div className="h-8 w-20 rounded-md bg-muted animate-pulse delay-200"></div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="h-16 rounded-md bg-muted/40 animate-pulse delay-100"></div>
+                          <div className="h-16 rounded-md bg-muted/40 animate-pulse delay-200"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mb-1">PiPilot Preview</h3>
+                    <p className="text-muted-foreground text-sm mb-5">
+                      See your app come to life. Build, preview, and deploy -- all in one place.
+                    </p>
+
                     <Button
                       onClick={createPreview}
                       disabled={!project || preview.isLoading}
-                      className="rounded-full px-6"
+                      size="lg"
+                      className="rounded-full px-8 shadow-md"
                     >
                       <Play className="h-4 w-4 mr-2" />
                       Start Preview
