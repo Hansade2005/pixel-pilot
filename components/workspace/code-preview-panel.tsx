@@ -143,60 +143,443 @@ const FEATURE_CARDS = [
   {
     icon: MessageSquare,
     title: "AI Chat Commands",
-    description: "Use / slash commands to fix, refactor, deploy, and more. Mention files with @ to give AI context.",
+    description: "Type / for slash commands, @ to reference files.",
     color: "from-blue-500/20 to-blue-600/10",
     accent: "text-blue-500",
-    details: ["/fix - Fix errors", "/deploy - Deploy to Vercel", "/branch - Branch conversation", "@ - Reference any file"]
+    accentBg: "bg-blue-500",
   },
   {
     icon: MousePointerClick,
     title: "Visual Click-to-Edit",
-    description: "Click any element in the preview to edit styles, text, and props in real-time. No code needed.",
+    description: "Click any element in the preview to edit it live.",
     color: "from-purple-500/20 to-purple-600/10",
     accent: "text-purple-500",
-    details: ["Live element selection", "Instant style editing", "100+ Google Fonts", "One-click themes"]
+    accentBg: "bg-purple-500",
   },
   {
     icon: RotateCcw,
     title: "Message Actions",
-    description: "Hover any message to retry, revert to checkpoint, branch from it, copy, or delete. Full control over your conversation.",
+    description: "Hover messages to retry, revert, branch, or copy.",
     color: "from-amber-500/20 to-amber-600/10",
     accent: "text-amber-500",
-    details: ["Retry / Resend", "Revert to checkpoint", "Branch from message", "Copy & Delete"]
+    accentBg: "bg-amber-500",
   },
   {
     icon: GitBranch,
     title: "Branch & Revert",
-    description: "Branch conversations to explore different approaches. Revert to any checkpoint instantly.",
+    description: "Branch conversations and revert to any checkpoint.",
     color: "from-green-500/20 to-green-600/10",
     accent: "text-green-500",
-    details: ["Conversation branching", "Checkpoint restore", "5-min undo window", "Named branches"]
+    accentBg: "bg-green-500",
   },
   {
     icon: Rocket,
     title: "One-Click Deploy",
-    description: "Deploy to Vercel or Netlify with one click. Push to GitHub. Share your live app with the world.",
+    description: "Deploy to Vercel, Netlify, or push to GitHub.",
     color: "from-orange-500/20 to-orange-600/10",
     accent: "text-orange-500",
-    details: ["Vercel deployment", "GitHub integration", "Netlify hosting", "Shareable links"]
+    accentBg: "bg-orange-500",
   },
   {
     icon: Share2,
     title: "Project Actions",
-    description: "Hover any project card to clone, publish as a paid or free template, or delete. Manage projects effortlessly.",
+    description: "Clone projects, publish & sell templates.",
     color: "from-pink-500/20 to-pink-600/10",
     accent: "text-pink-500",
-    details: ["Clone project", "Publish as template", "Template marketplace", "Set pricing ($0-$999)"]
+    accentBg: "bg-pink-500",
   },
   {
     icon: Palette,
     title: "Theme & Typography",
-    description: "Switch themes instantly with CSS variable support. Access 100+ Google Fonts with live preview.",
+    description: "Switch themes, 100+ Google Fonts, live preview.",
     color: "from-cyan-500/20 to-cyan-600/10",
     accent: "text-cyan-500",
-    details: ["Pre-built themes", "CSS variable system", "Font live preview", "WCAG compliance"]
+    accentBg: "bg-cyan-500",
   },
 ]
+
+// ── Animated Demo Components ─────────────────────────────────────────
+
+function ChatCommandsDemo() {
+  const [step, setStep] = useState(0)
+  const commands = [
+    { cmd: "/fix", desc: "Fix last error" },
+    { cmd: "/deploy", desc: "Deploy to Vercel" },
+    { cmd: "/branch", desc: "Branch conversation" },
+    { cmd: "/refactor", desc: "Refactor code" },
+  ]
+  useEffect(() => {
+    const t = setInterval(() => setStep(p => (p + 1) % 5), 900)
+    return () => clearInterval(t)
+  }, [])
+  const typedText = step === 0 ? "/" : step <= 4 ? commands[step - 1]?.cmd || "/" : "/"
+  return (
+    <div className="space-y-2">
+      {/* Fake input */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background/80 border border-border">
+        <span className="text-xs text-blue-500 font-mono">{typedText}</span>
+        <span className="w-0.5 h-3.5 bg-blue-500 animate-pulse" />
+      </div>
+      {/* Dropdown */}
+      <div className="rounded-lg bg-background/80 border border-border overflow-hidden">
+        {commands.map((c, i) => (
+          <div
+            key={c.cmd}
+            className={`flex items-center justify-between px-3 py-1.5 text-xs transition-all duration-300 ${
+              i === (step > 0 ? step - 1 : 0) ? 'bg-blue-500/15' : ''
+            }`}
+          >
+            <span className="font-mono font-medium text-blue-400">{c.cmd}</span>
+            <span className="text-muted-foreground">{c.desc}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function VisualEditorDemo() {
+  const [step, setStep] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setStep(p => (p + 1) % 4), 1100)
+    return () => clearInterval(t)
+  }, [])
+  // Cursor positions for each step
+  const cursorPos = [
+    { left: '20%', top: '25%' },
+    { left: '55%', top: '25%' },
+    { left: '55%', top: '60%' },
+    { left: '30%', top: '60%' },
+  ]
+  const selected = step
+  return (
+    <div className="relative h-[120px] rounded-lg bg-background/80 border border-border overflow-hidden">
+      {/* Fake UI elements */}
+      <div className="absolute top-3 left-3 right-[52%] h-7 rounded bg-muted/60 flex items-center px-2">
+        <span className="text-[9px] text-muted-foreground">Header</span>
+      </div>
+      <div className="absolute top-3 left-[52%] right-3 h-7 rounded bg-muted/60 flex items-center px-2">
+        <span className="text-[9px] text-muted-foreground">Nav</span>
+      </div>
+      <div className="absolute top-[44px] left-3 right-[52%] bottom-3 rounded bg-muted/40 flex items-center justify-center">
+        <span className="text-[9px] text-muted-foreground">Card</span>
+      </div>
+      <div className="absolute top-[44px] left-[52%] right-3 bottom-3 rounded bg-muted/40 flex items-center justify-center">
+        <span className="text-[9px] text-muted-foreground">Image</span>
+      </div>
+      {/* Selection ring */}
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className={`absolute rounded transition-all duration-500 ${
+            selected === i ? 'ring-2 ring-purple-500 ring-offset-1 ring-offset-transparent' : ''
+          }`}
+          style={{
+            top: i < 2 ? '12px' : '44px',
+            left: i % 2 === 0 ? '12px' : '52%',
+            right: i % 2 === 0 ? '52%' : '12px',
+            bottom: i < 2 ? 'auto' : '12px',
+            height: i < 2 ? '28px' : undefined,
+          }}
+        />
+      ))}
+      {/* Animated cursor */}
+      <div
+        className="absolute w-4 h-4 transition-all duration-700 ease-in-out z-10"
+        style={{ left: cursorPos[step].left, top: cursorPos[step].top }}
+      >
+        <MousePointerClick className="h-4 w-4 text-purple-500 drop-shadow-md" />
+      </div>
+      {/* Style panel slides in on select */}
+      <div
+        className={`absolute right-0 top-0 bottom-0 w-[72px] bg-background/95 border-l border-border transition-transform duration-500 flex flex-col gap-1 p-1.5 ${
+          step >= 2 ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <span className="text-[8px] font-medium text-purple-400 px-1">Styles</span>
+        <div className="h-2.5 w-full rounded bg-purple-500/20" />
+        <div className="h-2.5 w-3/4 rounded bg-purple-500/15" />
+        <div className="h-2.5 w-full rounded bg-purple-500/10" />
+        <div className="flex gap-1 mt-1">
+          <div className="w-3 h-3 rounded-full bg-purple-400" />
+          <div className="w-3 h-3 rounded-full bg-pink-400" />
+          <div className="w-3 h-3 rounded-full bg-blue-400" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MessageActionsDemo() {
+  const [hovered, setHovered] = useState(false)
+  const [activeBtn, setActiveBtn] = useState(-1)
+  const actions = ["Retry", "Revert", "Branch", "Copy"]
+  useEffect(() => {
+    let step = 0
+    const t = setInterval(() => {
+      if (step === 0) { setHovered(true); setActiveBtn(-1) }
+      else if (step <= 4) { setActiveBtn(step - 1) }
+      else { setHovered(false); setActiveBtn(-1) }
+      step = (step + 1) % 7
+    }, 600)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="space-y-2">
+      {/* Assistant message */}
+      <div className="flex gap-2 items-start">
+        <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 flex items-center justify-center">
+          <Zap className="h-3 w-3 text-muted-foreground" />
+        </div>
+        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50">
+          <div className="h-2 w-3/4 rounded bg-muted-foreground/15 mb-1" />
+          <div className="h-2 w-1/2 rounded bg-muted-foreground/10" />
+        </div>
+      </div>
+      {/* User message with action bar */}
+      <div className="relative flex gap-2 items-start">
+        <div className="w-5 h-5 rounded-full bg-blue-500/20 flex-shrink-0 flex items-center justify-center">
+          <span className="text-[8px] font-bold text-blue-400">U</span>
+        </div>
+        <div className="flex-1 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <div className="h-2 w-full rounded bg-blue-400/15 mb-1" />
+          <div className="h-2 w-2/3 rounded bg-blue-400/10" />
+        </div>
+        {/* Floating action bar */}
+        <div
+          className={`absolute -top-6 right-0 flex gap-1 transition-all duration-300 ${
+            hovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+          }`}
+        >
+          {actions.map((a, i) => (
+            <div
+              key={a}
+              className={`px-1.5 py-0.5 rounded text-[8px] font-medium border transition-all duration-200 ${
+                activeBtn === i
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 scale-110'
+                  : 'bg-background/80 border-border text-muted-foreground'
+              }`}
+            >
+              {a}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BranchRevertDemo() {
+  const [activeCommit, setActiveCommit] = useState(0)
+  const [showBranch, setShowBranch] = useState(false)
+  useEffect(() => {
+    let step = 0
+    const t = setInterval(() => {
+      if (step < 4) { setActiveCommit(step); setShowBranch(false) }
+      else { setShowBranch(true) }
+      step = (step + 1) % 6
+    }, 700)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="flex gap-4 h-[110px] items-center justify-center">
+      {/* Main branch line */}
+      <div className="relative flex flex-col items-center gap-0">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full border-2 transition-all duration-300 ${
+              i <= activeCommit
+                ? 'border-green-500 bg-green-500/30 scale-110'
+                : 'border-muted-foreground/30 bg-transparent'
+            }`} />
+            <span className={`text-[8px] w-12 transition-colors duration-300 ${
+              i <= activeCommit ? 'text-green-400' : 'text-muted-foreground/50'
+            }`}>
+              {["init", "feat", "fix", "style"][i]}
+            </span>
+            {i < 3 && (
+              <div className="absolute" style={{ left: '5px', top: `${14 + i * 26}px` }}>
+                <div className={`w-0.5 h-[14px] transition-colors duration-300 ${
+                  i < activeCommit ? 'bg-green-500/60' : 'bg-muted-foreground/20'
+                }`} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Branch fork */}
+      <div className={`flex flex-col gap-1.5 transition-all duration-500 ${
+        showBranch ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'
+      }`}>
+        <div className="text-[8px] text-green-400 font-medium">new-branch</div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-0.5 bg-green-500/40" />
+          <div className="w-2.5 h-2.5 rounded-full border-2 border-green-400 bg-green-400/30" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-0.5 bg-green-500/30" />
+          <div className="w-2.5 h-2.5 rounded-full border-2 border-green-400/60 bg-green-400/20" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeployDemo() {
+  const [step, setStep] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setStep(p => (p + 1) % 5), 900)
+    return () => clearInterval(t)
+  }, [])
+  const progress = step === 0 ? 0 : step === 1 ? 30 : step === 2 ? 65 : step === 3 ? 100 : 100
+  const done = step >= 3
+  return (
+    <div className="space-y-3">
+      {/* Deploy button */}
+      <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all duration-500 ${
+        done ? 'bg-green-500/15 border-green-500/30' : 'bg-orange-500/10 border-orange-500/20'
+      }`}>
+        {done ? (
+          <><Globe className="h-3.5 w-3.5 text-green-500" /><span className="text-xs font-medium text-green-500">Deployed to Vercel</span></>
+        ) : (
+          <><Rocket className={`h-3.5 w-3.5 text-orange-500 ${step > 0 ? 'animate-bounce' : ''}`} /><span className="text-xs font-medium text-orange-400">{step === 0 ? 'Click to Deploy' : 'Deploying...'}</span></>
+        )}
+      </div>
+      {/* Progress bar */}
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ease-out ${done ? 'bg-green-500' : 'bg-orange-500'}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      {/* Log lines */}
+      <div className="space-y-1">
+        {["Building production bundle...", "Optimizing assets...", "Uploading to CDN...", "Live at your-app.vercel.app"].map((log, i) => (
+          <div
+            key={i}
+            className={`text-[9px] font-mono transition-all duration-300 ${
+              i < step ? 'opacity-100 text-muted-foreground' : i === step ? 'opacity-100 text-orange-400' : 'opacity-0'
+            }`}
+          >
+            {i < step ? '  ' : i === step ? '> ' : '  '}{log}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ProjectActionsDemo() {
+  const [hovered, setHovered] = useState(false)
+  const [activeBtn, setActiveBtn] = useState(-1)
+  useEffect(() => {
+    let step = 0
+    const t = setInterval(() => {
+      if (step === 0) { setHovered(true); setActiveBtn(-1) }
+      else if (step <= 3) setActiveBtn(step - 1)
+      else { setHovered(false); setActiveBtn(-1) }
+      step = (step + 1) % 6
+    }, 700)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="relative rounded-lg bg-background/80 border border-border overflow-hidden h-[110px]">
+      {/* Fake project card */}
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500/30 to-purple-500/30 flex items-center justify-center">
+            <Code className="h-4 w-4 text-pink-400" />
+          </div>
+          <div>
+            <div className="h-2.5 w-20 rounded bg-foreground/15" />
+            <div className="h-2 w-14 rounded bg-muted-foreground/10 mt-1" />
+          </div>
+        </div>
+        <div className="h-2 w-full rounded bg-muted/60 mb-1" />
+        <div className="h-2 w-3/4 rounded bg-muted/40" />
+      </div>
+      {/* Hover action buttons */}
+      <div className={`absolute top-2 right-2 flex gap-1 transition-all duration-300 ${
+        hovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
+      }`}>
+        {[
+          { label: "Clone", color: "bg-blue-500/80" },
+          { label: "Publish", color: "bg-green-500/80" },
+          { label: "Delete", color: "bg-red-500/80" },
+        ].map((btn, i) => (
+          <div
+            key={btn.label}
+            className={`w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200 ${btn.color} ${
+              activeBtn === i ? 'scale-125 ring-2 ring-white/30' : 'scale-100'
+            }`}
+          >
+            <span className="text-[7px] text-white font-bold">{btn.label[0]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ThemeTypographyDemo() {
+  const [step, setStep] = useState(0)
+  const themes = [
+    { bg: "bg-slate-900", fg: "text-white", accent: "bg-blue-500", name: "Dark" },
+    { bg: "bg-white", fg: "text-slate-900", accent: "bg-violet-500", name: "Light" },
+    { bg: "bg-emerald-950", fg: "text-emerald-100", accent: "bg-emerald-500", name: "Forest" },
+    { bg: "bg-orange-50", fg: "text-orange-900", accent: "bg-orange-500", name: "Warm" },
+  ]
+  const fonts = ["font-sans", "font-serif", "font-mono", "font-sans"]
+  useEffect(() => {
+    const t = setInterval(() => setStep(p => (p + 1) % themes.length), 1200)
+    return () => clearInterval(t)
+  }, [])
+  const theme = themes[step]
+  return (
+    <div className="space-y-2">
+      {/* Mini preview switching themes */}
+      <div className={`rounded-lg p-3 transition-all duration-700 ${theme.bg} border border-border/30`}>
+        <div className={`text-sm font-bold ${theme.fg} ${fonts[step]} transition-all duration-500 mb-1`}>
+          Hello World
+        </div>
+        <div className={`text-[10px] ${theme.fg} opacity-60 ${fonts[step]} transition-all duration-500 mb-2`}>
+          The quick brown fox jumps over the lazy dog
+        </div>
+        <div className="flex gap-1.5">
+          <div className={`h-5 px-2 rounded text-[8px] font-medium flex items-center ${theme.accent} text-white transition-all duration-500`}>
+            Button
+          </div>
+          <div className={`h-5 px-2 rounded text-[8px] font-medium flex items-center border border-current ${theme.fg} opacity-40 transition-all duration-500`}>
+            Outline
+          </div>
+        </div>
+      </div>
+      {/* Theme swatches */}
+      <div className="flex items-center justify-between">
+        {themes.map((t, i) => (
+          <div key={i} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-all duration-300 ${
+            i === step ? 'bg-muted ring-1 ring-primary/40' : ''
+          }`}>
+            <div className={`w-3 h-3 rounded-full ${t.accent} transition-transform duration-300 ${i === step ? 'scale-125' : ''}`} />
+            <span className="text-[8px] text-muted-foreground">{t.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const CARD_DEMOS = [
+  ChatCommandsDemo,
+  VisualEditorDemo,
+  MessageActionsDemo,
+  BranchRevertDemo,
+  DeployDemo,
+  ProjectActionsDemo,
+  ThemeTypographyDemo,
+]
+
+// ── PreviewEmptyState ────────────────────────────────────────────────
 
 function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
   projectName?: string;
@@ -211,7 +594,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
     if (!isPlaying) return
     const interval = setInterval(() => {
       setActiveCard(prev => (prev + 1) % FEATURE_CARDS.length)
-    }, 4000)
+    }, 5000)
     return () => clearInterval(interval)
   }, [isPlaying])
 
@@ -220,6 +603,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
 
   const card = FEATURE_CARDS[activeCard]
   const CardIcon = card.icon
+  const DemoComponent = CARD_DEMOS[activeCard]
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-background to-muted/20 overflow-y-auto">
@@ -247,31 +631,21 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
               className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
             >
               {/* Card header */}
-              <div className="px-5 pt-5 pb-3 flex items-start gap-3">
-                <div className={`p-2.5 rounded-xl bg-background/80 shadow-sm ${card.accent}`}>
-                  <CardIcon className="h-6 w-6" />
+              <div className="px-5 pt-4 pb-2 flex items-start gap-3">
+                <div className={`p-2 rounded-xl bg-background/80 shadow-sm ${card.accent}`}>
+                  <CardIcon className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-base leading-tight">{card.title}</h4>
-                  <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                  <h4 className="font-semibold text-sm leading-tight">{card.title}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
                     {card.description}
                   </p>
                 </div>
               </div>
 
-              {/* Detail items */}
-              <div className="px-5 pb-5">
-                <div className="grid grid-cols-2 gap-2">
-                  {card.details.map((detail, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/60 border border-border/50"
-                    >
-                      <ChevronRight className={`h-3 w-3 flex-shrink-0 ${card.accent}`} />
-                      <span className="text-xs text-foreground/80 truncate">{detail}</span>
-                    </div>
-                  ))}
-                </div>
+              {/* Animated demo area */}
+              <div className="px-4 pb-4">
+                <DemoComponent key={activeCard} />
               </div>
             </div>
           </div>
@@ -303,12 +677,9 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
           </div>
         </div>
 
-        {/* Mobile: horizontal dots + nav (visible only on small screens) */}
+        {/* Mobile: horizontal dots + nav */}
         <div className="flex sm:hidden items-center justify-center gap-3 mb-5">
-          <button
-            onClick={goPrev}
-            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
-          >
+          <button onClick={goPrev} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
             <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
           <div className="flex items-center gap-1.5">
@@ -317,27 +688,15 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
                 key={i}
                 onClick={() => setActiveCard(i)}
                 className={`rounded-full transition-all duration-300 ${
-                  i === activeCard
-                    ? 'w-5 h-1.5 bg-primary'
-                    : 'w-1.5 h-1.5 bg-muted-foreground/25 hover:bg-muted-foreground/50'
+                  i === activeCard ? 'w-5 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-muted-foreground/25'
                 }`}
               />
             ))}
           </div>
-          <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
-          >
-            {isPlaying ? (
-              <Pause className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <Play className="h-3 w-3 text-muted-foreground ml-0.5" />
-            )}
+          <button onClick={() => setIsPlaying(!isPlaying)} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
+            {isPlaying ? <Pause className="h-3 w-3 text-muted-foreground" /> : <Play className="h-3 w-3 text-muted-foreground ml-0.5" />}
           </button>
-          <button
-            onClick={goNext}
-            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
-          >
+          <button onClick={goNext} className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center">
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
