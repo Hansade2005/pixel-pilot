@@ -21,7 +21,18 @@ import {
   Copy,
   Database,
   Edit3,
-  Wand2
+  Wand2,
+  Rocket,
+  GitBranch,
+  MousePointerClick,
+  Palette,
+  MessageSquare,
+  Globe,
+  Share2,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Pause
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
@@ -125,6 +136,235 @@ interface PreviewState {
   url: string | null;
   isLoading: boolean;
   processId: string | null;
+}
+
+// Feature cards data for the rotating showcase
+const FEATURE_CARDS = [
+  {
+    icon: MessageSquare,
+    title: "AI Chat Commands",
+    description: "Use / slash commands to fix, refactor, deploy, and more. Mention files with @ to give AI context.",
+    color: "from-blue-500/20 to-blue-600/10",
+    accent: "text-blue-500",
+    details: ["/fix - Fix errors", "/deploy - Deploy to Vercel", "/branch - Branch conversation", "@ - Reference any file"]
+  },
+  {
+    icon: MousePointerClick,
+    title: "Visual Click-to-Edit",
+    description: "Click any element in the preview to edit styles, text, and props in real-time. No code needed.",
+    color: "from-purple-500/20 to-purple-600/10",
+    accent: "text-purple-500",
+    details: ["Live element selection", "Instant style editing", "100+ Google Fonts", "One-click themes"]
+  },
+  {
+    icon: RotateCcw,
+    title: "Message Actions",
+    description: "Hover any message to retry, revert to checkpoint, branch from it, copy, or delete. Full control over your conversation.",
+    color: "from-amber-500/20 to-amber-600/10",
+    accent: "text-amber-500",
+    details: ["Retry / Resend", "Revert to checkpoint", "Branch from message", "Copy & Delete"]
+  },
+  {
+    icon: GitBranch,
+    title: "Branch & Revert",
+    description: "Branch conversations to explore different approaches. Revert to any checkpoint instantly.",
+    color: "from-green-500/20 to-green-600/10",
+    accent: "text-green-500",
+    details: ["Conversation branching", "Checkpoint restore", "5-min undo window", "Named branches"]
+  },
+  {
+    icon: Rocket,
+    title: "One-Click Deploy",
+    description: "Deploy to Vercel or Netlify with one click. Push to GitHub. Share your live app with the world.",
+    color: "from-orange-500/20 to-orange-600/10",
+    accent: "text-orange-500",
+    details: ["Vercel deployment", "GitHub integration", "Netlify hosting", "Shareable links"]
+  },
+  {
+    icon: Share2,
+    title: "Project Actions",
+    description: "Hover any project card to clone, publish as a paid or free template, or delete. Manage projects effortlessly.",
+    color: "from-pink-500/20 to-pink-600/10",
+    accent: "text-pink-500",
+    details: ["Clone project", "Publish as template", "Template marketplace", "Set pricing ($0-$999)"]
+  },
+  {
+    icon: Palette,
+    title: "Theme & Typography",
+    description: "Switch themes instantly with CSS variable support. Access 100+ Google Fonts with live preview.",
+    color: "from-cyan-500/20 to-cyan-600/10",
+    accent: "text-cyan-500",
+    details: ["Pre-built themes", "CSS variable system", "Font live preview", "WCAG compliance"]
+  },
+]
+
+function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
+  projectName?: string;
+  onStartPreview: () => void;
+  disabled: boolean;
+}) {
+  const [activeCard, setActiveCard] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(true)
+
+  // Auto-rotate cards
+  useEffect(() => {
+    if (!isPlaying) return
+    const interval = setInterval(() => {
+      setActiveCard(prev => (prev + 1) % FEATURE_CARDS.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [isPlaying])
+
+  const goPrev = () => setActiveCard(prev => (prev - 1 + FEATURE_CARDS.length) % FEATURE_CARDS.length)
+  const goNext = () => setActiveCard(prev => (prev + 1) % FEATURE_CARDS.length)
+
+  const card = FEATURE_CARDS[activeCard]
+  const CardIcon = card.icon
+
+  return (
+    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-background to-muted/20 overflow-y-auto">
+      <div className="w-full max-w-lg">
+        {/* Card row: dots | card | nav buttons */}
+        <div className="flex items-center gap-3 mb-6">
+          {/* Left: vertical dot indicators */}
+          <div className="hidden sm:flex flex-col items-center gap-1.5 py-2">
+            {FEATURE_CARDS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveCard(i)}
+                className={`rounded-full transition-all duration-300 ${
+                  i === activeCard
+                    ? 'w-2 h-5 bg-primary'
+                    : 'w-2 h-2 bg-muted-foreground/25 hover:bg-muted-foreground/50'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Center: feature card */}
+          <div className="flex-1 min-w-0">
+            <div
+              className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
+            >
+              {/* Card header */}
+              <div className="px-5 pt-5 pb-3 flex items-start gap-3">
+                <div className={`p-2.5 rounded-xl bg-background/80 shadow-sm ${card.accent}`}>
+                  <CardIcon className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-base leading-tight">{card.title}</h4>
+                  <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                    {card.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Detail items */}
+              <div className="px-5 pb-5">
+                <div className="grid grid-cols-2 gap-2">
+                  {card.details.map((detail, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/60 border border-border/50"
+                    >
+                      <ChevronRight className={`h-3 w-3 flex-shrink-0 ${card.accent}`} />
+                      <span className="text-xs text-foreground/80 truncate">{detail}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: prev / play-pause / next buttons */}
+          <div className="hidden sm:flex flex-col items-center gap-1.5">
+            <button
+              onClick={goPrev}
+              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+            >
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+            >
+              {isPlaying ? (
+                <Pause className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <Play className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
+              )}
+            </button>
+            <button
+              onClick={goNext}
+              className="w-8 h-8 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center transition-colors shadow-sm"
+            >
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile: horizontal dots + nav (visible only on small screens) */}
+        <div className="flex sm:hidden items-center justify-center gap-3 mb-5">
+          <button
+            onClick={goPrev}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
+          >
+            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            {FEATURE_CARDS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveCard(i)}
+                className={`rounded-full transition-all duration-300 ${
+                  i === activeCard
+                    ? 'w-5 h-1.5 bg-primary'
+                    : 'w-1.5 h-1.5 bg-muted-foreground/25 hover:bg-muted-foreground/50'
+                }`}
+              />
+            ))}
+          </div>
+          <button
+            onClick={() => setIsPlaying(!isPlaying)}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
+          >
+            {isPlaying ? (
+              <Pause className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <Play className="h-3 w-3 text-muted-foreground ml-0.5" />
+            )}
+          </button>
+          <button
+            onClick={goNext}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted flex items-center justify-center"
+          >
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Title + CTA */}
+        <div className="text-center">
+          <h3 className="text-xl font-semibold mb-1">PiPilot Preview</h3>
+          <p className="text-muted-foreground text-sm mb-5">
+            {projectName
+              ? `Launch "${projectName}" to see it live`
+              : "Build, preview, and deploy your app -- all in one place"
+            }
+          </p>
+
+          <Button
+            onClick={onStartPreview}
+            disabled={disabled}
+            size="lg"
+            className="rounded-full px-8 shadow-md"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Start Preview
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
@@ -1658,20 +1898,35 @@ export default function TodoApp() {
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
               {preview.isLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <div className="relative w-24 h-24 mx-auto mb-6">
-                      <div className="absolute inset-0 rounded-full border-4 border-muted animate-ping"></div>
-                      <div className="absolute inset-2 rounded-full border-4 border-primary animate-pulse"></div>
-                      <div className="absolute inset-4 rounded-full border-t-4 border-accent animate-spin"></div>
-                      <div className="absolute inset-8 rounded-full bg-accent animate-pulse"></div>
+                <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30">
+                  <div className="text-center p-8 max-w-md">
+                    {/* Rocket GIF */}
+                    <div className="w-32 h-32 mx-auto mb-6">
+                      <img
+                        src="https://cdn.dribbble.com/userupload/21318302/file/original-0ae476e7023bfad18297f22527125cb2.gif"
+                        alt="Launching preview"
+                        className="w-full h-full object-contain"
+                      />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">
-                      {truncateMessage(currentLog, 40)}
+                    <h3 className="text-lg font-semibold mb-1">
+                      {truncateMessage(currentLog, 50)}
                     </h3>
                     <p className="text-muted-foreground text-sm mb-4">
-                      This may take a few moments
+                      Launching your app preview
                     </p>
+                    {/* Progress log trail */}
+                    <div className="mt-4 max-h-[120px] overflow-y-auto rounded-lg bg-muted/50 border border-border p-3 text-left">
+                      {consoleOutput.slice(-5).map((log, i) => (
+                        <p key={i} className="text-xs text-muted-foreground font-mono truncate leading-5">
+                          {log.replace(/^\[\d{1,2}:\d{2}:\d{2} (?:AM|PM)\] [^\s]+ \[[A-Z]+\] /, '')}
+                        </p>
+                      ))}
+                      {consoleOutput.length === 0 && (
+                        <p className="text-xs text-muted-foreground font-mono leading-5">
+                          Initializing...
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : preview.url ? (
@@ -1748,21 +2003,11 @@ export default function TodoApp() {
                   />
                 )
               ) : (
-                <div className="h-full flex items-center justify-center p-8">
-                  <div className="text-center">
-                    <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
-                    <p className="text-muted-foreground mb-4">Click "Start Preview" to see your app running</p>
-                    <Button
-                      onClick={createPreview}
-                      disabled={!project || preview.isLoading}
-                      className="rounded-full px-6"
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Preview
-                    </Button>
-                  </div>
-                </div>
+                <PreviewEmptyState
+                  projectName={project?.name}
+                  onStartPreview={createPreview}
+                  disabled={!project || preview.isLoading}
+                />
               )}
             </div>
 
