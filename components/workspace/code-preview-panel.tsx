@@ -579,6 +579,126 @@ const CARD_DEMOS = [
   ThemeTypographyDemo,
 ]
 
+// ── AI Responding View ───────────────────────────────────────────────
+
+function getWittyMessages(projectName?: string) {
+  const name = projectName || "your app"
+
+  return [
+    // Project-specific
+    `Making ${name} the best thing on the internet...`,
+    `${name} is about to level up...`,
+    `Giving ${name} that pixel-perfect touch...`,
+    `${name} deserves this glow-up...`,
+    `Crafting the next version of ${name}...`,
+    `${name} won't know what hit it...`,
+    `Pouring love into every line of ${name}...`,
+    `${name} is getting the VIP treatment...`,
+    `Plotting world domination for ${name}...`,
+    `${name}'s users are going to love this...`,
+
+    // Hans the mentor
+    "Channeling Hans's wisdom on this one...",
+    "Hans would approve of this approach...",
+    "Running it by Hans in my head... yep, looks good.",
+    "Hans didn't build PiPilot for us to write ugly code...",
+    "WWHD - What Would Hans Do?",
+    "Hans says ship it, so we ship it.",
+    "Learning from the best... thanks Hans.",
+    "Hans's vision, AI's execution...",
+    "Somewhere, Hans is nodding approvingly...",
+    "Built different, just like Hans intended.",
+
+    // Dev humor
+    "Teaching pixels to dance...",
+    "Convincing the code to cooperate...",
+    "Negotiating with the semicolons...",
+    "Asking the divs to align nicely...",
+    "Refactoring reality, one line at a time...",
+    "Calculating the meaning of null...",
+    "Whispering sweet nothings to the compiler...",
+    "Untangling the spaghetti before you see it...",
+    "Ctrl+Z won't undo how good this is about to be...",
+    "The bugs never stood a chance...",
+    "Reticulating splines, obviously...",
+    "Stacking divs like a pro...",
+    "Generating code that even linters love...",
+    "Almost there... jk, still working on it...",
+    "Zero bugs detected so far... fingers crossed...",
+
+    // Motivational
+    "Great things take a few seconds...",
+    "Your future users will thank you for waiting...",
+    "This is going to look amazing, trust me...",
+    "Making the internet a slightly better place...",
+    "Building Rome, but faster...",
+    "Hot-reloading brilliance...",
+    "PiPilot is cooking something special...",
+    "Deploying creativity at scale...",
+    "Writing code so clean it sparkles...",
+    "If code grew on trees, we'd still do it faster...",
+  ]
+}
+
+function AIRespondingView({ projectName }: { projectName?: string }) {
+  const messages = getWittyMessages(projectName)
+  const [messageIndex, setMessageIndex] = useState(() =>
+    Math.floor(Math.random() * messages.length)
+  )
+  const [fade, setFade] = useState(true)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setMessageIndex(prev => {
+          let next = prev
+          while (next === prev) {
+            next = Math.floor(Math.random() * messagesRef.current.length)
+          }
+          return next
+        })
+        setFade(true)
+      }, 300)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Rocket GIF background */}
+      <img
+        src="https://pipilot.dev/assets/pipilot_rocket_cruise.gif"
+        alt="AI is working"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {/* Bottom overlay with witty message */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent pt-20 pb-8 px-6">
+        <div className="text-center max-w-md mx-auto">
+          {/* Pulsing dots */}
+          <div className="flex items-center justify-center gap-1.5 mb-4">
+            <div className="w-2 h-2 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-2 drop-shadow-md">
+            AI is working its magic
+          </h3>
+          <p
+            className={`text-white/80 text-sm drop-shadow-sm transition-opacity duration-300 ${
+              fade ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {messagesRef.current[messageIndex]}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── PreviewEmptyState ────────────────────────────────────────────────
 
 function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
@@ -750,6 +870,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
   const [isExpoProject, setIsExpoProject] = useState(false)
+  const [isAIStreaming, setIsAIStreaming] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
   const [backgroundProcess, setBackgroundProcess] = useState<{
@@ -863,6 +984,16 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
   }, [consoleOutput, browserLogs, processLogs, isConsoleOpen])
+
+  // Listen for AI streaming state from chat panel
+  useEffect(() => {
+    const handleAIStreaming = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      setIsAIStreaming(detail?.isStreaming ?? false)
+    }
+    window.addEventListener('ai-streaming-state', handleAIStreaming)
+    return () => window.removeEventListener('ai-streaming-state', handleAIStreaming)
+  }, [])
 
   // Set up iframe message listener for browser logs
   useEffect(() => {
@@ -2369,6 +2500,8 @@ export default function TodoApp() {
                     }}
                   />
                 )
+              ) : isAIStreaming ? (
+                <AIRespondingView projectName={project?.name} />
               ) : (
                 <PreviewEmptyState
                   projectName={project?.name}
