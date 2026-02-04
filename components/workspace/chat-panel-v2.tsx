@@ -2299,7 +2299,9 @@ export function ChatPanelV2({
           ? { success: true }
           : (tool.status === 'failed'
             ? { error: 'Tool execution failed' }
-            : undefined)
+            : undefined),
+        textPosition: tool.textPosition,
+        reasoningPosition: tool.reasoningPosition,
       }))
 
       if (finalContent.trim() || toolInvocationsData.length > 0) {
@@ -2627,6 +2629,8 @@ export function ChatPanelV2({
           toolCallId: string
           input?: any
           status: 'executing' | 'completed' | 'failed'
+          textPosition?: number
+          reasoningPosition?: number
         }>>()
 
         uiMessages.forEach((msg: any) => {
@@ -2660,7 +2664,9 @@ export function ChatPanelV2({
                 toolName: inv.toolName,
                 toolCallId: inv.toolCallId,
                 input: inv.args,
-                status
+                status,
+                textPosition: inv.textPosition,
+                reasoningPosition: inv.reasoningPosition,
               }
             })
 
@@ -2925,14 +2931,16 @@ export function ChatPanelV2({
       // Continuation complete - update the original message with combined content
       // Get tool invocations for this message from activeToolCalls
       const toolInvocationsForMessage = activeToolCalls.get(assistantMessageId) || []
-      
+
       // Convert to the format expected by the database
       const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
         toolName: tool.toolName,
         toolCallId: tool.toolCallId,
         args: tool.input,
         state: tool.status === 'completed' ? 'result' : 'call',
-        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
+        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined),
+        textPosition: tool.textPosition,
+        reasoningPosition: tool.reasoningPosition,
       }))
       
       if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
@@ -4518,7 +4526,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         toolCallId: tool.toolCallId,
         args: tool.input,
         state: tool.status === 'completed' ? 'result' : 'call',
-        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
+        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined),
+        textPosition: tool.textPosition,
+        reasoningPosition: tool.reasoningPosition,
       }))
 
       console.log(`[ChatPanelV2][Save] Tool invocations data for database:`, toolInvocationsData)
