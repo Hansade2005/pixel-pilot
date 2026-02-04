@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-// Zeptomail SMTP Configuration (Zoho's transactional email service)
+// Zoho Mail SMTP Configuration
 const SMTP_CONFIG = {
-  host: 'smtp.zeptomail.com',
-  port: 587,
-  secure: false, // true for 465, false for 587
+  host: 'smtp.zoho.com',
+  port: 465,
+  secure: true,
   auth: {
-    user: 'emailapikey',
-    pass: 'wSsVR60krkLzB6Yrzzz8dbhryw4HUVulHBgo0VfyvyP8SKqU8cc8khDJAgfxSKMdFzY7FmFAobkgnx8F2mEHhtskw11TWSiF9mqRe1U4J3x17qnvhDzDWW9UlhKIKogLwAxpk2FpEMol+g=='
+    user: 'hello@pipilot.dev',
+    pass: 'Bamenda@5'
   }
 };
 
-// Create reusable transporter object using SMTP transport
 const transporter = nodemailer.createTransport(SMTP_CONFIG);
 
 interface EmailRequest {
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest) {
       attachments: body.attachments
     };
 
-    // Send email
+    // Send email via Zoho SMTP
     const info = await transporter.sendMail(mailOptions);
 
     console.log('Email sent successfully:', {

@@ -28,8 +28,7 @@ import {
   Sparkles,
   Eye,
   Code,
-  Wand2,
-  RefreshCw
+  Wand2
 } from "lucide-react"
 import {
   sendMarketingEmail,
@@ -39,8 +38,7 @@ import {
   loadEmailTemplates,
   type EmailTemplate
 } from "@/lib/email-templates"
-import FloatingAIEmailGenerator from "@/components/FloatingAIEmailGenerator"
-import { generateEmailContent } from "@/lib/ai-email-generator"
+import { generateEmailContent, improveEmailContent } from "@/lib/ai-email-generator"
 
 interface UserData {
   id: string
@@ -64,7 +62,6 @@ export default function AdminEmailPage() {
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
   const [showCompose, setShowCompose] = useState(false)
   const [sending, setSending] = useState(false)
-  const [showAIGenerator, setShowAIGenerator] = useState(false)
 
   // Compose form states
   const [recipients, setRecipients] = useState<string[]>([])
@@ -78,8 +75,6 @@ export default function AdminEmailPage() {
   // AI Generator states
   const [aiPrompt, setAiPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [aiContent, setAiContent] = useState('')
-  const [aiHtml, setAiHtml] = useState('')
 
   const { toast } = useToast()
   const router = useRouter()
@@ -174,41 +169,40 @@ export default function AdminEmailPage() {
     setHtml('')
     setEmailType('notification')
     setSelectedTemplate(null)
-    setShowAIGenerator(false)
     setActiveTab("compose")
     setAiPrompt('')
-    setAiContent('')
-    setAiHtml('')
   }
 
-  const handleAIContentApply = (aiSubject: string, aiContentText: string, aiHtmlText?: string) => {
-    if (aiSubject && !subject) {
-      setSubject(aiSubject)
-    }
-    setContent(aiContentText)
-    if (aiHtmlText) setHtml(aiHtmlText)
-  }
-
-  const handleAIGenerate = async () => {
-    if (!aiPrompt.trim()) return
+  const handleAIGenerate = async (improveType?: 'grammar' | 'tone' | 'length' | 'clarity' | 'engagement') => {
     setIsGenerating(true)
     try {
-      const result = await generateEmailContent({
-        type: emailType as any,
-        context: aiPrompt,
-        tone: 'professional',
-        length: 'medium',
-        recipientType: recipients.length > 1 ? 'group' : 'individual'
-      })
-      setAiContent(result.content)
-      setAiHtml(result.html)
-      if (result.subject && !subject) {
-        setSubject(result.subject)
+      if (improveType && content) {
+        const improved = await improveEmailContent(content, improveType)
+        setContent(improved)
+        setHtml(improved.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>'))
+        toast({
+          title: "Email improved",
+          description: `Content improved for better ${improveType}`,
+        })
+      } else {
+        const result = await generateEmailContent({
+          type: emailType as any,
+          subject: subject || undefined,
+          context: aiPrompt || undefined,
+          tone: 'professional',
+          length: 'medium',
+          recipientType: recipients.length > 1 ? 'group' : 'individual'
+        })
+        setContent(result.content)
+        setHtml(result.html)
+        if (result.subject) {
+          setSubject(result.subject)
+        }
+        toast({
+          title: content ? "Email regenerated" : "Email generated",
+          description: `${emailType.charAt(0).toUpperCase() + emailType.slice(1)} email ready to send`,
+        })
       }
-      toast({
-        title: "Email generated",
-        description: "AI content is ready. Click 'Apply to Content' to use it.",
-      })
     } catch (error) {
       toast({
         title: "Generation failed",
@@ -218,15 +212,6 @@ export default function AdminEmailPage() {
     } finally {
       setIsGenerating(false)
     }
-  }
-
-  const applyAIContent = () => {
-    if (aiContent) setContent(aiContent)
-    if (aiHtml) setHtml(aiHtml)
-    toast({
-      title: "Content applied",
-      description: "AI-generated content has been applied to your email.",
-    })
   }
 
   const applyTemplate = (template: EmailTemplate) => {
@@ -421,8 +406,8 @@ export default function AdminEmailPage() {
 
       {/* Gmail-style Compose Modal */}
       {showCompose && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20 z-50">
-          <Card className="w-full max-w-2xl mx-4 shadow-2xl bg-card">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-4 sm:pt-10 z-50 overflow-y-auto pb-4">
+          <Card className="w-full max-w-4xl mx-4 shadow-2xl bg-card max-h-[95vh] flex flex-col">
             <CardHeader className="bg-muted border-b px-4 py-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">New Message</CardTitle>
@@ -439,7 +424,7 @@ export default function AdminEmailPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 flex-1 overflow-y-auto">
               <div className="p-4 space-y-4">
                 {/* Recipients */}
                 <div className="flex items-center gap-2 text-sm">
@@ -512,31 +497,82 @@ export default function AdminEmailPage() {
                 )}
               </div>
 
-              {/* Content */}
-              <div className="px-4 pb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-muted-foreground">Content</span>
-                  <Button
-                    onClick={() => setShowAIGenerator(!showAIGenerator)}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    {showAIGenerator ? 'Hide' : 'AI'} Assistant
-                  </Button>
+              {/* AI Context Prompt */}
+              <div className="px-4 pb-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">AI Context (optional)</label>
+                  <Textarea
+                    placeholder="Describe what the email should be about, key points to cover, target audience..."
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    rows={2}
+                    className="resize-none text-sm"
+                  />
                 </div>
+              </div>
 
-                {/* Tabs for Compose and Preview */}
+              {/* AI Generation Buttons */}
+              <div className="px-4 pb-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => handleAIGenerate()}
+                    disabled={isGenerating}
+                    size="sm"
+                    variant={content ? "outline" : "default"}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    {content ? "Regenerate" : "Generate Email"}
+                  </Button>
+
+                  {content && (
+                    <>
+                      <Button
+                        onClick={() => handleAIGenerate('tone')}
+                        disabled={isGenerating}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Improve Tone
+                      </Button>
+                      <Button
+                        onClick={() => handleAIGenerate('clarity')}
+                        disabled={isGenerating}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Make Clearer
+                      </Button>
+                      <Button
+                        onClick={() => handleAIGenerate('engagement')}
+                        disabled={isGenerating}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        More Engaging
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Content Tabs: Preview & HTML Code */}
+              <div className="px-4 pb-4">
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="compose" className="flex items-center gap-2">
-                      <Code className="h-4 w-4" />
-                      Compose
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="flex items-center gap-2">
                       <Eye className="h-4 w-4" />
                       Preview
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="flex items-center gap-2">
+                      <Code className="h-4 w-4" />
+                      HTML Code
                     </TabsTrigger>
                   </TabsList>
 
@@ -545,128 +581,47 @@ export default function AdminEmailPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Message (Plain Text)</label>
                       <Textarea
-                        placeholder="Compose your message..."
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
-                        rows={12}
-                        className="resize-none"
+                        placeholder="Email message content..."
+                        className="min-h-[200px] font-mono text-sm"
                       />
                     </div>
 
-                    {/* HTML Editor */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">HTML Source (Optional)</label>
-                      <Textarea
-                        placeholder="HTML email code..."
-                        value={html}
-                        onChange={(e) => setHtml(e.target.value)}
-                        rows={8}
-                        className="resize-none font-mono text-xs"
-                        spellCheck={false}
-                      />
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="preview" className="mt-4 space-y-4">
-                    {/* Email Preview */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Email Preview</label>
-                      <div className="border rounded-lg p-4 bg-white dark:bg-gray-50 max-h-[400px] overflow-auto">
-                        {html ? (
-                          <div dangerouslySetInnerHTML={{ __html: html }} />
-                        ) : (
-                          <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                            {content}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Plain Text Fallback */}
-                    {html && content && (
+                    {/* HTML Preview */}
+                    {html && (
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Plain Text Version</label>
-                        <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 max-h-[200px] overflow-auto">
-                          <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 font-mono text-sm">
-                            {content}
-                          </div>
+                        <label className="text-sm font-medium">Email Preview</label>
+                        <div className="border rounded-lg p-4 bg-white dark:bg-gray-50 max-h-[400px] overflow-auto">
+                          <div dangerouslySetInnerHTML={{ __html: html }} />
                         </div>
                       </div>
                     )}
                   </TabsContent>
+
+                  <TabsContent value="preview" className="mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">HTML Source Code</label>
+                        <p className="text-xs text-muted-foreground">
+                          Edit to customize the email design
+                        </p>
+                      </div>
+                      <Textarea
+                        value={html}
+                        onChange={(e) => setHtml(e.target.value)}
+                        placeholder="HTML email code will appear here..."
+                        className="min-h-[400px] font-mono text-xs"
+                        spellCheck={false}
+                      />
+                    </div>
+                  </TabsContent>
                 </Tabs>
               </div>
 
-              {/* AI Generator */}
-              {showAIGenerator && (
-                <div className="px-4 pb-4 border-t">
-                  <div className="space-y-4 pt-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium">AI Email Assistant</span>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Prompt</label>
-                        <Textarea
-                          placeholder="Describe the email you want to generate..."
-                          value={aiPrompt}
-                          onChange={(e) => setAiPrompt(e.target.value)}
-                          rows={3}
-                          className="resize-none"
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleAIGenerate}
-                          disabled={isGenerating || !aiPrompt.trim()}
-                          size="sm"
-                          className="flex-1"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Wand2 className="h-4 w-4 mr-2" />
-                              Generate
-                            </>
-                          )}
-                        </Button>
-
-                        <Button
-                          onClick={applyAIContent}
-                          disabled={!aiContent && !aiHtml}
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          Apply to Content
-                        </Button>
-                      </div>
-
-                      {aiContent && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Generated Content</label>
-                          <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800 max-h-[200px] overflow-auto">
-                            <div className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
-                              {aiContent}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="bg-muted px-4 py-3 flex items-center justify-between border-t">
-                <div className="flex items-center gap-2">
+              {/* Footer Actions */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-4 py-3 border-t bg-muted">
+                <div className="flex flex-wrap items-center gap-2">
                   <Select value={emailType} onValueChange={setEmailType}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -679,11 +634,11 @@ export default function AdminEmailPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {recipients.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {recipients.length} recipient(s)
-                    </span>
-                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {isGenerating && "Generating with AI..."}
+                    {!isGenerating && content && `${content.length} characters`}
+                    {!isGenerating && !content && recipients.length > 0 && `${recipients.length} recipient(s)`}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -693,12 +648,13 @@ export default function AdminEmailPage() {
                     }}
                     variant="outline"
                     size="sm"
+                    disabled={isGenerating || sending}
                   >
                     Discard
                   </Button>
                   <Button
                     onClick={sendEmails}
-                    disabled={sending || recipients.length === 0}
+                    disabled={sending || isGenerating || recipients.length === 0 || !subject || !content}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     {sending ? (
@@ -709,7 +665,7 @@ export default function AdminEmailPage() {
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-2" />
-                        Send
+                        Send Email
                       </>
                     )}
                   </Button>
@@ -719,16 +675,6 @@ export default function AdminEmailPage() {
           </Card>
         </div>
       )}
-
-      {/* Floating AI Email Generator */}
-      <FloatingAIEmailGenerator
-        isVisible={showCompose && showAIGenerator}
-        onClose={() => setShowAIGenerator(false)}
-        onApplyContent={handleAIContentApply}
-        currentSubject={subject}
-        currentContent={content}
-        emailType={emailType}
-      />
     </div>
   )
 }
