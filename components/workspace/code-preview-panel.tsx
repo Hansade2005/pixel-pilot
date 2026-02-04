@@ -154,6 +154,14 @@ const FEATURE_CARDS = [
     details: ["Live element selection", "Instant style editing", "100+ Google Fonts", "One-click themes"]
   },
   {
+    icon: RotateCcw,
+    title: "Message Actions",
+    description: "Hover any message to retry, revert to checkpoint, branch from it, copy, or delete. Full control over your conversation.",
+    color: "from-amber-500/20 to-amber-600/10",
+    accent: "text-amber-500",
+    details: ["Retry / Resend", "Revert to checkpoint", "Branch from message", "Copy & Delete"]
+  },
+  {
     icon: GitBranch,
     title: "Branch & Revert",
     description: "Branch conversations to explore different approaches. Revert to any checkpoint instantly.",
