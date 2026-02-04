@@ -738,6 +738,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   })
   const [customUrl, setCustomUrl] = useState("")
   const [currentLog, setCurrentLog] = useState("Initializing preview...")
+  const [rocketPhase, setRocketPhase] = useState<'cruising' | 'landing'>('cruising')
   const [isExporting, setIsExporting] = useState(false)
   const [consoleOutput, setConsoleOutput] = useState<string[]>([])
   const [isConsoleOpen, setIsConsoleOpen] = useState(false)
@@ -1151,6 +1152,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     const loadingPreview = { ...preview, isLoading: true }
     setPreview(loadingPreview)
     setCurrentLog("Booting VM...")
+    setRocketPhase('cruising') // Start with cruise rocket
     setConsoleOutput([]) // Clear previous console output
     
     // Dispatch preview starting event
@@ -1285,7 +1287,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                       }))
 
                       // Set custom loading message for the build phase
-                      setCurrentLog("🏗️ Building production bundle...")
+                      setCurrentLog("Building production bundle...")
 
                       // Start E2B log streaming for runtime logs
                       startE2BLogStreaming(msg.sandboxId, msg.processId)
@@ -1295,7 +1297,8 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
                       // For hosted previews (subdomain URLs), mark as ready immediately since no localhost server logs will appear
                       if (msg.url && !msg.url.includes('localhost')) {
-                        setCurrentLog("✅ Preview ready!")
+                        setRocketPhase('landing')
+                        setCurrentLog("Preview ready!")
                         setPreview(prev => ({ ...prev, isLoading: false }))
                         
                         // Dispatch preview ready event for hosted URLs
@@ -1317,47 +1320,60 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     if (msg.type === "log") {
                       // Update current log for specific build stages
                       if (msg.message.includes("vite build") || msg.message.includes("next build")) {
-                        setCurrentLog("🏗️ Building production bundle...")
+                        setCurrentLog("Building production bundle...")
                       } else if (msg.message.includes("transforming")) {
-                        setCurrentLog("⚙️ Transforming modules...")
+                        setCurrentLog("Transforming modules...")
                       } else if (msg.message.includes("rendering chunks") || msg.message.includes("Generating static pages")) {
-                        setCurrentLog("📦 Rendering chunks...")
+                        setCurrentLog("Rendering chunks...")
                       } else if (msg.message.includes("computing gzip size") || msg.message.includes("Finalizing page optimization")) {
-                        setCurrentLog("🗜️ Optimizing bundle size...")
+                        setCurrentLog("Optimizing bundle size...")
                       } else if (msg.message.includes("preview") || msg.message.includes("start")) {
-                        setCurrentLog("🚀 Starting production server...")
+                        setCurrentLog("Starting production server...")
                       } else if (msg.message.includes("next dev") || msg.message.includes("pnpm dev") || msg.message.includes("npm run dev")) {
-                        setCurrentLog("🚀 Starting Next.js development server...")
+                        setCurrentLog("Starting development server...")
                       } else if (msg.message.includes("compiled successfully") || msg.message.includes("ready")) {
-                        setCurrentLog("✅ Next.js dev server ready...")
+                        setCurrentLog("Dev server ready...")
                       }
-                      
+
+                      // Switch rocket to landing phase when build completes or packages are installed
+                      // For Vite: build completes before serving
+                      if (msg.message.includes("Build completed successfully") || msg.message.includes("project hosted at")) {
+                        setRocketPhase('landing')
+                        setCurrentLog("Almost there...")
+                      }
+                      // For non-Vite frameworks (Next.js, Expo, etc): switch after dependencies installed
+                      if (msg.message.includes("Dependencies installed successfully")) {
+                        setRocketPhase('landing')
+                        setCurrentLog("Starting server...")
+                      }
+
                       // Vite detection - very specific
                       const isViteReady = msg.message.includes("➜ Local: http://localhost:")
-                      
+
                       // Next.js detection - must have the dash prefix which appears when server actually starts
                       const isNextReady = (
                         msg.message.includes("- Local:") && msg.message.includes("http://localhost:") ||
                         msg.message.includes("- Network:") && msg.message.includes("http://")
                       )
-                      
+
                       // Generic detection for custom servers
                       const isGenericReady = msg.message.includes("Production server running")
-                      
+
                       if (isViteReady || isNextReady || isGenericReady) {
                         // Now the server is actually ready to serve content
-                        setCurrentLog("✅ Preview ready!")
+                        setRocketPhase('landing') // Ensure landing phase
+                        setCurrentLog("Preview ready!")
                         setPreview(prev => ({ ...prev, isLoading: false }))
-                        
+
                         // Dispatch preview ready event NOW
                         if (typeof window !== 'undefined' && preview.sandboxId && preview.url) {
-                          window.dispatchEvent(new CustomEvent('preview-ready', { 
-                            detail: { preview: { 
+                          window.dispatchEvent(new CustomEvent('preview-ready', {
+                            detail: { preview: {
                               sandboxId: preview.sandboxId,
                               url: preview.url,
                               processId: preview.processId,
                               isLoading: false
-                            } } 
+                            } }
                           }))
                         }
                       }
@@ -2257,34 +2273,26 @@ export default function TodoApp() {
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
               {preview.isLoading ? (
-                <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30">
-                  <div className="text-center p-8 max-w-md">
-                    {/* Rocket GIF */}
-                    <div className="w-32 h-32 mx-auto mb-6">
-                      <img
-                        src="https://cdn.dribbble.com/userupload/21318302/file/original-0ae476e7023bfad18297f22527125cb2.gif"
-                        alt="Launching preview"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-1">
-                      {truncateMessage(currentLog, 50)}
-                    </h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      Launching your app preview
-                    </p>
-                    {/* Progress log trail */}
-                    <div className="mt-4 max-h-[120px] overflow-y-auto rounded-lg bg-muted/50 border border-border p-3 text-left">
-                      {consoleOutput.slice(-5).map((log, i) => (
-                        <p key={i} className="text-xs text-muted-foreground font-mono truncate leading-5">
-                          {log.replace(/^\[\d{1,2}:\d{2}:\d{2} (?:AM|PM)\] [^\s]+ \[[A-Z]+\] /, '')}
-                        </p>
-                      ))}
-                      {consoleOutput.length === 0 && (
-                        <p className="text-xs text-muted-foreground font-mono leading-5">
-                          Initializing...
-                        </p>
-                      )}
+                <div className="relative h-full w-full overflow-hidden">
+                  {/* Full-window rocket GIF background */}
+                  <img
+                    key={rocketPhase}
+                    src={rocketPhase === 'cruising'
+                      ? 'https://pipilot.dev/assets/pipilot_rocket_cruise.gif'
+                      : 'https://pipilot.dev/assets/pipilot_rocket_closing.gif'
+                    }
+                    alt={rocketPhase === 'cruising' ? 'Launching preview' : 'Landing preview'}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {/* Status overlay at bottom */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-6">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-white mb-1 drop-shadow-md">
+                        {truncateMessage(currentLog, 50)}
+                      </h3>
+                      <p className="text-white/70 text-sm drop-shadow-sm">
+                        {rocketPhase === 'cruising' ? 'Setting up your preview environment' : 'Almost ready...'}
+                      </p>
                     </div>
                   </div>
                 </div>
