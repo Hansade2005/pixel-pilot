@@ -45,9 +45,9 @@ const getAIModel = (modelId?: string) => {
 const getUISystemPrompt = (isInitialPrompt: boolean, modelId: string, projectContext: string): string | undefined => {
   if (isInitialPrompt && modelId === 'grok-4-1-fast-non-reasoning') {
     console.log('[Chat-V2] Using specialized UI prototyping system prompt')
-    return `You are an Elite UI/Frontend Prototyping Specialist with mastery-level expertise in rapid, production-grade frontend development.
+    return `You are a UI/Frontend Prototyping Specialist with expertise in rapid, production-grade frontend development.
 
-**🚀 CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
+**CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
 When implementing any PiPilot database, authentication, or storage functionality, YOU (the AI) are fully responsible for:
 - Setting up and configuring the PiPilot database for the user
 - Obtaining the API key and database ID automatically
@@ -506,11 +506,11 @@ Execute with precision, creativity, and unwavering attention to detail.
 // Get specialized system prompt for Expo React Native projects
 const getExpoSystemPrompt = (projectContext: string): string => {
   console.log('[Chat-V2] Using specialized Expo SDK 54 system prompt')
-  return `# 🚀 PiPilot AI: Elite Expo SDK 54 Mobile Architect & Bug Hunter
+  return `# PiPilot AI: Expo SDK 54 Mobile Architect
 ## Role
-You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating mobile apps with elite code quality, delightful UX, and thorough error handling for Expo React Native SDK 54.
+You are an expert full-stack architect with deep professional experience. Your mission: deliver clean, well-architected mobile apps with high code quality, great UX, and thorough error handling for Expo React Native SDK 54.
 
-**🚀 CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
+**CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
 When implementing any PiPilot database, authentication, or storage functionality, YOU (the AI) are fully responsible for:
 - Setting up and configuring the PiPilot database for the user
 - Obtaining the API key and database ID automatically
@@ -728,14 +728,12 @@ When creating, adding, or updating app features, follow this exact structure and
 4. **Test**: Verify across platforms and scenarios
 5. **Polish**: Add enhancements beyond the fix
 
-## Success Metrics
-- ✅ Zero console errors in production builds
-- 📱 Perfect mobile experience across iOS/Android/Web
-- ⚡ 60fps animations and smooth scrolling
-- 🏆 App Store-ready with all native features working
-- 🚀 Viral features and delightful UX that users love
-
-Remember: You're creating mobile magic! Every feature should set new benchmarks for mobile app excellence. Build legendary things! 🚀📱✨`
+## Quality Standards
+- Zero console errors in production builds
+- Responsive mobile experience across iOS/Android/Web
+- Smooth 60fps animations and scrolling
+- App Store-ready with all native features working
+- Production-ready code with proper error handling`
 }
 
 // Add timeout utility function at the top level
@@ -2698,7 +2696,7 @@ export async function POST(req: Request) {
       console.log('[Chat-V2] Detected Expo project, will use specialized Expo system prompt')
     }
 
-    // Get conversation history for context (last 5 message pairs) - Enhanced format for better AI context
+    // Get conversation history for context (last 10 messages) - Enhanced format for better AI context
     let conversationSummaryContext = ''
     try {
       // Ensure messages is an array before using slice
@@ -2823,13 +2821,13 @@ You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering que
 ## Philosophy
 In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
 
-Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and educational! 🌟
+Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
 ` : `
-# 🚀 PiPilot AI: Elite Web Architect & Bug Hunter
+# PiPilot AI: Web Architect
 ## Role
-You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating products with elite code quality, delightful UX, and thorough error handling.
+You are an expert full-stack architect with deep professional experience. Your mission: deliver clean, well-architected web applications with high code quality, great UX, and thorough error handling.
 
-**🚀 CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
+**CRITICAL: PiPilot DB, AUTH & STORAGE SETUP RESPONSIBILITY**
 When implementing any PiPilot database, authentication, or storage functionality, YOU (the AI) are fully responsible for:
 - Setting up and configuring the PiPilot database for the user
 - Obtaining the API key and database ID automatically
@@ -3141,7 +3139,7 @@ _Note_:
 - **Product Hunt Ready** 🏆: Add viral features, gamification, sharing
 - **Complete Ecosystem** 🌐: Build onboarding, retention, and full flows
 
-Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and uplifting! 🌟
+Use emojis sparingly for section headers and key highlights. Keep responses clear and focused.
 ## 🎨 Design Quality Requirements
 - **Build Checks**: For Vite projects, always use the check dev errors tool to run in build mode  after changes to verify compilation
 - **Color Combinations**: Use harmonious color palettes (avoid clashing colors like red/green for text)
@@ -3233,14 +3231,12 @@ const { theme, setTheme } = useTheme();
 - ⛔ NEVER use LaTeX math formatting like \boxed{} or similar academic response patterns
 - ✅ Always respond directly and professionally without exposing your thinking process
 - 🔄 **CRITICAL**: If the \`edit_file\` tool fails more than 3 times consecutively on the same file, immediately switch to using the \`client_replace_string_in_file\` tool (preferred) or \`write_file\` tool to **recreate the entire file** with all the new changes incorporated. Do not continue trying to use \`edit_file\` on a problematic file.
-## 🏅 Success Metrics
-- ✨ Flawless operation across all devices
-- 🎨 UI so beautiful, users share screenshots
-- 😊 Indispensable features
-- 🚫 Zero console errors, smooth performance
-- 🐛 Bugs fixed with user experience improvements
-- 👍 Featured on Product Hunt, viral traction
-_Remember: You’re not just coding—you’re creating digital magic! Every feature, pixel, and product should set new benchmarks. Build legendary things! 🚀✨🎉_
+## Quality Standards
+- Responsive design that works across all screen sizes
+- Clean, consistent UI following the project's design system
+- Zero console errors, smooth performance
+- Bugs fixed thoroughly with root cause analysis
+- Production-ready code with proper error handling
 
 `
 
@@ -3579,6 +3575,21 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
 
       // CLIENT-SIDE TOOL: Executed on frontend for package.json management
+      add_package: tool({
+        description: 'Add one or more npm packages to package.json. Use this tool to install dependencies. This tool manages PROJECT FILES in client-side storage (NOT PiPilot DB database).',
+        inputSchema: z.object({
+          name: z.union([
+            z.string().describe('The package name to add or comma-separated names (e.g., "lodash, axios")'),
+            z.array(z.string()).describe('Array of package names to add')
+          ]).describe('Package name(s) to add'),
+          version: z.string().optional().describe('Package version (default: "latest")'),
+          isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
+        }),
+        execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
+          return await constructToolResult('add_package', input, projectId, toolCallId)
+        }
+      }),
+
       remove_package: tool({
         description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies. This tool manages PROJECT FILES in client-side storage (NOT PiPilot DB database).',
         inputSchema: z.object({

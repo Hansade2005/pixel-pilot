@@ -4025,16 +4025,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
     const controller = new AbortController()
     setAbortController(controller)
 
-    // AI SDK Pattern: Send only last 5 messages + new message
+    // AI SDK Pattern: Send last 10 messages + new message for context
     try {
-      // Get last 5 messages from current conversation
-      const recentMessages = messages.slice(-10) // Last 5 messages
+      // Get last 10 messages from current conversation
+      const recentMessages = messages.slice(-10)
       const messagesToSend = [
         ...recentMessages.map((m: any) => ({ role: m.role, content: m.content })),
         { role: 'user', content: enhancedContent }
       ]
 
-      console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 5 + new)`)
+      console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 10 + new)`)
 
       // Always refresh project files to catch latest changes made by user
       console.log(`[ChatPanelV2] Refreshing project files for real-time sync...`)
@@ -4557,8 +4557,23 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         // Note: handleStop already marks the stream as user_aborted
       } else {
         setError(error)
-        // Remove the placeholder assistant message on error
-        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+        console.error('[ChatPanelV2] Stream error (non-abort):', error.message || error)
+        // Preserve the assistant message with whatever content was streamed so far
+        // instead of deleting it (which loses user progress)
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === assistantMessageId) {
+            const currentContent = typeof msg.content === 'string' ? msg.content : ''
+            // Only keep the message if it has some content; remove empty placeholders
+            if (!currentContent.trim()) {
+              return null
+            }
+            return {
+              ...msg,
+              content: currentContent + '\n\n---\n*Stream interrupted due to a network error. You can try sending your message again.*'
+            }
+          }
+          return msg
+        }).filter(Boolean) as any)
         // Clean up tool calls for failed message
         setActiveToolCalls(prev => {
           const newMap = new Map(prev)
