@@ -363,6 +363,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
 
+    // Auto-switch to preview tab when AI starts streaming so the user
+    // sees the AI responding view (rocket + witty messages) immediately.
+    // Skip if a live preview is already loaded to avoid hiding it.
+    const handleAiStreamingState = (event: CustomEvent) => {
+      const { isStreaming } = event.detail
+      if (isStreaming && !codePreviewRef.current?.preview?.url) {
+        setActiveTab('preview')
+        if (isMobile) {
+          setMobileTab('preview')
+        }
+      }
+    }
+
     // Handle opening file from search results or other sources
     const handleOpenFileInEditor = async (event: CustomEvent) => {
       const { filePath, lineNumber } = event.detail
@@ -409,6 +422,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     window.addEventListener('preview-starting', handlePreviewStarting as EventListener)
     window.addEventListener('preview-stopped', handlePreviewStopped as EventListener)
     window.addEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
+    window.addEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
     window.addEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
 
     return () => {
@@ -418,6 +432,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       window.removeEventListener('preview-starting', handlePreviewStarting as EventListener)
       window.removeEventListener('preview-stopped', handlePreviewStopped as EventListener)
       window.removeEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
+      window.removeEventListener('ai-streaming-state', handleAiStreamingState as EventListener)
       window.removeEventListener('openFileInEditor', handleOpenFileInEditor as EventListener)
     }
   }, [selectedProject, isMobile, toast])
