@@ -21,7 +21,15 @@ import {
   Copy,
   Database,
   Edit3,
-  Wand2
+  Wand2,
+  Rocket,
+  GitBranch,
+  MousePointerClick,
+  Palette,
+  MessageSquare,
+  Globe,
+  Share2,
+  ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
@@ -125,6 +133,155 @@ interface PreviewState {
   url: string | null;
   isLoading: boolean;
   processId: string | null;
+}
+
+// Feature cards data for the rotating showcase
+const FEATURE_CARDS = [
+  {
+    icon: MessageSquare,
+    title: "AI Chat Commands",
+    description: "Use / slash commands to fix, refactor, deploy, and more. Mention files with @ to give AI context.",
+    color: "from-blue-500/20 to-blue-600/10",
+    accent: "text-blue-500",
+    details: ["/fix - Fix errors", "/deploy - Deploy to Vercel", "/branch - Branch conversation", "@ - Reference any file"]
+  },
+  {
+    icon: MousePointerClick,
+    title: "Visual Click-to-Edit",
+    description: "Click any element in the preview to edit styles, text, and props in real-time. No code needed.",
+    color: "from-purple-500/20 to-purple-600/10",
+    accent: "text-purple-500",
+    details: ["Live element selection", "Instant style editing", "100+ Google Fonts", "One-click themes"]
+  },
+  {
+    icon: GitBranch,
+    title: "Branch & Revert",
+    description: "Branch conversations to explore different approaches. Revert to any checkpoint instantly.",
+    color: "from-green-500/20 to-green-600/10",
+    accent: "text-green-500",
+    details: ["Conversation branching", "Checkpoint restore", "5-min undo window", "Named branches"]
+  },
+  {
+    icon: Rocket,
+    title: "One-Click Deploy",
+    description: "Deploy to Vercel or Netlify with one click. Push to GitHub. Share your live app with the world.",
+    color: "from-orange-500/20 to-orange-600/10",
+    accent: "text-orange-500",
+    details: ["Vercel deployment", "GitHub integration", "Netlify hosting", "Shareable links"]
+  },
+  {
+    icon: Share2,
+    title: "Clone & Templates",
+    description: "Publish your project as a template for others. Clone any template to kickstart new projects.",
+    color: "from-pink-500/20 to-pink-600/10",
+    accent: "text-pink-500",
+    details: ["Publish as template", "Template marketplace", "Project cloning", "Earn from templates"]
+  },
+  {
+    icon: Palette,
+    title: "Theme & Typography",
+    description: "Switch themes instantly with CSS variable support. Access 100+ Google Fonts with live preview.",
+    color: "from-cyan-500/20 to-cyan-600/10",
+    accent: "text-cyan-500",
+    details: ["Pre-built themes", "CSS variable system", "Font live preview", "WCAG compliance"]
+  },
+]
+
+function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
+  projectName?: string;
+  onStartPreview: () => void;
+  disabled: boolean;
+}) {
+  const [activeCard, setActiveCard] = useState(0)
+
+  // Auto-rotate cards every 4 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveCard(prev => (prev + 1) % FEATURE_CARDS.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const card = FEATURE_CARDS[activeCard]
+  const CardIcon = card.icon
+
+  return (
+    <div className="h-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-background to-muted/20 overflow-y-auto">
+      <div className="w-full max-w-md">
+        {/* Rotating Feature Card */}
+        <div className="relative mx-auto mb-6">
+          <div
+            className={`rounded-2xl border border-border bg-gradient-to-br ${card.color} shadow-lg overflow-hidden transition-all duration-500`}
+          >
+            {/* Card header */}
+            <div className="px-5 pt-5 pb-3 flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl bg-background/80 shadow-sm ${card.accent}`}>
+                <CardIcon className="h-6 w-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-base leading-tight">{card.title}</h4>
+                <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                  {card.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Detail items */}
+            <div className="px-5 pb-5">
+              <div className="grid grid-cols-2 gap-2">
+                {card.details.map((detail, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background/60 border border-border/50"
+                    style={{ animationDelay: `${i * 100}ms` }}
+                  >
+                    <ChevronRight className={`h-3 w-3 flex-shrink-0 ${card.accent}`} />
+                    <span className="text-xs text-foreground/80 truncate">{detail}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dot indicators */}
+        <div className="flex justify-center gap-1.5 mb-5">
+          {FEATURE_CARDS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveCard(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === activeCard
+                  ? 'w-6 bg-primary'
+                  : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Title + CTA */}
+        <div className="text-center">
+          <h3 className="text-xl font-semibold mb-1">PiPilot Preview</h3>
+          <p className="text-muted-foreground text-sm mb-5">
+            {projectName
+              ? `Launch "${projectName}" to see it live`
+              : "Build, preview, and deploy your app -- all in one place"
+            }
+          </p>
+
+          <Button
+            onClick={onStartPreview}
+            disabled={disabled}
+            size="lg"
+            className="rounded-full px-8 shadow-md"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Start Preview
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
@@ -1763,53 +1920,11 @@ export default function TodoApp() {
                   />
                 )
               ) : (
-                <div className="h-full flex items-center justify-center p-6 bg-gradient-to-b from-background to-muted/20">
-                  <div className="text-center max-w-lg w-full">
-                    {/* Preview mockup card */}
-                    <div className="relative mx-auto mb-6 rounded-xl border border-border bg-card shadow-lg overflow-hidden max-w-sm">
-                      {/* Fake browser chrome */}
-                      <div className="flex items-center gap-1.5 px-3 py-2 bg-muted border-b border-border">
-                        <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
-                        <div className="flex-1 mx-2 h-5 rounded bg-background/60 flex items-center justify-center">
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {project?.name ? `${project.name.toLowerCase().replace(/\s+/g, '-')}.pipilot.dev` : 'your-app.pipilot.dev'}
-                          </span>
-                        </div>
-                      </div>
-                      {/* Fake page content skeleton */}
-                      <div className="p-4 space-y-3 min-h-[160px]">
-                        <div className="h-4 w-3/4 rounded bg-muted animate-pulse"></div>
-                        <div className="h-3 w-full rounded bg-muted/60 animate-pulse delay-75"></div>
-                        <div className="h-3 w-5/6 rounded bg-muted/60 animate-pulse delay-100"></div>
-                        <div className="mt-4 flex gap-2">
-                          <div className="h-8 w-20 rounded-md bg-primary/20 animate-pulse delay-150"></div>
-                          <div className="h-8 w-20 rounded-md bg-muted animate-pulse delay-200"></div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                          <div className="h-16 rounded-md bg-muted/40 animate-pulse delay-100"></div>
-                          <div className="h-16 rounded-md bg-muted/40 animate-pulse delay-200"></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <h3 className="text-xl font-semibold mb-1">PiPilot Preview</h3>
-                    <p className="text-muted-foreground text-sm mb-5">
-                      See your app come to life. Build, preview, and deploy -- all in one place.
-                    </p>
-
-                    <Button
-                      onClick={createPreview}
-                      disabled={!project || preview.isLoading}
-                      size="lg"
-                      className="rounded-full px-8 shadow-md"
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Start Preview
-                    </Button>
-                  </div>
-                </div>
+                <PreviewEmptyState
+                  projectName={project?.name}
+                  onStartPreview={createPreview}
+                  disabled={!project || preview.isLoading}
+                />
               )}
             </div>
 
