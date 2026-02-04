@@ -1098,6 +1098,15 @@ export function ChatPanelV2({
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
 
+  // Broadcast AI streaming state to other panels (e.g. preview panel)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ai-streaming-state', {
+        detail: { isStreaming: isLoading }
+      }))
+    }
+  }, [isLoading])
+
   // Chat mode state - true for Ask mode, false for Agent mode
   const [isAskMode, setIsAskMode] = useState(false)
 

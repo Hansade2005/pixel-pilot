@@ -579,6 +579,103 @@ const CARD_DEMOS = [
   ThemeTypographyDemo,
 ]
 
+// ── AI Responding View ───────────────────────────────────────────────
+
+const AI_WITTY_MESSAGES = [
+  "Teaching pixels to dance...",
+  "Convincing the code to cooperate...",
+  "Brewing some fresh components...",
+  "Negotiating with the semicolons...",
+  "Summoning the right variables...",
+  "Polishing your UI to perfection...",
+  "Asking the divs to align nicely...",
+  "Refactoring reality, one line at a time...",
+  "The AI is in the zone, do not disturb...",
+  "Turning caffeine into code...",
+  "Making your app dreams come true...",
+  "Running on pure imagination...",
+  "Deploying creativity at scale...",
+  "Calculating the meaning of null...",
+  "Whispering sweet nothings to the compiler...",
+  "Untangling the spaghetti before you see it...",
+  "Building Rome, but faster...",
+  "Your future users will thank you for waiting...",
+  "Great things take a few seconds...",
+  "Ctrl+Z won't undo how good this is about to be...",
+  "Hot-reloading brilliance...",
+  "The bugs never stood a chance...",
+  "Reticulating splines, obviously...",
+  "Making the internet a slightly better place...",
+  "This is going to look amazing, trust me...",
+  "PiPilot is cooking something special...",
+  "Optimizing for vibes and performance...",
+  "Stacking divs like a pro...",
+  "Generating code that even linters love...",
+  "Almost there... jk, still working on it...",
+  "Writing code so clean it sparkles...",
+  "This is the AI equivalent of a deep breath...",
+  "Composing your masterpiece, note by note...",
+  "If code grew on trees, we'd still do it faster...",
+  "Zero bugs detected so far... fingers crossed...",
+]
+
+function AIRespondingView() {
+  const [messageIndex, setMessageIndex] = useState(() =>
+    Math.floor(Math.random() * AI_WITTY_MESSAGES.length)
+  )
+  const [fade, setFade] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setMessageIndex(prev => {
+          let next = prev
+          // Avoid repeating the same message
+          while (next === prev) {
+            next = Math.floor(Math.random() * AI_WITTY_MESSAGES.length)
+          }
+          return next
+        })
+        setFade(true)
+      }, 300)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Rocket GIF background */}
+      <img
+        src="https://pipilot.dev/assets/pipilot_rocket_cruise.gif"
+        alt="AI is working"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {/* Bottom overlay with witty message */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent pt-20 pb-8 px-6">
+        <div className="text-center max-w-md mx-auto">
+          {/* Pulsing dots */}
+          <div className="flex items-center justify-center gap-1.5 mb-4">
+            <div className="w-2 h-2 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-2 drop-shadow-md">
+            AI is working its magic
+          </h3>
+          <p
+            className={`text-white/80 text-sm drop-shadow-sm transition-opacity duration-300 ${
+              fade ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {AI_WITTY_MESSAGES[messageIndex]}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── PreviewEmptyState ────────────────────────────────────────────────
 
 function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
@@ -750,6 +847,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
   const [isExpoProject, setIsExpoProject] = useState(false)
+  const [isAIStreaming, setIsAIStreaming] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
   const [backgroundProcess, setBackgroundProcess] = useState<{
@@ -863,6 +961,16 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
   }, [consoleOutput, browserLogs, processLogs, isConsoleOpen])
+
+  // Listen for AI streaming state from chat panel
+  useEffect(() => {
+    const handleAIStreaming = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      setIsAIStreaming(detail?.isStreaming ?? false)
+    }
+    window.addEventListener('ai-streaming-state', handleAIStreaming)
+    return () => window.removeEventListener('ai-streaming-state', handleAIStreaming)
+  }, [])
 
   // Set up iframe message listener for browser logs
   useEffect(() => {
@@ -2369,6 +2477,8 @@ export default function TodoApp() {
                     }}
                   />
                 )
+              ) : isAIStreaming ? (
+                <AIRespondingView />
               ) : (
                 <PreviewEmptyState
                   projectName={project?.name}
