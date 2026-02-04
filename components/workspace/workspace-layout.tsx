@@ -312,6 +312,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Preview view mode state
   const [previewViewMode, setPreviewViewMode] = useState<'desktop' | 'mobile'>('desktop')
 
+  // Track AI streaming state (always mounted, unlike CodePreviewPanel)
+  const [isAIStreaming, setIsAIStreaming] = useState(false)
+
   // Listen for preview state changes from CodePreviewPanel
   useEffect(() => {
     const handlePreviewStateChange = (event: CustomEvent) => {
@@ -368,6 +371,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     // Skip if a live preview is already loaded to avoid hiding it.
     const handleAiStreamingState = (event: CustomEvent) => {
       const { isStreaming } = event.detail
+      setIsAIStreaming(isStreaming)
       if (isStreaming && !codePreviewRef.current?.preview?.url) {
         setActiveTab('preview')
         if (isMobile) {
@@ -1148,10 +1152,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           // Trigger preview creation
                           codePreviewRef.current?.createPreview()
                         }}
+                        isAIStreaming={isAIStreaming}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
-                      <CloudTab user={user} selectedProject={selectedProject} /> 
+                      <CloudTab user={user} selectedProject={selectedProject} />
                     ) : activeTab === "audit" ? (
                       /* Audit Tab */
                       <AuditTab user={user} selectedProject={selectedProject} />
@@ -1623,10 +1628,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onUrlChange={setCustomUrl}
                       onVisualEditorSave={handleVisualEditorSave}
                       onApplyTheme={handleVisualEditorThemeSave}
+                      isAIStreaming={isAIStreaming}
                     />
                   </div>
                 </TabsContent>
-                
+
                 <TabsContent value="cloud" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
                     <CloudTab user={user} selectedProject={selectedProject} />
