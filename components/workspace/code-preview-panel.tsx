@@ -32,7 +32,9 @@ import {
   ChevronRight,
   ChevronUp,
   ChevronDown,
-  Pause
+  Pause,
+  FlaskConical,
+  X as XIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
@@ -57,6 +59,17 @@ import {
   VisualEditorToggle,
 } from "./visual-editor-wrapper";
 import type { StyleChange, Theme } from "@/lib/visual-editor";
+import dynamic from "next/dynamic";
+
+// Lazy-load Sandpack (heavy dependency) only when needed
+const SandpackProviderLazy = dynamic(
+  () => import("@codesandbox/sandpack-react").then(mod => ({ default: mod.SandpackProvider })),
+  { ssr: false }
+);
+const SandpackPreviewLazy = dynamic(
+  () => import("@codesandbox/sandpack-react").then(mod => ({ default: mod.SandpackPreview })),
+  { ssr: false }
+);
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -871,6 +884,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
   const [isExpoProject, setIsExpoProject] = useState(false)
+  const [isViteProject, setIsViteProject] = useState(false)
+  const [showSandpackPreview, setShowSandpackPreview] = useState(false)
+  const [sandpackFiles, setSandpackFiles] = useState<Record<string, { code: string }> | null>(null)
+  const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({})
+  const [sandpackDevDeps, setSandpackDevDeps] = useState<Record<string, string>>({})
+  const [sandpackLoading, setSandpackLoading] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
   const [backgroundProcess, setBackgroundProcess] = useState<{
@@ -936,34 +955,45 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   useEffect(() => {
     if (!project) {
       setIsExpoProject(false)
+      setIsViteProject(false)
+      setShowSandpackPreview(false)
       return
     }
 
-    const checkExpoProject = async () => {
+    const checkProjectFramework = async () => {
       try {
         const { storageManager } = await import('@/lib/storage-manager')
         const files = await storageManager.getFiles(project.id)
-        // Check for app.json or app.config.js
+
+        // Check Expo: app.json or app.config.js or expo in dependencies
         const hasExpoConfig = files.some((f: StorageFile) => f.path === 'app.json' || f.path === 'app.config.js')
-        if (hasExpoConfig) {
+        const packageJsonFile = files.find((f: StorageFile) => f.path === 'package.json')
+        let packageJson: any = null
+        if (packageJsonFile) {
+          try { packageJson = JSON.parse(packageJsonFile.content) } catch {}
+        }
+
+        if (hasExpoConfig || packageJson?.dependencies?.expo || packageJson?.devDependencies?.expo) {
           setIsExpoProject(true)
+          setIsViteProject(false)
           return
         }
-        // Check package.json for expo dependency
-        const packageJsonFile = files.find((f: StorageFile) => f.path === 'package.json')
-        if (packageJsonFile) {
-          const packageJson = JSON.parse(packageJsonFile.content)
-          setIsExpoProject(!!(packageJson.dependencies?.expo || packageJson.devDependencies?.expo))
-        } else {
-          setIsExpoProject(false)
-        }
-      } catch (error) {
-        console.error('Error checking for Expo project:', error)
         setIsExpoProject(false)
+
+        // Check Vite: vite.config.ts/js/mjs or vite in devDependencies
+        const hasViteConfig = files.some((f: StorageFile) =>
+          f.path === 'vite.config.ts' || f.path === 'vite.config.js' || f.path === 'vite.config.mjs'
+        )
+        const hasViteDep = !!(packageJson?.devDependencies?.vite || packageJson?.dependencies?.vite)
+        setIsViteProject(hasViteConfig || hasViteDep)
+      } catch (error) {
+        console.error('Error checking project framework:', error)
+        setIsExpoProject(false)
+        setIsViteProject(false)
       }
     }
 
-    checkExpoProject()
+    checkProjectFramework()
   }, [project])
 
   useEffect(() => {
@@ -1585,11 +1615,89 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     }
   }
 
+  // Load project files into Sandpack format and show the Sandpack preview
+  const openSandpackPreview = async () => {
+    if (!project) return
+    setSandpackLoading(true)
+
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      const files = await storageManager.getFiles(project.id)
+
+      // Binary/large file extensions to skip
+      const skipExtensions = new Set([
+        'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'bmp',
+        'mp4', 'mp3', 'wav', 'ogg', 'webm',
+        'woff', 'woff2', 'ttf', 'eot', 'otf',
+        'pdf', 'zip', 'tar', 'gz',
+        'lock', 'DS_Store'
+      ])
+
+      const spFiles: Record<string, { code: string }> = {}
+      let deps: Record<string, string> = {}
+      let devDeps: Record<string, string> = {}
+
+      for (const file of files) {
+        if (!file.content || file.isDirectory) continue
+        const ext = file.path.split('.').pop()?.toLowerCase() || ''
+        if (skipExtensions.has(ext)) continue
+        // Skip node_modules, .git, dist, build
+        if (file.path.startsWith('node_modules/') || file.path.startsWith('.git/') ||
+            file.path.startsWith('dist/') || file.path.startsWith('build/')) continue
+
+        // Sandpack needs paths starting with /
+        const spPath = file.path.startsWith('/') ? file.path : `/${file.path}`
+        spFiles[spPath] = { code: file.content }
+
+        // Extract deps from package.json
+        if (file.path === 'package.json') {
+          try {
+            const pkg = JSON.parse(file.content)
+            deps = pkg.dependencies || {}
+            devDeps = pkg.devDependencies || {}
+          } catch {}
+        }
+      }
+
+      // Ensure we have at least an index.html entry point
+      if (!spFiles['/index.html']) {
+        spFiles['/index.html'] = {
+          code: `<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>App</title></head>
+  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+</html>`
+        }
+      }
+
+      setSandpackFiles(spFiles)
+      setSandpackDeps(deps)
+      setSandpackDevDeps(devDeps)
+      setShowSandpackPreview(true)
+
+      console.log('[Sandpack] Loaded', Object.keys(spFiles).length, 'files,', Object.keys(deps).length, 'deps')
+    } catch (error) {
+      console.error('[Sandpack] Error loading project files:', error)
+      toast({
+        title: "Failed to load Sandpack preview",
+        description: String(error),
+        variant: "destructive"
+      })
+    } finally {
+      setSandpackLoading(false)
+    }
+  }
+
+  const closeSandpackPreview = () => {
+    setShowSandpackPreview(false)
+    setSandpackFiles(null)
+  }
+
   const exportProject = async () => {
     if (!project) return
 
     setIsExporting(true)
-    
+
     try {
       // Fetch files from IndexedDB client-side
       const { storageManager } = await import('@/lib/storage-manager')
@@ -2390,10 +2498,72 @@ export default function TodoApp() {
                   <Square className="h-4 w-4" />
                 </WebPreviewNavigationButton>
               )}
+
+              {/* Sandpack Research Preview - Vite projects only */}
+              {isViteProject && !isExpoProject && (
+                <>
+                  <div className="w-px h-5 bg-border mx-1" />
+                  {showSandpackPreview ? (
+                    <WebPreviewNavigationButton
+                      onClick={closeSandpackPreview}
+                      tooltip="Close Sandpack Preview"
+                    >
+                      <XIcon className="h-4 w-4 text-orange-500" />
+                    </WebPreviewNavigationButton>
+                  ) : (
+                    <WebPreviewNavigationButton
+                      onClick={openSandpackPreview}
+                      disabled={!project || sandpackLoading}
+                      tooltip="Try Sandpack Preview (Research)"
+                    >
+                      <FlaskConical className={`h-4 w-4 ${sandpackLoading ? 'animate-pulse text-orange-400' : 'text-orange-500'}`} />
+                    </WebPreviewNavigationButton>
+                  )}
+                </>
+              )}
             </WebPreviewNavigation>
 
             <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
-              {preview.isLoading ? (
+              {/* Sandpack Research Preview */}
+              {showSandpackPreview && sandpackFiles ? (
+                <div className="h-full w-full flex flex-col">
+                  {/* Research banner */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border-b border-orange-500/20 text-xs">
+                    <FlaskConical className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                    <span className="text-orange-600 dark:text-orange-400 font-medium">Research Preview</span>
+                    <span className="text-muted-foreground">Sandpack in-browser runtime (no cloud sandbox)</span>
+                    <button
+                      onClick={closeSandpackPreview}
+                      className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    <SandpackProviderLazy
+                      template="vite-react-ts"
+                      files={sandpackFiles}
+                      customSetup={{
+                        dependencies: sandpackDeps,
+                        devDependencies: sandpackDevDeps,
+                      }}
+                      options={{
+                        recompileMode: "delayed",
+                        recompileDelay: 500,
+                        autoReload: true,
+                        autorun: true,
+                      }}
+                      theme="dark"
+                    >
+                      <SandpackPreviewLazy
+                        style={{ height: "100%", width: "100%" }}
+                        showOpenInCodeSandbox={false}
+                        showRefreshButton={true}
+                      />
+                    </SandpackProviderLazy>
+                  </div>
+                </div>
+              ) : preview.isLoading ? (
                 <div className="relative h-full w-full overflow-hidden">
                   {/* Full-window rocket GIF background */}
                   <img
