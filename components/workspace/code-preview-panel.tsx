@@ -888,7 +888,6 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [showSandpackPreview, setShowSandpackPreview] = useState(false)
   const [sandpackFiles, setSandpackFiles] = useState<Record<string, { code: string }> | null>(null)
   const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({})
-  const [sandpackDevDeps, setSandpackDevDeps] = useState<Record<string, string>>({})
   const [sandpackLoading, setSandpackLoading] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
@@ -1633,15 +1632,36 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         'lock', 'DS_Store'
       ])
 
+      // Files to skip - Sandpack's bundler handles these natively
+      const skipFiles = new Set([
+        'vite.config.ts', 'vite.config.js', 'vite.config.mjs',
+        'tsconfig.json', 'tsconfig.node.json', 'tsconfig.app.json',
+        'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock',
+        '.eslintrc.cjs', '.eslintrc.js', 'eslint.config.js',
+        'postcss.config.js', 'postcss.config.cjs', 'postcss.config.mjs',
+        'tailwind.config.js', 'tailwind.config.ts'
+      ])
+
+      // Vite-specific deps to exclude (Sandpack uses its own bundler)
+      const excludeDeps = new Set([
+        'vite', '@vitejs/plugin-react', '@vitejs/plugin-react-swc',
+        'esbuild', 'esbuild-wasm', 'rollup',
+        'typescript', '@types/react', '@types/react-dom', '@types/node',
+        'eslint', 'prettier', 'autoprefixer', 'postcss',
+        '@eslint/js', 'globals', 'eslint-plugin-react-hooks',
+        'eslint-plugin-react-refresh', 'tailwindcss'
+      ])
+
       const spFiles: Record<string, { code: string }> = {}
       let deps: Record<string, string> = {}
-      let devDeps: Record<string, string> = {}
 
       for (const file of files) {
         if (!file.content || file.isDirectory) continue
         const ext = file.path.split('.').pop()?.toLowerCase() || ''
         if (skipExtensions.has(ext)) continue
-        // Skip node_modules, .git, dist, build
+        const fileName = file.path.split('/').pop() || ''
+        if (skipFiles.has(fileName)) continue
+        // Skip node_modules, .git, dist, build, public (Sandpack handles public differently)
         if (file.path.startsWith('node_modules/') || file.path.startsWith('.git/') ||
             file.path.startsWith('dist/') || file.path.startsWith('build/')) continue
 
@@ -1649,30 +1669,29 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         const spPath = file.path.startsWith('/') ? file.path : `/${file.path}`
         spFiles[spPath] = { code: file.content }
 
-        // Extract deps from package.json
+        // Extract deps from package.json (read it but don't include the file)
         if (file.path === 'package.json') {
           try {
             const pkg = JSON.parse(file.content)
-            deps = pkg.dependencies || {}
-            devDeps = pkg.devDependencies || {}
+            const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }
+            // Filter out build-only / Vite-specific deps
+            for (const [name, version] of Object.entries(allDeps)) {
+              if (!excludeDeps.has(name) && !name.startsWith('@types/')) {
+                deps[name] = version as string
+              }
+            }
           } catch {}
+          // Don't add package.json to files - let Sandpack manage it
+          delete spFiles[spPath]
         }
       }
 
-      // Ensure we have at least an index.html entry point
-      if (!spFiles['/index.html']) {
-        spFiles['/index.html'] = {
-          code: `<!DOCTYPE html>
-<html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>App</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
-</html>`
-        }
-      }
+      // Ensure react/react-dom are always present
+      if (!deps['react']) deps['react'] = '^18.2.0'
+      if (!deps['react-dom']) deps['react-dom'] = '^18.2.0'
 
       setSandpackFiles(spFiles)
       setSandpackDeps(deps)
-      setSandpackDevDeps(devDeps)
       setShowSandpackPreview(true)
 
       console.log('[Sandpack] Loaded', Object.keys(spFiles).length, 'files,', Object.keys(deps).length, 'deps')
@@ -2523,12 +2542,12 @@ export default function TodoApp() {
               )}
             </WebPreviewNavigation>
 
-            <div className={isExpoProject ? "flex-1 min-h-0 pt-16" : "flex-1 min-h-0"}>
+            <div className={isExpoProject ? "flex-1 min-h-0 pt-16 relative" : "flex-1 min-h-0 relative"}>
               {/* Sandpack Research Preview */}
               {showSandpackPreview && sandpackFiles ? (
-                <div className="h-full w-full flex flex-col">
+                <div className="absolute inset-0 flex flex-col">
                   {/* Research banner */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border-b border-orange-500/20 text-xs">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border-b border-orange-500/20 text-xs shrink-0">
                     <FlaskConical className="h-3.5 w-3.5 text-orange-500 shrink-0" />
                     <span className="text-orange-600 dark:text-orange-400 font-medium">Research Preview</span>
                     <span className="text-muted-foreground">Sandpack in-browser runtime (no cloud sandbox)</span>
@@ -2539,13 +2558,12 @@ export default function TodoApp() {
                       <XIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <div className="flex-1 min-h-0">
+                  <div className="flex-1 min-h-0 overflow-hidden" style={{ position: 'relative' }}>
                     <SandpackProviderLazy
-                      template="vite-react-ts"
+                      template="react-ts"
                       files={sandpackFiles}
                       customSetup={{
                         dependencies: sandpackDeps,
-                        devDependencies: sandpackDevDeps,
                       }}
                       options={{
                         recompileMode: "delayed",
@@ -2556,7 +2574,7 @@ export default function TodoApp() {
                       theme="dark"
                     >
                       <SandpackPreviewLazy
-                        style={{ height: "100%", width: "100%" }}
+                        style={{ height: "100%", width: "100%", position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                         showOpenInCodeSandbox={false}
                         showRefreshButton={true}
                       />
