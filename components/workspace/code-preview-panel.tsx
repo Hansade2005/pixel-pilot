@@ -1615,6 +1615,43 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     }
   }
 
+  // Helper: Transform path aliases (@/) to relative paths for Sandpack
+  // In Vite/Next.js projects, @/ typically maps to /src/
+  const resolvePathAliases = (content: string, filePath: string): string => {
+    // Calculate relative path from file to /src/
+    const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+
+    // Count how many levels deep we are from root
+    const depth = fileDir.split('/').filter(Boolean).length
+
+    // Calculate relative prefix to get to /src from current file location
+    // e.g., /src/components/ui/button.tsx -> depth=4, needs ../../ to reach /src
+    // The @/ alias maps to /src/, so from /src/components/ui/ we need ../../
+    let relativeToSrc = ''
+    if (fileDir.startsWith('/src')) {
+      // Count levels within /src
+      const levelsInSrc = fileDir.substring(4).split('/').filter(Boolean).length
+      if (levelsInSrc === 0) {
+        relativeToSrc = './'
+      } else {
+        relativeToSrc = '../'.repeat(levelsInSrc)
+      }
+    } else {
+      // File is outside /src, use absolute-style relative path
+      relativeToSrc = './src/'
+    }
+
+    // Replace @/ imports with relative paths
+    // Match: from "@/...", from '@/...', import "@/...", import '@/...'
+    const aliasPattern = /(from\s+['"])@\/([^'"]+)(['"])/g
+    const aliasPattern2 = /(import\s+['"])@\/([^'"]+)(['"])/g
+
+    let transformed = content.replace(aliasPattern, `$1${relativeToSrc}$2$3`)
+    transformed = transformed.replace(aliasPattern2, `$1${relativeToSrc}$2$3`)
+
+    return transformed
+  }
+
   // Load project files into Sandpack format and show the Sandpack preview
   const openSandpackPreview = async () => {
     if (!project) return
@@ -1706,7 +1743,15 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
         // Sandpack needs paths starting with /
         const spPath = file.path.startsWith('/') ? file.path : `/${file.path}`
-        spFiles[spPath] = { code: file.content }
+
+        // Transform path aliases (@/) to relative paths for Sandpack
+        // In Vite/Next.js projects, @/ typically maps to /src/
+        let transformedContent = file.content
+        if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') {
+          transformedContent = resolvePathAliases(file.content, spPath)
+        }
+
+        spFiles[spPath] = { code: transformedContent }
 
         if (isCriticalFile) {
           console.log('[Sandpack] Added critical file:', spPath, '- length:', file.content.length)
