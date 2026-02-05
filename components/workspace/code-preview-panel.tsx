@@ -1717,22 +1717,18 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         console.warn('[Sandpack] Skipped critical files:', skippedReasons)
       }
 
-      // Step 3: Fix Vite→Sandpack entry point mismatch
-      // Sandpack's react-ts template uses /src/index.tsx as entry.
-      // Vite projects use /src/main.tsx. Map main→index so the template picks it up.
-      let entryFile = '/src/index.tsx'
-      if (spFiles['/src/main.tsx'] && !spFiles['/src/index.tsx']) {
-        spFiles['/src/index.tsx'] = spFiles['/src/main.tsx']
-        delete spFiles['/src/main.tsx']
-        entryFile = '/src/index.tsx'
-      } else if (spFiles['/src/main.ts'] && !spFiles['/src/index.ts']) {
-        spFiles['/src/index.ts'] = spFiles['/src/main.ts']
-        delete spFiles['/src/main.ts']
-        entryFile = '/src/index.ts'
-      } else if (spFiles['/src/main.jsx'] && !spFiles['/src/index.jsx']) {
-        spFiles['/src/index.jsx'] = spFiles['/src/main.jsx']
-        delete spFiles['/src/main.jsx']
-        entryFile = '/src/index.jsx'
+      // Step 3: Determine the entry file
+      // Without a template, we can use the project's actual entry file directly
+      // Vite projects typically use /src/main.tsx, CRA uses /src/index.tsx
+      let entryFile = '/src/index.tsx' // default
+      if (spFiles['/src/main.tsx']) {
+        entryFile = '/src/main.tsx'
+      } else if (spFiles['/src/main.ts']) {
+        entryFile = '/src/main.ts'
+      } else if (spFiles['/src/main.jsx']) {
+        entryFile = '/src/main.jsx'
+      } else if (spFiles['/src/main.js']) {
+        entryFile = '/src/main.js'
       } else if (spFiles['/src/index.tsx']) {
         entryFile = '/src/index.tsx'
       } else if (spFiles['/src/index.ts']) {
@@ -1743,27 +1739,32 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         entryFile = '/src/index.js'
       }
 
-      // Remove project's index.html since the template provides one
-      // (Sandpack's bundler doesn't use it the same way Vite does)
-      delete spFiles['/index.html']
-
-      // Step 4: Create root-level bridge files to override template defaults
-      // The react-ts template has /App.tsx at root which shows "Hello World".
-      // Our project files are at /src/App.tsx. We need a root /App.tsx that imports from src.
-      if (spFiles['/src/App.tsx'] && !spFiles['/App.tsx']) {
-        spFiles['/App.tsx'] = {
-          code: `// Bridge file: re-exports App from src folder
-export { default } from './src/App';
-export * from './src/App';`
+      // Step 4: Prepare index.html for Sandpack
+      // We need to ensure index.html exists and has a root div for React to mount
+      // If project has index.html, modify it for Sandpack; otherwise create one
+      if (spFiles['/index.html']) {
+        // Use project's index.html but ensure it has the root div
+        let html = spFiles['/index.html'].code
+        // If it references /src/main.tsx (Vite style), replace with the entry we're using
+        html = html.replace(/\/src\/main\.tsx/g, entryFile)
+        html = html.replace(/\/src\/main\.ts/g, entryFile)
+        html = html.replace(/type="module"/g, '') // Sandpack handles modules differently
+        spFiles['/index.html'] = { code: html }
+      } else {
+        // Create a minimal index.html
+        spFiles['/index.html'] = {
+          code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`
         }
-        console.log('[Sandpack] Created bridge /App.tsx → /src/App.tsx')
-      } else if (spFiles['/src/App.jsx'] && !spFiles['/App.jsx']) {
-        spFiles['/App.jsx'] = {
-          code: `// Bridge file: re-exports App from src folder
-export { default } from './src/App';
-export * from './src/App';`
-        }
-        console.log('[Sandpack] Created bridge /App.jsx → /src/App.jsx')
       }
 
       // Debug: Log the key files to verify they're correct
@@ -2646,11 +2647,11 @@ export default function TodoApp() {
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden" style={{ position: 'relative' }}>
                     <SandpackProviderLazy
-                      template="react-ts"
                       files={sandpackFiles}
                       customSetup={{
                         entry: sandpackEntry,
                         dependencies: sandpackDeps,
+                        environment: "create-react-app",
                       }}
                       options={{
                         recompileMode: "delayed",
