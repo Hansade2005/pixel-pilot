@@ -888,6 +888,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   const [showSandpackPreview, setShowSandpackPreview] = useState(false)
   const [sandpackFiles, setSandpackFiles] = useState<Record<string, { code: string }> | null>(null)
   const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({})
+  const [sandpackEntry, setSandpackEntry] = useState<string>('/src/index.tsx')
   const [sandpackLoading, setSandpackLoading] = useState(false)
   const browserLogsRef = useRef<HTMLDivElement>(null)
   const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
@@ -1674,41 +1675,109 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       // Step 2: Build the Sandpack file map
       const spFiles: Record<string, { code: string }> = {}
+      let skippedReasons: string[] = []
 
       for (const file of files) {
-        if (!file.content || file.isDirectory) continue
         const ext = file.path.split('.').pop()?.toLowerCase() || ''
-        if (skipExtensions.has(ext)) continue
         const fileName = file.path.split('/').pop() || ''
-        if (skipFiles.has(fileName)) continue
+
+        // Log why critical files might be skipped
+        const isCriticalFile = file.path.includes('App.tsx') || file.path.includes('main.tsx') || file.path.includes('index.tsx')
+
+        if (!file.content) {
+          if (isCriticalFile) skippedReasons.push(`${file.path}: no content`)
+          continue
+        }
+        if (file.isDirectory) {
+          continue
+        }
+        if (skipExtensions.has(ext)) {
+          if (isCriticalFile) skippedReasons.push(`${file.path}: skip extension`)
+          continue
+        }
+        if (skipFiles.has(fileName)) {
+          if (isCriticalFile) skippedReasons.push(`${file.path}: skip file`)
+          continue
+        }
         if (file.path.startsWith('node_modules/') || file.path.startsWith('.git/') ||
-            file.path.startsWith('dist/') || file.path.startsWith('build/')) continue
+            file.path.startsWith('dist/') || file.path.startsWith('build/')) {
+          continue
+        }
 
         // Sandpack needs paths starting with /
         const spPath = file.path.startsWith('/') ? file.path : `/${file.path}`
         spFiles[spPath] = { code: file.content }
+
+        if (isCriticalFile) {
+          console.log('[Sandpack] Added critical file:', spPath, '- length:', file.content.length)
+        }
+      }
+
+      if (skippedReasons.length > 0) {
+        console.warn('[Sandpack] Skipped critical files:', skippedReasons)
       }
 
       // Step 3: Fix Vite→Sandpack entry point mismatch
       // Sandpack's react-ts template uses /src/index.tsx as entry.
       // Vite projects use /src/main.tsx. Map main→index so the template picks it up.
+      let entryFile = '/src/index.tsx'
       if (spFiles['/src/main.tsx'] && !spFiles['/src/index.tsx']) {
         spFiles['/src/index.tsx'] = spFiles['/src/main.tsx']
         delete spFiles['/src/main.tsx']
+        entryFile = '/src/index.tsx'
       } else if (spFiles['/src/main.ts'] && !spFiles['/src/index.ts']) {
         spFiles['/src/index.ts'] = spFiles['/src/main.ts']
         delete spFiles['/src/main.ts']
+        entryFile = '/src/index.ts'
       } else if (spFiles['/src/main.jsx'] && !spFiles['/src/index.jsx']) {
         spFiles['/src/index.jsx'] = spFiles['/src/main.jsx']
         delete spFiles['/src/main.jsx']
+        entryFile = '/src/index.jsx'
+      } else if (spFiles['/src/index.tsx']) {
+        entryFile = '/src/index.tsx'
+      } else if (spFiles['/src/index.ts']) {
+        entryFile = '/src/index.ts'
+      } else if (spFiles['/src/index.jsx']) {
+        entryFile = '/src/index.jsx'
+      } else if (spFiles['/src/index.js']) {
+        entryFile = '/src/index.js'
       }
 
       // Remove project's index.html since the template provides one
       // (Sandpack's bundler doesn't use it the same way Vite does)
       delete spFiles['/index.html']
 
+      // Step 4: Create root-level bridge files to override template defaults
+      // The react-ts template has /App.tsx at root which shows "Hello World".
+      // Our project files are at /src/App.tsx. We need a root /App.tsx that imports from src.
+      if (spFiles['/src/App.tsx'] && !spFiles['/App.tsx']) {
+        spFiles['/App.tsx'] = {
+          code: `// Bridge file: re-exports App from src folder
+export { default } from './src/App';
+export * from './src/App';`
+        }
+        console.log('[Sandpack] Created bridge /App.tsx → /src/App.tsx')
+      } else if (spFiles['/src/App.jsx'] && !spFiles['/App.jsx']) {
+        spFiles['/App.jsx'] = {
+          code: `// Bridge file: re-exports App from src folder
+export { default } from './src/App';
+export * from './src/App';`
+        }
+        console.log('[Sandpack] Created bridge /App.jsx → /src/App.jsx')
+      }
+
+      // Debug: Log the key files to verify they're correct
+      console.log('[Sandpack] Entry file:', entryFile)
+      console.log('[Sandpack] Has /src/App.tsx:', !!spFiles['/src/App.tsx'])
+      console.log('[Sandpack] Has /src/index.tsx:', !!spFiles['/src/index.tsx'])
+      console.log('[Sandpack] File paths:', Object.keys(spFiles).slice(0, 20))
+      if (spFiles['/src/App.tsx']) {
+        console.log('[Sandpack] App.tsx first 200 chars:', spFiles['/src/App.tsx'].code.slice(0, 200))
+      }
+
       setSandpackFiles(spFiles)
       setSandpackDeps(deps)
+      setSandpackEntry(entryFile)
       setShowSandpackPreview(true)
 
       console.log('[Sandpack] Loaded', Object.keys(spFiles).length, 'files,', Object.keys(deps).length, 'deps')
@@ -2580,6 +2649,7 @@ export default function TodoApp() {
                       template="react-ts"
                       files={sandpackFiles}
                       customSetup={{
+                        entry: sandpackEntry,
                         dependencies: sandpackDeps,
                       }}
                       options={{
