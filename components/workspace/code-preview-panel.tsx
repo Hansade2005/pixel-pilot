@@ -1789,6 +1789,50 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // Also inject Tailwind CDN since Sandpack can't process Tailwind via PostCSS
       const tailwindCDN = '<script src="https://cdn.tailwindcss.com"></script>'
 
+      // Extract tailwind.config.js content if it exists
+      let tailwindConfigScript = ''
+      const twConfigFile = files.find((f: StorageFile) =>
+        f.path === 'tailwind.config.js' || f.path === 'tailwind.config.ts' || f.path === 'tailwind.config.mjs'
+      )
+      if (twConfigFile?.content) {
+        try {
+          // Extract the config object from the file
+          // Handles: export default {...}, module.exports = {...}, export default defineConfig({...})
+          let configContent = twConfigFile.content
+
+          // Remove import statements
+          configContent = configContent.replace(/^import\s+.*$/gm, '')
+
+          // Extract the config object
+          let configObj = ''
+
+          // Match: export default { ... } or module.exports = { ... }
+          const defaultExportMatch = configContent.match(/(?:export\s+default|module\.exports\s*=)\s*(\{[\s\S]*\})\s*;?\s*$/)
+          if (defaultExportMatch) {
+            configObj = defaultExportMatch[1]
+          }
+
+          // Match: export default defineConfig({ ... }) or similar wrapper
+          const defineConfigMatch = configContent.match(/(?:export\s+default|module\.exports\s*=)\s*\w+\(\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/)
+          if (!configObj && defineConfigMatch) {
+            configObj = defineConfigMatch[1]
+          }
+
+          if (configObj) {
+            // Clean up the config: remove content array (not needed for CDN), plugins, etc.
+            // The CDN only needs theme configuration
+            configObj = configObj
+              .replace(/content\s*:\s*\[[\s\S]*?\],?/g, '') // Remove content array
+              .replace(/plugins\s*:\s*\[[\s\S]*?\],?/g, '') // Remove plugins array
+
+            tailwindConfigScript = `<script>tailwind.config = ${configObj}</script>`
+            console.log('[Sandpack] Injected tailwind.config')
+          }
+        } catch (e) {
+          console.warn('[Sandpack] Failed to parse tailwind.config:', e)
+        }
+      }
+
       if (spFiles['/index.html']) {
         // Use project's index.html but ensure it has the root div
         let html = spFiles['/index.html'].code
@@ -1797,9 +1841,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         html = html.replace(/\/src\/main\.ts/g, entryFile)
         html = html.replace(/type="module"/g, '') // Sandpack handles modules differently
 
-        // Inject Tailwind CDN if not already present
+        // Inject Tailwind CDN and config if not already present
         if (!html.includes('tailwindcss')) {
-          html = html.replace('</head>', `  ${tailwindCDN}\n  </head>`)
+          html = html.replace('</head>', `  ${tailwindCDN}\n  ${tailwindConfigScript}\n  </head>`)
         }
 
         spFiles['/index.html'] = { code: html }
@@ -1813,6 +1857,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
     ${tailwindCDN}
+    ${tailwindConfigScript}
   </head>
   <body>
     <div id="root"></div>
