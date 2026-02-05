@@ -1747,6 +1747,25 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // (Sandpack's bundler doesn't use it the same way Vite does)
       delete spFiles['/index.html']
 
+      // Step 4: Create root-level bridge files to override template defaults
+      // The react-ts template has /App.tsx at root which shows "Hello World".
+      // Our project files are at /src/App.tsx. We need a root /App.tsx that imports from src.
+      if (spFiles['/src/App.tsx'] && !spFiles['/App.tsx']) {
+        spFiles['/App.tsx'] = {
+          code: `// Bridge file: re-exports App from src folder
+export { default } from './src/App';
+export * from './src/App';`
+        }
+        console.log('[Sandpack] Created bridge /App.tsx → /src/App.tsx')
+      } else if (spFiles['/src/App.jsx'] && !spFiles['/App.jsx']) {
+        spFiles['/App.jsx'] = {
+          code: `// Bridge file: re-exports App from src folder
+export { default } from './src/App';
+export * from './src/App';`
+        }
+        console.log('[Sandpack] Created bridge /App.jsx → /src/App.jsx')
+      }
+
       // Debug: Log the key files to verify they're correct
       console.log('[Sandpack] Entry file:', entryFile)
       console.log('[Sandpack] Has /src/App.tsx:', !!spFiles['/src/App.tsx'])
