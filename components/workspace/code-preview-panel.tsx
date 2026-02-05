@@ -1632,14 +1632,15 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         'lock', 'DS_Store'
       ])
 
-      // Files to skip - Sandpack's bundler handles these natively
+      // Files to skip as Sandpack files (bundler config, lockfiles, etc.)
       const skipFiles = new Set([
         'vite.config.ts', 'vite.config.js', 'vite.config.mjs',
         'tsconfig.json', 'tsconfig.node.json', 'tsconfig.app.json',
         'package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock',
         '.eslintrc.cjs', '.eslintrc.js', 'eslint.config.js',
         'postcss.config.js', 'postcss.config.cjs', 'postcss.config.mjs',
-        'tailwind.config.js', 'tailwind.config.ts'
+        'tailwind.config.js', 'tailwind.config.ts',
+        'vite-env.d.ts'
       ])
 
       // Vite-specific deps to exclude (Sandpack uses its own bundler)
@@ -1652,8 +1653,27 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         'eslint-plugin-react-refresh', 'tailwindcss'
       ])
 
-      const spFiles: Record<string, { code: string }> = {}
+      // Step 1: Extract deps from package.json FIRST (before the file loop skips it)
       let deps: Record<string, string> = {}
+      const pkgFile = files.find((f: StorageFile) => f.path === 'package.json')
+      if (pkgFile?.content) {
+        try {
+          const pkg = JSON.parse(pkgFile.content)
+          const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }
+          for (const [name, version] of Object.entries(allDeps)) {
+            if (!excludeDeps.has(name) && !name.startsWith('@types/')) {
+              deps[name] = version as string
+            }
+          }
+        } catch {}
+      }
+
+      // Ensure react/react-dom are always present
+      if (!deps['react']) deps['react'] = '^18.2.0'
+      if (!deps['react-dom']) deps['react-dom'] = '^18.2.0'
+
+      // Step 2: Build the Sandpack file map
+      const spFiles: Record<string, { code: string }> = {}
 
       for (const file of files) {
         if (!file.content || file.isDirectory) continue
@@ -1661,34 +1681,31 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         if (skipExtensions.has(ext)) continue
         const fileName = file.path.split('/').pop() || ''
         if (skipFiles.has(fileName)) continue
-        // Skip node_modules, .git, dist, build, public (Sandpack handles public differently)
         if (file.path.startsWith('node_modules/') || file.path.startsWith('.git/') ||
             file.path.startsWith('dist/') || file.path.startsWith('build/')) continue
 
         // Sandpack needs paths starting with /
         const spPath = file.path.startsWith('/') ? file.path : `/${file.path}`
         spFiles[spPath] = { code: file.content }
-
-        // Extract deps from package.json (read it but don't include the file)
-        if (file.path === 'package.json') {
-          try {
-            const pkg = JSON.parse(file.content)
-            const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }
-            // Filter out build-only / Vite-specific deps
-            for (const [name, version] of Object.entries(allDeps)) {
-              if (!excludeDeps.has(name) && !name.startsWith('@types/')) {
-                deps[name] = version as string
-              }
-            }
-          } catch {}
-          // Don't add package.json to files - let Sandpack manage it
-          delete spFiles[spPath]
-        }
       }
 
-      // Ensure react/react-dom are always present
-      if (!deps['react']) deps['react'] = '^18.2.0'
-      if (!deps['react-dom']) deps['react-dom'] = '^18.2.0'
+      // Step 3: Fix Vite→Sandpack entry point mismatch
+      // Sandpack's react-ts template uses /src/index.tsx as entry.
+      // Vite projects use /src/main.tsx. Map main→index so the template picks it up.
+      if (spFiles['/src/main.tsx'] && !spFiles['/src/index.tsx']) {
+        spFiles['/src/index.tsx'] = spFiles['/src/main.tsx']
+        delete spFiles['/src/main.tsx']
+      } else if (spFiles['/src/main.ts'] && !spFiles['/src/index.ts']) {
+        spFiles['/src/index.ts'] = spFiles['/src/main.ts']
+        delete spFiles['/src/main.ts']
+      } else if (spFiles['/src/main.jsx'] && !spFiles['/src/index.jsx']) {
+        spFiles['/src/index.jsx'] = spFiles['/src/main.jsx']
+        delete spFiles['/src/main.jsx']
+      }
+
+      // Remove project's index.html since the template provides one
+      // (Sandpack's bundler doesn't use it the same way Vite does)
+      delete spFiles['/index.html']
 
       setSandpackFiles(spFiles)
       setSandpackDeps(deps)
