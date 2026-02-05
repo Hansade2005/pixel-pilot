@@ -1786,7 +1786,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
       // Step 4: Prepare index.html for Sandpack
       // We need to ensure index.html exists and has a root div for React to mount
-      // If project has index.html, modify it for Sandpack; otherwise create one
+      // Also inject Tailwind CDN since Sandpack can't process Tailwind via PostCSS
+      const tailwindCDN = '<script src="https://cdn.tailwindcss.com"></script>'
+
       if (spFiles['/index.html']) {
         // Use project's index.html but ensure it has the root div
         let html = spFiles['/index.html'].code
@@ -1794,9 +1796,15 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         html = html.replace(/\/src\/main\.tsx/g, entryFile)
         html = html.replace(/\/src\/main\.ts/g, entryFile)
         html = html.replace(/type="module"/g, '') // Sandpack handles modules differently
+
+        // Inject Tailwind CDN if not already present
+        if (!html.includes('tailwindcss')) {
+          html = html.replace('</head>', `  ${tailwindCDN}\n  </head>`)
+        }
+
         spFiles['/index.html'] = { code: html }
       } else {
-        // Create a minimal index.html
+        // Create a minimal index.html with Tailwind CDN
         spFiles['/index.html'] = {
           code: `<!DOCTYPE html>
 <html lang="en">
@@ -1804,6 +1812,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
+    ${tailwindCDN}
   </head>
   <body>
     <div id="root"></div>
