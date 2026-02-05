@@ -1751,14 +1751,18 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
           transformedContent = resolvePathAliases(file.content, spPath)
         }
 
-        // Process CSS files: strip Tailwind directives (CDN auto-injects base styles)
-        // and convert @apply to inline styles where possible
+        // Process CSS files: strip Tailwind directives and convert @apply for shadcn/ui
         if (ext === 'css') {
           transformedContent = transformedContent
             // Remove @tailwind directives - CDN handles these automatically
             .replace(/@tailwind\s+(base|components|utilities)\s*;?/g, '')
-            // Remove @layer directives but keep content
-            .replace(/@layer\s+(base|components|utilities)\s*\{/g, '/* @layer $1 */ {')
+            // Remove @layer wrappers but keep the content inside
+            .replace(/@layer\s+(base|components|utilities)\s*\{([\s\S]*?)\n\}/g, '$2')
+            // Convert common @apply directives to actual CSS (shadcn/ui patterns)
+            .replace(/@apply\s+border-border\s*;?/g, 'border-color: hsl(var(--border));')
+            .replace(/@apply\s+bg-background\s+text-foreground\s*;?/g, 'background-color: hsl(var(--background)); color: hsl(var(--foreground));')
+            .replace(/@apply\s+bg-background\s*;?/g, 'background-color: hsl(var(--background));')
+            .replace(/@apply\s+text-foreground\s*;?/g, 'color: hsl(var(--foreground));')
           console.log('[Sandpack] Processed CSS file:', spPath)
         }
 
