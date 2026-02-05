@@ -1751,6 +1751,17 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
           transformedContent = resolvePathAliases(file.content, spPath)
         }
 
+        // Process CSS files: strip Tailwind directives (CDN auto-injects base styles)
+        // and convert @apply to inline styles where possible
+        if (ext === 'css') {
+          transformedContent = transformedContent
+            // Remove @tailwind directives - CDN handles these automatically
+            .replace(/@tailwind\s+(base|components|utilities)\s*;?/g, '')
+            // Remove @layer directives but keep content
+            .replace(/@layer\s+(base|components|utilities)\s*\{/g, '/* @layer $1 */ {')
+          console.log('[Sandpack] Processed CSS file:', spPath)
+        }
+
         spFiles[spPath] = { code: transformedContent }
 
         if (isCriticalFile) {
