@@ -996,6 +996,49 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
+  // Track if files have changed since last preview was created
+  const filesChangedSincePreviewRef = useRef(false)
+  const lastPreviewFilesHashRef = useRef<string | null>(null)
+
+  // Listen for file changes and mark preview as needing refresh
+  useEffect(() => {
+    if (!project) return
+
+    const handleFilesChanged = (e: CustomEvent) => {
+      const detail = e.detail as { projectId: string }
+      if (detail.projectId === project.id) {
+        console.log('[CodePreviewPanel] Files changed for project:', project.id)
+        filesChangedSincePreviewRef.current = true
+
+        // If we have an active preview, show a toast suggesting refresh
+        if (preview.url && !preview.isLoading) {
+          // Dispatch event to notify that preview may be stale
+          window.dispatchEvent(new CustomEvent('preview-files-changed', {
+            detail: { projectId: project.id }
+          }))
+        }
+      }
+    }
+
+    window.addEventListener('files-changed', handleFilesChanged as EventListener)
+    return () => window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+  }, [project, preview.url, preview.isLoading])
+
+  // Auto-refresh preview when AI streaming ends if files have changed
+  useEffect(() => {
+    // When AI streaming ends and files have changed, refresh the preview
+    if (!isAIStreaming && filesChangedSincePreviewRef.current && preview.url && !preview.isLoading) {
+      console.log('[CodePreviewPanel] AI streaming ended, files changed - auto-refreshing preview')
+      // Use a small delay to ensure all file operations are complete
+      const timeoutId = setTimeout(() => {
+        if (filesChangedSincePreviewRef.current) {
+          refreshPreviewWithLatestFiles()
+        }
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isAIStreaming])
+
   useEffect(() => {
     if (preview.url) {
       setCustomUrl(preview.url)
@@ -1299,6 +1342,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
   const createPreview = async () => {
     if (!project) return
+
+    // Reset the files changed flag since we're creating a fresh preview
+    filesChangedSincePreviewRef.current = false
 
     const loadingPreview = { ...preview, isLoading: true }
     setPreview(loadingPreview)
@@ -1604,6 +1650,14 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   }
 
   const refreshPreview = () => {
+    // If files have changed since preview was created, do a full refresh with latest files
+    if (filesChangedSincePreviewRef.current) {
+      console.log('[CodePreviewPanel] Files changed - doing full preview refresh with latest files')
+      refreshPreviewWithLatestFiles()
+      return
+    }
+
+    // Otherwise just reload the iframe
     if (preview.url && previewIframeRef.current) {
       // Force iframe reload by updating src with cache-busting param
       const iframe = previewIframeRef.current;
@@ -1612,6 +1666,80 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       const url = new URL(currentSrc);
       url.searchParams.set('_refresh', Date.now().toString());
       iframe.src = url.toString();
+    }
+  }
+
+  // Refresh the preview by syncing latest files to the existing sandbox
+  const refreshPreviewWithLatestFiles = async () => {
+    if (!project || !preview.sandboxId) {
+      console.log('[CodePreviewPanel] No project or sandbox - calling createPreview instead')
+      createPreview()
+      return
+    }
+
+    try {
+      console.log('[CodePreviewPanel] Syncing latest files to preview sandbox:', preview.sandboxId)
+
+      // Fetch latest files from IndexedDB
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const files = await storageManager.getFiles(project.id)
+
+      if (!files || files.length === 0) {
+        console.warn('[CodePreviewPanel] No files found, skipping refresh')
+        return
+      }
+
+      // Filter unwanted files
+      const filteredFiles = filterUnwantedFiles(files)
+      console.log(`[CodePreviewPanel] Syncing ${filteredFiles.length} files to sandbox`)
+
+      // Send files to the sync endpoint
+      const response = await fetch('/api/preview/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sandboxId: preview.sandboxId,
+          files: filteredFiles.map(f => ({
+            path: f.path,
+            content: f.content
+          }))
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[CodePreviewPanel] Failed to sync files:', error)
+        // Fall back to full preview recreation
+        console.log('[CodePreviewPanel] Falling back to full preview recreation')
+        createPreview()
+        return
+      }
+
+      const result = await response.json()
+      console.log('[CodePreviewPanel] Files synced successfully:', result)
+
+      // Reset the files changed flag
+      filesChangedSincePreviewRef.current = false
+
+      // Reload the iframe to pick up the new files
+      if (previewIframeRef.current) {
+        const iframe = previewIframeRef.current
+        const currentSrc = iframe.src
+        const url = new URL(currentSrc)
+        url.searchParams.set('_refresh', Date.now().toString())
+        iframe.src = url.toString()
+      }
+
+      toast({
+        title: "Preview Updated",
+        description: "Latest file changes have been synced to the preview.",
+      })
+    } catch (error) {
+      console.error('[CodePreviewPanel] Error syncing files:', error)
+      // Fall back to full preview recreation
+      console.log('[CodePreviewPanel] Falling back to full preview recreation')
+      createPreview()
     }
   }
 
