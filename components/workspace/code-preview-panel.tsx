@@ -1670,7 +1670,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   }
 
   // Refresh the preview by syncing latest files to the existing sandbox
-  // For Vite projects (hosted on Supabase), we need to rebuild and re-upload
+  // For Vite projects (hosted on Supabase at *.pipilot.dev), we need to rebuild and re-upload
   // For Next.js projects (running on E2B), we can sync files to the running sandbox
   const refreshPreviewWithLatestFiles = async () => {
     if (!project) {
@@ -1679,12 +1679,13 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       return
     }
 
-    // For Vite projects hosted on Supabase, we need to rebuild and re-upload
-    // Check if the preview URL is a Supabase-hosted URL (sites.pipilot.dev)
-    const isSupabaseHosted = preview.url?.includes('sites.pipilot.dev')
+    // For Vite/HTML projects hosted on Supabase, we need to rebuild and re-upload
+    // These are hosted at {slug}.pipilot.dev (e.g., camtradehub.pipilot.dev)
+    // E2B sandbox URLs contain .e2b.app or similar patterns
+    const isPipilotHosted = preview.url ? /^https?:\/\/[^.]+\.pipilot\.dev/.test(preview.url) : false
 
-    if (isViteProject || isSupabaseHosted) {
-      console.log('[CodePreviewPanel] Vite/Supabase-hosted project - need to rebuild and re-upload')
+    if (isViteProject || isPipilotHosted) {
+      console.log('[CodePreviewPanel] Vite/Supabase-hosted project (*.pipilot.dev) - need to rebuild and re-upload')
       // For Vite projects, we must recreate the preview (rebuild + upload to Supabase)
       filesChangedSincePreviewRef.current = false
       createPreview()
