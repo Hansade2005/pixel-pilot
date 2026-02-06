@@ -672,8 +672,8 @@ export const WebPreviewConsole = ({
               <TabsTrigger value="browser" className="text-xs px-3 py-1 gap-1">
                 <Globe className="h-3 w-3" />
                 Browser
-                {parsedBrowserLogs.length > 0 && (
-                  <span className="ml-1 text-muted-foreground">({parsedBrowserLogs.length})</span>
+                {consoleFeedLogs.length > 0 && (
+                  <span className="ml-1 text-muted-foreground">({consoleFeedLogs.length})</span>
                 )}
               </TabsTrigger>
             </TabsList>
