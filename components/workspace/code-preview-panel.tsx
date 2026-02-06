@@ -1064,8 +1064,27 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // Only accept messages from our preview iframe
       const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
       if (iframe && event.source === iframe.contentWindow) {
+        // Handle legacy console messages
         if (event.data.type === 'console') {
           addConsoleLog(event.data.message, 'browser')
+          // Also add to browserLogs for the Browser tab
+          const level = event.data.level || 'log'
+          setBrowserLogs(prev => [...prev, JSON.stringify({
+            level,
+            message: event.data.message,
+            timestamp: new Date().toISOString()
+          })])
+        }
+        // Handle new BROWSER_CONSOLE_LOG from visual-editor-client.js
+        if (event.data.type === 'BROWSER_CONSOLE_LOG') {
+          const { level, message, timestamp } = event.data.payload
+          addConsoleLog(message, 'browser')
+          // Add to browserLogs for the Browser tab
+          setBrowserLogs(prev => [...prev, JSON.stringify({
+            level: level || 'log',
+            message,
+            timestamp: timestamp || new Date().toISOString()
+          })])
         }
       }
     }
@@ -3056,6 +3075,16 @@ export default function TodoApp() {
                   timestamp
                 }
               })}
+              terminalLogs={consoleOutput}
+              browserLogs={browserLogs}
+              onAskAiToFix={(errors) => {
+                // Dispatch custom event to fill chat input with error debugging request
+                const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
+                const prompt = `Debug and fix these browser console errors:\n\n${errorList}\n\nPlease analyze these errors and provide fixes.`
+                window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
+                  detail: { prompt, errors }
+                }))
+              }}
             />
           </WebPreview>
         </VisualEditorWrapper>

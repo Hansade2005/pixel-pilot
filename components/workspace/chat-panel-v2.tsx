@@ -2456,6 +2456,32 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
+  // Listen for "Ask AI to Fix" events from browser console errors
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleAskAiToFix = (e: CustomEvent) => {
+      const detail = e.detail as { prompt: string; errors: string[] }
+      if (detail.prompt) {
+        setInput(detail.prompt)
+        // Focus the input after setting it
+        setTimeout(() => {
+          const textarea = document.querySelector('textarea[placeholder*="Message"]') as HTMLTextAreaElement
+          if (textarea) {
+            textarea.focus()
+            textarea.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
+
+    return () => {
+      window.removeEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
+    }
+  }, [])
+
   // Save input to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {

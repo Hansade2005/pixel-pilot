@@ -14,7 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink } from "lucide-react";
+import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ComponentProps, ReactNode } from "react";
 import React, { createContext, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef } from "react";
 
@@ -478,21 +479,59 @@ export const WebPreviewBody = forwardRef<HTMLIFrameElement, WebPreviewBodyProps>
 
 WebPreviewBody.displayName = "WebPreviewBody";
 
+export type ConsoleLogEntry = {
+  level: "log" | "warn" | "error" | "info";
+  message: string;
+  timestamp: Date;
+};
+
 export type WebPreviewConsoleProps = ComponentProps<"div"> & {
-  logs?: Array<{
-    level: "log" | "warn" | "error";
-    message: string;
-    timestamp: Date;
-  }>;
+  logs?: Array<ConsoleLogEntry>;
+  terminalLogs?: string[];
+  browserLogs?: string[];
+  onAskAiToFix?: (errors: string[]) => void;
 };
 
 export const WebPreviewConsole = ({
   className,
   logs = [],
+  terminalLogs = [],
+  browserLogs = [],
+  onAskAiToFix,
   children,
   ...props
 }: WebPreviewConsoleProps) => {
   const { consoleOpen, setConsoleOpen } = useWebPreview();
+  const [activeTab, setActiveTab] = useState<"terminal" | "browser">("terminal");
+
+  // Parse browser logs from JSON strings
+  const parsedBrowserLogs = browserLogs.map((log, index) => {
+    try {
+      const parsed = JSON.parse(log);
+      return {
+        ...parsed,
+        timestamp: new Date(parsed.timestamp),
+        index
+      };
+    } catch {
+      return {
+        level: 'log' as const,
+        message: log,
+        timestamp: new Date(),
+        index
+      };
+    }
+  });
+
+  // Get error logs for "Ask AI to Fix" button
+  const errorLogs = parsedBrowserLogs.filter(log => log.level === 'error');
+
+  const handleAskAiToFix = () => {
+    if (onAskAiToFix && errorLogs.length > 0) {
+      const errorMessages = errorLogs.map(log => log.message);
+      onAskAiToFix(errorMessages);
+    }
+  };
 
   return (
     <Collapsible
@@ -506,7 +545,14 @@ export const WebPreviewConsole = ({
           className="flex w-full items-center justify-between p-4 text-left font-medium"
           variant="ghost"
         >
-          Console
+          <span className="flex items-center gap-2">
+            Console
+            {errorLogs.length > 0 && (
+              <span className="inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-xs font-medium text-destructive-foreground">
+                {errorLogs.length} error{errorLogs.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </span>
           <ChevronDownIcon
             className={cn(
               "h-4 w-4 transition-transform duration-200",
@@ -521,29 +567,100 @@ export const WebPreviewConsole = ({
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in"
         )}
       >
-        <div className="max-h-48 space-y-1 overflow-y-auto">
-          {logs.length === 0 ? (
-            <p className="text-muted-foreground">No console output</p>
-          ) : (
-            logs.map((log, index) => (
-              <div
-                className={cn(
-                  "text-xs",
-                  log.level === "error" && "text-destructive",
-                  log.level === "warn" && "text-yellow-600",
-                  log.level === "log" && "text-foreground"
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "terminal" | "browser")} className="w-full">
+          <div className="flex items-center justify-between mb-2">
+            <TabsList className="h-8">
+              <TabsTrigger value="terminal" className="text-xs px-3 py-1 gap-1">
+                <Terminal className="h-3 w-3" />
+                Terminal
+              </TabsTrigger>
+              <TabsTrigger value="browser" className="text-xs px-3 py-1 gap-1">
+                <Globe className="h-3 w-3" />
+                Browser
+                {parsedBrowserLogs.length > 0 && (
+                  <span className="ml-1 text-muted-foreground">({parsedBrowserLogs.length})</span>
                 )}
-                key={`${log.timestamp.getTime()}-${index}`}
+              </TabsTrigger>
+            </TabsList>
+            {activeTab === "browser" && errorLogs.length > 0 && onAskAiToFix && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
+                onClick={handleAskAiToFix}
               >
-                <span className="text-muted-foreground">
-                  {log.timestamp.toLocaleTimeString()}
-                </span>{" "}
-                {log.message}
-              </div>
-            ))
-          )}
-          {children}
-        </div>
+                <Sparkles className="h-3 w-3" />
+                Ask AI to Fix
+              </Button>
+            )}
+          </div>
+
+          <TabsContent value="terminal" className="mt-0">
+            <div className="max-h-48 space-y-1 overflow-y-auto">
+              {terminalLogs.length === 0 && logs.length === 0 ? (
+                <p className="text-muted-foreground text-xs">No terminal output</p>
+              ) : (
+                <>
+                  {terminalLogs.map((log, index) => (
+                    <div key={`terminal-${index}`} className="text-xs text-foreground whitespace-pre-wrap">
+                      {log}
+                    </div>
+                  ))}
+                  {logs.map((log, index) => (
+                    <div
+                      className={cn(
+                        "text-xs",
+                        log.level === "error" && "text-destructive",
+                        log.level === "warn" && "text-yellow-600",
+                        log.level === "log" && "text-foreground"
+                      )}
+                      key={`log-${log.timestamp.getTime()}-${index}`}
+                    >
+                      <span className="text-muted-foreground">
+                        {log.timestamp.toLocaleTimeString()}
+                      </span>{" "}
+                      {log.message}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="browser" className="mt-0">
+            <div className="max-h-48 space-y-1 overflow-y-auto">
+              {parsedBrowserLogs.length === 0 ? (
+                <p className="text-muted-foreground text-xs">No browser console output</p>
+              ) : (
+                parsedBrowserLogs.map((log) => (
+                  <div
+                    className={cn(
+                      "text-xs",
+                      log.level === "error" && "text-destructive",
+                      log.level === "warn" && "text-yellow-600",
+                      (log.level === "log" || log.level === "info") && "text-foreground"
+                    )}
+                    key={`browser-${log.index}`}
+                  >
+                    <span className="text-muted-foreground">
+                      {log.timestamp.toLocaleTimeString()}
+                    </span>{" "}
+                    <span className={cn(
+                      "inline-block px-1 rounded text-[10px] mr-1",
+                      log.level === "error" && "bg-destructive/20",
+                      log.level === "warn" && "bg-yellow-500/20",
+                      (log.level === "log" || log.level === "info") && "bg-muted"
+                    )}>
+                      {log.level.toUpperCase()}
+                    </span>
+                    {log.message}
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+        {children}
       </CollapsibleContent>
     </Collapsible>
   );

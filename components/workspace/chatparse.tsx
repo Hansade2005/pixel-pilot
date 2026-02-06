@@ -318,6 +318,31 @@ export function ChatPanelV2({
     }
   }, [input, debouncedHeightAdjustment])
 
+  // Listen for "Ask AI to Fix" events from browser console errors
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleAskAiToFix = (e: CustomEvent) => {
+      const detail = e.detail as { prompt: string; errors: string[] }
+      if (detail.prompt) {
+        setInput(detail.prompt)
+        // Focus the input after setting it
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus()
+            textareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
+
+    return () => {
+      window.removeEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
+    }
+  }, [])
+
   // Local state for messages (since we're not using useChat hook for complex attachment handling)
   const [messages, setMessages] = useState<any[]>([])
   const [error, setError] = useState<Error | null>(null)

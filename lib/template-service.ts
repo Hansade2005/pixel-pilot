@@ -562,7 +562,7 @@ export default {
  */
 (function() {
   'use strict';
-  
+
   // Only run in iframe context
   if (window === window.parent) {
     console.log('[VE-Client] Not in iframe, skipping initialization');
@@ -579,7 +579,7 @@ export default {
     'http://127.0.0.1:3000',
     'http://localhost:5173',
   ];
-  
+
   // Check if origin is allowed (supports wildcards for subdomains)
   function isAllowedOrigin(origin) {
     if (!origin) return false;
@@ -591,6 +591,92 @@ export default {
     if (origin.endsWith('.e2b.app')) return true;
     return false;
   }
+
+  // ============================================
+  // CONSOLE CAPTURE - Intercept and forward browser console logs
+  // ============================================
+  (function setupConsoleCapture() {
+    var originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info
+    };
+
+    function formatArgs(args) {
+      return Array.prototype.slice.call(args).map(function(arg) {
+        if (arg === null) return 'null';
+        if (arg === undefined) return 'undefined';
+        if (typeof arg === 'object') {
+          try {
+            if (arg instanceof Error) {
+              return arg.stack || arg.message || String(arg);
+            }
+            return JSON.stringify(arg, null, 2);
+          } catch (e) {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      }).join(' ');
+    }
+
+    function sendConsoleLog(level, args) {
+      try {
+        var message = formatArgs(args);
+        // Skip VE-Client's own logs to avoid noise
+        if (message.indexOf('[VE-Client]') === 0) {
+          return;
+        }
+        window.parent.postMessage({
+          type: 'BROWSER_CONSOLE_LOG',
+          payload: {
+            level: level,
+            message: message,
+            timestamp: new Date().toISOString(),
+            url: window.location.href
+          }
+        }, '*');
+      } catch (e) {
+        // Silently fail if postMessage fails
+      }
+    }
+
+    console.log = function() {
+      sendConsoleLog('log', arguments);
+      originalConsole.log.apply(console, arguments);
+    };
+
+    console.warn = function() {
+      sendConsoleLog('warn', arguments);
+      originalConsole.warn.apply(console, arguments);
+    };
+
+    console.error = function() {
+      sendConsoleLog('error', arguments);
+      originalConsole.error.apply(console, arguments);
+    };
+
+    console.info = function() {
+      sendConsoleLog('info', arguments);
+      originalConsole.info.apply(console, arguments);
+    };
+
+    // Also capture unhandled errors
+    window.addEventListener('error', function(event) {
+      sendConsoleLog('error', [
+        'Uncaught Error: ' + event.message +
+        '\\nAt: ' + event.filename + ':' + event.lineno + ':' + event.colno
+      ]);
+    });
+
+    // Capture unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+      sendConsoleLog('error', [
+        'Unhandled Promise Rejection: ' + (event.reason ? (event.reason.message || event.reason) : 'Unknown reason')
+      ]);
+    });
+  })();
 
   // State
   let isEnabled = false;
@@ -2417,7 +2503,7 @@ export default function NotFound() {
  */
 (function() {
   'use strict';
-  
+
   // Only run in iframe context
   if (window === window.parent) {
     console.log('[VE-Client] Not in iframe, skipping initialization');
@@ -2434,7 +2520,7 @@ export default function NotFound() {
     'http://127.0.0.1:3000',
     'http://localhost:5173',
   ];
-  
+
   // Check if origin is allowed (supports wildcards for subdomains)
   function isAllowedOrigin(origin) {
     if (!origin) return false;
@@ -2446,6 +2532,92 @@ export default function NotFound() {
     if (origin.endsWith('.e2b.app')) return true;
     return false;
   }
+
+  // ============================================
+  // CONSOLE CAPTURE - Intercept and forward browser console logs
+  // ============================================
+  (function setupConsoleCapture() {
+    var originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info
+    };
+
+    function formatArgs(args) {
+      return Array.prototype.slice.call(args).map(function(arg) {
+        if (arg === null) return 'null';
+        if (arg === undefined) return 'undefined';
+        if (typeof arg === 'object') {
+          try {
+            if (arg instanceof Error) {
+              return arg.stack || arg.message || String(arg);
+            }
+            return JSON.stringify(arg, null, 2);
+          } catch (e) {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      }).join(' ');
+    }
+
+    function sendConsoleLog(level, args) {
+      try {
+        var message = formatArgs(args);
+        // Skip VE-Client's own logs to avoid noise
+        if (message.indexOf('[VE-Client]') === 0) {
+          return;
+        }
+        window.parent.postMessage({
+          type: 'BROWSER_CONSOLE_LOG',
+          payload: {
+            level: level,
+            message: message,
+            timestamp: new Date().toISOString(),
+            url: window.location.href
+          }
+        }, '*');
+      } catch (e) {
+        // Silently fail if postMessage fails
+      }
+    }
+
+    console.log = function() {
+      sendConsoleLog('log', arguments);
+      originalConsole.log.apply(console, arguments);
+    };
+
+    console.warn = function() {
+      sendConsoleLog('warn', arguments);
+      originalConsole.warn.apply(console, arguments);
+    };
+
+    console.error = function() {
+      sendConsoleLog('error', arguments);
+      originalConsole.error.apply(console, arguments);
+    };
+
+    console.info = function() {
+      sendConsoleLog('info', arguments);
+      originalConsole.info.apply(console, arguments);
+    };
+
+    // Also capture unhandled errors
+    window.addEventListener('error', function(event) {
+      sendConsoleLog('error', [
+        'Uncaught Error: ' + event.message +
+        '\\nAt: ' + event.filename + ':' + event.lineno + ':' + event.colno
+      ]);
+    });
+
+    // Capture unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+      sendConsoleLog('error', [
+        'Unhandled Promise Rejection: ' + (event.reason ? (event.reason.message || event.reason) : 'Unknown reason')
+      ]);
+    });
+  })();
 
   // State
   let isEnabled = false;
