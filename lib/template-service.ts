@@ -27,65 +27,13 @@ export class TemplateService {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.28.0",
-
-    "@radix-ui/react-accordion": "1.2.2",
-    "@radix-ui/react-alert-dialog": "1.1.4",
-    "@radix-ui/react-aspect-ratio": "1.1.1",
-    "@radix-ui/react-avatar": "1.1.2",
-    "@radix-ui/react-checkbox": "1.1.3",
-    "@radix-ui/react-collapsible": "1.1.2",
-    "@radix-ui/react-context-menu": "2.2.4",
-    "@radix-ui/react-dialog": "1.1.4",
-    "@radix-ui/react-dropdown-menu": "2.1.4",
-    "@radix-ui/react-hover-card": "1.1.4",
-    "@radix-ui/react-label": "2.1.1",
-    "@radix-ui/react-menubar": "1.1.4",
-    "@radix-ui/react-navigation-menu": "1.2.3",
-    "@radix-ui/react-popover": "1.1.4",
-    "@radix-ui/react-progress": "1.1.1",
-    "@radix-ui/react-radio-group": "1.2.2",
-    "@radix-ui/react-scroll-area": "1.2.2",
-    "@radix-ui/react-select": "2.1.4",
-    "@radix-ui/react-separator": "1.1.1",
-    "@radix-ui/react-slider": "1.2.2",
-    "@radix-ui/react-slot": "1.1.1",
-    "@radix-ui/react-switch": "1.1.2",
-    "@radix-ui/react-tabs": "1.1.2",
-    "@radix-ui/react-toast": "1.2.4",
-    "@radix-ui/react-toggle": "1.1.1",
-    "@radix-ui/react-toggle-group": "1.1.1",
-    "@radix-ui/react-tooltip": "1.1.6",
-    "@radix-ui/react-icons": "^1.3.0",
-
     "lucide-react": "^0.454.0",
     "framer-motion": "^12.23.12",
-
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.5",
-    "cmdk": "1.0.4",
-    "next-themes": "^0.4.6",
-
-    "react-hook-form": "^7.60.0",
-    "zod": "3.25.67",
-    "@hookform/resolvers": "^3.10.0",
-
     "date-fns": "4.1.0",
     "recharts": "2.15.4",
-
-    "sonner": "^1.7.4",
-    "react-day-picker": "9.8.0",
-    "input-otp": "1.4.1",
-    "vaul": "^0.9.9",
-    "embla-carousel-react": "8.5.1",
-    "react-resizable-panels": "^2.1.7",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-
-    "@tanstack/react-table": "^8.20.5",
-    "@vercel/node": "^3.0.0",
     "@dyad-sh/react-vite-component-tagger": "0.8.0"
-
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -93,15 +41,11 @@ export class TemplateService {
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.6",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
-    "tailwindcss-animate": "^1.0.7",
     "@babel/core": "^7.24.0",
     "@babel/preset-react": "^7.23.3",
     "@babel/preset-typescript": "^7.23.3",
@@ -431,28 +375,28 @@ export default {
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
-    
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
+
     <!-- Google Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    
-    <!-- Google Fonts - All supported font families -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Nunito:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&family=Urbanist:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Lexend:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Figtree:wght@300;400;500;600;700&family=Cabin:wght@400;500;600;700&family=PT+Sans:wght@400;700&family=Manrope:wght@300;400;500;600;700&family=Mulish:wght@300;400;500;600;700&family=Sofia+Sans:wght@300;400;500;600;700&family=Josefin+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Serif Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Playfair+Display:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Domine:wght@400;500;600;700&family=Crimson+Text:wght@400;600;700&family=DM+Serif+Display&family=DM+Serif+Text&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Cardo:wght@400;700&family=Libre+Baskerville:wght@400;700&family=Spectral:wght@300;400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Old+Standard+TT:wght@400;700&family=Bodoni+Moda:wght@400;500;600;700&family=Cormorant:wght@300;400;500;600;700&family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=Forum&family=Tenor+Sans&family=Gilda+Display&family=Fraunces:wght@300;400;500;600;700&family=Rosarivo&display=swap" rel="stylesheet">
-    
-    <!-- Monospace Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Cousine:wght@400;700&family=Noto+Sans+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Handwritten & Script Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&family=Sacramento&family=Shantell+Sans:wght@300;400;500;600;700&family=Amatic+SC:wght@400;700&family=Great+Vibes&family=Parisienne&family=Shadows+Into+Light&family=Yellowtail&family=Satisfy&family=Allura&family=Indie+Flower&family=Kristi&family=Bad+Script&family=Mrs+Saint+Delafield&family=Marck+Script&display=swap" rel="stylesheet">
-    
-    <!-- Display & Decorative Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Anton&family=Abril+Fatface&family=Bungee&family=Alfa+Slab+One&family=Lobster&family=Rubik+Dirt&family=Playball&family=Fredoka:wght@300;400;500;600;700&family=Monoton&family=Righteous&family=Ultra&family=Press+Start+2P&family=Rampart+One&display=swap" rel="stylesheet">
-    
-    <!-- Futuristic & Tech Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=Audiowide&family=Oxanium:wght@300;400;500;600;700&family=Quantico:wght@400;700&family=Syncopate:wght@400;700&family=Teko:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Changa:wght@300;400;500;600;700&family=Michroma&display=swap" rel="stylesheet">
+
+    <!-- Google Fonts - Common font families -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
@@ -472,22 +416,11 @@ export default {
       content: `import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
-import { ThemeProvider } from './components/ThemeProvider'
-import { DebugBubble } from './components/DebugBubble'
-import { ErrorModal } from './components/ErrorModal'
 import './index.css'
-import { errorService } from './services/errorService'
-
-// Initialize error service
-window.__errorService = errorService
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <App />
-      <DebugBubble />
-      <ErrorModal />
-    </ThemeProvider>
+    <App />
   </React.StrictMode>,
 )`,
       fileType: 'typescript',
@@ -498,77 +431,68 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     {
       name: 'App.tsx',
       path: 'src/App.tsx',
-      content: `import React from 'react';
-import { ThemeToggle } from './components/ThemeToggle';
-
-function App() {
+      content: `function App() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <header className="bg-card border border-border rounded-lg p-6 mb-6 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-4xl font-bold text-foreground mb-2">
-                Hello World, it's You 🌍
-              </h1>
-              <p className="text-muted-foreground text-lg">
-                Welcome to your enhanced React + Vite app. Let's build something amazing together!
-              </p>
-            </div>
-            {/* Theme Toggle */}
-            <ThemeToggle />
-          </div>
+        <header className="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-sm">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Hello World
+          </h1>
+          <p className="text-gray-600 text-lg">
+            Welcome to your React + Vite app with Tailwind CSS. Let's build something amazing!
+          </p>
         </header>
 
         {/* Features Grid */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
             <div className="text-3xl mb-3">⚡</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Lightning Fast</h3>
-            <p className="text-muted-foreground">
-              Generate complete applications in minutes, not hours. Our AI understands your vision instantly.
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Lightning Fast</h3>
+            <p className="text-gray-600">
+              Vite provides instant hot module replacement for rapid development.
             </p>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
             <div className="text-3xl mb-3">🎨</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Beautiful UI</h3>
-            <p className="text-muted-foreground">
-              Modern, responsive design with purposeful interactions and clean aesthetics built-in.
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Tailwind CSS</h3>
+            <p className="text-gray-600">
+              Utility-first CSS framework loaded via CDN for rapid styling.
             </p>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">🔒</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Privacy First</h3>
-            <p className="text-muted-foreground">
-              Architected with encrypted data and compliance-ready workflows to keep your users safe.
+          <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">⚛️</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">React 18</h3>
+            <p className="text-gray-600">
+              Built with the latest React features for modern web apps.
             </p>
           </div>
         </div>
 
         {/* Call to Action */}
-        <div className="bg-secondary border border-border rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold text-secondary-foreground mb-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Ready to get started?
           </h2>
-          <p className="text-muted-foreground mb-6">
-            This landing page is powered by CSS variables. Change themes and see the magic happen instantly!
+          <p className="text-gray-600 mb-6">
+            Edit src/App.tsx and start building your application!
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <button className="bg-primary text-primary-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity">
+            <button className="bg-blue-600 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 transition-colors">
               Get Started
             </button>
-            <button className="bg-accent text-accent-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity border border-border">
+            <button className="bg-white text-gray-700 px-6 py-3 rounded-md font-medium hover:bg-gray-50 transition-colors border border-gray-300">
               Learn More
             </button>
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="mt-8 text-center text-muted-foreground text-sm">
-          <p>© 2025 Your App — Built with React + Vite + Tailwind CSS</p>
+        <footer className="mt-8 text-center text-gray-500 text-sm">
+          <p>Built with React + Vite + Tailwind CSS (CDN)</p>
         </footer>
       </div>
     </div>
@@ -594,64 +518,28 @@ export default App`,
     {
       name: 'index.css',
       path: 'src/index.css',
-      content: `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-  }
+      content: `/* Base styles - Tailwind is loaded via CDN in index.html */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utility classes */
+.transition-base {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Dark mode support */
+.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
 }`,
       fileType: 'css',
       type: 'css',
@@ -6029,63 +5917,12 @@ NODE_ENV=development`,
     "next": "14.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.28.0",
-
-    "@radix-ui/react-accordion": "1.2.2",
-    "@radix-ui/react-alert-dialog": "1.1.4",
-    "@radix-ui/react-aspect-ratio": "1.1.1",
-    "@radix-ui/react-avatar": "1.1.2",
-    "@radix-ui/react-checkbox": "1.1.3",
-    "@radix-ui/react-collapsible": "1.1.2",
-    "@radix-ui/react-context-menu": "2.2.4",
-    "@radix-ui/react-dialog": "1.1.4",
-    "@radix-ui/react-dropdown-menu": "2.1.4",
-    "@radix-ui/react-hover-card": "1.1.4",
-    "@radix-ui/react-label": "2.1.1",
-    "@radix-ui/react-menubar": "1.1.4",
-    "@radix-ui/react-navigation-menu": "1.2.3",
-    "@radix-ui/react-popover": "1.1.4",
-    "@radix-ui/react-progress": "1.1.1",
-    "@radix-ui/react-radio-group": "1.2.2",
-    "@radix-ui/react-scroll-area": "1.2.2",
-    "@radix-ui/react-select": "2.1.4",
-    "@radix-ui/react-separator": "1.1.1",
-    "@radix-ui/react-slider": "1.2.2",
-    "@radix-ui/react-slot": "1.1.1",
-    "@radix-ui/react-switch": "1.1.2",
-    "@radix-ui/react-tabs": "1.1.2",
-    "@radix-ui/react-toast": "1.2.4",
-    "@radix-ui/react-toggle": "1.1.1",
-    "@radix-ui/react-toggle-group": "1.1.1",
-    "@radix-ui/react-tooltip": "1.1.6",
-    "@radix-ui/react-icons": "^1.3.0",
-
     "lucide-react": "^0.454.0",
     "framer-motion": "^12.23.12",
-
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.5",
-    "cmdk": "1.0.4",
-    "next-themes": "^0.4.6",
-
-    "react-hook-form": "^7.60.0",
-    "zod": "3.25.67",
-    "@hookform/resolvers": "^3.10.0",
-
     "date-fns": "4.1.0",
     "recharts": "2.15.4",
-
-    "sonner": "^1.7.4",
-    "react-day-picker": "9.8.0",
-    "input-otp": "1.4.1",
-    "vaul": "^0.9.9",
-    "embla-carousel-react": "8.5.1",
-    "react-resizable-panels": "^2.1.7",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-
-    "@tanstack/react-table": "^8.20.5",
     "@dyad-sh/nextjs-webpack-component-tagger": "0.8.0"
   },
   "devDependencies": {
@@ -6093,12 +5930,8 @@ NODE_ENV=development`,
     "@types/react-dom": "^18.2.17",
     "@types/node": "^25.0.0",
     "typescript": "^5.2.2",
-    "tailwindcss": "^3.3.6",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
     "eslint": "^8.55.0",
     "eslint-config-next": "14.0.4",
-    "tailwindcss-animate": "^1.0.7",
     "@babel/core": "^7.24.0",
     "@babel/preset-react": "^7.23.3",
     "@babel/preset-typescript": "^7.23.3"
@@ -6416,64 +6249,28 @@ export default {
     {
       name: 'globals.css',
       path: 'src/app/globals.css',
-      content: `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
-  }
+      content: `/* Base styles - Tailwind is loaded via CDN in layout.tsx */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utility classes */
+.transition-base {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Dark mode support */
+.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
 }`,
       fileType: 'css',
       type: 'css',
@@ -6484,24 +6281,12 @@ export default {
       name: 'layout.tsx',
       path: 'src/app/layout.tsx',
       content: `import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
-import { DebugBubble } from '@/components/DebugBubble'
-import { ErrorModal } from '@/components/ErrorModal'
-import { ThemeProvider } from '@/components/ThemeProvider'
-import { errorService } from '@/services/errorService'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Next.js App',
-  description: 'Generated by create next app',
-}
-
-// Initialize error service (development only)
-if (process.env.NODE_ENV === 'development') {
-  typeof globalThis !== 'undefined' && (globalThis as any).__errorService = errorService
+  description: 'Built with Next.js and Tailwind CSS',
 }
 
 export default function RootLayout({
@@ -6512,34 +6297,32 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Tailwind CSS via CDN */}
+        <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
+        <Script id="tailwind-config" strategy="beforeInteractive">
+          {\`
+            tailwind.config = {
+              darkMode: 'class',
+              theme: {
+                extend: {
+                  fontFamily: {
+                    sans: ['Inter', 'system-ui', 'sans-serif'],
+                  },
+                }
+              }
+            }
+          \`}
+        </Script>
+
         {/* Google Fonts Preconnect */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        
-        {/* Sans-serif Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Nunito:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&family=Urbanist:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Lexend:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Figtree:wght@300;400;500;600;700&family=Cabin:wght@400;500;600;700&family=PT+Sans:wght@400;700&family=Manrope:wght@300;400;500;600;700&family=Mulish:wght@300;400;500;600;700&family=Sofia+Sans:wght@300;400;500;600;700&family=Josefin+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-        
-        {/* Serif Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Playfair+Display:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Domine:wght@400;500;600;700&family=Crimson+Text:wght@400;600;700&family=DM+Serif+Display&family=DM+Serif+Text&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Cardo:wght@400;700&family=Libre+Baskerville:wght@400;700&family=Spectral:wght@300;400;500;600;700&family=EB+Garamond:wght@400;500;600;700&family=Old+Standard+TT:wght@400;700&family=Bodoni+Moda:wght@400;500;600;700&family=Cormorant:wght@300;400;500;600;700&family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=Forum&family=Tenor+Sans&family=Gilda+Display&family=Fraunces:wght@300;400;500;600;700&family=Rosarivo&display=swap" rel="stylesheet" />
-        
-        {/* Monospace Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500;600;700&family=Source+Code+Pro:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inconsolata:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Cousine:wght@400;700&family=Noto+Sans+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-        
-        {/* Handwritten & Script Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Dancing+Script:wght@400;500;600;700&family=Caveat:wght@400;500;600;700&family=Sacramento&family=Shantell+Sans:wght@300;400;500;600;700&family=Amatic+SC:wght@400;700&family=Great+Vibes&family=Parisienne&family=Shadows+Into+Light&family=Yellowtail&family=Satisfy&family=Allura&family=Indie+Flower&family=Kristi&family=Bad+Script&family=Mrs+Saint+Delafield&family=Marck+Script&display=swap" rel="stylesheet" />
-        
-        {/* Display & Decorative Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=Anton&family=Abril+Fatface&family=Bungee&family=Alfa+Slab+One&family=Lobster&family=Rubik+Dirt&family=Playball&family=Fredoka:wght@300;400;500;600;700&family=Monoton&family=Righteous&family=Ultra&family=Press+Start+2P&family=Rampart+One&display=swap" rel="stylesheet" />
-        
-        {/* Futuristic & Tech Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&family=Audiowide&family=Oxanium:wght@300;400;500;600;700&family=Quantico:wght@400;700&family=Syncopate:wght@400;700&family=Teko:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Changa:wght@300;400;500;600;700&family=Michroma&display=swap" rel="stylesheet" />
+
+        {/* Google Fonts - Common font families */}
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className={inter.className}>
-        <ThemeProvider>
-          {children}
-          <DebugBubble />
-          <ErrorModal />
-        </ThemeProvider>
+      <body className="font-sans">
+        {children}
         {/* Visual Editor Client - enables visual editing when loaded in pipilot.dev iframe */}
         <Script src="/visual-editor-client.js" strategy="afterInteractive" />
       </body>
@@ -6556,66 +6339,66 @@ export default function RootLayout({
       path: 'src/app/page.tsx',
       content: `export default function Home() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-gray-50 text-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <header className="bg-card border border-border rounded-lg p-6 mb-6 shadow-sm">
-          <h1 className="text-4xl font-bold text-foreground mb-2">
-            Hello World, it's You 🌍
+        <header className="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-sm">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Hello World
           </h1>
-          <p className="text-muted-foreground text-lg">
-            Welcome to your enhanced Next.js app. Let's build something amazing together!
+          <p className="text-gray-600 text-lg">
+            Welcome to your Next.js app with Tailwind CSS. Let's build something amazing!
           </p>
         </header>
 
         {/* Features Grid */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
             <div className="text-3xl mb-3">⚡</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Lightning Fast</h3>
-            <p className="text-muted-foreground">
-              Generate complete applications in minutes, not hours. Our AI understands your vision instantly.
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Server Components</h3>
+            <p className="text-gray-600">
+              Next.js 14 with React Server Components for optimal performance.
             </p>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
             <div className="text-3xl mb-3">🎨</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Beautiful UI</h3>
-            <p className="text-muted-foreground">
-              Modern, responsive design with purposeful interactions and clean aesthetics built-in.
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Tailwind CSS</h3>
+            <p className="text-gray-600">
+              Utility-first CSS framework loaded via CDN for rapid styling.
             </p>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-3">🔒</div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">Privacy First</h3>
-            <p className="text-muted-foreground">
-              Architected with encrypted data and compliance-ready workflows to keep your users safe.
+          <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+            <div className="text-3xl mb-3">📦</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">App Router</h3>
+            <p className="text-gray-600">
+              File-based routing with layouts, loading states, and error handling.
             </p>
           </div>
         </div>
 
         {/* Call to Action */}
-        <div className="bg-secondary border border-border rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold text-secondary-foreground mb-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Ready to get started?
           </h2>
-          <p className="text-muted-foreground mb-6">
-            This landing page is powered by CSS variables. Change themes and see the magic happen instantly!
+          <p className="text-gray-600 mb-6">
+            Edit src/app/page.tsx and start building your application!
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <button className="bg-primary text-primary-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity">
+            <button className="bg-blue-600 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 transition-colors">
               Get Started
             </button>
-            <button className="bg-accent text-accent-foreground px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity border border-border">
+            <button className="bg-white text-gray-700 px-6 py-3 rounded-md font-medium hover:bg-gray-50 transition-colors border border-gray-300">
               Learn More
             </button>
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="mt-8 text-center text-muted-foreground text-sm">
-          <p>© 2025 Your App — Built with Next.js + Tailwind CSS</p>
+        <footer className="mt-8 text-center text-gray-500 text-sm">
+          <p>Built with Next.js + Tailwind CSS (CDN)</p>
         </footer>
       </div>
     </main>

@@ -242,15 +242,12 @@ Follow project's routing pattern:
   • Graceful degradation strategies
 
 🎯 THEMING & CSS VARIABLES (CRITICAL FOR VISUAL EDITOR)
-  • **ALWAYS use CSS variables for colors** - enables instant theme switching
-  • **Define colors in :root** with HSL format: --background: 0 0% 100%
-  • **Use Tailwind utility classes** that reference CSS variables (bg-background, text-foreground, border-border)
-  • **NEVER hardcode colors** (no bg-white, text-black, bg-blue-500) unless for static decorative elements
-  • **Pattern**: Tailwind config maps to CSS vars → bg-background resolves to hsl(var(--background))
-  • **Required CSS variables**: --background, --foreground, --primary, --secondary, --muted, --accent, --destructive, --border, --input, --ring
-  • **Dark mode support**: Use .dark class with alternate variable definitions
-  • **Component styling**: Prefer Tailwind utilities (bg-card, text-card-foreground) over custom CSS
-  • **Why**: Visual editor themes apply via root.style.setProperty() - only works with CSS variables
+  • **Tailwind CSS via CDN** - loaded in index.html, no build step required for styles
+  • **Use standard Tailwind utilities** - bg-white, bg-gray-100, text-gray-900, bg-blue-600, etc.
+  • **Dark mode**: Use Tailwind's dark: prefix (dark:bg-gray-900, dark:text-white)
+  • **Custom styles**: Add to src/index.css for anything beyond Tailwind utilities
+  • **Tailwind config**: Inline in index.html via tailwind.config object
+  • **Component styling**: Prefer Tailwind utilities directly in JSX/TSX
   • User-friendly error messages (no stack traces to users)
   • Loading states for all async operations (loading.tsx for Next.js or Suspense)
   • Empty states and zero-data scenarios
@@ -989,46 +986,9 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
       timeZoneName: 'long'
     })
 
-    // Filter out shadcn UI components and common excluded files
+    // Filter out common excluded files (node_modules, .git, build outputs)
     const filteredFiles = files.filter((file: any) => {
       const path = file.path.toLowerCase()
-      // Exclude shadcn UI components
-      if (path.includes('components/ui/') && (
-        path.includes('button.tsx') ||
-        path.includes('input.tsx') ||
-        path.includes('dialog.tsx') ||
-        path.includes('card.tsx') ||
-        path.includes('badge.tsx') ||
-        path.includes('alert.tsx') ||
-        path.includes('accordion.tsx') ||
-        path.includes('avatar.tsx') ||
-        path.includes('checkbox.tsx') ||
-        path.includes('dropdown-menu.tsx') ||
-        path.includes('form.tsx') ||
-        path.includes('label.tsx') ||
-        path.includes('select.tsx') ||
-        path.includes('sheet.tsx') ||
-        path.includes('tabs.tsx') ||
-        path.includes('textarea.tsx') ||
-        path.includes('toast.tsx') ||
-        path.includes('tooltip.tsx') ||
-        path.includes('separator.tsx') ||
-        path.includes('skeleton.tsx') ||
-        path.includes('scroll-area.tsx') ||
-        path.includes('progress.tsx') ||
-        path.includes('popover.tsx') ||
-        path.includes('navigation-menu.tsx') ||
-        path.includes('menubar.tsx') ||
-        path.includes('hover-card.tsx') ||
-        path.includes('command.tsx') ||
-        path.includes('calendar.tsx') ||
-        path.includes('table.tsx') ||
-        path.includes('switch.tsx') ||
-        path.includes('slider.tsx') ||
-        path.includes('radio-group.tsx')
-      )) {
-        return false
-      }
 
       // Exclude node_modules, .git, build outputs
       if (path.includes('node_modules') ||
@@ -3093,25 +3053,15 @@ const { theme, setTheme } = useTheme();
 - **Error Handling**: Implement proper error boundaries and user-friendly error messages
 - **Loading States**: Add skeleton loaders and progress indicators for better UX
 
-## 🎨 CSS Variables & Theming (Critical for Visual Editor)
-**ALWAYS use CSS variables for all colors to enable instant theme switching:**
-- **Define colors in :root** with HSL format: \`--background: 0 0% 100%;\` \`--primary: 222 47% 11%;\`
-- **Use Tailwind utilities** that map to CSS vars: \`bg-background\`, \`text-foreground\`, \`border-border\`, \`bg-primary\`
-- **NEVER hardcode colors** like \`bg-white\`, \`text-black\`, \`bg-blue-500\`, \`text-gray-900\` (except for static decorative elements)
-- **Pattern**: Tailwind config maps to CSS vars → \`bg-background\` resolves to \`hsl(var(--background))\`
-- **Required CSS variables**:
-  - Layout: \`--background\`, \`--foreground\`, \`--card\`, \`--card-foreground\`, \`--popover\`, \`--popover-foreground\`
-  - UI Elements: \`--primary\`, \`--primary-foreground\`, \`--secondary\`, \`--secondary-foreground\`, \`--muted\`, \`--muted-foreground\`
-  - Interactive: \`--accent\`, \`--accent-foreground\`, \`--destructive\`, \`--destructive-foreground\`
-  - Borders/Inputs: \`--border\`, \`--input\`, \`--ring\`, \`--radius\`
-- **Dark mode**: Use \`.dark\` class with alternate CSS variable values in :root
-- **Component patterns**: \`bg-card text-card-foreground\`, \`bg-primary text-primary-foreground\`, \`border-border\`
-- **Why it matters**: Visual editor themes apply via \`root.style.setProperty()\` - only works with CSS variables
-- **Setup checklist**:
-  ✓ Define all color variables in \`index.css\` or \`globals.css\` under \`:root\` and \`.dark\`
-  ✓ Configure \`tailwind.config.js\` to map colors to \`hsl(var(--variable-name))\`
-  ✓ Use semantic Tailwind utilities in components (bg-background, not bg-white)
-  ✓ Test theme switching works by changing CSS variable values
+## 🎨 Tailwind CSS via CDN (Vite Projects)
+**Tailwind CSS is loaded via CDN in index.html for rapid styling:**
+- **Use standard Tailwind utilities**: \`bg-white\`, \`bg-gray-100\`, \`text-gray-900\`, \`bg-blue-600\`, \`border-gray-200\`, etc.
+- **Dark mode**: Use Tailwind's \`dark:\` prefix: \`dark:bg-gray-900\`, \`dark:text-white\`, \`dark:border-gray-700\`
+- **Custom config**: Inline in index.html via \`tailwind.config\` object
+- **Custom styles**: Add to \`src/index.css\` for anything beyond Tailwind utilities
+- **No build step**: Tailwind processes classes at runtime via CDN
+- **Component patterns**: \`bg-white border border-gray-200 rounded-lg shadow-sm\`, \`bg-blue-600 text-white hover:bg-blue-700\`
+- **Responsive design**: Use Tailwind breakpoints: \`sm:\`, \`md:\`, \`lg:\`, \`xl:\`
 ## 🚫 Critical Non-Negotiables
 - ❌ No HTML comments in TypeScript/JSX files
 - 📚 Always study existing code before making changes
