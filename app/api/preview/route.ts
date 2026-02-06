@@ -116,15 +116,51 @@ OUTPUT: Only return the slug, nothing else.`
   }
 }
 
-// Function to create site tracking record
+// Function to create or update site tracking record
 export async function createSiteRecord(
   projectSlug: string,
   originalSlug: string | null,
   authUserId: string,
   authUsername: string,
-  externalSupabase: any
+  externalSupabase: any,
+  projectId?: string,
+  siteType: string = 'preview'
 ): Promise<void> {
   try {
+    // If we have a project ID, upsert to ensure we can reuse the slug
+    if (projectId) {
+      // First check if a record exists for this project
+      const { data: existing } = await externalSupabase
+        .from('sites')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('site_type', siteType)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing record
+        const { error } = await externalSupabase
+          .from('sites')
+          .update({
+            project_slug: projectSlug,
+            original_slug: originalSlug,
+            auth_user_id: authUserId,
+            auth_username: authUsername,
+            updated_at: new Date().toISOString(),
+            is_active: true
+          })
+          .eq('id', existing.id);
+
+        if (error) {
+          console.error('[Site Tracking] Error updating site record:', error);
+          throw error;
+        }
+        console.log(`[Site Tracking] Updated record for project ${projectId} with slug ${projectSlug}`);
+        return;
+      }
+    }
+
+    // Insert new record
     const { error } = await externalSupabase
       .from('sites')
       .insert({
@@ -132,6 +168,9 @@ export async function createSiteRecord(
         original_slug: originalSlug,
         auth_user_id: authUserId,
         auth_username: authUsername,
+        project_id: projectId || null,
+        site_type: siteType,
+        is_active: true,
         created_at: new Date().toISOString(),
         metadata: {
           source: 'pipilot-preview',
@@ -144,9 +183,9 @@ export async function createSiteRecord(
       throw error;
     }
 
-    console.log(`[Site Tracking] Created record for ${projectSlug} by ${authUsername}`);
+    console.log(`[Site Tracking] Created record for ${projectSlug} (project: ${projectId || 'none'}) by ${authUsername}`);
   } catch (error) {
-    console.error('[Site Tracking] Failed to create site record:', error);
+    console.error('[Site Tracking] Failed to create/update site record:', error);
     // Don't throw - site creation should continue even if tracking fails
   }
 }
@@ -805,9 +844,9 @@ async function handleStreamingPreview(req: Request) {
 
     console.log(`[Domain Check] Final slug: ${finalSlug}`)
 
-    // Create site tracking record if we have auth info
+    // Create site tracking record if we have auth info (with project_id for slug reuse)
     if (authUserId && authUsername) {
-      await createSiteRecord(finalSlug, originalSlug, authUserId, authUsername, externalSupabase)
+      await createSiteRecord(finalSlug, originalSlug, authUserId, authUsername, externalSupabase, projectId, 'preview')
     }
 
     const stream = new ReadableStream({
@@ -1468,9 +1507,9 @@ async function handleRegularPreview(req: Request) {
 
     console.log(`[Domain Check] Final slug: ${finalSlug}`)
 
-    // Create site tracking record if we have auth info
+    // Create site tracking record if we have auth info (with project_id for slug reuse)
     if (authUserId && authUsername) {
-      await createSiteRecord(finalSlug, originalSlug, authUserId, authUsername, externalSupabase)
+      await createSiteRecord(finalSlug, originalSlug, authUserId, authUsername, externalSupabase, projectId, 'preview')
     }
 
     // Parse environment variables from .env.local file if it exists
