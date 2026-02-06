@@ -227,6 +227,8 @@ export function ProjectHeader({
         await TemplateService.applyNextJSTemplate(workspace.id)
       } else if (selectedTemplate === 'expo') {
         await TemplateService.applyExpoTemplate(workspace.id)
+      } else if (selectedTemplate === 'html') {
+        await TemplateService.applyHtmlTemplate(workspace.id)
       } else {
         await TemplateService.applyViteReactTemplate(workspace.id)
       }
@@ -300,7 +302,7 @@ export function ProjectHeader({
                 </div>
                 <div>
                   <Label htmlFor="template">Template</Label>
-                  <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo') => setSelectedTemplate(value)}>
+                  <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => setSelectedTemplate(value)}>
                     <SelectTrigger id="template">
                       <SelectValue placeholder="Select a template..." />
                     </SelectTrigger>
@@ -308,6 +310,7 @@ export function ProjectHeader({
                       <SelectItem value="vite-react">Vite</SelectItem>
                       <SelectItem value="nextjs">Next.js</SelectItem>
                       <SelectItem value="expo">Expo (Mobile)</SelectItem>
+                      <SelectItem value="html">HTML</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -430,7 +433,7 @@ export function ProjectHeader({
               </div>
               <div>
                 <Label htmlFor="template">Template</Label>
-                <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo') => setSelectedTemplate(value)}>
+                <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs' | 'expo' | 'html') => setSelectedTemplate(value)}>
                   <SelectTrigger id="template">
                     <SelectValue placeholder="Select a template..." />
                   </SelectTrigger>
@@ -438,6 +441,7 @@ export function ProjectHeader({
                     <SelectItem value="vite-react">Vite</SelectItem>
                     <SelectItem value="nextjs">Next.js</SelectItem>
                     <SelectItem value="expo">Expo (Mobile)</SelectItem>
+                    <SelectItem value="html">HTML</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
