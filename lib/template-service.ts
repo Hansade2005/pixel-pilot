@@ -1725,9 +1725,6 @@ NODE_ENV=development`,
       path: 'next.config.js',
       content: `/** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   images: {
     domains: ['localhost','api.a0.dev'],
   },
