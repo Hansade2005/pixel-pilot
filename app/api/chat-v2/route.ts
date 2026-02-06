@@ -10259,14 +10259,9 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         unavailableTools.push(...supabaseRemoteTools)
       }
 
-      // PiPilot database tools require databaseId
-      if (!databaseId) {
-        const dbTools = [
-          'create_table', 'query_database', 'manipulate_table_data', 'manage_api_keys',
-          'list_tables', 'read_table', 'delete_table'
-        ]
-        unavailableTools.push(...dbTools)
-      }
+      // PiPilot database tools are ALWAYS available - do NOT filter them out
+      // Even without a databaseId, the AI should be able to guide users to create a database first
+      // The tools will return helpful error messages if called without a valid database
 
       // node_machine requires E2B_API_KEY
       if (!process.env.E2B_API_KEY) {
