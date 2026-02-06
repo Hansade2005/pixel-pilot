@@ -1670,9 +1670,30 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   }
 
   // Refresh the preview by syncing latest files to the existing sandbox
+  // For Vite projects (hosted on Supabase), we need to rebuild and re-upload
+  // For Next.js projects (running on E2B), we can sync files to the running sandbox
   const refreshPreviewWithLatestFiles = async () => {
-    if (!project || !preview.sandboxId) {
-      console.log('[CodePreviewPanel] No project or sandbox - calling createPreview instead')
+    if (!project) {
+      console.log('[CodePreviewPanel] No project - calling createPreview')
+      createPreview()
+      return
+    }
+
+    // For Vite projects hosted on Supabase, we need to rebuild and re-upload
+    // Check if the preview URL is a Supabase-hosted URL (sites.pipilot.dev)
+    const isSupabaseHosted = preview.url?.includes('sites.pipilot.dev')
+
+    if (isViteProject || isSupabaseHosted) {
+      console.log('[CodePreviewPanel] Vite/Supabase-hosted project - need to rebuild and re-upload')
+      // For Vite projects, we must recreate the preview (rebuild + upload to Supabase)
+      filesChangedSincePreviewRef.current = false
+      createPreview()
+      return
+    }
+
+    // For Next.js/other projects running on E2B sandbox, sync files directly
+    if (!preview.sandboxId) {
+      console.log('[CodePreviewPanel] No sandbox - calling createPreview instead')
       createPreview()
       return
     }
