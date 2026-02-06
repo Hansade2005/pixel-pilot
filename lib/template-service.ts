@@ -49,7 +49,10 @@ export class TemplateService {
     "@babel/core": "^7.24.0",
     "@babel/preset-react": "^7.23.3",
     "@babel/preset-typescript": "^7.23.3",
-    "@babel/types": "^7.24.0"
+    "@babel/types": "^7.24.0",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.18"
   }
 }
 `,
@@ -294,31 +297,6 @@ export default visualEditorPlugin;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
 
-    <!-- Tailwind CSS via CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              'brand-dark': '#141413',
-              'brand-light': '#faf9f5',
-              'brand-mid-gray': '#b0aea5',
-              'brand-light-gray': '#e8e6dc',
-              'brand-orange': '#d97757',
-              'brand-blue': '#6a9bcc',
-              'brand-green': '#788c5d',
-            },
-            fontFamily: {
-              sans: ['Lora', 'Georgia', 'serif'],
-              heading: ['Poppins', 'Arial', 'sans-serif'],
-            },
-          }
-        }
-      }
-    </script>
-
     <!-- Google Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -394,62 +372,89 @@ export default App`,
     {
       name: 'index.css',
       path: 'src/index.css',
-      content: `/* Base styles - Tailwind is loaded via CDN in index.html */
-/* Anthropic Brand Colors */
-:root {
-  /* Main Colors */
-  --color-dark: #141413;
-  --color-light: #faf9f5;
-  --color-mid-gray: #b0aea5;
-  --color-light-gray: #e8e6dc;
+      content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  /* Accent Colors */
-  --color-accent-orange: #d97757;
-  --color-accent-blue: #6a9bcc;
-  --color-accent-green: #788c5d;
+/*
+ * =============================================================================
+ * VITE + REACT + TAILWIND CSS TEMPLATE
+ * =============================================================================
+ *
+ * STYLING GUIDE FOR AI:
+ * ---------------------
+ * 1. USE TAILWIND CLASSES FIRST: Always prefer Tailwind utility classes in JSX
+ *    Example: <div className="flex items-center justify-between p-4 bg-gray-100">
+ *
+ * 2. CUSTOM CSS HERE: Only add custom styles to this file when:
+ *    - You need complex animations not available in Tailwind
+ *    - You need CSS variables for theming
+ *    - You need styles that can't be expressed with utilities
+ *
+ * 3. AVAILABLE CUSTOM COLORS (in tailwind.config.js):
+ *    - brand-dark: #181818 (dark backgrounds, text)
+ *    - brand-light: #fafafa (light backgrounds)
+ *    - brand-gray: #6b7280 (secondary text)
+ *    - brand-accent: #3b82f6 (primary accent - blue)
+ *    - brand-success: #10b981 (success states - green)
+ *    - brand-warning: #f59e0b (warning states - amber)
+ *    - brand-error: #ef4444 (error states - red)
+ *
+ * 4. FONTS:
+ *    - font-sans: Inter (default body text)
+ *    - font-heading: Inter with font-semibold or font-bold
+ *
+ * =============================================================================
+ */
+
+/* Base layer customizations */
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-gray-900;
+  }
+
+  a {
+    @apply text-brand-accent hover:text-blue-700 transition-colors;
+  }
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Component layer - reusable component styles */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-brand-accent text-white rounded-lg hover:bg-blue-700 transition-colors font-medium;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors font-medium;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent;
+  }
 }
 
-body {
-  font-family: 'Lora', Georgia, serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-light);
-  color: var(--color-dark);
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', Arial, sans-serif;
-  color: var(--color-dark);
-}
-
-a {
-  color: var(--color-accent-orange);
-  transition: color 0.2s ease-in-out;
-}
-
-a:hover {
-  color: var(--color-accent-blue);
-}
-
-/* Custom utility classes */
-.transition-base {
-  transition: all 0.2s ease-in-out;
+/* Utilities layer - custom utilities */
+@layer utilities {
+  .transition-base {
+    @apply transition-all duration-200 ease-in-out;
+  }
 }
 
 /* Dark mode support */
 .dark body {
-  background-color: var(--color-dark);
-  color: var(--color-light);
+  @apply bg-brand-dark text-white;
 }
 
 .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-  color: var(--color-light);
+  @apply text-white;
 }`,
       fileType: 'css',
       type: 'css',
@@ -475,6 +480,53 @@ a:hover {
       'warn',
       { allowConstantExport: true },
     ],
+  },
+}`,
+      fileType: 'javascript',
+      type: 'javascript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'tailwind.config.js',
+      path: 'tailwind.config.js',
+      content: `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'brand-dark': '#181818',
+        'brand-light': '#fafafa',
+        'brand-gray': '#6b7280',
+        'brand-accent': '#3b82f6',
+        'brand-success': '#10b981',
+        'brand-warning': '#f59e0b',
+        'brand-error': '#ef4444',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+}`,
+      fileType: 'javascript',
+      type: 'javascript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'postcss.config.js',
+      path: 'postcss.config.js',
+      content: `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
   },
 }`,
       fileType: 'javascript',
@@ -1756,7 +1808,10 @@ NODE_ENV=development`,
     "eslint-config-next": "14.0.4",
     "@babel/core": "^7.24.0",
     "@babel/preset-react": "^7.23.3",
-    "@babel/preset-typescript": "^7.23.3"
+    "@babel/preset-typescript": "^7.23.3",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.18"
   }
 }`,
       fileType: 'json',
@@ -1808,6 +1863,56 @@ const nextConfig = {
 }
 
 module.exports = nextConfig`,
+      fileType: 'javascript',
+      type: 'javascript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'tailwind.config.ts',
+      path: 'tailwind.config.ts',
+      content: `import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'brand-dark': '#181818',
+        'brand-light': '#fafafa',
+        'brand-gray': '#6b7280',
+        'brand-accent': '#3b82f6',
+        'brand-success': '#10b981',
+        'brand-warning': '#f59e0b',
+        'brand-error': '#ef4444',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+}
+export default config`,
+      fileType: 'typescript',
+      type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'postcss.config.js',
+      path: 'postcss.config.js',
+      content: `module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`,
       fileType: 'javascript',
       type: 'javascript',
       size: 0,
@@ -1950,62 +2055,89 @@ module.exports = function visualEditorLoader(source) {
     {
       name: 'globals.css',
       path: 'src/app/globals.css',
-      content: `/* Base styles - Tailwind is loaded via CDN in layout.tsx */
-/* Anthropic Brand Colors */
-:root {
-  /* Main Colors */
-  --color-dark: #141413;
-  --color-light: #faf9f5;
-  --color-mid-gray: #b0aea5;
-  --color-light-gray: #e8e6dc;
+      content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  /* Accent Colors */
-  --color-accent-orange: #d97757;
-  --color-accent-blue: #6a9bcc;
-  --color-accent-green: #788c5d;
+/*
+ * =============================================================================
+ * NEXT.JS + TAILWIND CSS TEMPLATE
+ * =============================================================================
+ *
+ * STYLING GUIDE FOR AI:
+ * ---------------------
+ * 1. USE TAILWIND CLASSES FIRST: Always prefer Tailwind utility classes in JSX
+ *    Example: <div className="flex items-center justify-between p-4 bg-gray-100">
+ *
+ * 2. CUSTOM CSS HERE: Only add custom styles to this file when:
+ *    - You need complex animations not available in Tailwind
+ *    - You need CSS variables for theming
+ *    - You need styles that can't be expressed with utilities
+ *
+ * 3. AVAILABLE CUSTOM COLORS (in tailwind.config.ts):
+ *    - brand-dark: #181818 (dark backgrounds, text)
+ *    - brand-light: #fafafa (light backgrounds)
+ *    - brand-gray: #6b7280 (secondary text)
+ *    - brand-accent: #3b82f6 (primary accent - blue)
+ *    - brand-success: #10b981 (success states - green)
+ *    - brand-warning: #f59e0b (warning states - amber)
+ *    - brand-error: #ef4444 (error states - red)
+ *
+ * 4. FONTS:
+ *    - font-sans: Inter (default body text)
+ *    - font-heading: Inter with font-semibold or font-bold
+ *
+ * =============================================================================
+ */
+
+/* Base layer customizations */
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-gray-900;
+  }
+
+  a {
+    @apply text-brand-accent hover:text-blue-700 transition-colors;
+  }
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Component layer - reusable component styles */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-brand-accent text-white rounded-lg hover:bg-blue-700 transition-colors font-medium;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors font-medium;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent;
+  }
 }
 
-body {
-  font-family: 'Lora', Georgia, serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-light);
-  color: var(--color-dark);
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', Arial, sans-serif;
-  color: var(--color-dark);
-}
-
-a {
-  color: var(--color-accent-orange);
-  transition: color 0.2s ease-in-out;
-}
-
-a:hover {
-  color: var(--color-accent-blue);
-}
-
-/* Custom utility classes */
-.transition-base {
-  transition: all 0.2s ease-in-out;
+/* Utilities layer - custom utilities */
+@layer utilities {
+  .transition-base {
+    @apply transition-all duration-200 ease-in-out;
+  }
 }
 
 /* Dark mode support */
 .dark body {
-  background-color: var(--color-dark);
-  color: var(--color-light);
+  @apply bg-brand-dark text-white;
 }
 
 .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-  color: var(--color-light);
+  @apply text-white;
 }`,
       fileType: 'css',
       type: 'css',
@@ -2032,41 +2164,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Tailwind CSS via CDN */}
-        <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
-        <Script id="tailwind-config" strategy="beforeInteractive">
-          {\`
-            tailwind.config = {
-              darkMode: 'class',
-              theme: {
-                extend: {
-                  colors: {
-                    'brand-dark': '#141413',
-                    'brand-light': '#faf9f5',
-                    'brand-mid-gray': '#b0aea5',
-                    'brand-light-gray': '#e8e6dc',
-                    'brand-orange': '#d97757',
-                    'brand-blue': '#6a9bcc',
-                    'brand-green': '#788c5d',
-                  },
-                  fontFamily: {
-                    sans: ['Lora', 'Georgia', 'serif'],
-                    heading: ['Poppins', 'Arial', 'sans-serif'],
-                  },
-                }
-              }
-            }
-          \`}
-        </Script>
-
         {/* Google Fonts Preconnect */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
         {/* Google Fonts - Common font families */}
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-sans">
+      <body className="font-sans antialiased">
         {children}
         {/* Visual Editor Client - enables visual editing when loaded in pipilot.dev iframe */}
         <Script src="/visual-editor-client.js" strategy="afterInteractive" />
@@ -4785,83 +4890,122 @@ yarn-error.*
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My HTML Website</title>
-    <!-- Google Fonts - Anthropic Brand Typography -->
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-dark': '#181818',
+                        'brand-light': '#fafafa',
+                        'brand-gray': '#6b7280',
+                        'brand-accent': '#3b82f6',
+                        'brand-success': '#10b981',
+                        'brand-warning': '#f59e0b',
+                        'brand-error': '#ef4444',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS for additional styles -->
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <header>
-        <h1>Welcome to My Website</h1>
-        <nav>
-            <ul>
-                <li><a href="#home">Home</a></li>
-                <li><a href="#about">About</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </nav>
+<body class="bg-white text-gray-900 font-sans antialiased">
+    <!-- Header -->
+    <header class="bg-brand-dark text-white py-6">
+        <div class="max-w-6xl mx-auto px-4">
+            <h1 class="text-3xl font-bold mb-2">Welcome to My Website</h1>
+            <nav>
+                <ul class="flex flex-wrap gap-6 justify-center">
+                    <li><a href="#home" class="hover:text-brand-accent transition-colors">Home</a></li>
+                    <li><a href="#about" class="hover:text-brand-accent transition-colors">About</a></li>
+                    <li><a href="#contact" class="hover:text-brand-accent transition-colors">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
     </header>
 
-    <main>
-        <section id="home">
-            <h2>Home Section</h2>
-            <p>This is a modern HTML website with <strong>clean URLs</strong> and automatic Vercel rewrites!</p>
-            <p>Try these clean URLs:</p>
-            <ul style="text-align: left; display: inline-block; background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                <li><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">/contact</code> → Contact section</li>
-                <li><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">/about</code> → About section</li>
-                <li><code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">/home</code> → Home section</li>
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Home Section -->
+        <section id="home" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-brand-accent">Home Section</h2>
+            <p class="text-gray-700 mb-4">This is a modern HTML website built with <strong class="text-brand-accent">Tailwind CSS</strong> and automatic Vercel deployment!</p>
+            <p class="text-gray-700 mb-4">Features included:</p>
+            <ul class="text-left inline-block bg-gray-50 p-4 rounded-lg mb-4 text-gray-700">
+                <li class="mb-2"><code class="bg-gray-200 px-2 py-1 rounded text-sm">Tailwind CSS</code> - Utility-first styling</li>
+                <li class="mb-2"><code class="bg-gray-200 px-2 py-1 rounded text-sm">Custom CSS</code> - Additional styles in styles.css</li>
+                <li class="mb-2"><code class="bg-gray-200 px-2 py-1 rounded text-sm">Vercel Ready</code> - Zero-config deployment</li>
             </ul>
-            <p>Or use the old .html extensions - they'll automatically redirect to clean URLs!</p>
-            <button id="clickMe">Click Me!</button>
-            <p id="message"></p>
+            <div class="mt-6">
+                <button id="clickMe" class="bg-brand-accent text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Click Me!</button>
+                <p id="message" class="mt-4 text-brand-accent font-medium"></p>
+            </div>
         </section>
 
-        <section id="about">
-            <h2>About This Template</h2>
-            <p>This is a <strong>Vercel-optimized HTML website</strong> with automatic rewrites and intelligent routing.</p>
-            <div class="features-grid">
-                <div class="feature">
-                    <h3>🚀 Auto-Deployment</h3>
-                    <p>Deploy instantly to Vercel with zero configuration</p>
+        <!-- About Section -->
+        <section id="about" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-brand-accent">About This Template</h2>
+            <p class="text-gray-700 mb-6">This is a <strong>Tailwind CSS + HTML</strong> template optimized for quick development and easy deployment.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 hover:-translate-y-1 hover:shadow-lg transition-all">
+                    <h3 class="text-brand-accent font-semibold mb-2">Auto-Deployment</h3>
+                    <p class="text-gray-600 text-sm">Deploy instantly to Vercel with zero configuration</p>
                 </div>
-                <div class="feature">
-                    <h3>🔄 Smart Rewrites</h3>
-                    <p>All routes automatically serve the right content</p>
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 hover:-translate-y-1 hover:shadow-lg transition-all">
+                    <h3 class="text-brand-accent font-semibold mb-2">Tailwind CSS</h3>
+                    <p class="text-gray-600 text-sm">Utility-first CSS framework for rapid styling</p>
                 </div>
-                <div class="feature">
-                    <h3>📱 Responsive</h3>
-                    <p>Works perfectly on desktop, tablet, and mobile</p>
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 hover:-translate-y-1 hover:shadow-lg transition-all">
+                    <h3 class="text-brand-accent font-semibold mb-2">Responsive</h3>
+                    <p class="text-gray-600 text-sm">Works perfectly on desktop, tablet, and mobile</p>
                 </div>
-                <div class="feature">
-                    <h3>⚡ Fast Loading</h3>
-                    <p>Optimized assets with intelligent caching</p>
+                <div class="bg-gray-50 p-6 rounded-lg border border-gray-200 hover:-translate-y-1 hover:shadow-lg transition-all">
+                    <h3 class="text-brand-accent font-semibold mb-2">Fast Loading</h3>
+                    <p class="text-gray-600 text-sm">Optimized assets with intelligent caching</p>
                 </div>
             </div>
         </section>
 
-        <section id="contact">
-            <h2>Contact Section</h2>
-            <form id="contactForm">
-                <label for="name">Name:</label>
-                <input type="text" id="name" required>
-
-                <label for="email">Email:</label>
-                <input type="email" id="email" required>
-
-                <label for="message">Message:</label>
-                <textarea id="message" required></textarea>
-
-                <button type="submit">Send Message</button>
+        <!-- Contact Section -->
+        <section id="contact" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-brand-accent">Contact Section</h2>
+            <form id="contactForm" class="max-w-md space-y-4">
+                <div>
+                    <label for="name" class="block font-medium text-gray-700 mb-1">Name:</label>
+                    <input type="text" id="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent">
+                </div>
+                <div>
+                    <label for="email" class="block font-medium text-gray-700 mb-1">Email:</label>
+                    <input type="email" id="email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent">
+                </div>
+                <div>
+                    <label for="formMessage" class="block font-medium text-gray-700 mb-1">Message:</label>
+                    <textarea id="formMessage" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent min-h-[100px] resize-y"></textarea>
+                </div>
+                <button type="submit" class="bg-brand-accent text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">Send Message</button>
             </form>
         </section>
     </main>
 
-    <footer>
-        <p>&copy; 2024 My HTML Website. <strong>Auto-deployed to Vercel</strong> with intelligent rewrites 🚀</p>
-        <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">
-            Built with PiPilot AI - Deploy anywhere, rewrite everything!
+    <!-- Footer -->
+    <footer class="bg-brand-dark text-white text-center py-6">
+        <p>&copy; 2024 My HTML Website. Built with <strong class="text-brand-accent">Tailwind CSS</strong></p>
+        <p class="text-sm mt-2 opacity-80">
+            Built with PiPilot AI - Deploy anywhere!
         </p>
     </footer>
 
@@ -4876,207 +5020,93 @@ yarn-error.*
     {
       name: 'styles.css',
       path: 'styles.css',
-      content: `/* Anthropic Brand Colors */
-:root {
-    /* Main Colors */
-    --color-dark: #141413;
-    --color-light: #faf9f5;
-    --color-mid-gray: #b0aea5;
-    --color-light-gray: #e8e6dc;
+      content: `/*
+ * =============================================================================
+ * HTML + TAILWIND CSS TEMPLATE - CUSTOM STYLES
+ * =============================================================================
+ *
+ * STYLING GUIDE FOR AI:
+ * ---------------------
+ * 1. USE TAILWIND CLASSES FIRST: Always prefer Tailwind utility classes in HTML
+ *    Example: <div class="flex items-center justify-between p-4 bg-gray-100">
+ *
+ * 2. TAILWIND CDN IS LOADED IN index.html: The Tailwind CDN script is included
+ *    in the <head> section with a custom configuration.
+ *
+ * 3. CUSTOM CSS HERE: Only add styles to this file when:
+ *    - You need complex animations not available in Tailwind
+ *    - You need CSS variables for theming
+ *    - You need styles that can't be expressed with Tailwind utilities
+ *
+ * 4. AVAILABLE CUSTOM COLORS (configured in index.html):
+ *    - brand-dark: #181818 (dark backgrounds, text)
+ *    - brand-light: #fafafa (light backgrounds)
+ *    - brand-gray: #6b7280 (secondary text)
+ *    - brand-accent: #3b82f6 (primary accent - blue)
+ *    - brand-success: #10b981 (success states - green)
+ *    - brand-warning: #f59e0b (warning states - amber)
+ *    - brand-error: #ef4444 (error states - red)
+ *
+ * 5. FONTS: Inter is the default font (loaded via Google Fonts)
+ *
+ * =============================================================================
+ */
 
-    /* Accent Colors */
-    --color-accent-orange: #d97757;
-    --color-accent-blue: #6a9bcc;
-    --color-accent-green: #788c5d;
+/* Custom animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-/* Reset and base styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
-body {
-    font-family: 'Lora', Georgia, serif;
-    line-height: 1.6;
-    color: var(--color-dark);
-    background-color: var(--color-light);
-    margin: 0;
-    padding: 0;
+/* Utility classes for animations */
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
 }
 
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', Arial, sans-serif;
+.animate-pulse-slow {
+    animation: pulse 2s ease-in-out infinite;
 }
 
-/* Header styles */
-header {
-    background-color: var(--color-dark);
-    color: var(--color-light);
-    padding: 1rem 0;
-    text-align: center;
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
 
-header h1 {
-    margin-bottom: 0.5rem;
-    color: var(--color-light);
-}
-
-nav ul {
-    list-style: none;
-    padding: 0;
-}
-
-nav ul li {
-    display: inline;
-    margin: 0 1rem;
-}
-
-nav a {
-    color: var(--color-light);
-    text-decoration: none;
-    transition: color 0.3s;
-}
-
-nav a:hover {
-    color: var(--color-accent-orange);
-}
-
-/* Main content styles */
-main {
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 0 1rem;
-}
-
-section {
-    background-color: white;
-    margin-bottom: 2rem;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(20, 20, 19, 0.1);
-}
-
-section h2 {
-    color: var(--color-dark);
-    margin-bottom: 1rem;
-    border-bottom: 2px solid var(--color-accent-orange);
-    padding-bottom: 0.5rem;
-}
-
-/* Button styles */
-button {
-    background-color: var(--color-accent-orange);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
     border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-family: 'Poppins', Arial, sans-serif;
-    transition: background-color 0.3s;
 }
 
-button:hover {
-    background-color: var(--color-accent-blue);
-}
-
-/* Form styles */
-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    max-width: 500px;
-}
-
-label {
-    font-weight: bold;
-    font-family: 'Poppins', Arial, sans-serif;
-}
-
-input, textarea {
-    padding: 0.75rem;
-    border: 1px solid var(--color-light-gray);
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
     border-radius: 4px;
-    font-size: 1rem;
-    font-family: 'Lora', Georgia, serif;
 }
 
-input:focus, textarea:focus {
-    outline: none;
-    border-color: var(--color-accent-orange);
+::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
 }
 
-textarea {
-    resize: vertical;
-    min-height: 100px;
+/* Focus styles for accessibility */
+*:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
 }
 
-/* Features grid */
-.features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
-}
-
-.feature {
-    background-color: var(--color-light-gray);
-    padding: 1.5rem;
-    border-radius: 8px;
-    border: 1px solid var(--color-mid-gray);
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.feature:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(20, 20, 19, 0.15);
-}
-
-.feature h3 {
-    color: var(--color-accent-orange);
-    margin-bottom: 0.5rem;
-    font-size: 1.1rem;
-}
-
-.feature p {
-    color: var(--color-dark);
-    font-size: 0.9rem;
-    line-height: 1.4;
-}
-
-/* Footer styles */
-footer {
-    background-color: var(--color-dark);
-    color: var(--color-light);
-    text-align: center;
-    padding: 1.5rem;
-}
-
-/* Link styles */
-a {
-    color: var(--color-accent-orange);
-    transition: color 0.2s;
-}
-
-a:hover {
-    color: var(--color-accent-blue);
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-    main {
-        padding: 0 0.5rem;
+/* Print styles */
+@media print {
+    header, footer {
+        background: white !important;
+        color: black !important;
     }
 
-    section {
-        padding: 1rem;
-    }
-
-    nav ul li {
-        display: block;
-        margin: 0.5rem 0;
+    .no-print {
+        display: none !important;
     }
 }`,
       fileType: 'css',
@@ -5087,15 +5117,27 @@ a:hover {
     {
       name: 'script.js',
       path: 'script.js',
-      content: `// Simple JavaScript for interactivity
+      content: `/*
+ * =============================================================================
+ * HTML + TAILWIND CSS TEMPLATE - JAVASCRIPT
+ * =============================================================================
+ *
+ * JAVASCRIPT GUIDE FOR AI:
+ * ------------------------
+ * 1. Use modern ES6+ syntax (const, let, arrow functions, template literals)
+ * 2. Use querySelector/querySelectorAll for DOM selection
+ * 3. Add event listeners instead of inline onclick handlers
+ * 4. Use classList.add/remove/toggle for dynamic styling
+ * 5. For animations, prefer CSS classes over JS style manipulation
+ *
+ * =============================================================================
+ */
 
 // Button click event
 document.getElementById('clickMe').addEventListener('click', function() {
-    const message = document.getElementById('message');
-    message.textContent = '🎉 This site uses Vercel rewrites! All routes automatically serve the right content. Deployed with PiPilot AI! 🚀';
-    message.style.color = '#d97757';
-    message.style.fontWeight = 'bold';
-    message.style.fontSize = '1.1rem';
+    const messageEl = document.getElementById('message');
+    messageEl.textContent = 'Hello! This site is built with Tailwind CSS via CDN. Easy to style, easy to deploy!';
+    messageEl.classList.add('animate-fade-in');
 });
 
 // Form submission
@@ -5104,10 +5146,10 @@ document.getElementById('contactForm').addEventListener('submit', function(e) {
 
     const name = document.getElementById('name').value;
     const email = document.getElementById('email').value;
-    const message = document.getElementById('message').value;
+    const formMessage = document.getElementById('formMessage').value;
 
     // Simple validation
-    if (name && email && message) {
+    if (name && email && formMessage) {
         alert(\`Thank you \${name}! Your message has been sent. (This is a demo - no actual email was sent)\`);
         this.reset();
     } else {
@@ -5170,133 +5212,103 @@ document.addEventListener('DOMContentLoaded', function() {
     {
       name: 'README.md',
       path: 'README.md',
-      content: `# HTML Website - Vercel Ready
+      content: `# HTML + Tailwind CSS Template
 
-A modern, responsive HTML, CSS, and JavaScript website optimized for Vercel deployment with automatic rewrites.
+A modern, responsive HTML website powered by Tailwind CSS via CDN, ready for instant Vercel deployment.
 
-## 🚀 Features
+## AI STYLING GUIDE
 
-- **Responsive Design** - Works perfectly on all devices
-- **Modern CSS** - Flexbox, Grid, and smooth animations
-- **Interactive JavaScript** - Form handling and dynamic content
-- **Vercel Optimized** - Automatic rewrites and caching
-- **SEO Friendly** - Proper HTML structure and meta tags
-- **Security Headers** - Built-in security configurations
+**IMPORTANT FOR AI: Always prefer Tailwind utility classes over custom CSS.**
 
-## 📁 Project Structure
+### How to Style Elements
+
+1. **USE TAILWIND CLASSES** - Add utility classes directly in HTML:
+   \`\`\`html
+   <div class="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
+   <button class="bg-brand-accent text-white px-4 py-2 rounded hover:bg-blue-700">
+   \`\`\`
+
+2. **AVAILABLE CUSTOM COLORS** (configured in index.html):
+   - \`brand-dark\`: #181818 - Dark backgrounds, text
+   - \`brand-light\`: #fafafa - Light backgrounds
+   - \`brand-gray\`: #6b7280 - Secondary text
+   - \`brand-accent\`: #3b82f6 - Primary accent (blue)
+   - \`brand-success\`: #10b981 - Success states (green)
+   - \`brand-warning\`: #f59e0b - Warning states (amber)
+   - \`brand-error\`: #ef4444 - Error states (red)
+
+3. **CUSTOM CSS** - Only use styles.css when you need:
+   - Complex animations not in Tailwind
+   - CSS variables for theming
+   - Styles that can't be expressed with utilities
+
+### Common Tailwind Patterns
+
+**Buttons:**
+\`\`\`html
+<button class="bg-brand-accent text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+\`\`\`
+
+**Cards:**
+\`\`\`html
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+\`\`\`
+
+**Forms:**
+\`\`\`html
+<input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent">
+\`\`\`
+
+**Layout:**
+\`\`\`html
+<div class="max-w-6xl mx-auto px-4">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="flex items-center justify-between">
+\`\`\`
+
+## Project Structure
 
 \`\`\`
-├── index.html      # Main HTML page
-├── styles.css      # CSS styles with responsive design
-├── script.js       # Vanilla JavaScript for interactivity
-├── vercel.json     # Vercel deployment configuration
-├── package.json    # NPM scripts and dependencies
+├── index.html      # Main HTML with Tailwind CDN
+├── styles.css      # Custom CSS (animations, scrollbar, etc.)
+├── script.js       # Vanilla JavaScript
+├── vercel.json     # Vercel deployment config
+├── package.json    # NPM scripts
 └── README.md       # This file
 \`\`\`
 
-## 🛠️ Development
+## Development
 
-### Local Development
 \`\`\`bash
-# Install dependencies (optional, only for local server)
 npm install
-
-# Start development server
 npm run dev
-# or
-python3 -m http.server 3000
 \`\`\`
 
-### Build (No build required for HTML sites)
+## Deployment
+
+Push to GitHub and connect to Vercel - it auto-deploys!
+
+Or manually:
 \`\`\`bash
-npm run build
-\`\`\`
-
-## 🚀 Deployment to Vercel
-
-### Automatic Deployment
-1. Push this code to GitHub/GitLab
-2. Connect your repository to Vercel
-3. Vercel will automatically detect and deploy your HTML site with full rewrite support
-
-### Manual Deployment
-\`\`\`bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-npm run deploy
-# or
 vercel --prod
 \`\`\`
 
-## 🔄 Vercel Rewrites & Clean URLs
+## Responsive Design
 
-This template includes intelligent routing with **clean URL support**:
+Tailwind breakpoints:
+- \`sm:\` - 640px+
+- \`md:\` - 768px+
+- \`lg:\` - 1024px+
+- \`xl:\` - 1280px+
 
-- **Clean URLs**: \`/contact.html\` → \`/contact\` (automatic redirect)
-- **Static Assets**: JS, CSS, images are cached for 1 year
-- **API Routes**: \`/api/*\` routes are preserved for backend functionality
-- **SPA Routing**: All routes serve \`index.html\` with client-side navigation
-- **Security Headers**: XSS protection, content sniffing prevention, and more
-
-### Clean URL Examples:
-- \`yoursite.com/contact.html\` → \`yoursite.com/contact\`
-- \`yoursite.com/about.html\` → \`yoursite.com/about\`
-- \`yoursite.com/home.html\` → \`yoursite.com/home\`
-
-### Automatic Section Navigation:
-When users visit clean URLs, the page automatically:
-1. Updates the page title based on the section
-2. Smoothly scrolls to the relevant section
-3. Maintains browser history and bookmarkability
-
-### Rewrite Rules:
-- \`/api/*\` → Preserved for API calls
-- \`/*.js|*.css|*.png|*.jpg|*.svg\` → Cached static assets
-- \`/*\` → Serves \`index.html\` for client-side routing
-
-## 🎨 Customization
-
-### Styling
-Edit \`styles.css\` to customize the appearance. The design uses:
-- CSS Variables for easy theming
-- Flexbox and Grid for layouts
-- Smooth transitions and hover effects
-
-### Functionality
-Modify \`script.js\` to add new features:
-- Form validation
-- Dynamic content loading
-- Interactive elements
-- API integrations
-
-### Content
-Update \`index.html\` to change the content and structure.
-
-## 🌐 Browser Support
-
-- Chrome/Edge 88+
-- Firefox 85+
-- Safari 14+
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
-## 📱 Responsive Breakpoints
-
-- Mobile: < 768px
-- Tablet: 768px - 1024px
-- Desktop: > 1024px
-
-## 🔒 Security Features
-
-- Content Security Policy headers
-- XSS protection
-- Frame options (no iframes)
-- Strict referrer policy
+Example:
+\`\`\`html
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+\`\`\`
 
 ---
 
-Built with ❤️ by PiPilot AI - Deploy anywhere, scale everywhere!`,
+Built with PiPilot AI`,
       fileType: 'markdown',
       type: 'text',
       size: 0,
