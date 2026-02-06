@@ -301,8 +301,18 @@ export default visualEditorPlugin;
         darkMode: 'class',
         theme: {
           extend: {
+            colors: {
+              'brand-dark': '#141413',
+              'brand-light': '#faf9f5',
+              'brand-mid-gray': '#b0aea5',
+              'brand-light-gray': '#e8e6dc',
+              'brand-orange': '#d97757',
+              'brand-blue': '#6a9bcc',
+              'brand-green': '#788c5d',
+            },
             fontFamily: {
-              sans: ['Inter', 'system-ui', 'sans-serif'],
+              sans: ['Lora', 'Georgia', 'serif'],
+              heading: ['Poppins', 'Arial', 'sans-serif'],
             },
           }
         }
@@ -314,7 +324,7 @@ export default visualEditorPlugin;
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <!-- Google Fonts - Common font families -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
@@ -385,6 +395,20 @@ export default App`,
       name: 'index.css',
       path: 'src/index.css',
       content: `/* Base styles - Tailwind is loaded via CDN in index.html */
+/* Anthropic Brand Colors */
+:root {
+  /* Main Colors */
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+
+  /* Accent Colors */
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -392,9 +416,25 @@ export default App`,
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Lora', Georgia, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-light);
+  color: var(--color-dark);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', Arial, sans-serif;
+  color: var(--color-dark);
+}
+
+a {
+  color: var(--color-accent-orange);
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+  color: var(--color-accent-blue);
 }
 
 /* Custom utility classes */
@@ -404,8 +444,12 @@ body {
 
 /* Dark mode support */
 .dark body {
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: var(--color-dark);
+  color: var(--color-light);
+}
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: var(--color-light);
 }`,
       fileType: 'css',
       type: 'css',
@@ -1907,6 +1951,20 @@ module.exports = function visualEditorLoader(source) {
       name: 'globals.css',
       path: 'src/app/globals.css',
       content: `/* Base styles - Tailwind is loaded via CDN in layout.tsx */
+/* Anthropic Brand Colors */
+:root {
+  /* Main Colors */
+  --color-dark: #141413;
+  --color-light: #faf9f5;
+  --color-mid-gray: #b0aea5;
+  --color-light-gray: #e8e6dc;
+
+  /* Accent Colors */
+  --color-accent-orange: #d97757;
+  --color-accent-blue: #6a9bcc;
+  --color-accent-green: #788c5d;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -1914,9 +1972,25 @@ module.exports = function visualEditorLoader(source) {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Lora', Georgia, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-light);
+  color: var(--color-dark);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', Arial, sans-serif;
+  color: var(--color-dark);
+}
+
+a {
+  color: var(--color-accent-orange);
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+  color: var(--color-accent-blue);
 }
 
 /* Custom utility classes */
@@ -1926,8 +2000,12 @@ body {
 
 /* Dark mode support */
 .dark body {
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: var(--color-dark);
+  color: var(--color-light);
+}
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: var(--color-light);
 }`,
       fileType: 'css',
       type: 'css',
@@ -1962,8 +2040,18 @@ export default function RootLayout({
               darkMode: 'class',
               theme: {
                 extend: {
+                  colors: {
+                    'brand-dark': '#141413',
+                    'brand-light': '#faf9f5',
+                    'brand-mid-gray': '#b0aea5',
+                    'brand-light-gray': '#e8e6dc',
+                    'brand-orange': '#d97757',
+                    'brand-blue': '#6a9bcc',
+                    'brand-green': '#788c5d',
+                  },
                   fontFamily: {
-                    sans: ['Inter', 'system-ui', 'sans-serif'],
+                    sans: ['Lora', 'Georgia', 'serif'],
+                    heading: ['Poppins', 'Arial', 'sans-serif'],
                   },
                 }
               }
@@ -1976,7 +2064,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
         {/* Google Fonts - Common font families */}
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Lora:wght@400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-sans">
         {children}
@@ -4697,6 +4785,10 @@ yarn-error.*
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My HTML Website</title>
+    <!-- Google Fonts - Anthropic Brand Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -4784,7 +4876,21 @@ yarn-error.*
     {
       name: 'styles.css',
       path: 'styles.css',
-      content: `/* Reset and base styles */
+      content: `/* Anthropic Brand Colors */
+:root {
+    /* Main Colors */
+    --color-dark: #141413;
+    --color-light: #faf9f5;
+    --color-mid-gray: #b0aea5;
+    --color-light-gray: #e8e6dc;
+
+    /* Accent Colors */
+    --color-accent-orange: #d97757;
+    --color-accent-blue: #6a9bcc;
+    --color-accent-green: #788c5d;
+}
+
+/* Reset and base styles */
 * {
     margin: 0;
     padding: 0;
@@ -4792,24 +4898,29 @@ yarn-error.*
 }
 
 body {
-    font-family: 'Arial', sans-serif;
+    font-family: 'Lora', Georgia, serif;
     line-height: 1.6;
-    color: #333;
-    background-color: #f4f4f4;
+    color: var(--color-dark);
+    background-color: var(--color-light);
     margin: 0;
     padding: 0;
 }
 
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', Arial, sans-serif;
+}
+
 /* Header styles */
 header {
-    background-color: #2c3e50;
-    color: white;
+    background-color: var(--color-dark);
+    color: var(--color-light);
     padding: 1rem 0;
     text-align: center;
 }
 
 header h1 {
     margin-bottom: 0.5rem;
+    color: var(--color-light);
 }
 
 nav ul {
@@ -4823,13 +4934,13 @@ nav ul li {
 }
 
 nav a {
-    color: white;
+    color: var(--color-light);
     text-decoration: none;
     transition: color 0.3s;
 }
 
 nav a:hover {
-    color: #3498db;
+    color: var(--color-accent-orange);
 }
 
 /* Main content styles */
@@ -4844,30 +4955,31 @@ section {
     margin-bottom: 2rem;
     padding: 2rem;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 10px rgba(20, 20, 19, 0.1);
 }
 
 section h2 {
-    color: #2c3e50;
+    color: var(--color-dark);
     margin-bottom: 1rem;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid var(--color-accent-orange);
     padding-bottom: 0.5rem;
 }
 
 /* Button styles */
 button {
-    background-color: #3498db;
+    background-color: var(--color-accent-orange);
     color: white;
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 4px;
     cursor: pointer;
     font-size: 1rem;
+    font-family: 'Poppins', Arial, sans-serif;
     transition: background-color 0.3s;
 }
 
 button:hover {
-    background-color: #2980b9;
+    background-color: var(--color-accent-blue);
 }
 
 /* Form styles */
@@ -4880,13 +4992,20 @@ form {
 
 label {
     font-weight: bold;
+    font-family: 'Poppins', Arial, sans-serif;
 }
 
 input, textarea {
     padding: 0.75rem;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-light-gray);
     border-radius: 4px;
     font-size: 1rem;
+    font-family: 'Lora', Georgia, serif;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--color-accent-orange);
 }
 
 textarea {
@@ -4903,28 +5022,46 @@ textarea {
 }
 
 .feature {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--color-light-gray);
     padding: 1.5rem;
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--color-mid-gray);
     transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .feature:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 25px rgba(20, 20, 19, 0.15);
 }
 
 .feature h3 {
-    color: #3498db;
+    color: var(--color-accent-orange);
     margin-bottom: 0.5rem;
     font-size: 1.1rem;
 }
 
 .feature p {
-    color: #666;
+    color: var(--color-dark);
     font-size: 0.9rem;
     line-height: 1.4;
+}
+
+/* Footer styles */
+footer {
+    background-color: var(--color-dark);
+    color: var(--color-light);
+    text-align: center;
+    padding: 1.5rem;
+}
+
+/* Link styles */
+a {
+    color: var(--color-accent-orange);
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: var(--color-accent-blue);
 }
 
 /* Responsive design */
@@ -4956,7 +5093,7 @@ textarea {
 document.getElementById('clickMe').addEventListener('click', function() {
     const message = document.getElementById('message');
     message.textContent = '🎉 This site uses Vercel rewrites! All routes automatically serve the right content. Deployed with PiPilot AI! 🚀';
-    message.style.color = '#3498db';
+    message.style.color = '#d97757';
     message.style.fontWeight = 'bold';
     message.style.fontSize = '1.1rem';
 });
