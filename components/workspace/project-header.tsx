@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud, Check, X, Loader2 } from "lucide-react"
+import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -79,11 +79,6 @@ export function ProjectHeader({
   const [isCreating, setIsCreating] = useState(false)
   const [gitHubConnected, setGitHubConnected] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
-  // Deployment slug states
-  const [deploymentSlug, setDeploymentSlug] = useState("")
-  const [isCheckingSlug, setIsCheckingSlug] = useState(false)
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
-  const [slugError, setSlugError] = useState<string | null>(null)
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
@@ -130,66 +125,6 @@ export function ProjectHeader({
       setSelectedTemplate('vite-react')
     }
   }, [initialName, initialDescription, openDialog])
-
-  // Check slug availability with debounce
-  useEffect(() => {
-    if (!deploymentSlug.trim()) {
-      setSlugAvailable(null)
-      setSlugError(null)
-      return
-    }
-
-    const normalizedSlug = deploymentSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-
-    if (normalizedSlug.length < 3) {
-      setSlugAvailable(false)
-      setSlugError('Slug must be at least 3 characters')
-      return
-    }
-
-    const timeoutId = setTimeout(async () => {
-      setIsCheckingSlug(true)
-      setSlugError(null)
-
-      try {
-        const response = await fetch('/api/check-slug', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug: normalizedSlug })
-        })
-
-        const data = await response.json()
-        setSlugAvailable(data.available)
-        if (!data.available && data.reason) {
-          setSlugError(data.reason)
-        }
-      } catch (error) {
-        console.error('Error checking slug:', error)
-        setSlugError('Failed to check availability')
-      } finally {
-        setIsCheckingSlug(false)
-      }
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timeoutId)
-  }, [deploymentSlug])
-
-  // Auto-generate slug from project name
-  useEffect(() => {
-    if (newProjectName && !deploymentSlug) {
-      const autoSlug = newProjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-      setDeploymentSlug(autoSlug)
-    }
-  }, [newProjectName])
-
-  // Reset slug when dialog closes
-  useEffect(() => {
-    if (!isCreateDialogOpen) {
-      setDeploymentSlug("")
-      setSlugAvailable(null)
-      setSlugError(null)
-    }
-  }, [isCreateDialogOpen])
 
   const handleShareClick = async () => {
     if (!project) return
@@ -266,16 +201,6 @@ export function ProjectHeader({
   const handleCreateProject = async () => {
     if (!newProjectName.trim() || !user) return
 
-    // Check if slug is available before creating
-    if (deploymentSlug && slugAvailable === false) {
-      toast({
-        title: "Slug Not Available",
-        description: slugError || "Please choose a different deployment slug",
-        variant: "destructive"
-      })
-      return
-    }
-
     setIsCreating(true)
 
     try {
@@ -283,10 +208,8 @@ export function ProjectHeader({
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
 
-      // Use custom deployment slug if provided, otherwise generate from project name
-      const slug = deploymentSlug.trim()
-        ? deploymentSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-        : newProjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      // Auto-generate slug from project name
+      const slug = newProjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
       const workspace = await storageManager.createWorkspace({
         name: newProjectName,
@@ -312,7 +235,6 @@ export function ProjectHeader({
       onDialogOpenChange?.(false)
       setNewProjectName("")
       setNewProjectDescription("")
-      setDeploymentSlug("")
       // Notify parent to refresh projects
       if (onProjectCreated && workspace) {
         await onProjectCreated(workspace)
@@ -389,35 +311,9 @@ export function ProjectHeader({
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="slug">Deployment Slug (Optional)</Label>
-                  <div className="relative">
-                    <Input
-                      id="slug"
-                      placeholder="my-awesome-app"
-                      value={deploymentSlug}
-                      onChange={(e) => setDeploymentSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                      className={`pr-10 ${slugAvailable === true ? 'border-green-500' : slugAvailable === false ? 'border-red-500' : ''}`}
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {isCheckingSlug && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                      {!isCheckingSlug && slugAvailable === true && <Check className="h-4 w-4 text-green-500" />}
-                      {!isCheckingSlug && slugAvailable === false && <X className="h-4 w-4 text-red-500" />}
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {slugError ? (
-                      <span className="text-red-500">{slugError}</span>
-                    ) : deploymentSlug ? (
-                      <>Your site will be at: <span className="font-mono">{deploymentSlug}.pipilot.dev</span></>
-                    ) : (
-                      "Leave blank to auto-generate from project name"
-                    )}
-                  </p>
-                </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating || (deploymentSlug && slugAvailable === false)}>
+                <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
                   {isCreating ? "Creating..." : "Create Project"}
                 </Button>
               </DialogFooter>
