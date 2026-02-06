@@ -14,10 +14,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles } from "lucide-react";
+import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles, Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ComponentProps, ReactNode } from "react";
-import React, { createContext, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef, useMemo } from "react";
+import { Console as ConsoleFeed } from "console-feed";
+import type { Message as ConsoleFeedMessage } from "console-feed/lib/definitions/Component";
 
 export type DevicePreset = {
   name: string;
@@ -485,12 +487,98 @@ export type ConsoleLogEntry = {
   timestamp: Date;
 };
 
+// Serialized argument format from visual-editor-client.js
+export type SerializedArg = {
+  type: 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'object' | 'array' | 'function' | 'error' | 'date' | 'regexp' | 'symbol' | 'bigint' | 'html';
+  value: any;
+};
+
+// Raw browser log format from visual-editor-client.js
+export type RawBrowserLog = {
+  method: string;
+  data: SerializedArg[];
+  timestamp: string;
+  id: string;
+};
+
 export type WebPreviewConsoleProps = ComponentProps<"div"> & {
   logs?: Array<ConsoleLogEntry>;
   terminalLogs?: string[];
   browserLogs?: string[];
   onAskAiToFix?: (errors: string[]) => void;
+  onClearBrowserLogs?: () => void;
 };
+
+// Deserialize an argument from visual-editor-client.js format to console-feed format
+function deserializeArg(arg: SerializedArg): any {
+  if (!arg || typeof arg !== 'object') return arg;
+
+  switch (arg.type) {
+    case 'null': return null;
+    case 'undefined': return undefined;
+    case 'string': return arg.value;
+    case 'number':
+      if (arg.value === 'NaN') return NaN;
+      if (arg.value === 'Infinity') return Infinity;
+      if (arg.value === '-Infinity') return -Infinity;
+      return arg.value;
+    case 'boolean': return arg.value;
+    case 'symbol': return Symbol.for(arg.value);
+    case 'bigint': return BigInt(arg.value);
+    case 'function': return { __isFunction: true, source: arg.value };
+    case 'date': return new Date(arg.value);
+    case 'regexp': return arg.value; // Keep as string representation
+    case 'error':
+      const err = new Error(arg.value?.message || 'Unknown error');
+      err.name = arg.value?.name || 'Error';
+      err.stack = arg.value?.stack;
+      return err;
+    case 'array':
+      return Array.isArray(arg.value) ? arg.value.map(deserializeArg) : [];
+    case 'object':
+      if (typeof arg.value === 'object' && arg.value !== null) {
+        const obj: Record<string, any> = {};
+        for (const key of Object.keys(arg.value)) {
+          obj[key] = deserializeArg(arg.value[key]);
+        }
+        return obj;
+      }
+      return arg.value;
+    case 'html':
+      return { __isHTML: true, ...arg.value };
+    default:
+      return arg.value;
+  }
+}
+
+// Convert raw browser log to console-feed format
+function toConsoleFeedLog(rawLog: RawBrowserLog): ConsoleFeedMessage {
+  const deserializedData = rawLog.data.map(deserializeArg);
+
+  return {
+    method: rawLog.method as ConsoleFeedMessage['method'],
+    data: deserializedData,
+    id: rawLog.id,
+  };
+}
+
+// Extract error message from serialized data for "Ask AI to Fix"
+function extractErrorMessage(data: SerializedArg[]): string {
+  return data.map(arg => {
+    if (arg.type === 'error') {
+      return `${arg.value?.name || 'Error'}: ${arg.value?.message || 'Unknown error'}${arg.value?.stack ? '\n' + arg.value.stack : ''}`;
+    }
+    if (arg.type === 'string') return arg.value;
+    if (arg.type === 'object' || arg.type === 'array') {
+      try {
+        return JSON.stringify(arg.value);
+      } catch {
+        return String(arg.value);
+      }
+    }
+    return String(arg.value);
+  }).join(' ');
+}
 
 export const WebPreviewConsole = ({
   className,
@@ -498,37 +586,44 @@ export const WebPreviewConsole = ({
   terminalLogs = [],
   browserLogs = [],
   onAskAiToFix,
+  onClearBrowserLogs,
   children,
   ...props
 }: WebPreviewConsoleProps) => {
   const { consoleOpen, setConsoleOpen } = useWebPreview();
   const [activeTab, setActiveTab] = useState<"terminal" | "browser">("terminal");
 
-  // Parse browser logs from JSON strings
-  const parsedBrowserLogs = browserLogs.map((log, index) => {
-    try {
-      const parsed = JSON.parse(log);
-      return {
-        ...parsed,
-        timestamp: new Date(parsed.timestamp),
-        index
-      };
-    } catch {
-      return {
-        level: 'log' as const,
-        message: log,
-        timestamp: new Date(),
-        index
-      };
-    }
-  });
+  // Parse browser logs from JSON strings to raw format
+  const parsedRawLogs = useMemo(() => {
+    return browserLogs.map((log, index) => {
+      try {
+        const parsed = JSON.parse(log) as RawBrowserLog;
+        return parsed;
+      } catch {
+        // Legacy format fallback
+        return {
+          method: 'log',
+          data: [{ type: 'string' as const, value: log }],
+          timestamp: new Date().toISOString(),
+          id: `legacy-${index}`
+        } as RawBrowserLog;
+      }
+    });
+  }, [browserLogs]);
+
+  // Convert to console-feed format
+  const consoleFeedLogs = useMemo(() => {
+    return parsedRawLogs.map(toConsoleFeedLog);
+  }, [parsedRawLogs]);
 
   // Get error logs for "Ask AI to Fix" button
-  const errorLogs = parsedBrowserLogs.filter(log => log.level === 'error');
+  const errorLogs = useMemo(() => {
+    return parsedRawLogs.filter(log => log.method === 'error' || log.method === 'assert');
+  }, [parsedRawLogs]);
 
   const handleAskAiToFix = () => {
     if (onAskAiToFix && errorLogs.length > 0) {
-      const errorMessages = errorLogs.map(log => log.message);
+      const errorMessages = errorLogs.map(log => extractErrorMessage(log.data));
       onAskAiToFix(errorMessages);
     }
   };
@@ -582,17 +677,30 @@ export const WebPreviewConsole = ({
                 )}
               </TabsTrigger>
             </TabsList>
-            {activeTab === "browser" && errorLogs.length > 0 && onAskAiToFix && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
-                onClick={handleAskAiToFix}
-              >
-                <Sparkles className="h-3 w-3" />
-                Ask AI to Fix
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {activeTab === "browser" && errorLogs.length > 0 && onAskAiToFix && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
+                  onClick={handleAskAiToFix}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Ask AI to Fix
+                </Button>
+              )}
+              {activeTab === "browser" && consoleFeedLogs.length > 0 && onClearBrowserLogs && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={onClearBrowserLogs}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
 
           <TabsContent value="terminal" className="mt-0">
@@ -628,34 +736,19 @@ export const WebPreviewConsole = ({
           </TabsContent>
 
           <TabsContent value="browser" className="mt-0">
-            <div className="max-h-48 space-y-1 overflow-y-auto">
-              {parsedBrowserLogs.length === 0 ? (
-                <p className="text-muted-foreground text-xs">No browser console output</p>
+            <div className="max-h-64 overflow-y-auto rounded bg-[#242424]">
+              {consoleFeedLogs.length === 0 ? (
+                <p className="text-muted-foreground text-xs p-3">No browser console output</p>
               ) : (
-                parsedBrowserLogs.map((log) => (
-                  <div
-                    className={cn(
-                      "text-xs",
-                      log.level === "error" && "text-destructive",
-                      log.level === "warn" && "text-yellow-600",
-                      (log.level === "log" || log.level === "info") && "text-foreground"
-                    )}
-                    key={`browser-${log.index}`}
-                  >
-                    <span className="text-muted-foreground">
-                      {log.timestamp.toLocaleTimeString()}
-                    </span>{" "}
-                    <span className={cn(
-                      "inline-block px-1 rounded text-[10px] mr-1",
-                      log.level === "error" && "bg-destructive/20",
-                      log.level === "warn" && "bg-yellow-500/20",
-                      (log.level === "log" || log.level === "info") && "bg-muted"
-                    )}>
-                      {log.level.toUpperCase()}
-                    </span>
-                    {log.message}
-                  </div>
-                ))
+                <ConsoleFeed
+                  logs={consoleFeedLogs}
+                  variant="dark"
+                  styles={{
+                    BASE_FONT_SIZE: 12,
+                    LOG_ICON_WIDTH: 14,
+                    LOG_ICON_HEIGHT: 14,
+                  }}
+                />
               )}
             </div>
           </TabsContent>

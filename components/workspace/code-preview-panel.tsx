@@ -1067,23 +1067,35 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         // Handle legacy console messages
         if (event.data.type === 'console') {
           addConsoleLog(event.data.message, 'browser')
-          // Also add to browserLogs for the Browser tab
+          // Also add to browserLogs for the Browser tab (legacy format)
           const level = event.data.level || 'log'
           setBrowserLogs(prev => [...prev, JSON.stringify({
-            level,
-            message: event.data.message,
-            timestamp: new Date().toISOString()
+            method: level,
+            data: [{ type: 'string', value: event.data.message }],
+            timestamp: new Date().toISOString(),
+            id: `legacy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           })])
         }
-        // Handle new BROWSER_CONSOLE_LOG from visual-editor-client.js
+        // Handle new BROWSER_CONSOLE_LOG from visual-editor-client.js (console-feed compatible)
         if (event.data.type === 'BROWSER_CONSOLE_LOG') {
-          const { level, message, timestamp } = event.data.payload
-          addConsoleLog(message, 'browser')
-          // Add to browserLogs for the Browser tab
+          const { method, data, timestamp, id } = event.data.payload
+          // Extract a simple message for the unified console log
+          const simpleMessage = data?.map((arg: any) => {
+            if (arg.type === 'string') return arg.value
+            if (arg.type === 'error') return `${arg.value?.name || 'Error'}: ${arg.value?.message || 'Unknown'}`
+            if (arg.type === 'object' || arg.type === 'array') {
+              try { return JSON.stringify(arg.value) } catch { return '[Object]' }
+            }
+            return String(arg.value ?? '')
+          }).join(' ') || ''
+
+          addConsoleLog(simpleMessage, 'browser')
+          // Add to browserLogs for the Browser tab (console-feed format)
           setBrowserLogs(prev => [...prev, JSON.stringify({
-            level: level || 'log',
-            message,
-            timestamp: timestamp || new Date().toISOString()
+            method: method || 'log',
+            data: data || [],
+            timestamp: timestamp || new Date().toISOString(),
+            id: id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           })])
         }
       }
@@ -3084,6 +3096,9 @@ export default function TodoApp() {
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
                   detail: { prompt, errors }
                 }))
+              }}
+              onClearBrowserLogs={() => {
+                setBrowserLogs([])
               }}
             />
           </WebPreview>

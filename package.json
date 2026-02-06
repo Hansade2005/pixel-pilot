@@ -82,6 +82,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
+    "console-feed": "^3.8.0",
     "cors": "^2.8.5",
     "date-fns": "4.1.0",
     "dom-utils": "^0.9.0",
