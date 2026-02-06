@@ -241,13 +241,15 @@ Follow project's routing pattern:
   • Use error.tsx for Next.js App Router or ErrorBoundary components
   • Graceful degradation strategies
 
-🎯 THEMING & CSS VARIABLES (CRITICAL FOR VISUAL EDITOR)
-  • **Tailwind CSS via CDN** - loaded in index.html, no build step required for styles
-  • **Use standard Tailwind utilities** - bg-white, bg-gray-100, text-gray-900, bg-blue-600, etc.
-  • **Dark mode**: Use Tailwind's dark: prefix (dark:bg-gray-900, dark:text-white)
-  • **Custom styles**: Add to src/index.css for anything beyond Tailwind utilities
-  • **Tailwind config**: Inline in index.html via tailwind.config object
-  • **Component styling**: Prefer Tailwind utilities directly in JSX/TSX
+🎯 TAILWIND CSS STYLING (CRITICAL - USE TAILWIND CLASSES!)
+  • **ALWAYS use Tailwind utility classes in JSX** - This is the PRIMARY styling method
+  • **Standard utilities**: bg-white, bg-gray-100, text-gray-900, bg-blue-600, border-gray-200, etc.
+  • **Responsive**: Use breakpoint prefixes: sm:, md:, lg:, xl: (e.g., md:grid-cols-2)
+  • **Dark mode**: Use dark: prefix (dark:bg-gray-900, dark:text-white)
+  • **Hover/Focus**: Use state prefixes (hover:bg-blue-700, focus:ring-2)
+  • **Custom colors available**: brand-dark, brand-light, brand-accent, brand-success, brand-warning, brand-error
+  • **Custom CSS**: ONLY use index.css/globals.css for complex animations or CSS that can't be expressed with Tailwind
+  • **Component styling**: Prefer Tailwind utilities directly in className - avoid inline styles
   • User-friendly error messages (no stack traces to users)
   • Loading states for all async operations (loading.tsx for Next.js or Suspense)
   • Empty states and zero-data scenarios
@@ -3045,15 +3047,46 @@ const { theme, setTheme } = useTheme();
 - **Error Handling**: Implement proper error boundaries and user-friendly error messages
 - **Loading States**: Add skeleton loaders and progress indicators for better UX
 
-## 🎨 Tailwind CSS via CDN (Vite Projects)
-**Tailwind CSS is loaded via CDN in index.html for rapid styling:**
-- **Use standard Tailwind utilities**: \`bg-white\`, \`bg-gray-100\`, \`text-gray-900\`, \`bg-blue-600\`, \`border-gray-200\`, etc.
-- **Dark mode**: Use Tailwind's \`dark:\` prefix: \`dark:bg-gray-900\`, \`dark:text-white\`, \`dark:border-gray-700\`
-- **Custom config**: Inline in index.html via \`tailwind.config\` object
-- **Custom styles**: Add to \`src/index.css\` for anything beyond Tailwind utilities
-- **No build step**: Tailwind processes classes at runtime via CDN
-- **Component patterns**: \`bg-white border border-gray-200 rounded-lg shadow-sm\`, \`bg-blue-600 text-white hover:bg-blue-700\`
-- **Responsive design**: Use Tailwind breakpoints: \`sm:\`, \`md:\`, \`lg:\`, \`xl:\`
+## 🎨 Tailwind CSS Styling Guide
+
+**CRITICAL: ALWAYS use Tailwind utility classes as the PRIMARY styling method!**
+
+### Template Setup:
+- **Vite/Next.js**: Proper Tailwind setup with tailwind.config.js/ts, postcss.config.js
+- **HTML template**: Tailwind CDN in index.html for quick prototyping
+
+### Usage Rules:
+1. **USE TAILWIND CLASSES IN JSX/HTML** - This is the primary way to style:
+   \`\`\`jsx
+   <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow-sm">
+   <button className="bg-brand-accent text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+   \`\`\`
+
+2. **Available Custom Colors** (in tailwind.config):
+   - \`brand-dark\`: #181818 - Dark backgrounds, text
+   - \`brand-light\`: #fafafa - Light backgrounds
+   - \`brand-accent\`: #3b82f6 - Primary accent (blue)
+   - \`brand-success\`: #10b981 - Success (green)
+   - \`brand-warning\`: #f59e0b - Warning (amber)
+   - \`brand-error\`: #ef4444 - Error (red)
+
+3. **Responsive Design**: Use breakpoint prefixes: \`sm:\`, \`md:\`, \`lg:\`, \`xl:\`
+   \`\`\`jsx
+   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+   \`\`\`
+
+4. **Dark Mode**: Use \`dark:\` prefix: \`dark:bg-gray-900\`, \`dark:text-white\`
+
+5. **Custom CSS**: ONLY use index.css/globals.css for:
+   - Complex animations not in Tailwind
+   - CSS variables for advanced theming
+   - Styles that truly can't be expressed with utilities
+
+### Common Patterns:
+- **Cards**: \`bg-white rounded-xl shadow-sm border border-gray-200 p-6\`
+- **Buttons**: \`bg-brand-accent text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors\`
+- **Inputs**: \`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent\`
+- **Layout**: \`max-w-6xl mx-auto px-4\`, \`flex items-center justify-between\`
 ## 🚫 Critical Non-Negotiables
 - ❌ No HTML comments in TypeScript/JSX files
 - 📚 Always study existing code before making changes
