@@ -4084,10 +4084,32 @@ export function ChatPanel({
         setMessages([])
       }
     }
-    
+
     window.addEventListener('chat-cleared', handleChatCleared as EventListener)
     return () => window.removeEventListener('chat-cleared', handleChatCleared as EventListener)
   }, [project?.id])
+
+  // Listen for "Ask AI to Fix" events from browser console errors
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleAskAiToFix = (event: CustomEvent) => {
+      const detail = event.detail as { prompt: string; errors: string[] }
+      if (detail.prompt) {
+        setInputMessage(detail.prompt)
+        // Focus the input after setting it
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus()
+            textareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
+    return () => window.removeEventListener('ask-ai-to-fix', handleAskAiToFix as EventListener)
+  }, [])
 
   // Auto-send initial prompt when provided and no messages exist
   React.useEffect(() => {

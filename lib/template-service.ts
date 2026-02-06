@@ -562,7 +562,7 @@ export default {
  */
 (function() {
   'use strict';
-  
+
   // Only run in iframe context
   if (window === window.parent) {
     console.log('[VE-Client] Not in iframe, skipping initialization');
@@ -579,7 +579,7 @@ export default {
     'http://127.0.0.1:3000',
     'http://localhost:5173',
   ];
-  
+
   // Check if origin is allowed (supports wildcards for subdomains)
   function isAllowedOrigin(origin) {
     if (!origin) return false;
@@ -591,6 +591,213 @@ export default {
     if (origin.endsWith('.e2b.app')) return true;
     return false;
   }
+
+  // ============================================
+  // CONSOLE CAPTURE - Intercept and forward browser console logs
+  // Compatible with console-feed library format
+  // ============================================
+  (function setupConsoleCapture() {
+    var originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info,
+      debug: console.debug,
+      table: console.table,
+      clear: console.clear,
+      time: console.time,
+      timeEnd: console.timeEnd,
+      count: console.count,
+      assert: console.assert
+    };
+
+    // Serialize an argument for cross-origin transfer
+    // This creates a format compatible with console-feed
+    function serializeArg(arg, depth) {
+      if (depth === undefined) depth = 0;
+      if (depth > 5) return { type: 'string', value: '[Max depth reached]' };
+
+      if (arg === null) return { type: 'null', value: null };
+      if (arg === undefined) return { type: 'undefined', value: undefined };
+
+      var type = typeof arg;
+
+      if (type === 'string') return { type: 'string', value: arg };
+      if (type === 'number') {
+        if (isNaN(arg)) return { type: 'number', value: 'NaN' };
+        if (!isFinite(arg)) return { type: 'number', value: arg > 0 ? 'Infinity' : '-Infinity' };
+        return { type: 'number', value: arg };
+      }
+      if (type === 'boolean') return { type: 'boolean', value: arg };
+      if (type === 'symbol') return { type: 'symbol', value: arg.toString() };
+      if (type === 'bigint') return { type: 'bigint', value: arg.toString() };
+      if (type === 'function') return { type: 'function', value: arg.toString().substring(0, 200) };
+
+      if (arg instanceof Error) {
+        return {
+          type: 'error',
+          value: {
+            name: arg.name,
+            message: arg.message,
+            stack: arg.stack
+          }
+        };
+      }
+
+      if (arg instanceof Date) {
+        return { type: 'date', value: arg.toISOString() };
+      }
+
+      if (arg instanceof RegExp) {
+        return { type: 'regexp', value: arg.toString() };
+      }
+
+      if (Array.isArray(arg)) {
+        try {
+          var arr = [];
+          for (var i = 0; i < Math.min(arg.length, 100); i++) {
+            arr.push(serializeArg(arg[i], depth + 1));
+          }
+          if (arg.length > 100) arr.push({ type: 'string', value: '... ' + (arg.length - 100) + ' more items' });
+          return { type: 'array', value: arr };
+        } catch (e) {
+          return { type: 'string', value: '[Array]' };
+        }
+      }
+
+      if (arg instanceof HTMLElement) {
+        return {
+          type: 'html',
+          value: {
+            tagName: arg.tagName.toLowerCase(),
+            id: arg.id || undefined,
+            className: arg.className || undefined,
+            outerHTML: arg.outerHTML.substring(0, 500)
+          }
+        };
+      }
+
+      if (type === 'object') {
+        try {
+          var obj = {};
+          var keys = Object.keys(arg).slice(0, 50);
+          for (var j = 0; j < keys.length; j++) {
+            var key = keys[j];
+            obj[key] = serializeArg(arg[key], depth + 1);
+          }
+          return { type: 'object', value: obj };
+        } catch (e) {
+          return { type: 'string', value: '[Object]' };
+        }
+      }
+
+      return { type: 'string', value: String(arg) };
+    }
+
+    function sendConsoleLog(method, args) {
+      try {
+        var argsArray = Array.prototype.slice.call(args);
+        // Skip VE-Client's own logs to avoid noise
+        if (argsArray.length > 0 && typeof argsArray[0] === 'string' && argsArray[0].indexOf('[VE-Client]') === 0) {
+          return;
+        }
+
+        var serializedData = argsArray.map(function(arg) {
+          return serializeArg(arg, 0);
+        });
+
+        window.parent.postMessage({
+          type: 'BROWSER_CONSOLE_LOG',
+          payload: {
+            method: method,
+            data: serializedData,
+            timestamp: new Date().toISOString(),
+            id: Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+          }
+        }, '*');
+      } catch (e) {
+        // Silently fail if postMessage fails
+      }
+    }
+
+    console.log = function() {
+      sendConsoleLog('log', arguments);
+      originalConsole.log.apply(console, arguments);
+    };
+
+    console.warn = function() {
+      sendConsoleLog('warn', arguments);
+      originalConsole.warn.apply(console, arguments);
+    };
+
+    console.error = function() {
+      sendConsoleLog('error', arguments);
+      originalConsole.error.apply(console, arguments);
+    };
+
+    console.info = function() {
+      sendConsoleLog('info', arguments);
+      originalConsole.info.apply(console, arguments);
+    };
+
+    console.debug = function() {
+      sendConsoleLog('debug', arguments);
+      originalConsole.debug.apply(console, arguments);
+    };
+
+    console.table = function() {
+      sendConsoleLog('table', arguments);
+      originalConsole.table.apply(console, arguments);
+    };
+
+    console.clear = function() {
+      sendConsoleLog('clear', []);
+      originalConsole.clear.apply(console, arguments);
+    };
+
+    console.time = function(label) {
+      sendConsoleLog('time', [label || 'default']);
+      originalConsole.time.apply(console, arguments);
+    };
+
+    console.timeEnd = function(label) {
+      sendConsoleLog('timeEnd', [label || 'default']);
+      originalConsole.timeEnd.apply(console, arguments);
+    };
+
+    console.count = function(label) {
+      sendConsoleLog('count', [label || 'default']);
+      originalConsole.count.apply(console, arguments);
+    };
+
+    console.assert = function(assertion) {
+      if (!assertion) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        args.unshift('Assertion failed:');
+        sendConsoleLog('assert', args);
+      }
+      originalConsole.assert.apply(console, arguments);
+    };
+
+    // Capture unhandled errors
+    window.addEventListener('error', function(event) {
+      sendConsoleLog('error', [{
+        name: 'UncaughtError',
+        message: event.message,
+        stack: 'at ' + event.filename + ':' + event.lineno + ':' + event.colno
+      }]);
+    });
+
+    // Capture unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+      var reason = event.reason;
+      if (reason instanceof Error) {
+        sendConsoleLog('error', [reason]);
+      } else {
+        sendConsoleLog('error', ['Unhandled Promise Rejection:', reason]);
+      }
+    });
+  })();
 
   // State
   let isEnabled = false;
@@ -2417,7 +2624,7 @@ export default function NotFound() {
  */
 (function() {
   'use strict';
-  
+
   // Only run in iframe context
   if (window === window.parent) {
     console.log('[VE-Client] Not in iframe, skipping initialization');
@@ -2434,7 +2641,7 @@ export default function NotFound() {
     'http://127.0.0.1:3000',
     'http://localhost:5173',
   ];
-  
+
   // Check if origin is allowed (supports wildcards for subdomains)
   function isAllowedOrigin(origin) {
     if (!origin) return false;
@@ -2446,6 +2653,213 @@ export default function NotFound() {
     if (origin.endsWith('.e2b.app')) return true;
     return false;
   }
+
+  // ============================================
+  // CONSOLE CAPTURE - Intercept and forward browser console logs
+  // Compatible with console-feed library format
+  // ============================================
+  (function setupConsoleCapture() {
+    var originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info,
+      debug: console.debug,
+      table: console.table,
+      clear: console.clear,
+      time: console.time,
+      timeEnd: console.timeEnd,
+      count: console.count,
+      assert: console.assert
+    };
+
+    // Serialize an argument for cross-origin transfer
+    // This creates a format compatible with console-feed
+    function serializeArg(arg, depth) {
+      if (depth === undefined) depth = 0;
+      if (depth > 5) return { type: 'string', value: '[Max depth reached]' };
+
+      if (arg === null) return { type: 'null', value: null };
+      if (arg === undefined) return { type: 'undefined', value: undefined };
+
+      var type = typeof arg;
+
+      if (type === 'string') return { type: 'string', value: arg };
+      if (type === 'number') {
+        if (isNaN(arg)) return { type: 'number', value: 'NaN' };
+        if (!isFinite(arg)) return { type: 'number', value: arg > 0 ? 'Infinity' : '-Infinity' };
+        return { type: 'number', value: arg };
+      }
+      if (type === 'boolean') return { type: 'boolean', value: arg };
+      if (type === 'symbol') return { type: 'symbol', value: arg.toString() };
+      if (type === 'bigint') return { type: 'bigint', value: arg.toString() };
+      if (type === 'function') return { type: 'function', value: arg.toString().substring(0, 200) };
+
+      if (arg instanceof Error) {
+        return {
+          type: 'error',
+          value: {
+            name: arg.name,
+            message: arg.message,
+            stack: arg.stack
+          }
+        };
+      }
+
+      if (arg instanceof Date) {
+        return { type: 'date', value: arg.toISOString() };
+      }
+
+      if (arg instanceof RegExp) {
+        return { type: 'regexp', value: arg.toString() };
+      }
+
+      if (Array.isArray(arg)) {
+        try {
+          var arr = [];
+          for (var i = 0; i < Math.min(arg.length, 100); i++) {
+            arr.push(serializeArg(arg[i], depth + 1));
+          }
+          if (arg.length > 100) arr.push({ type: 'string', value: '... ' + (arg.length - 100) + ' more items' });
+          return { type: 'array', value: arr };
+        } catch (e) {
+          return { type: 'string', value: '[Array]' };
+        }
+      }
+
+      if (arg instanceof HTMLElement) {
+        return {
+          type: 'html',
+          value: {
+            tagName: arg.tagName.toLowerCase(),
+            id: arg.id || undefined,
+            className: arg.className || undefined,
+            outerHTML: arg.outerHTML.substring(0, 500)
+          }
+        };
+      }
+
+      if (type === 'object') {
+        try {
+          var obj = {};
+          var keys = Object.keys(arg).slice(0, 50);
+          for (var j = 0; j < keys.length; j++) {
+            var key = keys[j];
+            obj[key] = serializeArg(arg[key], depth + 1);
+          }
+          return { type: 'object', value: obj };
+        } catch (e) {
+          return { type: 'string', value: '[Object]' };
+        }
+      }
+
+      return { type: 'string', value: String(arg) };
+    }
+
+    function sendConsoleLog(method, args) {
+      try {
+        var argsArray = Array.prototype.slice.call(args);
+        // Skip VE-Client's own logs to avoid noise
+        if (argsArray.length > 0 && typeof argsArray[0] === 'string' && argsArray[0].indexOf('[VE-Client]') === 0) {
+          return;
+        }
+
+        var serializedData = argsArray.map(function(arg) {
+          return serializeArg(arg, 0);
+        });
+
+        window.parent.postMessage({
+          type: 'BROWSER_CONSOLE_LOG',
+          payload: {
+            method: method,
+            data: serializedData,
+            timestamp: new Date().toISOString(),
+            id: Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+          }
+        }, '*');
+      } catch (e) {
+        // Silently fail if postMessage fails
+      }
+    }
+
+    console.log = function() {
+      sendConsoleLog('log', arguments);
+      originalConsole.log.apply(console, arguments);
+    };
+
+    console.warn = function() {
+      sendConsoleLog('warn', arguments);
+      originalConsole.warn.apply(console, arguments);
+    };
+
+    console.error = function() {
+      sendConsoleLog('error', arguments);
+      originalConsole.error.apply(console, arguments);
+    };
+
+    console.info = function() {
+      sendConsoleLog('info', arguments);
+      originalConsole.info.apply(console, arguments);
+    };
+
+    console.debug = function() {
+      sendConsoleLog('debug', arguments);
+      originalConsole.debug.apply(console, arguments);
+    };
+
+    console.table = function() {
+      sendConsoleLog('table', arguments);
+      originalConsole.table.apply(console, arguments);
+    };
+
+    console.clear = function() {
+      sendConsoleLog('clear', []);
+      originalConsole.clear.apply(console, arguments);
+    };
+
+    console.time = function(label) {
+      sendConsoleLog('time', [label || 'default']);
+      originalConsole.time.apply(console, arguments);
+    };
+
+    console.timeEnd = function(label) {
+      sendConsoleLog('timeEnd', [label || 'default']);
+      originalConsole.timeEnd.apply(console, arguments);
+    };
+
+    console.count = function(label) {
+      sendConsoleLog('count', [label || 'default']);
+      originalConsole.count.apply(console, arguments);
+    };
+
+    console.assert = function(assertion) {
+      if (!assertion) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        args.unshift('Assertion failed:');
+        sendConsoleLog('assert', args);
+      }
+      originalConsole.assert.apply(console, arguments);
+    };
+
+    // Capture unhandled errors
+    window.addEventListener('error', function(event) {
+      sendConsoleLog('error', [{
+        name: 'UncaughtError',
+        message: event.message,
+        stack: 'at ' + event.filename + ':' + event.lineno + ':' + event.colno
+      }]);
+    });
+
+    // Capture unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+      var reason = event.reason;
+      if (reason instanceof Error) {
+        sendConsoleLog('error', [reason]);
+      } else {
+        sendConsoleLog('error', ['Unhandled Promise Rejection:', reason]);
+      }
+    });
+  })();
 
   // State
   let isEnabled = false;

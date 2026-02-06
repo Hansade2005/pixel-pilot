@@ -1064,8 +1064,39 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       // Only accept messages from our preview iframe
       const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
       if (iframe && event.source === iframe.contentWindow) {
+        // Handle legacy console messages
         if (event.data.type === 'console') {
           addConsoleLog(event.data.message, 'browser')
+          // Also add to browserLogs for the Browser tab (legacy format)
+          const level = event.data.level || 'log'
+          setBrowserLogs(prev => [...prev, JSON.stringify({
+            method: level,
+            data: [{ type: 'string', value: event.data.message }],
+            timestamp: new Date().toISOString(),
+            id: `legacy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          })])
+        }
+        // Handle new BROWSER_CONSOLE_LOG from visual-editor-client.js (console-feed compatible)
+        if (event.data.type === 'BROWSER_CONSOLE_LOG') {
+          const { method, data, timestamp, id } = event.data.payload
+          // Extract a simple message for the unified console log
+          const simpleMessage = data?.map((arg: any) => {
+            if (arg.type === 'string') return arg.value
+            if (arg.type === 'error') return `${arg.value?.name || 'Error'}: ${arg.value?.message || 'Unknown'}`
+            if (arg.type === 'object' || arg.type === 'array') {
+              try { return JSON.stringify(arg.value) } catch { return '[Object]' }
+            }
+            return String(arg.value ?? '')
+          }).join(' ') || ''
+
+          addConsoleLog(simpleMessage, 'browser')
+          // Add to browserLogs for the Browser tab (console-feed format)
+          setBrowserLogs(prev => [...prev, JSON.stringify({
+            method: method || 'log',
+            data: data || [],
+            timestamp: timestamp || new Date().toISOString(),
+            id: id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          })])
         }
       }
     }
@@ -3056,6 +3087,19 @@ export default function TodoApp() {
                   timestamp
                 }
               })}
+              terminalLogs={consoleOutput}
+              browserLogs={browserLogs}
+              onAskAiToFix={(errors) => {
+                // Dispatch custom event to fill chat input with error debugging request
+                const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
+                const prompt = `Debug and fix these browser console errors:\n\n${errorList}\n\nPlease analyze these errors and provide fixes.`
+                window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
+                  detail: { prompt, errors }
+                }))
+              }}
+              onClearBrowserLogs={() => {
+                setBrowserLogs([])
+              }}
             />
           </WebPreview>
         </VisualEditorWrapper>
