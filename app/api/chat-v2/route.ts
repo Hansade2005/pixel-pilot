@@ -2108,8 +2108,8 @@ export async function POST(req: Request) {
 
   // Add overall request timeout to stay under Vercel's 300s limit
   const REQUEST_TIMEOUT_MS = 290000; // 290 seconds (5s buffer under 300s limit)
-  const STREAM_CONTINUE_THRESHOLD_MS = 260000; // 260 seconds - trigger continuation earlier for smoother UX
-  const WARNING_TIME_MS = 220000; // Warn at 220 seconds (70 seconds remaining)
+  const STREAM_CONTINUE_THRESHOLD_MS = 230000; // 230 seconds - trigger continuation with 70s buffer for reliable handoff
+  const WARNING_TIME_MS = 200000; // Warn at 200 seconds (100 seconds remaining)
   const controller = new AbortController();
   const requestTimeoutId = setTimeout(() => {
     controller.abort();
@@ -10534,19 +10534,57 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
             // ABE BILLING - Token-based credit deduction with AI SDK usage
             // ============================================================================
             console.log('[Chat-V2] 🔍 FINALLY BLOCK: Starting token-based billing...')
-            
+
             const responseTime = Date.now() - startTime
-            
+            const VERCEL_HARD_LIMIT_MS = 300000 // Vercel's absolute 300s limit
+            const elapsedMs = Date.now() - startTime
+            const remainingBeforeVercelTimeout = VERCEL_HARD_LIMIT_MS - elapsedMs
+
+            // EMERGENCY EXIT: If we're within 8 seconds of Vercel's hard limit, close immediately
+            if (remainingBeforeVercelTimeout < 8000) {
+              console.log(`[Chat-V2] 🚨 EMERGENCY: Only ${remainingBeforeVercelTimeout}ms remaining before Vercel timeout - closing stream immediately`)
+              controller.close()
+              return
+            }
+
+            // If we triggered continuation OR if we've exceeded the continuation threshold
+            // (which can happen if stream was blocked mid-generation), skip billing await
+            // Billing will be handled on the continuation request
+            if (shouldContinue || elapsedMs >= STREAM_CONTINUE_THRESHOLD_MS) {
+              console.log(`[Chat-V2] ⏭️ Skipping billing await - ${shouldContinue ? 'continuation triggered' : 'exceeded continuation threshold (' + elapsedMs + 'ms)'}, will bill on next request`)
+              controller.close()
+              return
+            }
+
+            // Calculate remaining time for billing operations
+            const remainingTimeMs = REQUEST_TIMEOUT_MS - elapsedMs
+            const billingTimeoutMs = Math.max(5000, Math.min(remainingTimeMs - 5000, 15000)) // 5-15 seconds, with 5s buffer
+
             try {
-              // Get total token usage from AI SDK (all steps combined)
-              const totalUsage = await result.usage
-              const stepsCount = (await result.steps).length
-              
+              // Get total token usage from AI SDK with timeout to prevent blocking
+              const billingPromise = (async () => {
+                const totalUsage = await result.usage
+                const stepsCount = (await result.steps).length
+                return { totalUsage, stepsCount }
+              })()
+
+              const timeoutPromise = new Promise<null>((_, reject) =>
+                setTimeout(() => reject(new Error(`Billing timeout after ${billingTimeoutMs}ms`)), billingTimeoutMs)
+              )
+
+              const billingData = await Promise.race([billingPromise, timeoutPromise])
+
+              if (!billingData) {
+                throw new Error('Billing timed out')
+              }
+
+              const { totalUsage, stepsCount } = billingData
+
               console.log(`[Chat-V2] 📊 Token Usage: ${totalUsage.inputTokens || 0} input + ${totalUsage.outputTokens || 0} output (${stepsCount} steps)`)
-              
+
               // Create server-side Supabase client for billing
               const supabase = await createClient()
-              
+
               // Deduct credits based on actual token usage
               const billingResult = await deductCreditsFromUsage(
                 authContext.userId,
@@ -10564,7 +10602,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
                 },
                 supabase
               )
-              
+
               if (billingResult.success) {
                 console.log(
                   `[Chat-V2] 💰 Deducted ${billingResult.creditsUsed} credits (${(totalUsage.inputTokens || 0) + (totalUsage.outputTokens || 0)} tokens). New balance: ${billingResult.newBalance} credits`
@@ -10576,7 +10614,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
               console.error('[Chat-V2] ⚠️ Error processing token-based billing:', usageError)
               // Fallback: still close the stream
             }
-            
+
             controller.close()
           }
         }
