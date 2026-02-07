@@ -1,7 +1,7 @@
 import { streamText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel } from '@/lib/ai-providers'
+import { getModel, getModelWithVision, requiresAnthropicImageFormat } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
@@ -22,7 +22,8 @@ export const config = {
 }
 
 // Get AI model by ID with fallback to default
-const getAIModel = (modelId?: string) => {
+// hasImages: when true, uses Anthropic provider for models that support vision via gateway (like Devstral)
+const getAIModel = (modelId?: string, hasImages: boolean = false) => {
   try {
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
     const modelInfo = getModelById(selectedModelId)
@@ -32,7 +33,13 @@ const getAIModel = (modelId?: string) => {
       return getModel(DEFAULT_CHAT_MODEL)
     }
 
-    console.log(`[Chat-V2] Using AI model: ${modelInfo.name} (${modelInfo.provider})`)
+    console.log(`[Chat-V2] Using AI model: ${modelInfo.name} (${modelInfo.provider})${hasImages ? ' with vision support' : ''}`)
+
+    // Use vision-capable provider for models that need special image handling
+    if (hasImages) {
+      return getModelWithVision(selectedModelId, true)
+    }
+
     return getModel(selectedModelId)
   } catch (error) {
     console.error('[Chat-V2] Failed to get AI model:', error)
@@ -3306,9 +3313,6 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
 
       console.log('[Chat-V2] 🔄 Recovery continuation mode - continuing from interrupted stream')
     }
-
-    // Get AI model
-    const model = getAIModel(modelId)
 
     // Validate messages
     if (!processedMessages || processedMessages.length === 0) {
@@ -10360,17 +10364,26 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
 
     const isAnthropicModel = anthropicModels.includes(modelId);
 
-    // Gateway models that support vision (Mistral Devstral, etc.)
-    const gatewayVisionModels = [
+    // Models that need Anthropic format for images (Devstral through Anthropic provider)
+    // These use Anthropic SDK format: { type: 'image', source: { type: 'base64', media_type: '...', data: '...' } }
+    const devstralModels = [
       'mistral/devstral-2',
       'mistral/devstral-small-2',
-      'google/gemini-2.5-flash',
-      'google/gemini-2.5-pro',
     ];
-    const isGatewayVisionModel = gatewayVisionModels.includes(modelId);
+    const isDevstralModel = devstralModels.includes(modelId);
+
+    // Detect if any message has images - we need this to select the right provider
+    const messagesHaveImages = processedMessages.some((msg: any) => {
+      if (msg.role !== 'user' || !Array.isArray(msg.content)) return false;
+      return msg.content.some((part: any) => part.type === 'image');
+    });
+
+    // For Devstral with images, we use Anthropic provider which requires Anthropic image format
+    const useAnthropicFormat = (isAnthropicModel || (isDevstralModel && messagesHaveImages));
+
+    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, useAnthropicFormat=${useAnthropicFormat}`);
 
     // Preprocess messages to handle image formats for different providers
-    // For gateway models, convert image format to OpenAI-compatible format explicitly
     const preprocessedMessages = processedMessages.map((msg: any) => {
       if (msg.role !== 'user' || !Array.isArray(msg.content)) {
         return msg;
@@ -10382,7 +10395,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         return msg;
       }
 
-      // Convert image parts to OpenAI format for gateway models
+      // Convert image parts based on provider requirements
       const convertedContent = msg.content.map((part: any) => {
         if (part.type !== 'image' || !part.image) {
           return part;
@@ -10397,19 +10410,12 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         }
 
-        // For gateway models, use OpenAI image_url format
-        if (isGatewayVisionModel) {
-          return {
-            type: 'image',
-            image: imageUrl,
-          };
-        }
-
-        // For Anthropic models, convert to Anthropic format
-        if (isAnthropicModel) {
+        // For Anthropic models OR Devstral with images (via Anthropic provider), use Anthropic format
+        if (useAnthropicFormat) {
           // Extract base64 and media type from data URL
           const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
           if (match) {
+            console.log(`[Chat-V2] Converting image to Anthropic format for ${modelId}`);
             return {
               type: 'image',
               source: {
@@ -10421,7 +10427,11 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         }
 
-        return part;
+        // For other models, keep original format
+        return {
+          type: 'image',
+          image: imageUrl,
+        };
       });
 
       console.log(`[Chat-V2] Preprocessed message with ${msg.content.filter((p: any) => p.type === 'image').length} image(s) for model ${modelId}`);
@@ -10432,18 +10442,25 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       };
     });
 
+    // Get AI model - use vision-capable provider for Devstral with images
+    // This uses Anthropic provider for Devstral when images are present, enabling vision via gateway
+    const model = getAIModel(modelId, messagesHaveImages);
+
+    // Determine if we're using Anthropic provider (either true Anthropic model OR Devstral with images)
+    const usingAnthropicProvider = isAnthropicModel || (isDevstralModel && messagesHaveImages);
+
     const messagesWithSystem = [
       {
         role: 'system',
         content: systemPrompt,
-        // Apply cache control for OpenRouter models and Anthropic models
+        // Apply cache control for OpenRouter models and models using Anthropic provider
         ...(openRouterModels.includes(modelId) ? {
           providerOptions: {
             openrouter: {
               cache_control: { type: 'ephemeral' }
             }
           }
-        } : isAnthropicModel ? {
+        } : usingAnthropicProvider ? {
           providerOptions: {
             anthropic: {
               cacheControl: { type: 'ephemeral' }
@@ -10454,7 +10471,8 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       ...preprocessedMessages
     ];
 
-    // Prepare provider options for Anthropic models (reasoning + context management)
+    // Prepare provider options for true Anthropic models only (reasoning + context management)
+    // Note: Devstral via Anthropic provider doesn't support reasoning, so only apply to actual Claude models
     const anthropicProviderOptions = isAnthropicModel ? {
       anthropic: {
         // Enable reasoning with budget
