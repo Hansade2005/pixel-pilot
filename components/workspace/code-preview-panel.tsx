@@ -1061,43 +1061,96 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   // Set up iframe message listener for browser logs
   useEffect(() => {
     const handleIframeMessage = (event: MessageEvent) => {
-      // Only accept messages from our preview iframe
+      // Accept messages from preview iframe or any pipilot.dev subdomain (for cross-origin iframes)
       const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
-      if (iframe && event.source === iframe.contentWindow) {
-        // Handle legacy console messages
-        if (event.data.type === 'console') {
-          addConsoleLog(event.data.message, 'browser')
-          // Also add to browserLogs for the Browser tab (legacy format)
-          const level = event.data.level || 'log'
-          setBrowserLogs(prev => [...prev, JSON.stringify({
-            method: level,
-            data: [{ type: 'string', value: event.data.message }],
-            timestamp: new Date().toISOString(),
-            id: `legacy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          })])
-        }
-        // Handle new BROWSER_CONSOLE_LOG from visual-editor-client.js (console-feed compatible)
-        if (event.data.type === 'BROWSER_CONSOLE_LOG') {
-          const { method, data, timestamp, id } = event.data.payload
-          // Extract a simple message for the unified console log
-          const simpleMessage = data?.map((arg: any) => {
-            if (arg.type === 'string') return arg.value
+      const isFromIframe = iframe && event.source === iframe.contentWindow
+      const isFromPipilotDomain = typeof event.origin === 'string' && (
+        event.origin.includes('pipilot.dev') ||
+        event.origin.includes('pipilot.app') ||
+        event.origin.includes('e2b.app') ||
+        event.origin.includes('localhost') ||
+        event.origin.includes('127.0.0.1')
+      )
+
+      // Only process if from our iframe or a trusted domain
+      if (!isFromIframe && !isFromPipilotDomain) {
+        return
+      }
+
+      // Handle legacy console messages
+      if (event.data?.type === 'console') {
+        addConsoleLog(event.data.message, 'browser')
+        // Also add to browserLogs for the Browser tab (legacy format)
+        const level = event.data.level || 'log'
+        setBrowserLogs(prev => [...prev, JSON.stringify({
+          method: level,
+          data: [{ type: 'string', value: event.data.message }],
+          timestamp: new Date().toISOString(),
+          id: `legacy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        })])
+      }
+
+      // Handle BROWSER_CONSOLE_LOG from console bridge (both formats)
+      if (event.data?.type === 'BROWSER_CONSOLE_LOG' && event.data?.payload) {
+        const { method, data, timestamp, id } = event.data.payload
+
+        // Helper to format a single arg (handles both wrapped and direct formats)
+        const formatArg = (arg: any): string => {
+          // Handle wrapped format: { type: 'string', value: ... }
+          if (arg && typeof arg === 'object' && 'type' in arg && 'value' in arg) {
+            if (arg.type === 'string') return String(arg.value)
             if (arg.type === 'error') return `${arg.value?.name || 'Error'}: ${arg.value?.message || 'Unknown'}`
             if (arg.type === 'object' || arg.type === 'array') {
               try { return JSON.stringify(arg.value) } catch { return '[Object]' }
             }
             return String(arg.value ?? '')
-          }).join(' ') || ''
+          }
 
-          addConsoleLog(simpleMessage, 'browser')
-          // Add to browserLogs for the Browser tab (console-feed format)
-          setBrowserLogs(prev => [...prev, JSON.stringify({
-            method: method || 'log',
-            data: data || [],
-            timestamp: timestamp || new Date().toISOString(),
-            id: id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          })])
+          // Handle direct format from console bridge
+          if (arg && typeof arg === 'object' && arg.__isError) {
+            // Error object from console bridge
+            return `${arg.name || 'Error'}: ${arg.message || 'Unknown error'}${arg.stack ? '\n' + arg.stack : ''}`
+          }
+
+          // Handle plain objects and arrays
+          if (arg && typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2) } catch { return '[Object]' }
+          }
+
+          // Handle primitives
+          return String(arg ?? '')
         }
+
+        // Extract a simple message for the unified console log
+        const simpleMessage = Array.isArray(data)
+          ? data.map(formatArg).join(' ')
+          : formatArg(data)
+
+        addConsoleLog(simpleMessage, 'browser')
+
+        // Add to browserLogs for the Browser tab (console-feed format)
+        // Normalize the data to console-feed format
+        const normalizedData = Array.isArray(data)
+          ? data.map((arg: any) => {
+              if (arg && typeof arg === 'object' && arg.__isError) {
+                return { type: 'error', value: { name: arg.name, message: arg.message, stack: arg.stack } }
+              }
+              if (arg && typeof arg === 'object' && 'type' in arg && 'value' in arg) {
+                return arg // Already in correct format
+              }
+              if (typeof arg === 'object' && arg !== null) {
+                return { type: 'object', value: arg }
+              }
+              return { type: typeof arg, value: arg }
+            })
+          : [{ type: typeof data, value: data }]
+
+        setBrowserLogs(prev => [...prev, JSON.stringify({
+          method: method || 'log',
+          data: normalizedData,
+          timestamp: timestamp || new Date().toISOString(),
+          id: id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        })])
       }
     }
 
