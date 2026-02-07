@@ -987,6 +987,37 @@ interface TaggedComponent {
   textContent?: string
 }
 
+// Models that support direct vision/image input (no need for image description API)
+const VISION_CAPABLE_MODELS = [
+  // Anthropic models
+  'anthropic/claude-sonnet-4.5',
+  'anthropic/claude-opus-4.5',
+  'anthropic/claude-haiku-4.5',
+  // OpenAI/GPT models
+  'openai/gpt-5.1-thinking',
+  'openai/gpt-5.2-codex',
+  'openai/o3',
+  // Google Gemini models
+  'google/gemini-2.5-flash',
+  'google/gemini-2.5-pro',
+  // Mistral Devstral models (vision capable)
+  'mistral/devstral-2',
+  'mistral/devstral-small-2',
+  // GLM models
+  'xai/glm-4.7',
+  'zai/glm-4.7-flash',
+  // Pixtral (vision model)
+  'pixtral-12b-2409',
+]
+
+// Maximum number of images that can be attached
+const MAX_IMAGE_ATTACHMENTS = 5
+
+// Helper to check if a model supports direct vision input
+function isVisionCapableModel(modelId: string): boolean {
+  return VISION_CAPABLE_MODELS.some(m => modelId.includes(m) || m.includes(modelId))
+}
+
 interface ChatPanelV2Props {
   project: any
   isMobile?: boolean
@@ -3859,18 +3890,34 @@ export function ChatPanelV2({
     let enhancedContent = input.trim()
     let displayContent = input.trim() // Content shown to user (without hidden contexts)
 
-    // Add image descriptions (hidden from user display)
-    if (attachedImages.length > 0) {
-      const imageDescriptions = attachedImages
-        .map((img: AttachedImage) => {
-          const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
-          return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
-        })
-        .join('')
+    // Check if model supports vision for direct image passing
+    const modelSupportsVision = isVisionCapableModel(selectedModel)
 
-      if (imageDescriptions) {
-        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
-        // Note: displayContent remains unchanged - image context is hidden from users
+    // Store images for multimodal content (for vision models)
+    const imagesToSend: AttachedImage[] = [...attachedImages]
+
+    // Handle images based on model capability
+    if (attachedImages.length > 0) {
+      if (modelSupportsVision) {
+        // For vision models: images will be passed directly as multimodal content
+        // Just add a note to the text content for context
+        const imageNames = attachedImages.map(img => img.name).join(', ')
+        enhancedContent = `${enhancedContent}\n\n[${attachedImages.length} image(s) attached: ${imageNames}]`
+        console.log(`[ChatPanelV2] Vision model detected (${selectedModel}), will pass ${attachedImages.length} image(s) directly`)
+      } else {
+        // For non-vision models: use text descriptions from API processing
+        const imageDescriptions = attachedImages
+          .map((img: AttachedImage) => {
+            const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
+            return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
+          })
+          .join('')
+
+        if (imageDescriptions) {
+          enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
+          // Note: displayContent remains unchanged - image context is hidden from users
+        }
+        console.log(`[ChatPanelV2] Non-vision model (${selectedModel}), using text descriptions for ${attachedImages.length} image(s)`)
       }
     }
 
@@ -4049,9 +4096,38 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
     try {
       // Get last 10 messages from current conversation
       const recentMessages = messages.slice(-10)
+
+      // Build the new message content - multimodal for vision models with images
+      let newMessageContent: string | Array<{ type: string; text?: string; image?: string }>
+
+      if (modelSupportsVision && imagesToSend.length > 0) {
+        // Build multimodal content array for vision models
+        const contentParts: Array<{ type: string; text?: string; image?: string }> = []
+
+        // Add each image as a content part
+        for (const img of imagesToSend) {
+          contentParts.push({
+            type: 'image',
+            image: img.base64 // base64 data URL (data:image/png;base64,...)
+          })
+        }
+
+        // Add the text content
+        contentParts.push({
+          type: 'text',
+          text: enhancedContent
+        })
+
+        newMessageContent = contentParts
+        console.log(`[ChatPanelV2] Built multimodal message with ${imagesToSend.length} image(s) for vision model`)
+      } else {
+        // Text-only content for non-vision models or when no images
+        newMessageContent = enhancedContent
+      }
+
       const messagesToSend = [
         ...recentMessages.map((m: any) => ({ role: m.role, content: m.content })),
-        { role: 'user', content: enhancedContent }
+        { role: 'user', content: newMessageContent }
       ]
 
       console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 10 + new)`)
@@ -5449,50 +5525,93 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }
                 */
 
-                // Handle image pasting (existing logic)
+                // Handle image pasting - supports multiple images up to MAX_IMAGE_ATTACHMENTS
+                const imageItems: DataTransferItem[] = []
                 for (let i = 0; i < items.length; i++) {
-                  const item = items[i]
+                  if (items[i].type.indexOf('image') !== -1) {
+                    imageItems.push(items[i])
+                  }
+                }
 
-                  if (item.type.indexOf('image') !== -1) {
-                    e.preventDefault()
+                if (imageItems.length === 0) return
 
-                    // Check total attachment limit
-                    const totalAttachments = attachedImages.length + attachedUploadedFiles.length + attachedUrls.length
-                    if (totalAttachments >= 2) {
-                      toast({
-                        title: "Maximum attachments reached",
-                        description: "You can attach a maximum of 2 items (images, files, and/or URLs)",
-                        variant: "destructive"
+                e.preventDefault()
+
+                // Check how many more images we can add
+                const currentImageCount = attachedImages.length
+                const remainingSlots = MAX_IMAGE_ATTACHMENTS - currentImageCount
+
+                if (remainingSlots <= 0) {
+                  toast({
+                    title: "Maximum images reached",
+                    description: `You can attach a maximum of ${MAX_IMAGE_ATTACHMENTS} images`,
+                    variant: "destructive"
+                  })
+                  return
+                }
+
+                // Limit to remaining slots
+                const imagesToProcess = imageItems.slice(0, remainingSlots)
+
+                if (imagesToProcess.length < imageItems.length) {
+                  toast({
+                    title: "Some images skipped",
+                    description: `Only ${imagesToProcess.length} of ${imageItems.length} images added (limit: ${MAX_IMAGE_ATTACHMENTS})`,
+                  })
+                }
+
+                // Check if current model supports vision for processing decision
+                const modelSupportsVision = isVisionCapableModel(selectedModel)
+
+                // Process each image
+                imagesToProcess.forEach((item, index) => {
+                  const file = item.getAsFile()
+                  if (!file) return
+
+                  // Validate file size (max 10MB)
+                  if (file.size > 10 * 1024 * 1024) {
+                    toast({
+                      title: "File too large",
+                      description: "Pasted image is too large. Maximum size is 10MB",
+                      variant: "destructive"
+                    })
+                    return
+                  }
+
+                  // Convert to base64
+                  const reader = new FileReader()
+                  reader.onload = async (event) => {
+                    const base64 = event.target?.result as string
+                    const imageId = `pasted_img_${Date.now()}_${index}`
+
+                    // For vision models, add image immediately without API processing
+                    if (modelSupportsVision) {
+                      setAttachedImages(prev => {
+                        const newImageNumber = prev.length + 1
+                        return [...prev, {
+                          id: imageId,
+                          name: `Pasted Image ${newImageNumber}`,
+                          base64: base64,
+                          description: '[Direct vision - image will be sent to AI model]',
+                          isProcessing: false
+                        }]
                       })
-                      return
-                    }
 
-                    const file = item.getAsFile()
-                    if (!file) continue
-
-                    // Validate file size (max 10MB)
-                    if (file.size > 10 * 1024 * 1024) {
                       toast({
-                        title: "File too large",
-                        description: "Pasted image is too large. Maximum size is 10MB",
-                        variant: "destructive"
+                        title: "Image attached",
+                        description: "Image will be sent directly to the vision model"
                       })
-                      continue
-                    }
-
-                    // Convert to base64
-                    const reader = new FileReader()
-                    reader.onload = async (event) => {
-                      const base64 = event.target?.result as string
-                      const imageId = `pasted_img_${Date.now()}_${i}`
-
-                      // Add image with processing flag
-                      setAttachedImages(prev => [...prev, {
-                        id: imageId,
-                        name: `Pasted Image ${attachedImages.length + 1}`,
-                        base64: base64,
-                        isProcessing: true
-                      }])
+                    } else {
+                      // For non-vision models, process through describe-image API
+                      setAttachedImages(prev => {
+                        const newImageNumber = prev.length + 1
+                        return [...prev, {
+                          id: imageId,
+                          name: `Pasted Image ${newImageNumber}`,
+                          base64: base64,
+                          isProcessing: true
+                        }]
+                      })
 
                       // Send to Pixtral for description
                       try {
@@ -5517,8 +5636,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                         ))
 
                         toast({
-                          title: "Image pasted and processed",
-                          description: "Image attached successfully"
+                          title: "Image processed",
+                          description: "Image description generated"
                         })
                       } catch (error) {
                         console.error('Error describing pasted image:', error)
@@ -5530,18 +5649,18 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                         setAttachedImages(prev => prev.filter(img => img.id !== imageId))
                       }
                     }
-
-                    reader.onerror = () => {
-                      toast({
-                        title: "Read error",
-                        description: "Failed to read pasted image",
-                        variant: "destructive"
-                      })
-                    }
-
-                    reader.readAsDataURL(file)
                   }
-                }
+
+                  reader.onerror = () => {
+                    toast({
+                      title: "Read error",
+                      description: "Failed to read pasted image",
+                      variant: "destructive"
+                    })
+                  }
+
+                  reader.readAsDataURL(file)
+                })
               }}
             />
           </form>
