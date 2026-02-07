@@ -5677,8 +5677,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 type="submit"
                 size="icon"
                 className="h-8 w-8"
-                disabled={!input.trim() && attachedFiles.length === 0}
-                onClick={handleEnhancedSubmit}
+                disabled={!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0}
               >
                 <CornerDownLeft className="size-4" />
               </Button>
