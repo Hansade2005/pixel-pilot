@@ -961,6 +961,7 @@ interface AttachedImage {
   base64: string
   description?: string
   isProcessing?: boolean
+  abortController?: AbortController
 }
 
 interface AttachedUrl {
@@ -4950,21 +4951,72 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       reader.onload = async (event) => {
         const base64 = event.target?.result as string
         const imageId = Date.now().toString() + Math.random()
+        const controller = new AbortController()
 
-        // Just store the image - processing happens at send time with user's message
-        // This allows proper intent detection (clone/debug/context) based on what user types
+        // Add image with processing state
         setAttachedImages((prev: AttachedImage[]) => [...prev, {
           id: imageId,
           name: file.name,
           base64,
-          isProcessing: false,
-          description: '[Will be analyzed with your message]'
+          isProcessing: true,
+          abortController: controller
         }])
 
-        toast({
-          title: "Image attached",
-          description: "Will be analyzed when you send your message"
-        })
+        // Process image immediately via describe-image API
+        try {
+          const response = await fetch('/api/describe-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 }),
+            signal: controller.signal
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to process image')
+          }
+
+          const result = await response.json()
+
+          // Extract description from response
+          let description: string
+          if (result.specification) {
+            description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
+          } else if (result.description) {
+            description = result.description
+          } else {
+            description = '[Image processed]'
+          }
+
+          // Update image with description
+          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
+            img.id === imageId ? { ...img, description, isProcessing: false, abortController: undefined } : img
+          ))
+
+          toast({
+            title: "Image ready",
+            description: "Image analyzed successfully"
+          })
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            // User cancelled - remove the image
+            setAttachedImages((prev: AttachedImage[]) => prev.filter((img: AttachedImage) => img.id !== imageId))
+            toast({
+              title: "Cancelled",
+              description: "Image processing cancelled"
+            })
+          } else {
+            console.error('Error processing image:', error)
+            // Update image to show error state
+            setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
+              img.id === imageId ? { ...img, description: '[Error processing image]', isProcessing: false, abortController: undefined } : img
+            ))
+            toast({
+              title: "Error",
+              description: "Failed to process image",
+              variant: "destructive"
+            })
+          }
+        }
       }
       reader.readAsDataURL(file)
     }
@@ -5257,13 +5309,30 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               </div>
             ))}
             {attachedImages.map((img: AttachedImage) => (
-              <div key={img.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+              <div key={img.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${img.isProcessing ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700' : 'bg-secondary'}`}>
                 <ImageIcon className="size-3" />
                 <span>{img.name}</span>
-                {img.isProcessing && <Loader2 className="size-3 animate-spin" />}
-                <button onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
-                  <X className="size-3" />
-                </button>
+                {img.isProcessing ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin text-blue-500" />
+                    <button
+                      onClick={() => {
+                        // Cancel the processing
+                        if (img.abortController) {
+                          img.abortController.abort()
+                        }
+                      }}
+                      className="ml-1 text-red-500 hover:text-red-700"
+                      title="Cancel processing"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+                    <X className="size-3" />
+                  </button>
+                )}
               </div>
             ))}
             {attachedUploadedFiles.map((file: AttachedUploadedFile) => (
@@ -5534,24 +5603,75 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   reader.onload = async (event) => {
                     const base64 = event.target?.result as string
                     const imageId = `pasted_img_${Date.now()}_${index}`
+                    const controller = new AbortController()
 
-                    // Just store the image - processing happens at send time with user's message
-                    // This allows proper intent detection (clone/debug/context) based on what user types
+                    // Add image with processing state
                     setAttachedImages(prev => {
                       const newImageNumber = prev.length + 1
                       return [...prev, {
                         id: imageId,
                         name: `Pasted Image ${newImageNumber}`,
                         base64: base64,
-                        isProcessing: false, // No processing yet - happens at send time
-                        description: '[Will be analyzed with your message]'
+                        isProcessing: true,
+                        abortController: controller
                       }]
                     })
 
-                    toast({
-                      title: "Image attached",
-                      description: "Will be analyzed when you send your message"
-                    })
+                    // Process image immediately via describe-image API
+                    try {
+                      const response = await fetch('/api/describe-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64 }),
+                        signal: controller.signal
+                      })
+
+                      if (!response.ok) {
+                        throw new Error('Failed to process image')
+                      }
+
+                      const result = await response.json()
+
+                      // Extract description from response
+                      let description: string
+                      if (result.specification) {
+                        description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
+                      } else if (result.description) {
+                        description = result.description
+                      } else {
+                        description = '[Image processed]'
+                      }
+
+                      // Update image with description
+                      setAttachedImages(prev => prev.map((img: AttachedImage) =>
+                        img.id === imageId ? { ...img, description, isProcessing: false, abortController: undefined } : img
+                      ))
+
+                      toast({
+                        title: "Image ready",
+                        description: "Image analyzed successfully"
+                      })
+                    } catch (error: any) {
+                      if (error.name === 'AbortError') {
+                        // User cancelled - remove the image
+                        setAttachedImages(prev => prev.filter((img: AttachedImage) => img.id !== imageId))
+                        toast({
+                          title: "Cancelled",
+                          description: "Image processing cancelled"
+                        })
+                      } else {
+                        console.error('Error processing pasted image:', error)
+                        // Update image to show error state
+                        setAttachedImages(prev => prev.map((img: AttachedImage) =>
+                          img.id === imageId ? { ...img, description: '[Error processing image]', isProcessing: false, abortController: undefined } : img
+                        ))
+                        toast({
+                          title: "Error",
+                          description: "Failed to process image",
+                          variant: "destructive"
+                        })
+                      }
+                    }
                   }
 
                   reader.onerror = () => {
@@ -5677,7 +5797,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 type="submit"
                 size="icon"
                 className="h-8 w-8"
-                disabled={!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0}
+                disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
               >
                 <CornerDownLeft className="size-4" />
               </Button>
