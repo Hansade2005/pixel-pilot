@@ -3863,35 +3863,20 @@ export function ChatPanelV2({
     let enhancedContent = input.trim()
     let displayContent = input.trim() // Content shown to user (without hidden contexts)
 
-    // Check if model supports vision for direct image passing
-    const hasVisionSupport = modelSupportsVision(selectedModel)
-
-    // Store images for multimodal content (for vision models)
-    const imagesToSend: AttachedImage[] = [...attachedImages]
-
-    // Handle images based on model capability
+    // Handle images - ALL models use describe-image API for consistent analysis
+    // This provides structured descriptions that help models understand errors, bugs, UI cloning, etc.
     if (attachedImages.length > 0) {
-      if (hasVisionSupport) {
-        // For vision models: images will be passed directly as multimodal content
-        // Just add a note to the text content for context
-        const imageNames = attachedImages.map(img => img.name).join(', ')
-        enhancedContent = `${enhancedContent}\n\n[${attachedImages.length} image(s) attached: ${imageNames}]`
-        console.log(`[ChatPanelV2] Vision model detected (${selectedModel}), will pass ${attachedImages.length} image(s) directly`)
-      } else {
-        // For non-vision models: use text descriptions from API processing
-        const imageDescriptions = attachedImages
-          .map((img: AttachedImage) => {
-            const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
-            return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
-          })
-          .join('')
+      const imageDescriptions = attachedImages
+        .map((img: AttachedImage) => {
+          const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
+          return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
+        })
+        .join('')
 
-        if (imageDescriptions) {
-          enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
-          // Note: displayContent remains unchanged - image context is hidden from users
-        }
-        console.log(`[ChatPanelV2] Non-vision model (${selectedModel}), using text descriptions for ${attachedImages.length} image(s)`)
+      if (imageDescriptions) {
+        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
       }
+      console.log(`[ChatPanelV2] Using describe-image analysis for ${attachedImages.length} image(s)`)
     }
 
     // Add URL contents (shown to user)
@@ -4070,33 +4055,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Get last 10 messages from current conversation
       const recentMessages = messages.slice(-10)
 
-      // Build the new message content - multimodal for vision models with images
-      let newMessageContent: string | Array<{ type: string; text?: string; image?: string }>
-
-      if (hasVisionSupport && imagesToSend.length > 0) {
-        // Build multimodal content array for vision models
-        const contentParts: Array<{ type: string; text?: string; image?: string }> = []
-
-        // Add each image as a content part
-        for (const img of imagesToSend) {
-          contentParts.push({
-            type: 'image',
-            image: img.base64 // base64 data URL (data:image/png;base64,...)
-          })
-        }
-
-        // Add the text content
-        contentParts.push({
-          type: 'text',
-          text: enhancedContent
-        })
-
-        newMessageContent = contentParts
-        console.log(`[ChatPanelV2] Built multimodal message with ${imagesToSend.length} image(s) for vision model`)
-      } else {
-        // Text-only content for non-vision models or when no images
-        newMessageContent = enhancedContent
-      }
+      // Build the new message content - always text-only since images are processed via describe-image API
+      // This ensures consistent behavior across all models with structured image analysis
+      const newMessageContent = enhancedContent
 
       const messagesToSend = [
         ...recentMessages.map((m: any) => ({ role: m.role, content: m.content })),
@@ -5544,10 +5505,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   })
                 }
 
-                // Check if current model supports vision for processing decision
-                const hasVisionSupport = modelSupportsVision(selectedModel)
-
-                // Process each image
+                // Process each image through describe-image API (ALL models use this)
                 imagesToProcess.forEach((item, index) => {
                   const file = item.getAsFile()
                   if (!file) return
@@ -5568,74 +5526,42 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     const base64 = event.target?.result as string
                     const imageId = `pasted_img_${Date.now()}_${index}`
 
-                    // For vision models, add image immediately without API processing
-                    if (hasVisionSupport) {
-                      setAttachedImages(prev => {
-                        const newImageNumber = prev.length + 1
-                        return [...prev, {
-                          id: imageId,
-                          name: `Pasted Image ${newImageNumber}`,
-                          base64: base64,
-                          description: '[Direct vision - image will be sent to AI model]',
-                          isProcessing: false
-                        }]
+                    // Add image with processing state
+                    setAttachedImages(prev => {
+                      const newImageNumber = prev.length + 1
+                      return [...prev, {
+                        id: imageId,
+                        name: `Pasted Image ${newImageNumber}`,
+                        base64: base64,
+                        isProcessing: true
+                      }]
+                    })
+
+                    // Process through describe-image API for comprehensive analysis
+                    try {
+                      const response = await fetch('/api/describe-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64 })
                       })
+
+                      if (!response.ok) throw new Error('Failed to describe image')
+
+                      const result = await response.json()
+
+                      // Update image with description
+                      setAttachedImages(prev => prev.map(img =>
+                        img.id === imageId
+                          ? { ...img, description: result.description, isProcessing: false }
+                          : img
+                      ))
 
                       toast({
-                        title: "Image attached",
-                        description: "Image will be sent directly to the vision model"
+                        title: "Image analyzed",
+                        description: `Detected: ${result.imageType || 'UI'}`
                       })
-                    } else {
-                      // For non-vision models, process through describe-image API
-                      setAttachedImages(prev => {
-                        const newImageNumber = prev.length + 1
-                        return [...prev, {
-                          id: imageId,
-                          name: `Pasted Image ${newImageNumber}`,
-                          base64: base64,
-                          isProcessing: true
-                        }]
-                      })
-
-                      // Send to Pixtral for structured description (JSON format for code generation)
-                      try {
-                        const response = await fetch('/api/describe-image', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            image: base64,
-                            mode: 'structured' // Use structured JSON output for code generation
-                          })
-                        })
-
-                        if (!response.ok) throw new Error('Failed to describe image')
-
-                        const result = await response.json()
-
-                        // Extract description from structured or fallback response
-                        let description: string
-                        if (result.specification) {
-                          // Structured JSON specification - format for model consumption
-                          description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
-                        } else if (result.description) {
-                          description = result.description
-                        } else {
-                          description = '[Image processed]'
-                        }
-
-                        // Update image with description
-                        setAttachedImages(prev => prev.map(img =>
-                          img.id === imageId
-                            ? { ...img, description, isProcessing: false }
-                            : img
-                        ))
-
-                        toast({
-                          title: "Image processed",
-                          description: "UI specification generated for code generation"
-                        })
-                      } catch (error) {
-                        console.error('Error describing pasted image:', error)
+                    } catch (error) {
+                      console.error('Error describing pasted image:', error)
                         toast({
                           title: "Processing failed",
                           description: "Failed to process pasted image",
