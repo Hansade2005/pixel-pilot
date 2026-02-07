@@ -43,6 +43,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
 import { uploadLargePayload } from '@/lib/cloud-sync'
+import { modelSupportsVision } from '@/lib/ai-models'
 
 // New feature components
 import { SlashCommands, useSlashCommands, getDefaultSlashCommands, type SlashCommand } from '@/components/ui/slash-commands'
@@ -987,34 +988,8 @@ interface TaggedComponent {
   textContent?: string
 }
 
-// Models that support direct vision/image input (no need for image description API)
-// These models can accept images directly via the Vercel AI SDK multimodal format
-const VISION_CAPABLE_MODELS = [
-  // Anthropic models
-  'anthropic/claude-sonnet-4.5',
-  'anthropic/claude-opus-4.5',
-  'anthropic/claude-haiku-4.5',
-  // OpenAI/GPT models
-  'openai/gpt-5.1-thinking',
-  'openai/gpt-5.2-codex',
-  'openai/o3',
-  // Google Gemini models
-  'google/gemini-2.5-flash',
-  'google/gemini-2.5-pro',
-  // Mistral models - Devstral supports vision through Vercel AI Gateway
-  'mistral/devstral-2',
-  'mistral/devstral-small-2',
-  'pixtral-12b-2409',
-  'mistral/pixtral-large-2411',
-]
-
 // Maximum number of images that can be attached
 const MAX_IMAGE_ATTACHMENTS = 5
-
-// Helper to check if a model supports direct vision input
-function isVisionCapableModel(modelId: string): boolean {
-  return VISION_CAPABLE_MODELS.some(m => modelId.includes(m) || m.includes(modelId))
-}
 
 interface ChatPanelV2Props {
   project: any
@@ -3889,14 +3864,14 @@ export function ChatPanelV2({
     let displayContent = input.trim() // Content shown to user (without hidden contexts)
 
     // Check if model supports vision for direct image passing
-    const modelSupportsVision = isVisionCapableModel(selectedModel)
+    const hasVisionSupport = modelSupportsVision(selectedModel)
 
     // Store images for multimodal content (for vision models)
     const imagesToSend: AttachedImage[] = [...attachedImages]
 
     // Handle images based on model capability
     if (attachedImages.length > 0) {
-      if (modelSupportsVision) {
+      if (hasVisionSupport) {
         // For vision models: images will be passed directly as multimodal content
         // Just add a note to the text content for context
         const imageNames = attachedImages.map(img => img.name).join(', ')
@@ -4098,7 +4073,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Build the new message content - multimodal for vision models with images
       let newMessageContent: string | Array<{ type: string; text?: string; image?: string }>
 
-      if (modelSupportsVision && imagesToSend.length > 0) {
+      if (hasVisionSupport && imagesToSend.length > 0) {
         // Build multimodal content array for vision models
         const contentParts: Array<{ type: string; text?: string; image?: string }> = []
 
@@ -4984,7 +4959,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
           isProcessing: true
         }])
 
-        // Get description using vision API
+        // Get structured description using vision API (JSON format for code generation)
         try {
           const response = await fetch('/api/describe-image', {
             method: 'POST',
@@ -4993,11 +4968,22 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             },
             body: JSON.stringify({
               image: base64,
-              prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
+              mode: 'structured' // Use structured JSON output for code generation
             }),
           })
 
-          const { description } = await response.json()
+          const result = await response.json()
+
+          // Extract description from structured or fallback response
+          let description: string
+          if (result.specification) {
+            // Structured JSON specification - format for model consumption
+            description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
+          } else if (result.description) {
+            description = result.description
+          } else {
+            description = '[Image processed]'
+          }
 
           // Update with description
           setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
@@ -5559,7 +5545,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }
 
                 // Check if current model supports vision for processing decision
-                const modelSupportsVision = isVisionCapableModel(selectedModel)
+                const hasVisionSupport = modelSupportsVision(selectedModel)
 
                 // Process each image
                 imagesToProcess.forEach((item, index) => {
@@ -5583,7 +5569,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     const imageId = `pasted_img_${Date.now()}_${index}`
 
                     // For vision models, add image immediately without API processing
-                    if (modelSupportsVision) {
+                    if (hasVisionSupport) {
                       setAttachedImages(prev => {
                         const newImageNumber = prev.length + 1
                         return [...prev, {
@@ -5611,31 +5597,42 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                         }]
                       })
 
-                      // Send to Pixtral for description
+                      // Send to Pixtral for structured description (JSON format for code generation)
                       try {
                         const response = await fetch('/api/describe-image', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             image: base64,
-                            prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information."
+                            mode: 'structured' // Use structured JSON output for code generation
                           })
                         })
 
                         if (!response.ok) throw new Error('Failed to describe image')
 
-                        const data = await response.json()
+                        const result = await response.json()
+
+                        // Extract description from structured or fallback response
+                        let description: string
+                        if (result.specification) {
+                          // Structured JSON specification - format for model consumption
+                          description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
+                        } else if (result.description) {
+                          description = result.description
+                        } else {
+                          description = '[Image processed]'
+                        }
 
                         // Update image with description
                         setAttachedImages(prev => prev.map(img =>
                           img.id === imageId
-                            ? { ...img, description: data.description, isProcessing: false }
+                            ? { ...img, description, isProcessing: false }
                             : img
                         ))
 
                         toast({
                           title: "Image processed",
-                          description: "Image description generated"
+                          description: "UI specification generated for code generation"
                         })
                       } catch (error) {
                         console.error('Error describing pasted image:', error)
