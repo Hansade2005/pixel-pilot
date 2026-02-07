@@ -189,38 +189,6 @@ const pipilotProvider = createOpenAICompatible({
   apiKey: 'not-needed', // Internal API doesn't require key
 });
 
-// Smart routing for xAI Grok Code Fast 1 - tries gateway first, falls back to direct xAI
-function createSmartXaiGrokProvider() {
-  const gatewayModel = vercelGateway('xai/grok-code-fast-1');
-  const directXaiModel = xaiProvider('grok-code-fast-1');
-
-  return {
-    ...gatewayModel,
-    async doGenerate(options: any) {
-      try {
-        // Try gateway first
-        return await gatewayModel.doGenerate(options);
-      } catch (error) {
-        console.log('Gateway failed for xAI Grok Code Fast 1, falling back to direct xAI provider');
-        // Fall back to direct xAI provider
-        return await directXaiModel.doGenerate(options);
-      }
-    },
-    async doStream(options: any) {
-      try {
-        // Try gateway first
-        return await gatewayModel.doStream(options);
-      } catch (error) {
-        console.log('Gateway failed for xAI Grok Code Fast 1, falling back to direct xAI provider');
-        // Fall back to direct xAI provider
-        return await directXaiModel.doStream(options);
-      }
-    }
-  };
-}
-
-const smartXaiGrokProvider = createSmartXaiGrokProvider();
-
 // Debug function to check environment variables
 function checkProviderKeys() {
   const keys = {
@@ -264,8 +232,8 @@ if (process.env.NODE_ENV === 'development') {
 
 // Model mapping with direct provider instances
 const modelProviders: Record<string, any> = {
-  // Auto/Default Option - uses Grok Code Fast 1 with smart routing
-  'auto': smartXaiGrokProvider,
+  // Auto/Default Option - uses direct xAI Grok Code Fast 1
+  'auto': xaiProvider('grok-code-fast-1'),
 
   // Codestral Models (Custom - kept as is)
   'codestral-latest': codestral('codestral-latest'),
@@ -279,14 +247,14 @@ const modelProviders: Record<string, any> = {
   // Vercel AI Gateway Models
   'mistral/devstral-2': vercelGateway('mistral/devstral-2'),
   'kwaipilot/kat-coder-pro-v1': vercelGateway('kwaipilot/kat-coder-pro-v1'),
-  'xai/grok-code-fast-1': smartXaiGrokProvider,
+  'xai/grok-code-fast-1': xaiProvider('grok-code-fast-1'), // Direct xAI provider
   'nvidia/nemotron-nano-12b-v2-vl': vercelGateway('nvidia/nemotron-nano-12b-v2-vl'),
   'minimax/minimax-m2': vercelGateway('minimax/minimax-m2'),
   'moonshotai/kimi-k2-thinking': vercelGateway('moonshotai/kimi-k2-thinking'),
   'mistral/devstral-small-2': vercelGateway('mistral/devstral-small-2'),
   'alibaba/qwen3-coder-plus': vercelGateway('alibaba/qwen3-coder-plus'),
   'meituan/longcat-flash-chat': vercelGateway('meituan/longcat-flash-chat'),
-  
+
   // New Vercel AI Gateway Models
   'google/gemini-2.5-flash': vercelGateway('google/gemini-2.5-flash'),
   'google/gemini-2.5-pro': vercelGateway('google/gemini-2.5-pro'),
