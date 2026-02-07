@@ -41,11 +41,13 @@ export function ModelSelector({
     ['auto', 'PiPilot Auto'],
     // Vercel AI Gateway Models
     ['mistral/devstral-2', 'PiPilot Mistral Devstral 2'],
+    ['mistral/devstral-small-2', 'PiPilot Mistral Devstral Small 2'],
     ['xai/grok-code-fast-1', 'PiPilot xAI Grok Code Fast 1'],
     ['moonshotai/kimi-k2-thinking', 'PiPilot MoonshotAI Kimi K2 Thinking'],
     ['google/gemini-2.5-flash', 'PiPilot Google Gemini 2.5 Flash'],
     ['google/gemini-2.5-pro', 'PiPilot Google Gemini 2.5 Pro'],
     ['xai/glm-4.7', 'PiPilot xAI GLM 4.7'],
+    ['zai/glm-4.7-flash', 'PiPilot ZAI GLM 4.7 Flash'],
     ['minimax/minimax-m2.1', 'PiPilot MiniMax M2.1'],
     ['alibaba/qwen3-max', 'PiPilot Alibaba Qwen3 Max'],
     ['anthropic/claude-haiku-4.5', 'PiPilot Anthropic Claude Haiku 4.5'],
@@ -76,7 +78,9 @@ export function ModelSelector({
     allowedModels = [
       'xai/grok-code-fast-1',
       'mistral/devstral-2',
+      'mistral/devstral-small-2',
       'google/gemini-2.5-flash',
+      'zai/glm-4.7-flash',
       'anthropic/claude-sonnet-4.5'
     ];
   } else if (isPremium && effectiveStatus === 'active') {
@@ -84,8 +88,10 @@ export function ModelSelector({
     allowedModels = [
       // Free models (premium users get access to everything)
       'mistral/devstral-2',
+      'mistral/devstral-small-2',
       'xai/grok-code-fast-1',
       'google/gemini-2.5-flash',
+      'zai/glm-4.7-flash',
       // Premium models
       'auto',
       'moonshotai/kimi-k2-thinking',
