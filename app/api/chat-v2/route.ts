@@ -1,7 +1,7 @@
 import { streamText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, getModelWithVision, requiresAnthropicImageFormat } from '@/lib/ai-providers'
+import { getModel, requiresImageUrlFormat } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
@@ -22,8 +22,7 @@ export const config = {
 }
 
 // Get AI model by ID with fallback to default
-// hasImages: when true, uses Anthropic provider for models that support vision via gateway (like Devstral)
-const getAIModel = (modelId?: string, hasImages: boolean = false) => {
+const getAIModel = (modelId?: string) => {
   try {
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
     const modelInfo = getModelById(selectedModelId)
@@ -33,12 +32,7 @@ const getAIModel = (modelId?: string, hasImages: boolean = false) => {
       return getModel(DEFAULT_CHAT_MODEL)
     }
 
-    console.log(`[Chat-V2] Using AI model: ${modelInfo.name} (${modelInfo.provider})${hasImages ? ' with vision support' : ''}`)
-
-    // Use vision-capable provider for models that need special image handling
-    if (hasImages) {
-      return getModelWithVision(selectedModelId, true)
-    }
+    console.log(`[Chat-V2] Using AI model: ${modelInfo.name} (${modelInfo.provider})`)
 
     return getModel(selectedModelId)
   } catch (error) {
@@ -10378,10 +10372,11 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       return msg.content.some((part: any) => part.type === 'image');
     });
 
-    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}`);
+    // Check if model needs image_url format (Mistral/Devstral models via OpenAI-compatible gateway)
+    const needsImageUrlFormat = requiresImageUrlFormat(modelId);
+    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, needsImageUrlFormat=${needsImageUrlFormat}`);
 
-    // Preprocess messages to ensure images are in Vercel AI SDK format
-    // The Anthropic provider handles conversion internally - do NOT manually convert to Anthropic format
+    // Preprocess messages to convert images based on model requirements
     const preprocessedMessages = processedMessages.map((msg: any) => {
       if (msg.role !== 'user' || !Array.isArray(msg.content)) {
         return msg;
@@ -10393,7 +10388,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         return msg;
       }
 
-      // Ensure images are in proper Vercel AI SDK format (data URL)
+      // Convert image parts based on model requirements
       const convertedContent = msg.content.map((part: any) => {
         if (part.type !== 'image' || !part.image) {
           return part;
@@ -10408,7 +10403,18 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         }
 
-        // Keep Vercel AI SDK format - the provider handles conversion internally
+        // For Devstral/Mistral models, use OpenAI-compatible image_url format
+        if (needsImageUrlFormat) {
+          console.log(`[Chat-V2] Converting image to image_url format for ${modelId}`);
+          return {
+            type: 'image_url',
+            image_url: {
+              url: imageUrl,
+            },
+          };
+        }
+
+        // For other models, use Vercel AI SDK format
         return {
           type: 'image',
           image: imageUrl,
@@ -10423,12 +10429,11 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       };
     });
 
-    // Get AI model - use vision-capable provider for Devstral with images
-    // This uses Anthropic provider for Devstral when images are present, enabling vision via gateway
-    const model = getAIModel(modelId, messagesHaveImages);
+    // Get AI model
+    const model = getAIModel(modelId);
 
-    // Determine if we're using Anthropic provider (either true Anthropic model OR Devstral with images)
-    const usingAnthropicProvider = isAnthropicModel || (isDevstralModel && messagesHaveImages);
+    // Determine if we're using Anthropic provider (only for true Anthropic models)
+    const usingAnthropicProvider = isAnthropicModel;
 
     const messagesWithSystem = [
       {
