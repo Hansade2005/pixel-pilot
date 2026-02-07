@@ -2556,17 +2556,34 @@ export async function POST(req: Request) {
       const recentMessages = Array.isArray(processedMessages) ? processedMessages.slice(-10) : []
 
       if (recentMessages && recentMessages.length > 0) {
+        // Helper to extract text from content (handles both string and multimodal array)
+        const getTextContent = (content: any): string => {
+          if (typeof content === 'string') return content
+          if (Array.isArray(content)) {
+            // Extract text parts from multimodal content
+            return content
+              .filter(part => part.type === 'text' && part.text)
+              .map(part => part.text)
+              .join('\n')
+          }
+          return ''
+        }
+
         // Filter out system messages and empty content
-        const filteredMessages = recentMessages.filter((msg: any) =>
-          msg.role !== 'system' && msg.content && msg.content.trim().length > 0
-        )
+        const filteredMessages = recentMessages.filter((msg: any) => {
+          const textContent = getTextContent(msg.content)
+          return msg.role !== 'system' && textContent.trim().length > 0
+        })
 
         // Create enhanced history format with better structure and context preservation
         const fullHistory = filteredMessages
           .map((msg: any, index: number) => {
             const role = msg.role === 'user' ? '👤 User' : msg.role === 'assistant' ? '🤖 Assistant' : msg.role.toUpperCase()
             const timestamp = msg.timestamp ? ` [${new Date(msg.timestamp).toLocaleTimeString()}]` : ''
-            const message = `${role}${timestamp}: ${msg.content.trim()}`
+            const textContent = getTextContent(msg.content)
+            const hasImages = Array.isArray(msg.content) && msg.content.some((p: any) => p.type === 'image')
+            const imageNote = hasImages ? ' [with images]' : ''
+            const message = `${role}${timestamp}${imageNote}: ${textContent.trim()}`
 
             // Add clear separators and interaction markers
             const isLastMessage = index === filteredMessages.length - 1
@@ -2616,11 +2633,22 @@ export async function POST(req: Request) {
           .map((msg, index) => {
             // Prepend dynamic context to the first user message
             if (msg.role === 'user' && index === 0 && dynamicContext) {
-              const combinedContent = `${dynamicContext}\n\n${msg.content}`
-              console.log(`[Chat-V2] Prepended dynamic context (${dynamicContext.length} chars) to first user message`)
-              return {
-                ...msg,
-                content: combinedContent
+              // Handle both string and multimodal (array) content
+              if (Array.isArray(msg.content)) {
+                // For multimodal content, prepend context to the text part
+                const updatedContent = msg.content.map((part: any) => {
+                  if (part.type === 'text' && part.text) {
+                    return { ...part, text: `${dynamicContext}\n\n${part.text}` }
+                  }
+                  return part
+                })
+                console.log(`[Chat-V2] Prepended dynamic context (${dynamicContext.length} chars) to first user message (multimodal)`)
+                return { ...msg, content: updatedContent }
+              } else {
+                // String content
+                const combinedContent = `${dynamicContext}\n\n${msg.content}`
+                console.log(`[Chat-V2] Prepended dynamic context (${dynamicContext.length} chars) to first user message`)
+                return { ...msg, content: combinedContent }
               }
             }
 
