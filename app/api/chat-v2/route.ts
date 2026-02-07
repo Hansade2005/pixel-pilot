@@ -2,7 +2,7 @@ import { streamText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, needsMistralVisionProvider, getDevstralVisionModel } from '@/lib/ai-providers'
-import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
+import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
 import { filterUnwantedFiles } from '@/lib/utils'
@@ -10372,14 +10372,90 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       return msg.content.some((part: any) => part.type === 'image');
     });
 
+    // Check if model supports vision natively
+    const hasNativeVision = modelSupportsVision(modelId);
+
     // Check if Devstral needs Mistral provider for vision
     const useDevstralVision = isDevstralModel && messagesHaveImages && needsMistralVisionProvider(modelId);
-    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, useDevstralVision=${useDevstralVision}`);
+    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, useDevstralVision=${useDevstralVision}, hasNativeVision=${hasNativeVision}`);
+
+    // For non-vision models with images, translate images to structured text using describe-image API
+    // This allows non-vision models to "see" UI designs and clone them
+    let translatedMessages = processedMessages;
+    if (messagesHaveImages && !hasNativeVision) {
+      console.log(`[Chat-V2] Model ${modelId} does not support vision. Translating images to structured text...`);
+
+      // Helper to call describe-image API
+      const describeImage = async (imageData: string): Promise<string> => {
+        try {
+          const response = await fetch(new URL('/api/describe-image', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imageData, mode: 'structured' }),
+          });
+
+          if (!response.ok) {
+            console.warn('[Chat-V2] describe-image API failed:', response.status);
+            return '[Image description unavailable]';
+          }
+
+          const result = await response.json();
+          if (result.specification) {
+            return `[UI SPECIFICATION - Use this to build the exact UI shown in the image]
+\`\`\`json
+${JSON.stringify(result.specification, null, 2)}
+\`\`\`
+
+INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use the component tree, Tailwind classes, and text content to recreate this UI exactly. Each section contains children with component types (heading, text, button, card, etc.) and their exact styling.`;
+          } else if (result.description) {
+            return `[UI DESCRIPTION]\n${result.description}`;
+          }
+          return '[Image could not be analyzed]';
+        } catch (error) {
+          console.error('[Chat-V2] Error calling describe-image API:', error);
+          return '[Image description unavailable due to error]';
+        }
+      };
+
+      // Process messages and translate images to text
+      translatedMessages = await Promise.all(processedMessages.map(async (msg: any) => {
+        if (msg.role !== 'user' || !Array.isArray(msg.content)) {
+          return msg;
+        }
+
+        const hasImages = msg.content.some((part: any) => part.type === 'image');
+        if (!hasImages) {
+          return msg;
+        }
+
+        // Translate each image to structured text
+        const translatedContent = await Promise.all(msg.content.map(async (part: any) => {
+          if (part.type !== 'image' || !part.image) {
+            return part;
+          }
+
+          const description = await describeImage(part.image);
+          return {
+            type: 'text',
+            text: description,
+          };
+        }));
+
+        console.log(`[Chat-V2] Translated ${msg.content.filter((p: any) => p.type === 'image').length} image(s) to structured text for non-vision model`);
+
+        return {
+          ...msg,
+          content: translatedContent,
+        };
+      }));
+    }
 
     // Preprocess messages to ensure images are in the correct format for the provider
     // Devstral via Vercel AI Gateway needs OpenAI-compatible format: { type: 'image_url', image_url: { url: '...' } }
     // Other providers use Vercel AI SDK format: { type: 'image', image: '...' }
-    const preprocessedMessages = processedMessages.map((msg: any) => {
+    // Use translatedMessages for non-vision models (images already converted to text)
+    const messagesToProcess = hasNativeVision ? processedMessages : translatedMessages;
+    const preprocessedMessages = messagesToProcess.map((msg: any) => {
       if (msg.role !== 'user' || !Array.isArray(msg.content)) {
         return msg;
       }

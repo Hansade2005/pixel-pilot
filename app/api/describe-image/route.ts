@@ -3,12 +3,380 @@ import { generateText } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 
 const mistral = createMistral({
-    apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
+  apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 })
+
+// Structured prompt that outputs JSON for code generation
+const STRUCTURED_UI_PROMPT = `You are a UI-to-Code Translation Engine. Your job is to analyze UI images and output a STRUCTURED JSON specification that a non-vision AI model can use to generate exact code.
+
+# CRITICAL: OUTPUT FORMAT
+You MUST output valid JSON only. No markdown, no explanations, no extra text. Just pure JSON.
+
+# JSON Schema
+
+{
+  "pageType": "landing|dashboard|form|auth|settings|profile|list|detail|error|other",
+  "theme": {
+    "mode": "light|dark",
+    "primaryColor": "#hex",
+    "backgroundColor": "#hex",
+    "textColor": "#hex",
+    "accentColor": "#hex"
+  },
+  "layout": {
+    "type": "flex-col|flex-row|grid|absolute",
+    "maxWidth": "string (e.g., 'max-w-7xl', '1200px')",
+    "padding": "string (e.g., 'p-4', 'px-6 py-8')",
+    "gap": "string (e.g., 'gap-4', 'space-y-6')",
+    "alignment": "center|start|end|stretch"
+  },
+  "sections": [
+    {
+      "id": "unique-section-id",
+      "type": "navbar|hero|features|cta|footer|sidebar|content|form|grid|list|modal|card-grid",
+      "layout": {
+        "type": "flex-col|flex-row|grid",
+        "justify": "start|center|end|between|around",
+        "align": "start|center|end|stretch",
+        "gap": "string",
+        "padding": "string",
+        "margin": "string"
+      },
+      "style": {
+        "background": "string (color or gradient)",
+        "borderRadius": "string",
+        "border": "string",
+        "shadow": "string"
+      },
+      "children": [
+        {
+          "component": "heading|text|button|input|image|icon|card|link|badge|avatar|divider|spacer|container|list|nav-item|logo|form-field",
+          "props": {
+            // Component-specific props
+          },
+          "className": "Tailwind classes string",
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+
+# Component Props Reference
+
+## heading
+{
+  "level": 1-6,
+  "text": "actual text content",
+  "className": "text-4xl font-bold text-gray-900"
+}
+
+## text
+{
+  "text": "actual text content",
+  "variant": "body|caption|label|muted",
+  "className": "text-base text-gray-600"
+}
+
+## button
+{
+  "text": "Button Text",
+  "variant": "primary|secondary|outline|ghost|destructive|link",
+  "size": "sm|md|lg|xl",
+  "icon": "icon-name or null",
+  "iconPosition": "left|right",
+  "className": "bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
+}
+
+## input
+{
+  "type": "text|email|password|number|search|textarea|select",
+  "placeholder": "Placeholder text",
+  "label": "Label text or null",
+  "className": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+}
+
+## image
+{
+  "src": "describe what the image shows",
+  "alt": "alt text",
+  "aspectRatio": "16:9|4:3|1:1|auto",
+  "objectFit": "cover|contain|fill",
+  "className": "w-full h-64 rounded-lg object-cover"
+}
+
+## icon
+{
+  "name": "descriptive-icon-name (e.g., menu, search, close, arrow-right, check, user, settings)",
+  "size": "sm|md|lg",
+  "className": "w-6 h-6 text-gray-500"
+}
+
+## card
+{
+  "variant": "default|elevated|outlined|ghost",
+  "className": "bg-white rounded-xl shadow-lg p-6",
+  "children": []
+}
+
+## link
+{
+  "text": "Link text",
+  "href": "#",
+  "className": "text-blue-600 hover:text-blue-800 hover:underline"
+}
+
+## badge
+{
+  "text": "Badge text",
+  "variant": "default|success|warning|error|info",
+  "className": "px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
+}
+
+## avatar
+{
+  "src": "describe avatar image",
+  "fallback": "initials like JD",
+  "size": "sm|md|lg|xl",
+  "className": "w-12 h-12 rounded-full"
+}
+
+## divider
+{
+  "orientation": "horizontal|vertical",
+  "className": "border-t border-gray-200 my-8"
+}
+
+## container
+{
+  "className": "flex items-center gap-4",
+  "children": []
+}
+
+## nav-item
+{
+  "text": "Nav Item",
+  "href": "#",
+  "active": true|false,
+  "icon": "icon-name or null",
+  "className": "px-4 py-2 text-gray-700 hover:text-gray-900"
+}
+
+## logo
+{
+  "text": "Brand Name",
+  "icon": "logo description or null",
+  "className": "text-2xl font-bold"
+}
+
+## form-field
+{
+  "label": "Field Label",
+  "type": "text|email|password|textarea|select|checkbox|radio",
+  "placeholder": "placeholder",
+  "required": true|false,
+  "options": ["option1", "option2"] // for select/radio
+}
+
+# Translation Rules
+
+1. ANALYZE THE LAYOUT FIRST
+   - Is it a single column? Use flex-col
+   - Multiple columns? Use grid with appropriate cols
+   - Horizontal alignment? Use flex-row with justify-between
+
+2. IDENTIFY SECTIONS
+   - Navbar is always at top
+   - Hero sections have big headings and CTAs
+   - Feature grids show multiple cards
+   - Footers have links and copyright
+
+3. EXTRACT EXACT TEXT
+   - Transcribe all visible text word-for-word
+   - Don't paraphrase or summarize
+
+4. MATCH COLORS TO TAILWIND
+   - Use closest Tailwind color (blue-600, gray-900, etc.)
+   - For exact colors, use arbitrary values [#hex]
+
+5. ESTIMATE SPACING
+   - Small gaps: gap-2, gap-4
+   - Medium: gap-6, gap-8
+   - Large: gap-12, gap-16
+
+6. DETECT COMPONENT PATTERNS
+   - Button with arrow = button with icon right
+   - Input with label above = form-field
+   - Image with overlay text = card with background image
+   - Icon + text = container with icon and text children
+
+# Example Output
+
+{
+  "pageType": "landing",
+  "theme": {
+    "mode": "light",
+    "primaryColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "textColor": "#111827",
+    "accentColor": "#3b82f6"
+  },
+  "layout": {
+    "type": "flex-col",
+    "maxWidth": "max-w-7xl",
+    "padding": "px-4",
+    "gap": "gap-0",
+    "alignment": "center"
+  },
+  "sections": [
+    {
+      "id": "navbar",
+      "type": "navbar",
+      "layout": {
+        "type": "flex-row",
+        "justify": "between",
+        "align": "center",
+        "padding": "px-6 py-4"
+      },
+      "style": {
+        "background": "bg-white",
+        "border": "border-b border-gray-200"
+      },
+      "children": [
+        {
+          "component": "logo",
+          "props": {
+            "text": "Acme",
+            "className": "text-2xl font-bold text-gray-900"
+          }
+        },
+        {
+          "component": "container",
+          "props": {
+            "className": "flex items-center gap-8"
+          },
+          "children": [
+            {
+              "component": "nav-item",
+              "props": {
+                "text": "Features",
+                "active": false,
+                "className": "text-gray-600 hover:text-gray-900"
+              }
+            },
+            {
+              "component": "nav-item",
+              "props": {
+                "text": "Pricing",
+                "active": false,
+                "className": "text-gray-600 hover:text-gray-900"
+              }
+            },
+            {
+              "component": "button",
+              "props": {
+                "text": "Get Started",
+                "variant": "primary",
+                "className": "bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hero",
+      "type": "hero",
+      "layout": {
+        "type": "flex-col",
+        "align": "center",
+        "gap": "gap-6",
+        "padding": "py-24 px-4"
+      },
+      "style": {
+        "background": "bg-gradient-to-b from-blue-50 to-white"
+      },
+      "children": [
+        {
+          "component": "badge",
+          "props": {
+            "text": "New Release",
+            "className": "px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium"
+          }
+        },
+        {
+          "component": "heading",
+          "props": {
+            "level": 1,
+            "text": "Build faster with AI",
+            "className": "text-5xl font-bold text-gray-900 text-center max-w-3xl"
+          }
+        },
+        {
+          "component": "text",
+          "props": {
+            "text": "The most advanced AI-powered development platform.",
+            "className": "text-xl text-gray-600 text-center max-w-2xl"
+          }
+        },
+        {
+          "component": "container",
+          "props": {
+            "className": "flex items-center gap-4 mt-4"
+          },
+          "children": [
+            {
+              "component": "button",
+              "props": {
+                "text": "Start Free Trial",
+                "variant": "primary",
+                "className": "bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 shadow-lg"
+              }
+            },
+            {
+              "component": "button",
+              "props": {
+                "text": "Watch Demo",
+                "variant": "outline",
+                "icon": "play",
+                "iconPosition": "left",
+                "className": "border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:border-gray-400"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+# CRITICAL INSTRUCTIONS
+
+1. Output ONLY valid JSON - no markdown code blocks, no explanations
+2. Transcribe ALL visible text exactly as shown
+3. Use Tailwind classes for ALL styling
+4. Build a complete component tree - every element must be represented
+5. Nest children properly - maintain the visual hierarchy
+6. Be exhaustive - don't skip any visible elements
+7. For icons, use descriptive names (menu, search, arrow-right, check, x, etc.)
+8. For images, describe what they show in the "src" field
+
+Analyze the provided image and output the JSON specification now.`
+
+// Simpler prompt for quick descriptions
+const QUICK_DESCRIPTION_PROMPT = `Analyze this UI image and provide a brief structured description:
+
+1. **Page Type**: What kind of page is this? (landing, dashboard, form, etc.)
+2. **Main Sections**: List the major sections from top to bottom
+3. **Key Components**: List the main UI components visible (buttons, cards, inputs, etc.)
+4. **Color Scheme**: Primary colors used
+5. **Layout Style**: How is the content organized?
+
+Keep it concise but complete.`
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt } = await request.json()
+    const { image, prompt, mode = 'structured' } = await request.json()
 
     if (!image) {
       return NextResponse.json(
@@ -17,7 +385,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use Pixtral (Mistral's vision model) for image description
+    // Choose prompt based on mode
+    const systemPrompt = mode === 'quick'
+      ? QUICK_DESCRIPTION_PROMPT
+      : (prompt || STRUCTURED_UI_PROMPT)
+
+    // Use Pixtral (Mistral's vision model) for image analysis
     const result = await generateText({
       model: mistral('pixtral-12b-2409'),
       messages: [
@@ -26,295 +399,7 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: 'text',
-              text: prompt || `You are a UI Visual Analysis Expert. Your sole purpose is to extract and document every visual detail from the provided interface image with extreme precision.
-
-# Your Mission
-Describe exactly what you see in the image—nothing more, nothing less. Provide objective, measurable details that would allow someone who cannot see the image to recreate it perfectly.
-
-# Critical Rules
-- **NEVER suggest frameworks, libraries, or implementation approaches**
-- **NEVER assume technical stack or tools**
-- **ONLY describe what is visually present**
-- **Be precise with measurements (estimate in px)**
-- **Be exhaustive—capture every visible element**
-- **Your description IS the only way a non-vision AI can "see" this UI**
-
----
-
-# Analysis Framework
-
-## 1. OVERALL LAYOUT & STRUCTURE
-- **Page/Screen Dimensions**: Estimated width and height
-- **Main Layout Pattern**: How the page is divided (columns, rows, sections)
-- **Section Breakdown**: Describe each distinct area from top to bottom
-- **Element Positioning**: Where each element sits relative to others
-- **Spacing Between Sections**: Vertical and horizontal gaps
-- **Content Width**: Maximum width of main content area
-- **Alignment**: How content aligns (centered, left-aligned, etc.)
-
-## 2. COLORS
-Document every color you see:
-- **Background Colors**: Main bg, section backgrounds, card backgrounds
-- **Text Colors**: All text shades (provide hex estimates)
-- **Accent Colors**: Buttons, links, highlights, borders
-- **Gradients**: If present, describe start color, end color, and direction
-- **Shadow Colors**: Colors used in shadows (usually with transparency)
-- **Overlay Colors**: Any semi-transparent overlays
-
-## 3. SPACING & MEASUREMENTS
-Estimate all spacing values:
-- **Padding**: Internal spacing within elements
-- **Margins**: Space between elements
-- **Gaps**: Space in grids or flex layouts
-- **Border Thickness**: Width of all borders
-- **Corner Radius**: Roundness of corners (0px = sharp, larger = rounder)
-- **Element Dimensions**: Width and height of major components
-
-## 4. TYPOGRAPHY
-For every piece of text visible, document:
-- **Content**: The actual text (transcribe exactly)
-- **Font Size**: Estimate in px (e.g., 14px, 18px, 32px)
-- **Font Weight**: Thin/Light (100-300), Regular (400), Medium (500), Semibold (600), Bold (700), Extra Bold (800-900)
-- **Line Height**: Space between lines of text
-- **Letter Spacing**: Tightness or looseness of character spacing
-- **Text Color**: Specific color or shade
-- **Text Alignment**: Left, center, right, justified
-- **Text Transform**: All caps, lowercase, capitalized
-- **Text Decoration**: Underline, strikethrough, none
-- **Text Hierarchy**: Is this a heading, subheading, body text, caption, label?
-
-## 5. VISUAL ELEMENTS
-
-### Buttons
-For each button:
-- **Size**: Width and height
-- **Shape**: Border radius value
-- **Background Color**: Default state
-- **Text**: Content, size, weight, color
-- **Border**: Width, color, style
-- **Shadow**: Offset, blur, spread, color
-- **Padding**: Internal spacing
-- **Icon**: If present, describe and position (left/right of text)
-
-### Input Fields
-- **Size**: Width, height
-- **Border**: Width, color, radius
-- **Background**: Color
-- **Placeholder Text**: Content and styling
-- **Label**: Text, position, styling
-- **Padding**: Internal spacing
-- **Shadow/Focus Ring**: Any visible effects
-
-### Images
-- **Position**: Where it appears
-- **Size**: Width and height
-- **Aspect Ratio**: Proportions (e.g., 16:9, 1:1, 4:3)
-- **Border Radius**: Any rounding
-- **Shadow**: If present
-- **Content Description**: What the image shows
-- **Object Fit**: How image fills space (cover, contain, stretch)
-
-### Icons
-- **Style**: Outline, filled, duotone
-- **Size**: Estimated px dimensions
-- **Color**: Exact color
-- **Stroke Width**: Thickness of lines (for outline icons)
-- **Position**: Where they appear
-- **Purpose**: What they represent (search, menu, close, etc.)
-
-### Cards/Containers
-- **Dimensions**: Width and height
-- **Background**: Color or gradient
-- **Border**: Width, color, radius
-- **Shadow**: Full shadow specifications
-- **Padding**: Internal spacing
-- **Content**: What's inside the card
-
-### Lists
-- **List Style**: Bullets, numbers, none
-- **Item Spacing**: Gap between items
-- **Indentation**: Left padding
-- **Markers**: Style and color of bullets/numbers
-
-### Tables/Grids
-- **Columns**: Number and width of columns
-- **Rows**: Number of rows
-- **Cell Padding**: Space inside cells
-- **Borders**: Presence and styling
-- **Header Styling**: How headers differ from cells
-- **Alternating Rows**: If rows have different backgrounds
-
-### Navigation
-- **Type**: Horizontal bar, vertical sidebar, etc.
-- **Items**: List all nav items
-- **Spacing**: Gaps between items
-- **Active State**: How current page is indicated
-- **Styling**: Colors, sizes, weights
-
-## 6. EFFECTS & STYLING
-
-### Shadows
-For each shadow:
-- **X Offset**: Horizontal shift
-- **Y Offset**: Vertical shift
-- **Blur Radius**: How soft the shadow is
-- **Spread**: How far shadow extends
-- **Color**: Shadow color with opacity
-
-### Borders
-- **Width**: Thickness in px
-- **Style**: Solid, dashed, dotted
-- **Color**: Exact color
-- **Which Sides**: All, top, bottom, left, right
-
-### Background Effects
-- **Solid Colors**: Hex values
-- **Gradients**: Linear/radial, angle, color stops
-- **Patterns**: Any repeating patterns
-- **Images**: Background images and their positioning
-- **Blur Effects**: Backdrop blur (glassmorphism)
-- **Opacity**: Any transparency
-
-## 7. INTERACTIVE STATE INDICATORS
-Look for visual clues of different states:
-- **Hover States**: Lighter/darker colors, underlines, shadows
-- **Active/Selected States**: Different background, borders, colors
-- **Disabled States**: Faded opacity, different colors
-- **Focus States**: Rings, outlines, borders around elements
-- **Loading States**: Spinners, skeletons, progress bars
-
-Note: Only document what is VISIBLE in the image, not what might happen on interaction.
-
-## 8. COMPONENT STATES VISIBLE
-Document any elements showing different states:
-- **Checked Checkboxes**: Style of checkmark
-- **Selected Radio Buttons**: Inner circle styling
-- **Toggle Switches**: On/off position and colors
-- **Dropdown Menus**: If expanded, what's visible
-- **Tabs**: Active vs inactive tab styling
-- **Accordion**: Expanded/collapsed sections
-
-## 9. BADGES, LABELS, TAGS
-- **Size**: Dimensions
-- **Shape**: Border radius
-- **Background**: Color
-- **Text**: Content, size, weight, color
-- **Border**: If present
-- **Position**: Where they appear (top-right of element, etc.)
-
-## 10. MODAL/OVERLAY ELEMENTS
-If any overlays are visible:
-- **Backdrop**: Color and opacity
-- **Modal Box**: Dimensions, position, background, shadow
-- **Close Button**: Position and styling
-- **Content**: Everything inside the modal
-
-## 11. DIVIDERS & SEPARATORS
-- **Type**: Horizontal or vertical line
-- **Thickness**: Width in px
-- **Color**: Exact color
-- **Length**: Full width or partial
-- **Position**: Where they appear
-
-## 12. WHITE SPACE & BREATHING ROOM
-- **Density**: Is content cramped or spacious?
-- **Section Gaps**: Large vertical spacing between sections
-- **Element Proximity**: How close related items are
-- **Container Padding**: Space around main content areas
-
----
-
-# OUTPUT FORMAT
-
-Provide your analysis in clear, structured sections. Use this exact format:
-\`\`\`
-=== OVERVIEW ===
-[Brief description of what type of interface this is]
-
-=== LAYOUT STRUCTURE ===
-[Detailed layout breakdown from top to bottom]
-
-=== COLOR PALETTE ===
-Background colors:
-- [List all backgrounds with hex codes]
-
-Text colors:
-- [List all text colors]
-
-Accent colors:
-- [List buttons, links, highlights]
-
-Other colors:
-- [Borders, shadows, etc.]
-
-=== TYPOGRAPHY SYSTEM ===
-[Document each text element with full specs]
-
-Example:
-Main Heading:
-- Text: "Welcome to Dashboard"
-- Size: 32px
-- Weight: 700 (Bold)
-- Color: #1a1a1a
-- Line height: 40px
-- Alignment: Left
-
-=== SPACING SCALE ===
-[List all unique spacing values observed]
-- 4px, 8px, 12px, 16px, 24px, 32px, 48px, etc.
-
-=== COMPONENTS CATALOG ===
-
-BUTTONS:
-[Full specs for each button type]
-
-INPUT FIELDS:
-[Full specs for each input]
-
-CARDS:
-[Full specs for each card]
-
-ICONS:
-[List and describe each icon]
-
-IMAGES:
-[Describe each image]
-
-[Continue for all visible components]
-
-=== SHADOWS ===
-[List all unique shadow styles with full values]
-
-=== BORDERS & CORNERS ===
-[List all border styles and radius values]
-
-=== VISUAL EFFECTS ===
-[Gradients, blurs, opacity, etc.]
-
-=== CONTENT TRANSCRIPTION ===
-[All visible text content, organized by section]
-
-=== ELEMENT-BY-ELEMENT BREAKDOWN ===
-[Top to bottom, left to right description of every single visible element]
-\`\`\`
-
----
-
-# CRITICAL REMINDERS
-
-1. **EXTRACT, DON'T INTERPRET**: You're a camera, not a designer
-2. **MEASURE EVERYTHING**: Provide specific px values, not "large" or "small"
-3. **TRANSCRIBE ALL TEXT**: Word-for-word accuracy
-4. **DESCRIBE ALL COLORS**: Hex codes or rgba values
-5. **ACCOUNT FOR EVERY PIXEL**: Don't skip minor details
-6. **NO IMPLEMENTATION TALK**: No mention of React, Tailwind, CSS, HTML, or any code
-7. **OBJECTIVE ONLY**: No opinions on design quality
-8. **COMPLETE VISIBILITY**: If an element is partially visible, describe what you can see
-
-The AI receiving your output cannot see the image. Your description must be so detailed and precise that they could recreate this pixel-perfectly using only your words.
-
-Begin your analysis now.
-`,
+              text: systemPrompt,
             },
             {
               type: 'image',
@@ -323,11 +408,52 @@ Begin your analysis now.
           ],
         },
       ],
-      temperature: 0.7,
+      temperature: 0.3, // Lower temperature for more consistent structured output
     })
 
+    // For structured mode, try to parse and validate the JSON
+    if (mode === 'structured' && !prompt) {
+      try {
+        // Clean up the response - remove any markdown code blocks if present
+        let jsonText = result.text.trim()
+
+        // Remove markdown code block wrapper if present
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.slice(7)
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.slice(3)
+        }
+        if (jsonText.endsWith('```')) {
+          jsonText = jsonText.slice(0, -3)
+        }
+        jsonText = jsonText.trim()
+
+        // Try to parse to validate it's proper JSON
+        const parsed = JSON.parse(jsonText)
+
+        return NextResponse.json({
+          success: true,
+          mode: 'structured',
+          specification: parsed,
+          raw: jsonText,
+        })
+      } catch (parseError) {
+        // If JSON parsing fails, return raw text with error flag
+        console.warn('Failed to parse structured output as JSON:', parseError)
+        return NextResponse.json({
+          success: true,
+          mode: 'structured',
+          parseError: true,
+          raw: result.text,
+          description: result.text,
+        })
+      }
+    }
+
+    // For quick mode or custom prompts, return text directly
     return NextResponse.json({
       success: true,
+      mode: mode,
       description: result.text,
     })
   } catch (error) {
