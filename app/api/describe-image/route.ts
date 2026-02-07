@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateText } from 'ai'
-import { createMistral } from '@ai-sdk/mistral'
-
-const mistral = createMistral({
-  apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
-})
+import { vercelGateway } from '@/lib/ai-providers'
 
 // =============================================================================
 // MODE: CLONE - Structured JSON for UI cloning/recreation
@@ -274,9 +270,9 @@ export async function POST(request: NextRequest) {
       systemPrompt = prompt
     }
 
-    // Use Pixtral (Mistral's vision model) for image analysis
+    // Use Mistral vision model via Vercel AI Gateway to avoid rate limits
     const result = await generateText({
-      model: mistral('pixtral-12b-2409'),
+      model: vercelGateway('mistral/devstral-small-2'),
       messages: [
         {
           role: 'user',
