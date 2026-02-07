@@ -506,6 +506,7 @@ export type WebPreviewConsoleProps = ComponentProps<"div"> & {
   terminalLogs?: string[];
   browserLogs?: string[];
   onAskAiToFix?: (errors: string[]) => void;
+  onAskAiToFixTerminal?: (errors: string[]) => void;
   onClearBrowserLogs?: () => void;
 };
 
@@ -586,12 +587,39 @@ export const WebPreviewConsole = ({
   terminalLogs = [],
   browserLogs = [],
   onAskAiToFix,
+  onAskAiToFixTerminal,
   onClearBrowserLogs,
   children,
   ...props
 }: WebPreviewConsoleProps) => {
   const { consoleOpen, setConsoleOpen } = useWebPreview();
   const [activeTab, setActiveTab] = useState<"terminal" | "browser">("terminal");
+
+  // Extract terminal errors for "Ask AI to Fix" button
+  const terminalErrors = useMemo(() => {
+    const errorPatterns = [
+      /error/i,
+      /ERR!/i,
+      /failed/i,
+      /exception/i,
+      /TypeError/i,
+      /ReferenceError/i,
+      /SyntaxError/i,
+      /Cannot find/i,
+      /ENOENT/i,
+      /EACCES/i,
+      /Module not found/i,
+    ];
+    return terminalLogs.filter(log =>
+      errorPatterns.some(pattern => pattern.test(log))
+    );
+  }, [terminalLogs]);
+
+  const handleAskAiToFixTerminal = () => {
+    if (onAskAiToFixTerminal && terminalErrors.length > 0) {
+      onAskAiToFixTerminal(terminalErrors);
+    }
+  };
 
   // Parse browser logs from JSON strings to raw format
   const parsedRawLogs = useMemo(() => {
@@ -678,6 +706,17 @@ export const WebPreviewConsole = ({
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              {activeTab === "terminal" && terminalErrors.length > 0 && onAskAiToFixTerminal && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-destructive hover:text-destructive border-destructive/50 hover:border-destructive hover:bg-destructive/10"
+                  onClick={handleAskAiToFixTerminal}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Ask AI to Fix
+                </Button>
+              )}
               {activeTab === "browser" && errorLogs.length > 0 && onAskAiToFix && (
                 <Button
                   variant="outline"
