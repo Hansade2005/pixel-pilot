@@ -10360,6 +10360,78 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
 
     const isAnthropicModel = anthropicModels.includes(modelId);
 
+    // Gateway models that support vision (Mistral Devstral, etc.)
+    const gatewayVisionModels = [
+      'mistral/devstral-2',
+      'mistral/devstral-small-2',
+      'google/gemini-2.5-flash',
+      'google/gemini-2.5-pro',
+    ];
+    const isGatewayVisionModel = gatewayVisionModels.includes(modelId);
+
+    // Preprocess messages to handle image formats for different providers
+    // For gateway models, convert image format to OpenAI-compatible format explicitly
+    const preprocessedMessages = processedMessages.map((msg: any) => {
+      if (msg.role !== 'user' || !Array.isArray(msg.content)) {
+        return msg;
+      }
+
+      // Check if message has image parts
+      const hasImages = msg.content.some((part: any) => part.type === 'image');
+      if (!hasImages) {
+        return msg;
+      }
+
+      // Convert image parts to OpenAI format for gateway models
+      const convertedContent = msg.content.map((part: any) => {
+        if (part.type !== 'image' || !part.image) {
+          return part;
+        }
+
+        // Ensure image is in data URL format
+        let imageUrl = part.image;
+        if (typeof imageUrl === 'string') {
+          // If it's raw base64 without prefix, add it
+          if (!imageUrl.startsWith('data:')) {
+            imageUrl = `data:image/png;base64,${imageUrl}`;
+          }
+        }
+
+        // For gateway models, use OpenAI image_url format
+        if (isGatewayVisionModel) {
+          return {
+            type: 'image',
+            image: imageUrl,
+          };
+        }
+
+        // For Anthropic models, convert to Anthropic format
+        if (isAnthropicModel) {
+          // Extract base64 and media type from data URL
+          const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) {
+            return {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: match[1],
+                data: match[2],
+              },
+            };
+          }
+        }
+
+        return part;
+      });
+
+      console.log(`[Chat-V2] Preprocessed message with ${msg.content.filter((p: any) => p.type === 'image').length} image(s) for model ${modelId}`);
+
+      return {
+        ...msg,
+        content: convertedContent,
+      };
+    });
+
     const messagesWithSystem = [
       {
         role: 'system',
@@ -10379,7 +10451,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         } : {})
       },
-      ...processedMessages
+      ...preprocessedMessages
     ];
 
     // Prepare provider options for Anthropic models (reasoning + context management)
