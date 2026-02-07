@@ -3,12 +3,239 @@ import { generateText } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 
 const mistral = createMistral({
-    apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
+  apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 })
 
+// =============================================================================
+// MODE: CLONE - Structured JSON for UI cloning/recreation
+// =============================================================================
+const CLONE_PROMPT = `You are a UI-to-Code Translation Engine. Your job is to analyze UI images and output a STRUCTURED JSON specification that a non-vision AI model can use to generate exact code.
+
+# CRITICAL: OUTPUT FORMAT
+You MUST output valid JSON only. No markdown, no explanations, no extra text. Just pure JSON.
+
+# JSON Schema
+
+{
+  "pageType": "landing|dashboard|form|auth|settings|profile|list|detail|error|other",
+  "theme": {
+    "mode": "light|dark",
+    "primaryColor": "#hex",
+    "backgroundColor": "#hex",
+    "textColor": "#hex",
+    "accentColor": "#hex"
+  },
+  "layout": {
+    "type": "flex-col|flex-row|grid|absolute",
+    "maxWidth": "string (e.g., 'max-w-7xl', '1200px')",
+    "padding": "string (e.g., 'p-4', 'px-6 py-8')",
+    "gap": "string (e.g., 'gap-4', 'space-y-6')",
+    "alignment": "center|start|end|stretch"
+  },
+  "sections": [
+    {
+      "id": "unique-section-id",
+      "type": "navbar|hero|features|cta|footer|sidebar|content|form|grid|list|modal|card-grid",
+      "layout": {
+        "type": "flex-col|flex-row|grid",
+        "justify": "start|center|end|between|around",
+        "align": "start|center|end|stretch",
+        "gap": "string",
+        "padding": "string",
+        "margin": "string"
+      },
+      "style": {
+        "background": "string (color or gradient)",
+        "borderRadius": "string",
+        "border": "string",
+        "shadow": "string"
+      },
+      "children": [
+        {
+          "component": "heading|text|button|input|image|icon|card|link|badge|avatar|divider|spacer|container|list|nav-item|logo|form-field",
+          "props": {},
+          "className": "Tailwind classes string",
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+
+# Component Props Reference
+
+## heading: { "level": 1-6, "text": "content", "className": "text-4xl font-bold" }
+## text: { "text": "content", "variant": "body|caption|label|muted", "className": "text-base" }
+## button: { "text": "Label", "variant": "primary|secondary|outline|ghost", "size": "sm|md|lg", "icon": "name|null", "className": "..." }
+## input: { "type": "text|email|password|textarea|select", "placeholder": "...", "label": "...|null", "className": "..." }
+## image: { "src": "description of image", "alt": "...", "aspectRatio": "16:9|4:3|1:1", "className": "..." }
+## icon: { "name": "menu|search|close|arrow-right|check|user|settings", "size": "sm|md|lg", "className": "..." }
+## card: { "variant": "default|elevated|outlined", "className": "...", "children": [] }
+## badge: { "text": "...", "variant": "default|success|warning|error", "className": "..." }
+## container: { "className": "flex items-center gap-4", "children": [] }
+
+# Rules
+1. Output ONLY valid JSON - no markdown, no explanations
+2. Transcribe ALL visible text exactly
+3. Use Tailwind classes for ALL styling
+4. Build complete component tree with proper nesting
+5. For icons, use descriptive names
+6. For images, describe what they show
+
+Analyze the image and output JSON now.`
+
+// =============================================================================
+// MODE: DEBUG - For bug reports, styling issues, visual problems
+// =============================================================================
+const DEBUG_PROMPT = `You are a UI Debugging Assistant. The user is showing you a screenshot of their app because something is wrong or needs fixing. Your job is to analyze the image and describe the issues you observe.
+
+# Your Task
+Carefully examine the screenshot and identify:
+
+1. **Visual Issues**: What looks wrong, broken, or out of place?
+   - Misaligned elements
+   - Overlapping content
+   - Incorrect spacing
+   - Cut-off text or elements
+   - Broken layouts
+
+2. **Styling Problems**: What styling doesn't look right?
+   - Color mismatches or inconsistencies
+   - Font issues (wrong size, weight, or family)
+   - Border/shadow problems
+   - Background issues
+   - Responsive/sizing issues
+
+3. **UI/UX Concerns**: What hurts usability?
+   - Hard to read text (contrast issues)
+   - Unclear interactive elements
+   - Confusing layout
+   - Missing visual feedback
+
+4. **Error Indicators**: Any visible errors?
+   - Error messages in the UI
+   - Console errors if visible
+   - Loading states stuck
+   - Empty states that shouldn't be empty
+
+# Output Format
+Provide a structured analysis:
+
+## ISSUES IDENTIFIED
+
+### Issue 1: [Brief title]
+- **Location**: Where in the UI (top-left, navbar, card #2, etc.)
+- **Problem**: What exactly is wrong
+- **Expected**: What it should look like
+- **Likely Cause**: Probable CSS/code issue (e.g., "missing flex-wrap", "z-index conflict")
+- **Suggested Fix**: Specific code change (e.g., "add 'flex-wrap: wrap' to the container")
+
+### Issue 2: [Brief title]
+...
+
+## ADDITIONAL OBSERVATIONS
+- Any other things that look slightly off
+- Potential improvements even if not bugs
+
+Be specific about element locations and provide actionable fixes.`
+
+// =============================================================================
+// MODE: CONTEXT - General understanding, reference images, examples
+// =============================================================================
+const CONTEXT_PROMPT = `You are a Visual Context Analyzer. The user is sharing an image to give you context about what they're working on or what they want. Your job is to thoroughly describe what you see so a non-vision AI model can understand it.
+
+# Analyze and Describe
+
+## 1. Overview
+- What type of content is this? (UI mockup, screenshot, diagram, example, inspiration, etc.)
+- What is the main purpose or subject?
+
+## 2. Visual Content
+Describe everything you see in detail:
+- Text content (transcribe exactly)
+- Images and graphics
+- UI elements (buttons, forms, cards, etc.)
+- Layout and structure
+- Colors and styling
+
+## 3. Key Details
+- Important information the user likely wants to reference
+- Specific elements that stand out
+- Any annotations, highlights, or indicators
+
+## 4. Context Clues
+- What might the user be trying to achieve?
+- How does this relate to building/coding something?
+- What aspects should the AI focus on?
+
+## 5. Actionable Information
+Summarize what a coding AI should know:
+- Specific styles to match
+- Functionality to implement
+- Content to include
+- Patterns to follow
+
+Be thorough but organized. The goal is to give a non-vision AI everything it needs to understand this image.`
+
+// =============================================================================
+// MODE: AUTO - Detect intent from user message and choose appropriate mode
+// =============================================================================
+function detectMode(userMessage?: string): 'clone' | 'debug' | 'context' {
+  if (!userMessage) return 'clone' // Default to clone for UI recreation
+
+  const message = userMessage.toLowerCase()
+
+  // Debug/issue keywords
+  const debugKeywords = [
+    'bug', 'issue', 'problem', 'wrong', 'broken', 'fix', 'error',
+    'not working', 'doesnt work', "doesn't work", 'incorrect',
+    'misalign', 'overflow', 'cut off', 'overlap', 'spacing',
+    'color wrong', 'style issue', 'styling issue', 'looks off',
+    'why is', 'why does', 'what happened', 'help me fix',
+    'something wrong', 'messed up', 'weird', 'glitch'
+  ]
+
+  // Clone/build keywords
+  const cloneKeywords = [
+    'clone', 'copy', 'recreate', 'build this', 'make this',
+    'create this', 'like this', 'same as', 'replicate',
+    'implement this', 'code this', 'build like', 'design like',
+    'match this', 'similar to'
+  ]
+
+  // Context/reference keywords
+  const contextKeywords = [
+    'example', 'reference', 'inspiration', 'show you', 'look at',
+    'here is', "here's", 'this is', 'see this', 'check this',
+    'screenshot of', 'image of', 'what do you think', 'feedback',
+    'compare', 'versus', 'or this'
+  ]
+
+  // Check for debug intent
+  for (const keyword of debugKeywords) {
+    if (message.includes(keyword)) return 'debug'
+  }
+
+  // Check for clone intent
+  for (const keyword of cloneKeywords) {
+    if (message.includes(keyword)) return 'clone'
+  }
+
+  // Check for context intent
+  for (const keyword of contextKeywords) {
+    if (message.includes(keyword)) return 'context'
+  }
+
+  // Default to clone for UI-focused platform
+  return 'clone'
+}
+
+// =============================================================================
+// API HANDLER
+// =============================================================================
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt } = await request.json()
+    const { image, prompt, mode, userMessage } = await request.json()
 
     if (!image) {
       return NextResponse.json(
@@ -17,7 +244,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use Pixtral (Mistral's vision model) for image description
+    // Determine mode: explicit mode > auto-detect from userMessage > default to clone
+    const effectiveMode = mode || detectMode(userMessage)
+    console.log(`[describe-image] Mode: ${effectiveMode}, userMessage: "${userMessage?.slice(0, 50)}..."`)
+
+    // Select prompt based on mode
+    let systemPrompt: string
+    switch (effectiveMode) {
+      case 'debug':
+        systemPrompt = DEBUG_PROMPT
+        break
+      case 'context':
+        systemPrompt = CONTEXT_PROMPT
+        break
+      case 'clone':
+      case 'structured': // Backwards compatibility
+      default:
+        systemPrompt = CLONE_PROMPT
+        break
+    }
+
+    // If custom prompt provided, append user context
+    if (userMessage && effectiveMode !== 'clone') {
+      systemPrompt = `${systemPrompt}\n\n# USER'S MESSAGE\nThe user said: "${userMessage}"\n\nKeep this context in mind when analyzing the image.`
+    }
+
+    // Use custom prompt if explicitly provided (overrides everything)
+    if (prompt) {
+      systemPrompt = prompt
+    }
+
+    // Use Pixtral (Mistral's vision model) for image analysis
     const result = await generateText({
       model: mistral('pixtral-12b-2409'),
       messages: [
@@ -26,295 +283,7 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: 'text',
-              text: prompt || `You are a UI Visual Analysis Expert. Your sole purpose is to extract and document every visual detail from the provided interface image with extreme precision.
-
-# Your Mission
-Describe exactly what you see in the image—nothing more, nothing less. Provide objective, measurable details that would allow someone who cannot see the image to recreate it perfectly.
-
-# Critical Rules
-- **NEVER suggest frameworks, libraries, or implementation approaches**
-- **NEVER assume technical stack or tools**
-- **ONLY describe what is visually present**
-- **Be precise with measurements (estimate in px)**
-- **Be exhaustive—capture every visible element**
-- **Your description IS the only way a non-vision AI can "see" this UI**
-
----
-
-# Analysis Framework
-
-## 1. OVERALL LAYOUT & STRUCTURE
-- **Page/Screen Dimensions**: Estimated width and height
-- **Main Layout Pattern**: How the page is divided (columns, rows, sections)
-- **Section Breakdown**: Describe each distinct area from top to bottom
-- **Element Positioning**: Where each element sits relative to others
-- **Spacing Between Sections**: Vertical and horizontal gaps
-- **Content Width**: Maximum width of main content area
-- **Alignment**: How content aligns (centered, left-aligned, etc.)
-
-## 2. COLORS
-Document every color you see:
-- **Background Colors**: Main bg, section backgrounds, card backgrounds
-- **Text Colors**: All text shades (provide hex estimates)
-- **Accent Colors**: Buttons, links, highlights, borders
-- **Gradients**: If present, describe start color, end color, and direction
-- **Shadow Colors**: Colors used in shadows (usually with transparency)
-- **Overlay Colors**: Any semi-transparent overlays
-
-## 3. SPACING & MEASUREMENTS
-Estimate all spacing values:
-- **Padding**: Internal spacing within elements
-- **Margins**: Space between elements
-- **Gaps**: Space in grids or flex layouts
-- **Border Thickness**: Width of all borders
-- **Corner Radius**: Roundness of corners (0px = sharp, larger = rounder)
-- **Element Dimensions**: Width and height of major components
-
-## 4. TYPOGRAPHY
-For every piece of text visible, document:
-- **Content**: The actual text (transcribe exactly)
-- **Font Size**: Estimate in px (e.g., 14px, 18px, 32px)
-- **Font Weight**: Thin/Light (100-300), Regular (400), Medium (500), Semibold (600), Bold (700), Extra Bold (800-900)
-- **Line Height**: Space between lines of text
-- **Letter Spacing**: Tightness or looseness of character spacing
-- **Text Color**: Specific color or shade
-- **Text Alignment**: Left, center, right, justified
-- **Text Transform**: All caps, lowercase, capitalized
-- **Text Decoration**: Underline, strikethrough, none
-- **Text Hierarchy**: Is this a heading, subheading, body text, caption, label?
-
-## 5. VISUAL ELEMENTS
-
-### Buttons
-For each button:
-- **Size**: Width and height
-- **Shape**: Border radius value
-- **Background Color**: Default state
-- **Text**: Content, size, weight, color
-- **Border**: Width, color, style
-- **Shadow**: Offset, blur, spread, color
-- **Padding**: Internal spacing
-- **Icon**: If present, describe and position (left/right of text)
-
-### Input Fields
-- **Size**: Width, height
-- **Border**: Width, color, radius
-- **Background**: Color
-- **Placeholder Text**: Content and styling
-- **Label**: Text, position, styling
-- **Padding**: Internal spacing
-- **Shadow/Focus Ring**: Any visible effects
-
-### Images
-- **Position**: Where it appears
-- **Size**: Width and height
-- **Aspect Ratio**: Proportions (e.g., 16:9, 1:1, 4:3)
-- **Border Radius**: Any rounding
-- **Shadow**: If present
-- **Content Description**: What the image shows
-- **Object Fit**: How image fills space (cover, contain, stretch)
-
-### Icons
-- **Style**: Outline, filled, duotone
-- **Size**: Estimated px dimensions
-- **Color**: Exact color
-- **Stroke Width**: Thickness of lines (for outline icons)
-- **Position**: Where they appear
-- **Purpose**: What they represent (search, menu, close, etc.)
-
-### Cards/Containers
-- **Dimensions**: Width and height
-- **Background**: Color or gradient
-- **Border**: Width, color, radius
-- **Shadow**: Full shadow specifications
-- **Padding**: Internal spacing
-- **Content**: What's inside the card
-
-### Lists
-- **List Style**: Bullets, numbers, none
-- **Item Spacing**: Gap between items
-- **Indentation**: Left padding
-- **Markers**: Style and color of bullets/numbers
-
-### Tables/Grids
-- **Columns**: Number and width of columns
-- **Rows**: Number of rows
-- **Cell Padding**: Space inside cells
-- **Borders**: Presence and styling
-- **Header Styling**: How headers differ from cells
-- **Alternating Rows**: If rows have different backgrounds
-
-### Navigation
-- **Type**: Horizontal bar, vertical sidebar, etc.
-- **Items**: List all nav items
-- **Spacing**: Gaps between items
-- **Active State**: How current page is indicated
-- **Styling**: Colors, sizes, weights
-
-## 6. EFFECTS & STYLING
-
-### Shadows
-For each shadow:
-- **X Offset**: Horizontal shift
-- **Y Offset**: Vertical shift
-- **Blur Radius**: How soft the shadow is
-- **Spread**: How far shadow extends
-- **Color**: Shadow color with opacity
-
-### Borders
-- **Width**: Thickness in px
-- **Style**: Solid, dashed, dotted
-- **Color**: Exact color
-- **Which Sides**: All, top, bottom, left, right
-
-### Background Effects
-- **Solid Colors**: Hex values
-- **Gradients**: Linear/radial, angle, color stops
-- **Patterns**: Any repeating patterns
-- **Images**: Background images and their positioning
-- **Blur Effects**: Backdrop blur (glassmorphism)
-- **Opacity**: Any transparency
-
-## 7. INTERACTIVE STATE INDICATORS
-Look for visual clues of different states:
-- **Hover States**: Lighter/darker colors, underlines, shadows
-- **Active/Selected States**: Different background, borders, colors
-- **Disabled States**: Faded opacity, different colors
-- **Focus States**: Rings, outlines, borders around elements
-- **Loading States**: Spinners, skeletons, progress bars
-
-Note: Only document what is VISIBLE in the image, not what might happen on interaction.
-
-## 8. COMPONENT STATES VISIBLE
-Document any elements showing different states:
-- **Checked Checkboxes**: Style of checkmark
-- **Selected Radio Buttons**: Inner circle styling
-- **Toggle Switches**: On/off position and colors
-- **Dropdown Menus**: If expanded, what's visible
-- **Tabs**: Active vs inactive tab styling
-- **Accordion**: Expanded/collapsed sections
-
-## 9. BADGES, LABELS, TAGS
-- **Size**: Dimensions
-- **Shape**: Border radius
-- **Background**: Color
-- **Text**: Content, size, weight, color
-- **Border**: If present
-- **Position**: Where they appear (top-right of element, etc.)
-
-## 10. MODAL/OVERLAY ELEMENTS
-If any overlays are visible:
-- **Backdrop**: Color and opacity
-- **Modal Box**: Dimensions, position, background, shadow
-- **Close Button**: Position and styling
-- **Content**: Everything inside the modal
-
-## 11. DIVIDERS & SEPARATORS
-- **Type**: Horizontal or vertical line
-- **Thickness**: Width in px
-- **Color**: Exact color
-- **Length**: Full width or partial
-- **Position**: Where they appear
-
-## 12. WHITE SPACE & BREATHING ROOM
-- **Density**: Is content cramped or spacious?
-- **Section Gaps**: Large vertical spacing between sections
-- **Element Proximity**: How close related items are
-- **Container Padding**: Space around main content areas
-
----
-
-# OUTPUT FORMAT
-
-Provide your analysis in clear, structured sections. Use this exact format:
-\`\`\`
-=== OVERVIEW ===
-[Brief description of what type of interface this is]
-
-=== LAYOUT STRUCTURE ===
-[Detailed layout breakdown from top to bottom]
-
-=== COLOR PALETTE ===
-Background colors:
-- [List all backgrounds with hex codes]
-
-Text colors:
-- [List all text colors]
-
-Accent colors:
-- [List buttons, links, highlights]
-
-Other colors:
-- [Borders, shadows, etc.]
-
-=== TYPOGRAPHY SYSTEM ===
-[Document each text element with full specs]
-
-Example:
-Main Heading:
-- Text: "Welcome to Dashboard"
-- Size: 32px
-- Weight: 700 (Bold)
-- Color: #1a1a1a
-- Line height: 40px
-- Alignment: Left
-
-=== SPACING SCALE ===
-[List all unique spacing values observed]
-- 4px, 8px, 12px, 16px, 24px, 32px, 48px, etc.
-
-=== COMPONENTS CATALOG ===
-
-BUTTONS:
-[Full specs for each button type]
-
-INPUT FIELDS:
-[Full specs for each input]
-
-CARDS:
-[Full specs for each card]
-
-ICONS:
-[List and describe each icon]
-
-IMAGES:
-[Describe each image]
-
-[Continue for all visible components]
-
-=== SHADOWS ===
-[List all unique shadow styles with full values]
-
-=== BORDERS & CORNERS ===
-[List all border styles and radius values]
-
-=== VISUAL EFFECTS ===
-[Gradients, blurs, opacity, etc.]
-
-=== CONTENT TRANSCRIPTION ===
-[All visible text content, organized by section]
-
-=== ELEMENT-BY-ELEMENT BREAKDOWN ===
-[Top to bottom, left to right description of every single visible element]
-\`\`\`
-
----
-
-# CRITICAL REMINDERS
-
-1. **EXTRACT, DON'T INTERPRET**: You're a camera, not a designer
-2. **MEASURE EVERYTHING**: Provide specific px values, not "large" or "small"
-3. **TRANSCRIBE ALL TEXT**: Word-for-word accuracy
-4. **DESCRIBE ALL COLORS**: Hex codes or rgba values
-5. **ACCOUNT FOR EVERY PIXEL**: Don't skip minor details
-6. **NO IMPLEMENTATION TALK**: No mention of React, Tailwind, CSS, HTML, or any code
-7. **OBJECTIVE ONLY**: No opinions on design quality
-8. **COMPLETE VISIBILITY**: If an element is partially visible, describe what you can see
-
-The AI receiving your output cannot see the image. Your description must be so detailed and precise that they could recreate this pixel-perfectly using only your words.
-
-Begin your analysis now.
-`,
+              text: systemPrompt,
             },
             {
               type: 'image',
@@ -323,11 +292,49 @@ Begin your analysis now.
           ],
         },
       ],
-      temperature: 0.7,
+      temperature: effectiveMode === 'clone' ? 0.2 : 0.4,
     })
 
+    // For clone mode, try to parse JSON
+    if ((effectiveMode === 'clone' || effectiveMode === 'structured') && !prompt) {
+      try {
+        let jsonText = result.text.trim()
+
+        // Remove markdown code block wrapper if present
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.slice(7)
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.slice(3)
+        }
+        if (jsonText.endsWith('```')) {
+          jsonText = jsonText.slice(0, -3)
+        }
+        jsonText = jsonText.trim()
+
+        const parsed = JSON.parse(jsonText)
+
+        return NextResponse.json({
+          success: true,
+          mode: 'clone',
+          specification: parsed,
+          raw: jsonText,
+        })
+      } catch (parseError) {
+        console.warn('Failed to parse clone output as JSON:', parseError)
+        return NextResponse.json({
+          success: true,
+          mode: 'clone',
+          parseError: true,
+          raw: result.text,
+          description: result.text,
+        })
+      }
+    }
+
+    // For debug and context modes, return text directly
     return NextResponse.json({
       success: true,
+      mode: effectiveMode,
       description: result.text,
     })
   } catch (error) {
