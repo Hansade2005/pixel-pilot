@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'xai/grok-code-fast-1';
+export const DEFAULT_CHAT_MODEL: string = 'mistral/devstral-2';
 
 export interface ChatModel {
   id: string;
@@ -45,6 +45,12 @@ export const chatModels: Array<ChatModel> = [
     id: 'mistral/devstral-2',
     name: 'Mistral Devstral 2',
     description: 'Mistral Devstral 2 via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
+    id: 'mistral/devstral-small-2',
+    name: 'Mistral Devstral Small 2',
+    description: 'Mistral Devstral Small 2 - Fast and efficient code generation',
     provider: 'vercel-gateway',
   },
   {
