@@ -84,6 +84,12 @@ export const chatModels: Array<ChatModel> = [
     provider: 'vercel-gateway',
   },
   {
+    id: 'zai/glm-4.7-flash',
+    name: 'ZAI GLM 4.7 Flash',
+    description: 'ZAI GLM 4.7 Flash - Fast inference via Vercel AI Gateway',
+    provider: 'vercel-gateway',
+  },
+  {
     id: 'minimax/minimax-m2.1',
     name: 'MiniMax M2.1',
     description: 'MiniMax M2.1 via Vercel AI Gateway',
