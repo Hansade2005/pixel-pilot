@@ -3864,51 +3864,11 @@ export function ChatPanelV2({
     let enhancedContent = input.trim()
     let displayContent = input.trim() // Content shown to user (without hidden contexts)
 
-    // Handle images - always process through describe-image API with user's message for intent detection
-    // This allows the API to understand if user wants to: clone UI, report bug, or provide context
+    // Handle images - use the already-processed descriptions from attach time
     if (attachedImages.length > 0) {
-      console.log(`[ChatPanelV2] Processing ${attachedImages.length} image(s) with user message for intent detection`)
-
-      // Re-process images with user's message for proper intent detection
-      const processedDescriptions = await Promise.all(
-        attachedImages.map(async (img: AttachedImage) => {
-          // If image already has a description from paste-time, we might want to re-analyze
-          // with user's message to detect proper intent (clone, debug, context)
-          try {
-            const response = await fetch('/api/describe-image', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                image: img.base64,
-                userMessage: input.trim() // Pass user's message for intent detection
-              })
-            })
-
-            if (!response.ok) {
-              return img.description || '[Image processing failed]'
-            }
-
-            const result = await response.json()
-            console.log(`[ChatPanelV2] Image analyzed with mode: ${result.mode}`)
-
-            // Format based on mode
-            if (result.specification) {
-              return `[UI SPECIFICATION - Mode: ${result.mode}]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
-            } else if (result.description) {
-              return `[IMAGE ANALYSIS - Mode: ${result.mode}]\n${result.description}`
-            }
-            return img.description || '[Image processed]'
-          } catch (error) {
-            console.error('Error re-processing image:', error)
-            return img.description || '[Image description not available]'
-          }
-        })
-      )
-
-      // Add all image descriptions to content
       const imageContexts = attachedImages
-        .map((img: AttachedImage, index: number) => {
-          const description = processedDescriptions[index]
+        .map((img: AttachedImage) => {
+          const description = img.description || '[Image description not available]'
           return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
         })
         .join('')
@@ -3916,7 +3876,7 @@ export function ChatPanelV2({
       if (imageContexts) {
         enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageContexts}\n=== END ATTACHED IMAGES ===`
       }
-      console.log(`[ChatPanelV2] Using describe-image analysis for ${attachedImages.length} image(s)`)
+      console.log(`[ChatPanelV2] Using pre-processed descriptions for ${attachedImages.length} image(s)`)
     }
 
     // Add URL contents (shown to user)
