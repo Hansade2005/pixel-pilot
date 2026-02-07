@@ -272,6 +272,13 @@ const modelProviders: Record<string, any> = {
   'anthropic/claude-opus-4.5': anthropicProvider('anthropic/claude-opus-4.5'),
 };
 
+// Models that support vision through Anthropic provider format (for image handling)
+// These models use the Anthropic SDK format when images are attached
+const visionViaAnthropicModels: Record<string, string> = {
+  'mistral/devstral-2': 'mistral/devstral-2',
+  'mistral/devstral-small-2': 'mistral/devstral-small-2',
+};
+
 // Helper function to get a model by ID
 export function getModel(modelId: string) {
   const model = modelProviders[modelId];
@@ -279,6 +286,25 @@ export function getModel(modelId: string) {
     throw new Error(`Model ${modelId} not found. Available models: ${Object.keys(modelProviders).join(', ')}`);
   }
   return model;
+}
+
+// Helper function to get model with vision support
+// For Devstral models with images, returns Anthropic provider which handles images correctly via gateway
+export function getModelWithVision(modelId: string, hasImages: boolean = false) {
+  // If no images or model doesn't need special handling, use default
+  if (!hasImages || !visionViaAnthropicModels[modelId]) {
+    return getModel(modelId);
+  }
+
+  // For Devstral with images, use Anthropic provider through gateway
+  // This sends images in Anthropic format which the gateway handles correctly
+  console.log(`[AI Providers] Using Anthropic provider for ${modelId} with images (gateway routing)`);
+  return anthropicProvider(visionViaAnthropicModels[modelId]);
+}
+
+// Check if a model requires Anthropic format for images
+export function requiresAnthropicImageFormat(modelId: string): boolean {
+  return !!visionViaAnthropicModels[modelId];
 }
 
 // Export individual providers for direct use if needed
