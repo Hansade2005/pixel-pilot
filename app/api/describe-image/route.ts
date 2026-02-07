@@ -6,201 +6,236 @@ const mistral = createMistral({
   apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 })
 
-// Comprehensive UI Analysis Prompt - handles ALL scenarios
-const COMPREHENSIVE_UI_ANALYSIS_PROMPT = `You are an expert UI/UX Analyst and Developer Assistant. Analyze the provided screenshot and give a comprehensive analysis that a non-vision AI coding assistant can use to understand and work with.
+// =============================================================================
+// MODE: CLONE - Structured JSON for UI cloning/recreation
+// =============================================================================
+const CLONE_PROMPT = `You are a UI-to-Code Translation Engine. Your job is to analyze UI images and output a STRUCTURED JSON specification that a non-vision AI model can use to generate exact code.
+
+# CRITICAL: OUTPUT FORMAT
+You MUST output valid JSON only. No markdown, no explanations, no extra text. Just pure JSON.
+
+# JSON Schema
+
+{
+  "pageType": "landing|dashboard|form|auth|settings|profile|list|detail|error|other",
+  "theme": {
+    "mode": "light|dark",
+    "primaryColor": "#hex",
+    "backgroundColor": "#hex",
+    "textColor": "#hex",
+    "accentColor": "#hex"
+  },
+  "layout": {
+    "type": "flex-col|flex-row|grid|absolute",
+    "maxWidth": "string (e.g., 'max-w-7xl', '1200px')",
+    "padding": "string (e.g., 'p-4', 'px-6 py-8')",
+    "gap": "string (e.g., 'gap-4', 'space-y-6')",
+    "alignment": "center|start|end|stretch"
+  },
+  "sections": [
+    {
+      "id": "unique-section-id",
+      "type": "navbar|hero|features|cta|footer|sidebar|content|form|grid|list|modal|card-grid",
+      "layout": {
+        "type": "flex-col|flex-row|grid",
+        "justify": "start|center|end|between|around",
+        "align": "start|center|end|stretch",
+        "gap": "string",
+        "padding": "string",
+        "margin": "string"
+      },
+      "style": {
+        "background": "string (color or gradient)",
+        "borderRadius": "string",
+        "border": "string",
+        "shadow": "string"
+      },
+      "children": [
+        {
+          "component": "heading|text|button|input|image|icon|card|link|badge|avatar|divider|spacer|container|list|nav-item|logo|form-field",
+          "props": {},
+          "className": "Tailwind classes string",
+          "children": []
+        }
+      ]
+    }
+  ]
+}
 
 # FIRST: Detect What Type of Image This Is
 
-Before analyzing, classify the image into one of these categories:
+## heading: { "level": 1-6, "text": "content", "className": "text-4xl font-bold" }
+## text: { "text": "content", "variant": "body|caption|label|muted", "className": "text-base" }
+## button: { "text": "Label", "variant": "primary|secondary|outline|ghost", "size": "sm|md|lg", "icon": "name|null", "className": "..." }
+## input: { "type": "text|email|password|textarea|select", "placeholder": "...", "label": "...|null", "className": "..." }
+## image: { "src": "description of image", "alt": "...", "aspectRatio": "16:9|4:3|1:1", "className": "..." }
+## icon: { "name": "menu|search|close|arrow-right|check|user|settings", "size": "sm|md|lg", "className": "..." }
+## card: { "variant": "default|elevated|outlined", "className": "...", "children": [] }
+## badge: { "text": "...", "variant": "default|success|warning|error", "className": "..." }
+## container: { "className": "flex items-center gap-4", "children": [] }
 
-1. **ERROR_STATE** - Blank screen, crash, React error boundary, console errors, "Something went wrong", white/black screen with no content
-2. **BUG_VISUAL** - UI rendering issues, misaligned elements, overlapping content, broken layouts, cut-off text, z-index problems
-3. **STYLE_ISSUE** - Color mismatches, wrong fonts, inconsistent spacing, design not matching expectations
-4. **WORKING_UI** - Normal functioning UI that user wants to understand, clone, or modify
+# Rules
+1. Output ONLY valid JSON - no markdown, no explanations
+2. Transcribe ALL visible text exactly
+3. Use Tailwind classes for ALL styling
+4. Build complete component tree with proper nesting
+5. For icons, use descriptive names
+6. For images, describe what they show
 
-# OUTPUT FORMAT
+Analyze the image and output JSON now.`
 
-Always respond with this exact structure:
+// =============================================================================
+// MODE: DEBUG - For bug reports, styling issues, visual problems
+// =============================================================================
+const DEBUG_PROMPT = `You are a UI Debugging Assistant. The user is showing you a screenshot of their app because something is wrong or needs fixing. Your job is to analyze the image and describe the issues you observe.
 
-## IMAGE_TYPE: [ERROR_STATE | BUG_VISUAL | STYLE_ISSUE | WORKING_UI]
+# Your Task
+Carefully examine the screenshot and identify:
 
-## SUMMARY
-[1-2 sentence overview of what you see]
+1. **Visual Issues**: What looks wrong, broken, or out of place?
+   - Misaligned elements
+   - Overlapping content
+   - Incorrect spacing
+   - Cut-off text or elements
+   - Broken layouts
 
----
+2. **Styling Problems**: What styling doesn't look right?
+   - Color mismatches or inconsistencies
+   - Font issues (wrong size, weight, or family)
+   - Border/shadow problems
+   - Background issues
+   - Responsive/sizing issues
 
-Then provide the appropriate detailed analysis based on the type:
+3. **UI/UX Concerns**: What hurts usability?
+   - Hard to read text (contrast issues)
+   - Unclear interactive elements
+   - Confusing layout
+   - Missing visual feedback
 
----
+4. **Error Indicators**: Any visible errors?
+   - Error messages in the UI
+   - Console errors if visible
+   - Loading states stuck
+   - Empty states that shouldn't be empty
 
-# IF ERROR_STATE:
+# Output Format
+Provide a structured analysis:
 
-## ERROR DETECTED
-- **Error Type**: [blank_screen | react_error | crash | console_error | loading_stuck | 404 | 500 | other]
-- **Error Message**: [Exact text of any error message visible, or "No error message visible"]
-- **Console Errors**: [If dev tools are visible, list any console errors]
-- **Stack Trace**: [If visible, include relevant parts]
+## ISSUES IDENTIFIED
 
-## PROBABLE CAUSES
-1. [Most likely cause based on the error]
-2. [Second possibility]
-3. [Third possibility]
+### Issue 1: [Brief title]
+- **Location**: Where in the UI (top-left, navbar, card #2, etc.)
+- **Problem**: What exactly is wrong
+- **Expected**: What it should look like
+- **Likely Cause**: Probable CSS/code issue (e.g., "missing flex-wrap", "z-index conflict")
+- **Suggested Fix**: Specific code change (e.g., "add 'flex-wrap: wrap' to the container")
 
-## SUGGESTED FIXES
-1. [Specific code fix or debugging step]
-2. [Alternative solution]
-3. [How to investigate further]
+### Issue 2: [Brief title]
+...
 
-## VISIBLE CONTEXT
-- **URL/Route**: [If visible in browser]
-- **Browser**: [Chrome, Firefox, Safari, etc. if identifiable]
-- **Viewport**: [Desktop, tablet, mobile size]
-- **Dev Tools Open**: [Yes/No, which panel]
+## ADDITIONAL OBSERVATIONS
+- Any other things that look slightly off
+- Potential improvements even if not bugs
 
----
+Be specific about element locations and provide actionable fixes.`
 
-# IF BUG_VISUAL:
+// =============================================================================
+// MODE: CONTEXT - General understanding, reference images, examples
+// =============================================================================
+const CONTEXT_PROMPT = `You are a Visual Context Analyzer. The user is sharing an image to give you context about what they're working on or what they want. Your job is to thoroughly describe what you see so a non-vision AI model can understand it.
 
-## VISUAL BUG DETECTED
-- **Bug Type**: [overflow | alignment | z-index | spacing | responsive | animation | rendering]
-- **Severity**: [critical | major | minor | cosmetic]
+# Analyze and Describe
 
-## AFFECTED ELEMENTS
-For each problematic element:
-### Element 1: [Name/Description]
-- **Location**: [Top-left, center, navbar, footer, etc.]
-- **What's Wrong**: [Detailed description]
-- **Expected Behavior**: [What it should look like]
-- **Current State**: [What it actually looks like]
+## 1. Overview
+- What type of content is this? (UI mockup, screenshot, diagram, example, inspiration, etc.)
+- What is the main purpose or subject?
 
-## ROOT CAUSE ANALYSIS
-- **Likely CSS Issue**: [e.g., "missing overflow-hidden", "incorrect flex properties"]
-- **Likely HTML Issue**: [e.g., "wrong nesting", "missing wrapper div"]
-- **Likely JS Issue**: [e.g., "state not updating", "race condition"]
+## 2. Visual Content
+Describe everything you see in detail:
+- Text content (transcribe exactly)
+- Images and graphics
+- UI elements (buttons, forms, cards, etc.)
+- Layout and structure
+- Colors and styling
 
-## FIX RECOMMENDATIONS
-\`\`\`css
-/* Suggested CSS fix */
-.affected-element {
-  /* specific properties to add/change */
+## 3. Key Details
+- Important information the user likely wants to reference
+- Specific elements that stand out
+- Any annotations, highlights, or indicators
+
+## 4. Context Clues
+- What might the user be trying to achieve?
+- How does this relate to building/coding something?
+- What aspects should the AI focus on?
+
+## 5. Actionable Information
+Summarize what a coding AI should know:
+- Specific styles to match
+- Functionality to implement
+- Content to include
+- Patterns to follow
+
+Be thorough but organized. The goal is to give a non-vision AI everything it needs to understand this image.`
+
+// =============================================================================
+// MODE: AUTO - Detect intent from user message and choose appropriate mode
+// =============================================================================
+function detectMode(userMessage?: string): 'clone' | 'debug' | 'context' {
+  if (!userMessage) return 'clone' // Default to clone for UI recreation
+
+  const message = userMessage.toLowerCase()
+
+  // Debug/issue keywords
+  const debugKeywords = [
+    'bug', 'issue', 'problem', 'wrong', 'broken', 'fix', 'error',
+    'not working', 'doesnt work', "doesn't work", 'incorrect',
+    'misalign', 'overflow', 'cut off', 'overlap', 'spacing',
+    'color wrong', 'style issue', 'styling issue', 'looks off',
+    'why is', 'why does', 'what happened', 'help me fix',
+    'something wrong', 'messed up', 'weird', 'glitch'
+  ]
+
+  // Clone/build keywords
+  const cloneKeywords = [
+    'clone', 'copy', 'recreate', 'build this', 'make this',
+    'create this', 'like this', 'same as', 'replicate',
+    'implement this', 'code this', 'build like', 'design like',
+    'match this', 'similar to'
+  ]
+
+  // Context/reference keywords
+  const contextKeywords = [
+    'example', 'reference', 'inspiration', 'show you', 'look at',
+    'here is', "here's", 'this is', 'see this', 'check this',
+    'screenshot of', 'image of', 'what do you think', 'feedback',
+    'compare', 'versus', 'or this'
+  ]
+
+  // Check for debug intent
+  for (const keyword of debugKeywords) {
+    if (message.includes(keyword)) return 'debug'
+  }
+
+  // Check for clone intent
+  for (const keyword of cloneKeywords) {
+    if (message.includes(keyword)) return 'clone'
+  }
+
+  // Check for context intent
+  for (const keyword of contextKeywords) {
+    if (message.includes(keyword)) return 'context'
+  }
+
+  // Default to clone for UI-focused platform
+  return 'clone'
 }
-\`\`\`
 
-\`\`\`jsx
-/* Or JSX structure fix */
-<div className="suggested-fix">
-  {/* corrected structure */}
-</div>
-\`\`\`
-
----
-
-# IF STYLE_ISSUE:
-
-## STYLE INCONSISTENCY DETECTED
-
-### Color Issues
-| Element | Current Color | Expected/Correct | Tailwind Fix |
-|---------|--------------|------------------|--------------|
-| [element] | [#hex or description] | [#hex or description] | [text-color-xxx] |
-
-### Typography Issues
-| Element | Current | Expected | Tailwind Fix |
-|---------|---------|----------|--------------|
-| [element] | [font specs] | [correct specs] | [font-xxx text-xxx] |
-
-### Spacing Issues
-| Location | Current | Expected | Tailwind Fix |
-|----------|---------|----------|--------------|
-| [location] | [current spacing] | [correct spacing] | [p-x, m-x, gap-x] |
-
-### Other Style Problems
-- [List any other inconsistencies]
-
-## DESIGN SYSTEM VIOLATIONS
-- [List any patterns that don't match typical design systems]
-
----
-
-# IF WORKING_UI:
-
-## UI STRUCTURE
-
-### Page Type
-[landing | dashboard | form | auth | settings | profile | list | detail | modal | other]
-
-### Overall Layout
-- **Layout Type**: [single-column | two-column | sidebar-main | grid | masonry]
-- **Max Width**: [full | max-w-7xl | max-w-5xl | etc.]
-- **Background**: [color or gradient in Tailwind]
-
-### Sections (Top to Bottom)
-For each distinct section:
-
-#### Section: [Name]
-- **Type**: [navbar | hero | features | cta | footer | form | card-grid | etc.]
-- **Background**: [Tailwind class]
-- **Padding**: [Tailwind class]
-- **Layout**: [flex-row | flex-col | grid-cols-X]
-
-**Elements:**
-| Component | Content/Text | Tailwind Classes |
-|-----------|--------------|------------------|
-| [heading/button/text/etc.] | [exact text] | [text-xl font-bold text-gray-900] |
-
-### Color Palette
-- **Primary**: [#hex] → [Tailwind: blue-600]
-- **Secondary**: [#hex] → [Tailwind: gray-600]
-- **Background**: [#hex] → [Tailwind: white/gray-50]
-- **Text Primary**: [#hex] → [Tailwind: gray-900]
-- **Text Secondary**: [#hex] → [Tailwind: gray-600]
-- **Accent/CTA**: [#hex] → [Tailwind: blue-500]
-
-### Typography Scale
-- **Heading 1**: [size, weight, color in Tailwind]
-- **Heading 2**: [size, weight, color in Tailwind]
-- **Body**: [size, weight, color in Tailwind]
-- **Caption/Small**: [size, weight, color in Tailwind]
-
-### Interactive Elements
-| Type | Text | Style (Tailwind) | State Visible |
-|------|------|------------------|---------------|
-| Primary Button | [text] | [bg-blue-600 text-white px-6 py-3 rounded-lg] | [default/hover/active] |
-| Secondary Button | [text] | [border border-gray-300 px-4 py-2 rounded] | [state] |
-| Link | [text] | [text-blue-600 hover:underline] | [state] |
-| Input | [placeholder] | [border rounded-lg px-4 py-2] | [state] |
-
-### Spacing Patterns
-- **Section padding**: [py-16, py-24, etc.]
-- **Element gaps**: [gap-4, gap-8, etc.]
-- **Container padding**: [px-4, px-6, etc.]
-
-### Special Effects
-- **Shadows**: [shadow-sm, shadow-lg, etc.]
-- **Borders**: [border, border-gray-200, etc.]
-- **Rounded corners**: [rounded-lg, rounded-xl, etc.]
-- **Gradients**: [bg-gradient-to-r from-X to-Y]
-- **Hover effects**: [hover:bg-X, hover:scale-105, etc.]
-
-### Content Transcription
-[Transcribe ALL visible text exactly as shown, organized by section]
-
----
-
-# IMPORTANT RULES
-
-1. **Be Specific**: Use exact Tailwind classes, not vague descriptions
-2. **Transcribe Text**: Copy all visible text word-for-word
-3. **Estimate Accurately**: When unsure about exact values, give best Tailwind approximation
-4. **Detect Problems First**: Always check for errors/bugs before describing as working UI
-5. **Think Like a Developer**: Provide info that helps fix/build, not just describe
-6. **Include Everything**: Don't skip small details - icons, badges, dividers all matter
-
-Now analyze the provided image.`
-
+// =============================================================================
+// API HANDLER
+// =============================================================================
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt, mode = 'structured' } = await request.json()
+    const { image, prompt, mode, userMessage } = await request.json()
 
     if (!image) {
       return NextResponse.json(
@@ -209,8 +244,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use comprehensive analysis prompt, or custom prompt if provided
-    const systemPrompt = prompt || COMPREHENSIVE_UI_ANALYSIS_PROMPT
+    // Determine mode: explicit mode > auto-detect from userMessage > default to clone
+    const effectiveMode = mode || detectMode(userMessage)
+    console.log(`[describe-image] Mode: ${effectiveMode}, userMessage: "${userMessage?.slice(0, 50)}..."`)
+
+    // Select prompt based on mode
+    let systemPrompt: string
+    switch (effectiveMode) {
+      case 'debug':
+        systemPrompt = DEBUG_PROMPT
+        break
+      case 'context':
+        systemPrompt = CONTEXT_PROMPT
+        break
+      case 'clone':
+      case 'structured': // Backwards compatibility
+      default:
+        systemPrompt = CLONE_PROMPT
+        break
+    }
+
+    // If custom prompt provided, append user context
+    if (userMessage && effectiveMode !== 'clone') {
+      systemPrompt = `${systemPrompt}\n\n# USER'S MESSAGE\nThe user said: "${userMessage}"\n\nKeep this context in mind when analyzing the image.`
+    }
+
+    // Use custom prompt if explicitly provided (overrides everything)
+    if (prompt) {
+      systemPrompt = prompt
+    }
 
     // Use Pixtral (Mistral's vision model) for image analysis
     const result = await generateText({
@@ -230,25 +292,50 @@ export async function POST(request: NextRequest) {
           ],
         },
       ],
-      temperature: 0.3,
+      temperature: effectiveMode === 'clone' ? 0.2 : 0.4,
     })
 
-    // Parse the response to extract image type
-    const responseText = result.text
-    let imageType = 'WORKING_UI'
+    // For clone mode, try to parse JSON
+    if ((effectiveMode === 'clone' || effectiveMode === 'structured') && !prompt) {
+      try {
+        let jsonText = result.text.trim()
 
-    // Try to detect the image type from the response
-    const typeMatch = responseText.match(/## IMAGE_TYPE:\s*(ERROR_STATE|BUG_VISUAL|STYLE_ISSUE|WORKING_UI)/i)
-    if (typeMatch) {
-      imageType = typeMatch[1].toUpperCase()
+        // Remove markdown code block wrapper if present
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.slice(7)
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.slice(3)
+        }
+        if (jsonText.endsWith('```')) {
+          jsonText = jsonText.slice(0, -3)
+        }
+        jsonText = jsonText.trim()
+
+        const parsed = JSON.parse(jsonText)
+
+        return NextResponse.json({
+          success: true,
+          mode: 'clone',
+          specification: parsed,
+          raw: jsonText,
+        })
+      } catch (parseError) {
+        console.warn('Failed to parse clone output as JSON:', parseError)
+        return NextResponse.json({
+          success: true,
+          mode: 'clone',
+          parseError: true,
+          raw: result.text,
+          description: result.text,
+        })
+      }
     }
 
+    // For debug and context modes, return text directly
     return NextResponse.json({
       success: true,
-      imageType,
-      description: responseText,
-      // Include raw for backwards compatibility
-      raw: responseText,
+      mode: effectiveMode,
+      description: result.text,
     })
   } catch (error) {
     console.error('Error describing image:', error)

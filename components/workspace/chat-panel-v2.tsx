@@ -43,7 +43,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
 import { uploadLargePayload } from '@/lib/cloud-sync'
-import { modelSupportsVision } from '@/lib/ai-models'
+// Note: modelSupportsVision removed - all images now go through describe-image API for consistent processing
 
 // New feature components
 import { SlashCommands, useSlashCommands, getDefaultSlashCommands, type SlashCommand } from '@/components/ui/slash-commands'
@@ -3863,18 +3863,57 @@ export function ChatPanelV2({
     let enhancedContent = input.trim()
     let displayContent = input.trim() // Content shown to user (without hidden contexts)
 
-    // Handle images - ALL models use describe-image API for consistent analysis
-    // This provides structured descriptions that help models understand errors, bugs, UI cloning, etc.
+    // Handle images - always process through describe-image API with user's message for intent detection
+    // This allows the API to understand if user wants to: clone UI, report bug, or provide context
     if (attachedImages.length > 0) {
-      const imageDescriptions = attachedImages
-        .map((img: AttachedImage) => {
-          const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
+      console.log(`[ChatPanelV2] Processing ${attachedImages.length} image(s) with user message for intent detection`)
+
+      // Re-process images with user's message for proper intent detection
+      const processedDescriptions = await Promise.all(
+        attachedImages.map(async (img: AttachedImage) => {
+          // If image already has a description from paste-time, we might want to re-analyze
+          // with user's message to detect proper intent (clone, debug, context)
+          try {
+            const response = await fetch('/api/describe-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image: img.base64,
+                userMessage: input.trim() // Pass user's message for intent detection
+              })
+            })
+
+            if (!response.ok) {
+              return img.description || '[Image processing failed]'
+            }
+
+            const result = await response.json()
+            console.log(`[ChatPanelV2] Image analyzed with mode: ${result.mode}`)
+
+            // Format based on mode
+            if (result.specification) {
+              return `[UI SPECIFICATION - Mode: ${result.mode}]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
+            } else if (result.description) {
+              return `[IMAGE ANALYSIS - Mode: ${result.mode}]\n${result.description}`
+            }
+            return img.description || '[Image processed]'
+          } catch (error) {
+            console.error('Error re-processing image:', error)
+            return img.description || '[Image description not available]'
+          }
+        })
+      )
+
+      // Add all image descriptions to content
+      const imageContexts = attachedImages
+        .map((img: AttachedImage, index: number) => {
+          const description = processedDescriptions[index]
           return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
         })
         .join('')
 
-      if (imageDescriptions) {
-        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
+      if (imageContexts) {
+        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageContexts}\n=== END ATTACHED IMAGES ===`
       }
       console.log(`[ChatPanelV2] Using describe-image analysis for ${attachedImages.length} image(s)`)
     }
@@ -4055,8 +4094,8 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       // Get last 10 messages from current conversation
       const recentMessages = messages.slice(-10)
 
-      // Build the new message content - always text-only since images are processed via describe-image API
-      // This ensures consistent behavior across all models with structured image analysis
+      // Build the new message content - always text-only since images are processed through describe-image API
+      // This ensures consistent behavior and proper intent detection (clone, debug, context) for all models
       const newMessageContent = enhancedContent
 
       const messagesToSend = [
@@ -4912,50 +4951,20 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         const base64 = event.target?.result as string
         const imageId = Date.now().toString() + Math.random()
 
-        // Add image with processing flag
+        // Just store the image - processing happens at send time with user's message
+        // This allows proper intent detection (clone/debug/context) based on what user types
         setAttachedImages((prev: AttachedImage[]) => [...prev, {
           id: imageId,
           name: file.name,
           base64,
-          isProcessing: true
+          isProcessing: false,
+          description: '[Will be analyzed with your message]'
         }])
 
-        // Get structured description using vision API (JSON format for code generation)
-        try {
-          const response = await fetch('/api/describe-image', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              image: base64,
-              mode: 'structured' // Use structured JSON output for code generation
-            }),
-          })
-
-          const result = await response.json()
-
-          // Extract description from structured or fallback response
-          let description: string
-          if (result.specification) {
-            // Structured JSON specification - format for model consumption
-            description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
-          } else if (result.description) {
-            description = result.description
-          } else {
-            description = '[Image processed]'
-          }
-
-          // Update with description
-          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
-            img.id === imageId ? { ...img, description, isProcessing: false } : img
-          ))
-        } catch (error) {
-          console.error('Error describing image:', error)
-          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
-            img.id === imageId ? { ...img, isProcessing: false } : img
-          ))
-        }
+        toast({
+          title: "Image attached",
+          description: "Will be analyzed when you send your message"
+        })
       }
       reader.readAsDataURL(file)
     }
@@ -5505,7 +5514,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   })
                 }
 
-                // Process each image through describe-image API (ALL models use this)
+                // Process each image - always through describe-image API
                 imagesToProcess.forEach((item, index) => {
                   const file = item.getAsFile()
                   if (!file) return
@@ -5526,50 +5535,23 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     const base64 = event.target?.result as string
                     const imageId = `pasted_img_${Date.now()}_${index}`
 
-                    // Add image with processing state
+                    // Just store the image - processing happens at send time with user's message
+                    // This allows proper intent detection (clone/debug/context) based on what user types
                     setAttachedImages(prev => {
                       const newImageNumber = prev.length + 1
                       return [...prev, {
                         id: imageId,
                         name: `Pasted Image ${newImageNumber}`,
                         base64: base64,
-                        isProcessing: true
+                        isProcessing: false, // No processing yet - happens at send time
+                        description: '[Will be analyzed with your message]'
                       }]
                     })
 
-                    // Process through describe-image API for comprehensive analysis
-                    try {
-                      const response = await fetch('/api/describe-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: base64 })
-                      })
-
-                      if (!response.ok) throw new Error('Failed to describe image')
-
-                      const result = await response.json()
-
-                      // Update image with description
-                      setAttachedImages(prev => prev.map(img =>
-                        img.id === imageId
-                          ? { ...img, description: result.description, isProcessing: false }
-                          : img
-                      ))
-
-                      toast({
-                        title: "Image analyzed",
-                        description: `Detected: ${result.imageType || 'UI'}`
-                      })
-                    } catch (error) {
-                      console.error('Error describing pasted image:', error)
-                        toast({
-                          title: "Processing failed",
-                          description: "Failed to process pasted image",
-                          variant: "destructive"
-                        })
-                        setAttachedImages(prev => prev.filter(img => img.id !== imageId))
-                      }
-                    }
+                    toast({
+                      title: "Image attached",
+                      description: "Will be analyzed when you send your message"
+                    })
                   }
 
                   reader.onerror = () => {
