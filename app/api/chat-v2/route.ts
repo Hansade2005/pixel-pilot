@@ -10376,7 +10376,9 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
     const useDevstralVision = isDevstralModel && messagesHaveImages && needsMistralVisionProvider(modelId);
     console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, useDevstralVision=${useDevstralVision}`);
 
-    // Preprocess messages to ensure images are in Vercel AI SDK format
+    // Preprocess messages to ensure images are in the correct format for the provider
+    // Devstral via Vercel AI Gateway needs OpenAI-compatible format: { type: 'image_url', image_url: { url: '...' } }
+    // Other providers use Vercel AI SDK format: { type: 'image', image: '...' }
     const preprocessedMessages = processedMessages.map((msg: any) => {
       if (msg.role !== 'user' || !Array.isArray(msg.content)) {
         return msg;
@@ -10388,7 +10390,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         return msg;
       }
 
-      // Ensure images are in proper Vercel AI SDK format (data URL)
+      // Convert images to the appropriate format based on provider
       const convertedContent = msg.content.map((part: any) => {
         if (part.type !== 'image' || !part.image) {
           return part;
@@ -10403,14 +10405,25 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         }
 
-        // Keep Vercel AI SDK format - the Mistral provider handles conversion internally
+        // For Devstral through Vercel AI Gateway, use OpenAI-compatible format
+        if (useDevstralVision) {
+          return {
+            type: 'image_url',
+            image_url: {
+              url: imageUrl,
+            },
+          };
+        }
+
+        // For other providers, use Vercel AI SDK format
         return {
           type: 'image',
           image: imageUrl,
         };
       });
 
-      console.log(`[Chat-V2] Preprocessed message with ${msg.content.filter((p: any) => p.type === 'image').length} image(s) for model ${modelId}`);
+      const imageCount = msg.content.filter((p: any) => p.type === 'image').length;
+      console.log(`[Chat-V2] Preprocessed message with ${imageCount} image(s) for model ${modelId} (format: ${useDevstralVision ? 'image_url' : 'image'})`);
 
       return {
         ...msg,
