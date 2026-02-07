@@ -1,7 +1,7 @@
 import { streamText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel, requiresImageUrlFormat } from '@/lib/ai-providers'
+import { getModel, needsMistralVisionProvider, getDevstralVisionModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
@@ -10372,11 +10372,11 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       return msg.content.some((part: any) => part.type === 'image');
     });
 
-    // Check if model needs image_url format (Mistral/Devstral models via OpenAI-compatible gateway)
-    const needsImageUrlFormat = requiresImageUrlFormat(modelId);
-    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, needsImageUrlFormat=${needsImageUrlFormat}`);
+    // Check if Devstral needs Mistral provider for vision
+    const useDevstralVision = isDevstralModel && messagesHaveImages && needsMistralVisionProvider(modelId);
+    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, useDevstralVision=${useDevstralVision}`);
 
-    // Preprocess messages to convert images based on model requirements
+    // Preprocess messages to ensure images are in Vercel AI SDK format
     const preprocessedMessages = processedMessages.map((msg: any) => {
       if (msg.role !== 'user' || !Array.isArray(msg.content)) {
         return msg;
@@ -10388,7 +10388,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         return msg;
       }
 
-      // Convert image parts based on model requirements
+      // Ensure images are in proper Vercel AI SDK format (data URL)
       const convertedContent = msg.content.map((part: any) => {
         if (part.type !== 'image' || !part.image) {
           return part;
@@ -10403,18 +10403,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         }
 
-        // For Devstral/Mistral models, use OpenAI-compatible image_url format
-        if (needsImageUrlFormat) {
-          console.log(`[Chat-V2] Converting image to image_url format for ${modelId}`);
-          return {
-            type: 'image_url',
-            image_url: {
-              url: imageUrl,
-            },
-          };
-        }
-
-        // For other models, use Vercel AI SDK format
+        // Keep Vercel AI SDK format - the Mistral provider handles conversion internally
         return {
           type: 'image',
           image: imageUrl,
@@ -10429,8 +10418,8 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       };
     });
 
-    // Get AI model
-    const model = getAIModel(modelId);
+    // Get AI model - use Mistral provider for Devstral with images
+    const model = useDevstralVision ? getDevstralVisionModel(modelId) : getAIModel(modelId);
 
     // Determine if we're using Anthropic provider (only for true Anthropic models)
     const usingAnthropicProvider = isAnthropicModel;

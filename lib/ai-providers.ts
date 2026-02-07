@@ -272,12 +272,12 @@ const modelProviders: Record<string, any> = {
   'anthropic/claude-opus-4.5': anthropicProvider('anthropic/claude-opus-4.5'),
 };
 
-// Models that support vision with OpenAI/Mistral image_url format
-// These need image conversion to { type: 'image_url', image_url: { url: dataUrl } }
-const visionViaImageUrlModels = new Set([
-  'mistral/devstral-2',
-  'mistral/devstral-small-2',
-]);
+// Models that support vision through Mistral provider (with correct Mistral API model names)
+// When images are present, we use the Mistral provider instead of vercelGateway
+const devstralVisionModels: Record<string, string> = {
+  'mistral/devstral-2': 'devstral-2512',
+  'mistral/devstral-small-2': 'labs-devstral-small-2512',
+};
 
 // Helper function to get a model by ID
 export function getModel(modelId: string) {
@@ -288,9 +288,19 @@ export function getModel(modelId: string) {
   return model;
 }
 
-// Check if a model requires OpenAI/Mistral image_url format for images
-export function requiresImageUrlFormat(modelId: string): boolean {
-  return visionViaImageUrlModels.has(modelId);
+// Check if a model needs Mistral provider for vision
+export function needsMistralVisionProvider(modelId: string): boolean {
+  return !!devstralVisionModels[modelId];
+}
+
+// Get the vision-capable model for Devstral (uses Mistral provider with correct model name)
+export function getDevstralVisionModel(modelId: string) {
+  const mistralModelName = devstralVisionModels[modelId];
+  if (!mistralModelName) {
+    throw new Error(`Model ${modelId} is not a Devstral vision model`);
+  }
+  console.log(`[AI Providers] Using Mistral provider for ${modelId} -> ${mistralModelName} (vision support)`);
+  return mistralProvider(mistralModelName);
 }
 
 // Export individual providers for direct use if needed
