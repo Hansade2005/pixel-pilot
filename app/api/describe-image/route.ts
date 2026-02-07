@@ -6,373 +6,197 @@ const mistral = createMistral({
   apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 })
 
-// Structured prompt that outputs JSON for code generation
-const STRUCTURED_UI_PROMPT = `You are a UI-to-Code Translation Engine. Your job is to analyze UI images and output a STRUCTURED JSON specification that a non-vision AI model can use to generate exact code.
+// Comprehensive UI Analysis Prompt - handles ALL scenarios
+const COMPREHENSIVE_UI_ANALYSIS_PROMPT = `You are an expert UI/UX Analyst and Developer Assistant. Analyze the provided screenshot and give a comprehensive analysis that a non-vision AI coding assistant can use to understand and work with.
 
-# CRITICAL: OUTPUT FORMAT
-You MUST output valid JSON only. No markdown, no explanations, no extra text. Just pure JSON.
+# FIRST: Detect What Type of Image This Is
 
-# JSON Schema
+Before analyzing, classify the image into one of these categories:
 
-{
-  "pageType": "landing|dashboard|form|auth|settings|profile|list|detail|error|other",
-  "theme": {
-    "mode": "light|dark",
-    "primaryColor": "#hex",
-    "backgroundColor": "#hex",
-    "textColor": "#hex",
-    "accentColor": "#hex"
-  },
-  "layout": {
-    "type": "flex-col|flex-row|grid|absolute",
-    "maxWidth": "string (e.g., 'max-w-7xl', '1200px')",
-    "padding": "string (e.g., 'p-4', 'px-6 py-8')",
-    "gap": "string (e.g., 'gap-4', 'space-y-6')",
-    "alignment": "center|start|end|stretch"
-  },
-  "sections": [
-    {
-      "id": "unique-section-id",
-      "type": "navbar|hero|features|cta|footer|sidebar|content|form|grid|list|modal|card-grid",
-      "layout": {
-        "type": "flex-col|flex-row|grid",
-        "justify": "start|center|end|between|around",
-        "align": "start|center|end|stretch",
-        "gap": "string",
-        "padding": "string",
-        "margin": "string"
-      },
-      "style": {
-        "background": "string (color or gradient)",
-        "borderRadius": "string",
-        "border": "string",
-        "shadow": "string"
-      },
-      "children": [
-        {
-          "component": "heading|text|button|input|image|icon|card|link|badge|avatar|divider|spacer|container|list|nav-item|logo|form-field",
-          "props": {
-            // Component-specific props
-          },
-          "className": "Tailwind classes string",
-          "children": []
-        }
-      ]
-    }
-  ]
+1. **ERROR_STATE** - Blank screen, crash, React error boundary, console errors, "Something went wrong", white/black screen with no content
+2. **BUG_VISUAL** - UI rendering issues, misaligned elements, overlapping content, broken layouts, cut-off text, z-index problems
+3. **STYLE_ISSUE** - Color mismatches, wrong fonts, inconsistent spacing, design not matching expectations
+4. **WORKING_UI** - Normal functioning UI that user wants to understand, clone, or modify
+
+# OUTPUT FORMAT
+
+Always respond with this exact structure:
+
+## IMAGE_TYPE: [ERROR_STATE | BUG_VISUAL | STYLE_ISSUE | WORKING_UI]
+
+## SUMMARY
+[1-2 sentence overview of what you see]
+
+---
+
+Then provide the appropriate detailed analysis based on the type:
+
+---
+
+# IF ERROR_STATE:
+
+## ERROR DETECTED
+- **Error Type**: [blank_screen | react_error | crash | console_error | loading_stuck | 404 | 500 | other]
+- **Error Message**: [Exact text of any error message visible, or "No error message visible"]
+- **Console Errors**: [If dev tools are visible, list any console errors]
+- **Stack Trace**: [If visible, include relevant parts]
+
+## PROBABLE CAUSES
+1. [Most likely cause based on the error]
+2. [Second possibility]
+3. [Third possibility]
+
+## SUGGESTED FIXES
+1. [Specific code fix or debugging step]
+2. [Alternative solution]
+3. [How to investigate further]
+
+## VISIBLE CONTEXT
+- **URL/Route**: [If visible in browser]
+- **Browser**: [Chrome, Firefox, Safari, etc. if identifiable]
+- **Viewport**: [Desktop, tablet, mobile size]
+- **Dev Tools Open**: [Yes/No, which panel]
+
+---
+
+# IF BUG_VISUAL:
+
+## VISUAL BUG DETECTED
+- **Bug Type**: [overflow | alignment | z-index | spacing | responsive | animation | rendering]
+- **Severity**: [critical | major | minor | cosmetic]
+
+## AFFECTED ELEMENTS
+For each problematic element:
+### Element 1: [Name/Description]
+- **Location**: [Top-left, center, navbar, footer, etc.]
+- **What's Wrong**: [Detailed description]
+- **Expected Behavior**: [What it should look like]
+- **Current State**: [What it actually looks like]
+
+## ROOT CAUSE ANALYSIS
+- **Likely CSS Issue**: [e.g., "missing overflow-hidden", "incorrect flex properties"]
+- **Likely HTML Issue**: [e.g., "wrong nesting", "missing wrapper div"]
+- **Likely JS Issue**: [e.g., "state not updating", "race condition"]
+
+## FIX RECOMMENDATIONS
+\`\`\`css
+/* Suggested CSS fix */
+.affected-element {
+  /* specific properties to add/change */
 }
+\`\`\`
 
-# Component Props Reference
+\`\`\`jsx
+/* Or JSX structure fix */
+<div className="suggested-fix">
+  {/* corrected structure */}
+</div>
+\`\`\`
 
-## heading
-{
-  "level": 1-6,
-  "text": "actual text content",
-  "className": "text-4xl font-bold text-gray-900"
-}
+---
 
-## text
-{
-  "text": "actual text content",
-  "variant": "body|caption|label|muted",
-  "className": "text-base text-gray-600"
-}
+# IF STYLE_ISSUE:
 
-## button
-{
-  "text": "Button Text",
-  "variant": "primary|secondary|outline|ghost|destructive|link",
-  "size": "sm|md|lg|xl",
-  "icon": "icon-name or null",
-  "iconPosition": "left|right",
-  "className": "bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
-}
+## STYLE INCONSISTENCY DETECTED
 
-## input
-{
-  "type": "text|email|password|number|search|textarea|select",
-  "placeholder": "Placeholder text",
-  "label": "Label text or null",
-  "className": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-}
+### Color Issues
+| Element | Current Color | Expected/Correct | Tailwind Fix |
+|---------|--------------|------------------|--------------|
+| [element] | [#hex or description] | [#hex or description] | [text-color-xxx] |
 
-## image
-{
-  "src": "describe what the image shows",
-  "alt": "alt text",
-  "aspectRatio": "16:9|4:3|1:1|auto",
-  "objectFit": "cover|contain|fill",
-  "className": "w-full h-64 rounded-lg object-cover"
-}
+### Typography Issues
+| Element | Current | Expected | Tailwind Fix |
+|---------|---------|----------|--------------|
+| [element] | [font specs] | [correct specs] | [font-xxx text-xxx] |
 
-## icon
-{
-  "name": "descriptive-icon-name (e.g., menu, search, close, arrow-right, check, user, settings)",
-  "size": "sm|md|lg",
-  "className": "w-6 h-6 text-gray-500"
-}
+### Spacing Issues
+| Location | Current | Expected | Tailwind Fix |
+|----------|---------|----------|--------------|
+| [location] | [current spacing] | [correct spacing] | [p-x, m-x, gap-x] |
 
-## card
-{
-  "variant": "default|elevated|outlined|ghost",
-  "className": "bg-white rounded-xl shadow-lg p-6",
-  "children": []
-}
+### Other Style Problems
+- [List any other inconsistencies]
 
-## link
-{
-  "text": "Link text",
-  "href": "#",
-  "className": "text-blue-600 hover:text-blue-800 hover:underline"
-}
+## DESIGN SYSTEM VIOLATIONS
+- [List any patterns that don't match typical design systems]
 
-## badge
-{
-  "text": "Badge text",
-  "variant": "default|success|warning|error|info",
-  "className": "px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
-}
+---
 
-## avatar
-{
-  "src": "describe avatar image",
-  "fallback": "initials like JD",
-  "size": "sm|md|lg|xl",
-  "className": "w-12 h-12 rounded-full"
-}
+# IF WORKING_UI:
 
-## divider
-{
-  "orientation": "horizontal|vertical",
-  "className": "border-t border-gray-200 my-8"
-}
+## UI STRUCTURE
 
-## container
-{
-  "className": "flex items-center gap-4",
-  "children": []
-}
+### Page Type
+[landing | dashboard | form | auth | settings | profile | list | detail | modal | other]
 
-## nav-item
-{
-  "text": "Nav Item",
-  "href": "#",
-  "active": true|false,
-  "icon": "icon-name or null",
-  "className": "px-4 py-2 text-gray-700 hover:text-gray-900"
-}
+### Overall Layout
+- **Layout Type**: [single-column | two-column | sidebar-main | grid | masonry]
+- **Max Width**: [full | max-w-7xl | max-w-5xl | etc.]
+- **Background**: [color or gradient in Tailwind]
 
-## logo
-{
-  "text": "Brand Name",
-  "icon": "logo description or null",
-  "className": "text-2xl font-bold"
-}
+### Sections (Top to Bottom)
+For each distinct section:
 
-## form-field
-{
-  "label": "Field Label",
-  "type": "text|email|password|textarea|select|checkbox|radio",
-  "placeholder": "placeholder",
-  "required": true|false,
-  "options": ["option1", "option2"] // for select/radio
-}
+#### Section: [Name]
+- **Type**: [navbar | hero | features | cta | footer | form | card-grid | etc.]
+- **Background**: [Tailwind class]
+- **Padding**: [Tailwind class]
+- **Layout**: [flex-row | flex-col | grid-cols-X]
 
-# Translation Rules
+**Elements:**
+| Component | Content/Text | Tailwind Classes |
+|-----------|--------------|------------------|
+| [heading/button/text/etc.] | [exact text] | [text-xl font-bold text-gray-900] |
 
-1. ANALYZE THE LAYOUT FIRST
-   - Is it a single column? Use flex-col
-   - Multiple columns? Use grid with appropriate cols
-   - Horizontal alignment? Use flex-row with justify-between
+### Color Palette
+- **Primary**: [#hex] → [Tailwind: blue-600]
+- **Secondary**: [#hex] → [Tailwind: gray-600]
+- **Background**: [#hex] → [Tailwind: white/gray-50]
+- **Text Primary**: [#hex] → [Tailwind: gray-900]
+- **Text Secondary**: [#hex] → [Tailwind: gray-600]
+- **Accent/CTA**: [#hex] → [Tailwind: blue-500]
 
-2. IDENTIFY SECTIONS
-   - Navbar is always at top
-   - Hero sections have big headings and CTAs
-   - Feature grids show multiple cards
-   - Footers have links and copyright
+### Typography Scale
+- **Heading 1**: [size, weight, color in Tailwind]
+- **Heading 2**: [size, weight, color in Tailwind]
+- **Body**: [size, weight, color in Tailwind]
+- **Caption/Small**: [size, weight, color in Tailwind]
 
-3. EXTRACT EXACT TEXT
-   - Transcribe all visible text word-for-word
-   - Don't paraphrase or summarize
+### Interactive Elements
+| Type | Text | Style (Tailwind) | State Visible |
+|------|------|------------------|---------------|
+| Primary Button | [text] | [bg-blue-600 text-white px-6 py-3 rounded-lg] | [default/hover/active] |
+| Secondary Button | [text] | [border border-gray-300 px-4 py-2 rounded] | [state] |
+| Link | [text] | [text-blue-600 hover:underline] | [state] |
+| Input | [placeholder] | [border rounded-lg px-4 py-2] | [state] |
 
-4. MATCH COLORS TO TAILWIND
-   - Use closest Tailwind color (blue-600, gray-900, etc.)
-   - For exact colors, use arbitrary values [#hex]
+### Spacing Patterns
+- **Section padding**: [py-16, py-24, etc.]
+- **Element gaps**: [gap-4, gap-8, etc.]
+- **Container padding**: [px-4, px-6, etc.]
 
-5. ESTIMATE SPACING
-   - Small gaps: gap-2, gap-4
-   - Medium: gap-6, gap-8
-   - Large: gap-12, gap-16
+### Special Effects
+- **Shadows**: [shadow-sm, shadow-lg, etc.]
+- **Borders**: [border, border-gray-200, etc.]
+- **Rounded corners**: [rounded-lg, rounded-xl, etc.]
+- **Gradients**: [bg-gradient-to-r from-X to-Y]
+- **Hover effects**: [hover:bg-X, hover:scale-105, etc.]
 
-6. DETECT COMPONENT PATTERNS
-   - Button with arrow = button with icon right
-   - Input with label above = form-field
-   - Image with overlay text = card with background image
-   - Icon + text = container with icon and text children
+### Content Transcription
+[Transcribe ALL visible text exactly as shown, organized by section]
 
-# Example Output
+---
 
-{
-  "pageType": "landing",
-  "theme": {
-    "mode": "light",
-    "primaryColor": "#2563eb",
-    "backgroundColor": "#ffffff",
-    "textColor": "#111827",
-    "accentColor": "#3b82f6"
-  },
-  "layout": {
-    "type": "flex-col",
-    "maxWidth": "max-w-7xl",
-    "padding": "px-4",
-    "gap": "gap-0",
-    "alignment": "center"
-  },
-  "sections": [
-    {
-      "id": "navbar",
-      "type": "navbar",
-      "layout": {
-        "type": "flex-row",
-        "justify": "between",
-        "align": "center",
-        "padding": "px-6 py-4"
-      },
-      "style": {
-        "background": "bg-white",
-        "border": "border-b border-gray-200"
-      },
-      "children": [
-        {
-          "component": "logo",
-          "props": {
-            "text": "Acme",
-            "className": "text-2xl font-bold text-gray-900"
-          }
-        },
-        {
-          "component": "container",
-          "props": {
-            "className": "flex items-center gap-8"
-          },
-          "children": [
-            {
-              "component": "nav-item",
-              "props": {
-                "text": "Features",
-                "active": false,
-                "className": "text-gray-600 hover:text-gray-900"
-              }
-            },
-            {
-              "component": "nav-item",
-              "props": {
-                "text": "Pricing",
-                "active": false,
-                "className": "text-gray-600 hover:text-gray-900"
-              }
-            },
-            {
-              "component": "button",
-              "props": {
-                "text": "Get Started",
-                "variant": "primary",
-                "className": "bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "hero",
-      "type": "hero",
-      "layout": {
-        "type": "flex-col",
-        "align": "center",
-        "gap": "gap-6",
-        "padding": "py-24 px-4"
-      },
-      "style": {
-        "background": "bg-gradient-to-b from-blue-50 to-white"
-      },
-      "children": [
-        {
-          "component": "badge",
-          "props": {
-            "text": "New Release",
-            "className": "px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium"
-          }
-        },
-        {
-          "component": "heading",
-          "props": {
-            "level": 1,
-            "text": "Build faster with AI",
-            "className": "text-5xl font-bold text-gray-900 text-center max-w-3xl"
-          }
-        },
-        {
-          "component": "text",
-          "props": {
-            "text": "The most advanced AI-powered development platform.",
-            "className": "text-xl text-gray-600 text-center max-w-2xl"
-          }
-        },
-        {
-          "component": "container",
-          "props": {
-            "className": "flex items-center gap-4 mt-4"
-          },
-          "children": [
-            {
-              "component": "button",
-              "props": {
-                "text": "Start Free Trial",
-                "variant": "primary",
-                "className": "bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 shadow-lg"
-              }
-            },
-            {
-              "component": "button",
-              "props": {
-                "text": "Watch Demo",
-                "variant": "outline",
-                "icon": "play",
-                "iconPosition": "left",
-                "className": "border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:border-gray-400"
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
+# IMPORTANT RULES
 
-# CRITICAL INSTRUCTIONS
+1. **Be Specific**: Use exact Tailwind classes, not vague descriptions
+2. **Transcribe Text**: Copy all visible text word-for-word
+3. **Estimate Accurately**: When unsure about exact values, give best Tailwind approximation
+4. **Detect Problems First**: Always check for errors/bugs before describing as working UI
+5. **Think Like a Developer**: Provide info that helps fix/build, not just describe
+6. **Include Everything**: Don't skip small details - icons, badges, dividers all matter
 
-1. Output ONLY valid JSON - no markdown code blocks, no explanations
-2. Transcribe ALL visible text exactly as shown
-3. Use Tailwind classes for ALL styling
-4. Build a complete component tree - every element must be represented
-5. Nest children properly - maintain the visual hierarchy
-6. Be exhaustive - don't skip any visible elements
-7. For icons, use descriptive names (menu, search, arrow-right, check, x, etc.)
-8. For images, describe what they show in the "src" field
-
-Analyze the provided image and output the JSON specification now.`
-
-// Simpler prompt for quick descriptions
-const QUICK_DESCRIPTION_PROMPT = `Analyze this UI image and provide a brief structured description:
-
-1. **Page Type**: What kind of page is this? (landing, dashboard, form, etc.)
-2. **Main Sections**: List the major sections from top to bottom
-3. **Key Components**: List the main UI components visible (buttons, cards, inputs, etc.)
-4. **Color Scheme**: Primary colors used
-5. **Layout Style**: How is the content organized?
-
-Keep it concise but complete.`
+Now analyze the provided image.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -385,10 +209,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Choose prompt based on mode
-    const systemPrompt = mode === 'quick'
-      ? QUICK_DESCRIPTION_PROMPT
-      : (prompt || STRUCTURED_UI_PROMPT)
+    // Use comprehensive analysis prompt, or custom prompt if provided
+    const systemPrompt = prompt || COMPREHENSIVE_UI_ANALYSIS_PROMPT
 
     // Use Pixtral (Mistral's vision model) for image analysis
     const result = await generateText({
@@ -408,53 +230,25 @@ export async function POST(request: NextRequest) {
           ],
         },
       ],
-      temperature: 0.3, // Lower temperature for more consistent structured output
+      temperature: 0.3,
     })
 
-    // For structured mode, try to parse and validate the JSON
-    if (mode === 'structured' && !prompt) {
-      try {
-        // Clean up the response - remove any markdown code blocks if present
-        let jsonText = result.text.trim()
+    // Parse the response to extract image type
+    const responseText = result.text
+    let imageType = 'WORKING_UI'
 
-        // Remove markdown code block wrapper if present
-        if (jsonText.startsWith('```json')) {
-          jsonText = jsonText.slice(7)
-        } else if (jsonText.startsWith('```')) {
-          jsonText = jsonText.slice(3)
-        }
-        if (jsonText.endsWith('```')) {
-          jsonText = jsonText.slice(0, -3)
-        }
-        jsonText = jsonText.trim()
-
-        // Try to parse to validate it's proper JSON
-        const parsed = JSON.parse(jsonText)
-
-        return NextResponse.json({
-          success: true,
-          mode: 'structured',
-          specification: parsed,
-          raw: jsonText,
-        })
-      } catch (parseError) {
-        // If JSON parsing fails, return raw text with error flag
-        console.warn('Failed to parse structured output as JSON:', parseError)
-        return NextResponse.json({
-          success: true,
-          mode: 'structured',
-          parseError: true,
-          raw: result.text,
-          description: result.text,
-        })
-      }
+    // Try to detect the image type from the response
+    const typeMatch = responseText.match(/## IMAGE_TYPE:\s*(ERROR_STATE|BUG_VISUAL|STYLE_ISSUE|WORKING_UI)/i)
+    if (typeMatch) {
+      imageType = typeMatch[1].toUpperCase()
     }
 
-    // For quick mode or custom prompts, return text directly
     return NextResponse.json({
       success: true,
-      mode: mode,
-      description: result.text,
+      imageType,
+      description: responseText,
+      // Include raw for backwards compatibility
+      raw: responseText,
     })
   } catch (error) {
     console.error('Error describing image:', error)
