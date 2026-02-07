@@ -3915,6 +3915,7 @@ export function ChatPanelV2({
       if (imageContexts) {
         enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageContexts}\n=== END ATTACHED IMAGES ===`
       }
+      console.log(`[ChatPanelV2] Using describe-image analysis for ${attachedImages.length} image(s)`)
     }
 
     // Add URL contents (shown to user)

@@ -62,7 +62,7 @@ You MUST output valid JSON only. No markdown, no explanations, no extra text. Ju
   ]
 }
 
-# Component Props Reference
+# FIRST: Detect What Type of Image This Is
 
 ## heading: { "level": 1-6, "text": "content", "className": "text-4xl font-bold" }
 ## text: { "text": "content", "variant": "body|caption|label|muted", "className": "text-base" }
