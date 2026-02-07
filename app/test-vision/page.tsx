@@ -2,13 +2,15 @@
 
 import { useState, useRef } from 'react'
 
+type Mode = 'clone' | 'debug' | 'context'
+
 export default function TestVisionPage() {
   const [image, setImage] = useState<string | null>(null)
-  const [prompt, setPrompt] = useState('What do you see in this image?')
+  const [prompt, setPrompt] = useState('')
   const [response, setResponse] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [model, setModel] = useState('mistral/devstral-2')
+  const [mode, setMode] = useState<Mode>('context')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,7 +43,7 @@ export default function TestVisionPage() {
     }
   }
 
-  const sendMessage = async () => {
+  const analyzeImage = async () => {
     if (!image) {
       setError('Please upload an image first')
       return
@@ -52,64 +54,33 @@ export default function TestVisionPage() {
     setResponse('')
 
     try {
-      const messages = [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image', image: image }
-          ]
-        }
-      ]
-
-      const res = await fetch('/api/chat-v2', {
+      const res = await fetch('/api/describe-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages,
-          modelId: model,
-          projectId: 'test-vision',
-          files: {},
+          image,
+          mode,
+          userMessage: prompt || undefined,
         }),
       })
 
       if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`API Error: ${res.status} - ${errorText}`)
+        const errorData = await res.json()
+        throw new Error(errorData.error || `API Error: ${res.status}`)
       }
 
-      // Handle streaming response
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
+      const data = await res.json()
 
-      if (!reader) {
-        throw new Error('No response body')
-      }
-
-      let fullResponse = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        // Parse SSE format
-        const lines = chunk.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('0:')) {
-            // Text content
-            try {
-              const text = JSON.parse(line.slice(2))
-              fullResponse += text
-              setResponse(fullResponse)
-            } catch {
-              // Not JSON, might be raw text
-              fullResponse += line.slice(2)
-              setResponse(fullResponse)
-            }
-          }
+      if (data.success) {
+        if (data.specification) {
+          setResponse(JSON.stringify(data.specification, null, 2))
+        } else {
+          setResponse(data.description || data.raw || 'No response')
         }
+      } else {
+        throw new Error(data.error || 'Unknown error')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -122,24 +93,50 @@ export default function TestVisionPage() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8" onPaste={handlePaste}>
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Vision Model Test</h1>
-        <p className="text-gray-400 mb-8">Test Devstral and other models with image input</p>
+        <h1 className="text-3xl font-bold mb-2">Vision API Test</h1>
+        <p className="text-gray-400 mb-8">Test image analysis via Mistral Devstral (Gateway)</p>
 
         <div className="space-y-6">
-          {/* Model Selection */}
+          {/* Mode Selection */}
           <div>
-            <label className="block text-sm font-medium mb-2">Model</label>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="mistral/devstral-2">Mistral Devstral 2 (123B)</option>
-              <option value="mistral/devstral-small-2">Mistral Devstral Small 2 (24B)</option>
-              <option value="pixtral-12b-2409">Pixtral 12B</option>
-              <option value="anthropic/claude-sonnet-4.5">Claude Sonnet 4.5</option>
-              <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
-            </select>
+            <label className="block text-sm font-medium mb-2">Analysis Mode</label>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setMode('clone')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  mode === 'clone'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                Clone (JSON)
+              </button>
+              <button
+                onClick={() => setMode('debug')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  mode === 'debug'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                Debug
+              </button>
+              <button
+                onClick={() => setMode('context')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  mode === 'context'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                Context
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              {mode === 'clone' && 'Outputs structured JSON for UI recreation'}
+              {mode === 'debug' && 'Identifies visual issues and suggests fixes'}
+              {mode === 'context' && 'General description for reference'}
+            </p>
           </div>
 
           {/* Image Upload */}
@@ -176,21 +173,21 @@ export default function TestVisionPage() {
             />
           </div>
 
-          {/* Prompt */}
+          {/* Optional Prompt */}
           <div>
-            <label className="block text-sm font-medium mb-2">Prompt</label>
+            <label className="block text-sm font-medium mb-2">Additional Context (optional)</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={3}
+              rows={2}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="What do you want to ask about the image?"
+              placeholder="Add any context about what you want to analyze..."
             />
           </div>
 
-          {/* Send Button */}
+          {/* Analyze Button */}
           <button
-            onClick={sendMessage}
+            onClick={analyzeImage}
             disabled={loading || !image}
             className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
               loading || !image
@@ -198,7 +195,7 @@ export default function TestVisionPage() {
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
-            {loading ? 'Processing...' : 'Send to Model'}
+            {loading ? 'Analyzing...' : 'Analyze Image'}
           </button>
 
           {/* Error Display */}
@@ -212,20 +209,21 @@ export default function TestVisionPage() {
           {/* Response Display */}
           {response && (
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-              <p className="text-gray-400 font-medium mb-2">Response from {model}</p>
+              <p className="text-gray-400 font-medium mb-2">Analysis Result ({mode} mode)</p>
               <div className="prose prose-invert max-w-none">
-                <pre className="whitespace-pre-wrap text-sm">{response}</pre>
+                <pre className="whitespace-pre-wrap text-sm overflow-x-auto">{response}</pre>
               </div>
             </div>
           )}
 
-          {/* Debug Info */}
-          <div className="text-xs text-gray-500 mt-8">
-            <p>Debug Info:</p>
-            <ul className="list-disc list-inside mt-1">
+          {/* Info */}
+          <div className="text-xs text-gray-500 mt-8 bg-gray-800/50 rounded-lg p-4">
+            <p className="font-medium mb-2">API Info:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Endpoint: /api/describe-image</li>
+              <li>Model: mistral/devstral-small-2 (via Vercel AI Gateway)</li>
               <li>Image loaded: {image ? 'Yes' : 'No'}</li>
-              <li>Image size: {image ? `${Math.round(image.length / 1024)} KB` : 'N/A'}</li>
-              <li>Model: {model}</li>
+              {image && <li>Image size: {Math.round(image.length / 1024)} KB</li>}
             </ul>
           </div>
         </div>
