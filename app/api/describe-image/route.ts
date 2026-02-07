@@ -3,6 +3,60 @@ import { generateText } from 'ai'
 import { vercelGateway } from '@/lib/ai-providers'
 
 // =============================================================================
+// MODE: DESCRIBE - Neutral, detailed image description (DEFAULT)
+// =============================================================================
+const DESCRIBE_PROMPT = `You are a Visual Translator. Your job is to describe images so vividly and completely that someone who cannot see the image can perfectly imagine it.
+
+# Your Task
+Describe everything you see in rich detail, as if painting a picture with words. Be objective and neutral - do not assume what the user wants to do with this image.
+
+# Description Structure
+
+## Type & Overview
+Start with what type of image this is (screenshot, photo, diagram, illustration, mockup, etc.) and a one-sentence summary.
+
+## Visual Composition
+- **Layout**: How elements are arranged (grid, list, centered, sidebar, etc.)
+- **Dimensions**: Approximate proportions and spacing
+- **Visual hierarchy**: What draws the eye first, second, third
+
+## Content Details
+For UI/Screenshots:
+- All visible text (transcribe exactly, including labels, buttons, headings)
+- Interactive elements (buttons, inputs, links, toggles)
+- Data displayed (tables, lists, cards, stats)
+- Navigation elements (menus, tabs, breadcrumbs)
+- Status indicators (badges, icons, alerts)
+
+For Photos/Illustrations:
+- Subjects and their positions
+- Actions or states depicted
+- Background and foreground elements
+- Notable details or features
+
+## Visual Style
+- **Colors**: Dominant colors, color scheme (dark/light mode, brand colors)
+- **Typography**: Font styles (bold headings, regular text, sizes)
+- **Spacing**: Dense or airy, tight or relaxed
+- **Borders/Shadows**: Card styles, depth, separation
+- **Icons**: Style (outline, filled, emoji) and their meanings
+
+## Notable Elements
+- Anything that stands out as important
+- Unique or distinctive features
+- Error states, empty states, or special conditions visible
+
+# Guidelines
+- Be thorough but organized
+- Use specific descriptions ("blue button with white text" not just "button")
+- Transcribe all readable text exactly
+- Describe positions (top-left, center, below the header)
+- Note approximate sizes (small icon, large hero image, half-width card)
+- Stay neutral - describe what IS, not what should be done with it
+
+The goal is that after reading your description, someone could accurately draw or code what you described without ever seeing the original image.`
+
+// =============================================================================
 // MODE: CLONE - Structured JSON for UI cloning/recreation
 // =============================================================================
 const CLONE_PROMPT = `You are a UI-to-Code Translation Engine. Your job is to analyze UI images and output a STRUCTURED JSON specification that a non-vision AI model can use to generate exact code.
@@ -58,8 +112,7 @@ You MUST output valid JSON only. No markdown, no explanations, no extra text. Ju
   ]
 }
 
-# FIRST: Detect What Type of Image This Is
-
+# Component Props
 ## heading: { "level": 1-6, "text": "content", "className": "text-4xl font-bold" }
 ## text: { "text": "content", "variant": "body|caption|label|muted", "className": "text-base" }
 ## button: { "text": "Label", "variant": "primary|secondary|outline|ghost", "size": "sm|md|lg", "icon": "name|null", "className": "..." }
@@ -136,95 +189,32 @@ Provide a structured analysis:
 Be specific about element locations and provide actionable fixes.`
 
 // =============================================================================
-// MODE: CONTEXT - General understanding, reference images, examples
+// MODE: CONTEXT - For reference images when user provides context
 // =============================================================================
-const CONTEXT_PROMPT = `You are a Visual Context Analyzer. The user is sharing an image to give you context about what they're working on or what they want. Your job is to thoroughly describe what you see so a non-vision AI model can understand it.
+const CONTEXT_PROMPT = `You are a Visual Context Analyzer. The user is sharing an image as a reference or example. Describe what you see in a way that helps understand their intent.
 
 # Analyze and Describe
 
 ## 1. Overview
-- What type of content is this? (UI mockup, screenshot, diagram, example, inspiration, etc.)
-- What is the main purpose or subject?
+- What type of content is this? (UI screenshot, mockup, diagram, example, inspiration, etc.)
+- What is the main subject or focus?
 
-## 2. Visual Content
-Describe everything you see in detail:
-- Text content (transcribe exactly)
-- Images and graphics
-- UI elements (buttons, forms, cards, etc.)
-- Layout and structure
-- Colors and styling
+## 2. Visual Details
+Describe the key elements:
+- All visible text (transcribe important parts exactly)
+- Main UI components or visual elements
+- Layout structure and organization
+- Color scheme and visual style
 
-## 3. Key Details
-- Important information the user likely wants to reference
-- Specific elements that stand out
-- Any annotations, highlights, or indicators
+## 3. Notable Features
+- What stands out as most important?
+- Any unique or distinctive elements?
+- Specific patterns or design choices?
 
-## 4. Context Clues
-- What might the user be trying to achieve?
-- How does this relate to building/coding something?
-- What aspects should the AI focus on?
+## 4. Context Summary
+Summarize what this image shows in a way that helps the AI understand what the user might be referencing or asking about.
 
-## 5. Actionable Information
-Summarize what a coding AI should know:
-- Specific styles to match
-- Functionality to implement
-- Content to include
-- Patterns to follow
-
-Be thorough but organized. The goal is to give a non-vision AI everything it needs to understand this image.`
-
-// =============================================================================
-// MODE: AUTO - Detect intent from user message and choose appropriate mode
-// =============================================================================
-function detectMode(userMessage?: string): 'clone' | 'debug' | 'context' {
-  if (!userMessage) return 'clone' // Default to clone for UI recreation
-
-  const message = userMessage.toLowerCase()
-
-  // Debug/issue keywords
-  const debugKeywords = [
-    'bug', 'issue', 'problem', 'wrong', 'broken', 'fix', 'error',
-    'not working', 'doesnt work', "doesn't work", 'incorrect',
-    'misalign', 'overflow', 'cut off', 'overlap', 'spacing',
-    'color wrong', 'style issue', 'styling issue', 'looks off',
-    'why is', 'why does', 'what happened', 'help me fix',
-    'something wrong', 'messed up', 'weird', 'glitch'
-  ]
-
-  // Clone/build keywords
-  const cloneKeywords = [
-    'clone', 'copy', 'recreate', 'build this', 'make this',
-    'create this', 'like this', 'same as', 'replicate',
-    'implement this', 'code this', 'build like', 'design like',
-    'match this', 'similar to'
-  ]
-
-  // Context/reference keywords
-  const contextKeywords = [
-    'example', 'reference', 'inspiration', 'show you', 'look at',
-    'here is', "here's", 'this is', 'see this', 'check this',
-    'screenshot of', 'image of', 'what do you think', 'feedback',
-    'compare', 'versus', 'or this'
-  ]
-
-  // Check for debug intent
-  for (const keyword of debugKeywords) {
-    if (message.includes(keyword)) return 'debug'
-  }
-
-  // Check for clone intent
-  for (const keyword of cloneKeywords) {
-    if (message.includes(keyword)) return 'clone'
-  }
-
-  // Check for context intent
-  for (const keyword of contextKeywords) {
-    if (message.includes(keyword)) return 'context'
-  }
-
-  // Default to clone for UI-focused platform
-  return 'clone'
-}
+Be concise but thorough. Focus on details that would be relevant for discussion or implementation.`
 
 // =============================================================================
 // API HANDLER
@@ -240,9 +230,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine mode: explicit mode > auto-detect from userMessage > default to clone
-    const effectiveMode = mode || detectMode(userMessage)
-    console.log(`[describe-image] Mode: ${effectiveMode}, userMessage: "${userMessage?.slice(0, 50)}..."`)
+    // Determine mode: explicit mode > default to 'describe' (neutral)
+    // Note: We always use 'describe' mode for initial processing
+    // The main AI will determine user intent from their actual message
+    const effectiveMode = mode || 'describe'
+    console.log(`[describe-image] Mode: ${effectiveMode}`)
 
     // Select prompt based on mode
     let systemPrompt: string
@@ -254,14 +246,17 @@ export async function POST(request: NextRequest) {
         systemPrompt = CONTEXT_PROMPT
         break
       case 'clone':
-      case 'structured': // Backwards compatibility
-      default:
+      case 'structured':
         systemPrompt = CLONE_PROMPT
+        break
+      case 'describe':
+      default:
+        systemPrompt = DESCRIBE_PROMPT
         break
     }
 
-    // If custom prompt provided, append user context
-    if (userMessage && effectiveMode !== 'clone') {
+    // If user message provided for context modes, append it
+    if (userMessage && effectiveMode === 'context') {
       systemPrompt = `${systemPrompt}\n\n# USER'S MESSAGE\nThe user said: "${userMessage}"\n\nKeep this context in mind when analyzing the image.`
     }
 
@@ -327,7 +322,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // For debug and context modes, return text directly
+    // For all other modes, return text description
     return NextResponse.json({
       success: true,
       mode: effectiveMode,
