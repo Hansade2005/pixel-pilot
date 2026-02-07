@@ -296,6 +296,39 @@ export default visualEditorPlugin;
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
+    <!-- PiPilot Console Bridge - Captures console logs for preview panel -->
+    <script>
+      (function() {
+        window.__PIPILOT_EARLY_ERRORS__ = [];
+        window.onerror = function(msg, url, line, col, error) {
+          var errorData = { __isError: true, name: error?.name || 'Error', message: msg, stack: error?.stack || ('at ' + url + ':' + line + ':' + col) };
+          window.__PIPILOT_EARLY_ERRORS__.push(errorData);
+          try { window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: 'error', data: [errorData], timestamp: new Date().toISOString(), id: 'error-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*'); } catch(e) {}
+          return false;
+        };
+        window.onunhandledrejection = function(event) {
+          var errorData = { __isError: true, name: 'UnhandledPromiseRejection', message: String(event.reason), stack: event.reason?.stack || '' };
+          window.__PIPILOT_EARLY_ERRORS__.push(errorData);
+          try { window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: 'error', data: [errorData], timestamp: new Date().toISOString(), id: 'rejection-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*'); } catch(e) {}
+        };
+        var originalConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info, debug: console.debug };
+        function sendToParent(method, args) {
+          try {
+            var serializedArgs = Array.prototype.slice.call(args).map(function(arg) {
+              if (arg instanceof Error) return { __isError: true, name: arg.name, message: arg.message, stack: arg.stack };
+              try { return JSON.parse(JSON.stringify(arg)); } catch(e) { return String(arg); }
+            });
+            window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: method, data: serializedArgs, timestamp: new Date().toISOString(), id: method + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*');
+          } catch(e) {}
+        }
+        console.log = function() { originalConsole.log.apply(console, arguments); sendToParent('log', arguments); };
+        console.warn = function() { originalConsole.warn.apply(console, arguments); sendToParent('warn', arguments); };
+        console.error = function() { originalConsole.error.apply(console, arguments); sendToParent('error', arguments); };
+        console.info = function() { originalConsole.info.apply(console, arguments); sendToParent('info', arguments); };
+        console.debug = function() { originalConsole.debug.apply(console, arguments); sendToParent('debug', arguments); };
+        setTimeout(function() { window.__PIPILOT_EARLY_ERRORS__.forEach(function(err) { sendToParent('error', [err]); }); }, 100);
+      })();
+    </script>
 
     <!-- Google Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2371,6 +2404,44 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* PiPilot Console Bridge - Captures console logs for preview panel */}
+        <script dangerouslySetInnerHTML={{ __html: \`
+          (function() {
+            window.__PIPILOT_EARLY_ERRORS__ = [];
+            window.onerror = function(msg, url, line, col, error) {
+              var errorData = { __isError: true, name: error?.name || 'Error', message: msg, stack: error?.stack || ('at ' + url + ':' + line + ':' + col) };
+              window.__PIPILOT_EARLY_ERRORS__.push(errorData);
+              try {
+                window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: 'error', data: [errorData], timestamp: new Date().toISOString(), id: 'error-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*');
+              } catch(e) {}
+              return false;
+            };
+            window.onunhandledrejection = function(event) {
+              var errorData = { __isError: true, name: 'UnhandledPromiseRejection', message: String(event.reason), stack: event.reason?.stack || '' };
+              window.__PIPILOT_EARLY_ERRORS__.push(errorData);
+              try {
+                window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: 'error', data: [errorData], timestamp: new Date().toISOString(), id: 'rejection-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*');
+              } catch(e) {}
+            };
+            var originalConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info, debug: console.debug };
+            function sendToParent(method, args) {
+              try {
+                var serializedArgs = Array.prototype.slice.call(args).map(function(arg) {
+                  if (arg instanceof Error) return { __isError: true, name: arg.name, message: arg.message, stack: arg.stack };
+                  try { return JSON.parse(JSON.stringify(arg)); } catch(e) { return String(arg); }
+                });
+                window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: method, data: serializedArgs, timestamp: new Date().toISOString(), id: method + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*');
+              } catch(e) {}
+            }
+            console.log = function() { originalConsole.log.apply(console, arguments); sendToParent('log', arguments); };
+            console.warn = function() { originalConsole.warn.apply(console, arguments); sendToParent('warn', arguments); };
+            console.error = function() { originalConsole.error.apply(console, arguments); sendToParent('error', arguments); };
+            console.info = function() { originalConsole.info.apply(console, arguments); sendToParent('info', arguments); };
+            console.debug = function() { originalConsole.debug.apply(console, arguments); sendToParent('debug', arguments); };
+            setTimeout(function() { window.__PIPILOT_EARLY_ERRORS__.forEach(function(err) { sendToParent('error', [err]); }); }, 100);
+          })();
+        \` }} />
+
         {/* Google Fonts Preconnect */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -5304,6 +5375,39 @@ yarn-error.*
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My HTML Website</title>
+    <!-- PiPilot Console Bridge - Captures console logs for preview panel -->
+    <script>
+      (function() {
+        window.__PIPILOT_EARLY_ERRORS__ = [];
+        window.onerror = function(msg, url, line, col, error) {
+          var errorData = { __isError: true, name: error?.name || 'Error', message: msg, stack: error?.stack || ('at ' + url + ':' + line + ':' + col) };
+          window.__PIPILOT_EARLY_ERRORS__.push(errorData);
+          try { window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: 'error', data: [errorData], timestamp: new Date().toISOString(), id: 'error-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*'); } catch(e) {}
+          return false;
+        };
+        window.onunhandledrejection = function(event) {
+          var errorData = { __isError: true, name: 'UnhandledPromiseRejection', message: String(event.reason), stack: event.reason?.stack || '' };
+          window.__PIPILOT_EARLY_ERRORS__.push(errorData);
+          try { window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: 'error', data: [errorData], timestamp: new Date().toISOString(), id: 'rejection-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*'); } catch(e) {}
+        };
+        var originalConsole = { log: console.log, warn: console.warn, error: console.error, info: console.info, debug: console.debug };
+        function sendToParent(method, args) {
+          try {
+            var serializedArgs = Array.prototype.slice.call(args).map(function(arg) {
+              if (arg instanceof Error) return { __isError: true, name: arg.name, message: arg.message, stack: arg.stack };
+              try { return JSON.parse(JSON.stringify(arg)); } catch(e) { return String(arg); }
+            });
+            window.parent.postMessage({ type: 'BROWSER_CONSOLE_LOG', payload: { method: method, data: serializedArgs, timestamp: new Date().toISOString(), id: method + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) } }, '*');
+          } catch(e) {}
+        }
+        console.log = function() { originalConsole.log.apply(console, arguments); sendToParent('log', arguments); };
+        console.warn = function() { originalConsole.warn.apply(console, arguments); sendToParent('warn', arguments); };
+        console.error = function() { originalConsole.error.apply(console, arguments); sendToParent('error', arguments); };
+        console.info = function() { originalConsole.info.apply(console, arguments); sendToParent('info', arguments); };
+        console.debug = function() { originalConsole.debug.apply(console, arguments); sendToParent('debug', arguments); };
+        setTimeout(function() { window.__PIPILOT_EARLY_ERRORS__.forEach(function(err) { sendToParent('error', [err]); }); }, 100);
+      })();
+    </script>
 
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
