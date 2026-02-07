@@ -4950,50 +4950,20 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         const base64 = event.target?.result as string
         const imageId = Date.now().toString() + Math.random()
 
-        // Add image with processing flag
+        // Just store the image - processing happens at send time with user's message
+        // This allows proper intent detection (clone/debug/context) based on what user types
         setAttachedImages((prev: AttachedImage[]) => [...prev, {
           id: imageId,
           name: file.name,
           base64,
-          isProcessing: true
+          isProcessing: false,
+          description: '[Will be analyzed with your message]'
         }])
 
-        // Get structured description using vision API (JSON format for code generation)
-        try {
-          const response = await fetch('/api/describe-image', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              image: base64,
-              mode: 'structured' // Use structured JSON output for code generation
-            }),
-          })
-
-          const result = await response.json()
-
-          // Extract description from structured or fallback response
-          let description: string
-          if (result.specification) {
-            // Structured JSON specification - format for model consumption
-            description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
-          } else if (result.description) {
-            description = result.description
-          } else {
-            description = '[Image processed]'
-          }
-
-          // Update with description
-          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
-            img.id === imageId ? { ...img, description, isProcessing: false } : img
-          ))
-        } catch (error) {
-          console.error('Error describing image:', error)
-          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
-            img.id === imageId ? { ...img, isProcessing: false } : img
-          ))
-        }
+        toast({
+          title: "Image attached",
+          description: "Will be analyzed when you send your message"
+        })
       }
       reader.readAsDataURL(file)
     }
@@ -5564,65 +5534,23 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                     const base64 = event.target?.result as string
                     const imageId = `pasted_img_${Date.now()}_${index}`
 
-                    // Always process images through describe-image API
-                    // This allows intent detection based on user's message
+                    // Just store the image - processing happens at send time with user's message
+                    // This allows proper intent detection (clone/debug/context) based on what user types
                     setAttachedImages(prev => {
                       const newImageNumber = prev.length + 1
                       return [...prev, {
                         id: imageId,
                         name: `Pasted Image ${newImageNumber}`,
                         base64: base64,
-                        isProcessing: true
+                        isProcessing: false, // No processing yet - happens at send time
+                        description: '[Will be analyzed with your message]'
                       }]
                     })
 
-                    // Send to Pixtral for analysis - mode will be detected when message is sent
-                    // For now, use 'context' mode as a neutral default until user types their message
-                    try {
-                      const response = await fetch('/api/describe-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          image: base64,
-                          mode: 'context' // Default to context - will be re-analyzed with user message when sent
-                        })
-                      })
-
-                      if (!response.ok) throw new Error('Failed to describe image')
-
-                      const result = await response.json()
-
-                      // Extract description based on mode
-                      let description: string
-                      if (result.specification) {
-                        // Structured JSON specification for clone mode
-                        description = `[UI SPECIFICATION]\n\`\`\`json\n${JSON.stringify(result.specification, null, 2)}\n\`\`\``
-                      } else if (result.description) {
-                        description = result.description
-                      } else {
-                        description = '[Image processed]'
-                      }
-
-                      // Update image with description
-                      setAttachedImages(prev => prev.map(img =>
-                        img.id === imageId
-                          ? { ...img, description, isProcessing: false }
-                          : img
-                      ))
-
-                      toast({
-                        title: "Image analyzed",
-                        description: "Ready for your message"
-                      })
-                    } catch (error) {
-                      console.error('Error describing pasted image:', error)
-                      toast({
-                        title: "Processing failed",
-                        description: "Failed to process pasted image",
-                        variant: "destructive"
-                      })
-                      setAttachedImages(prev => prev.filter(img => img.id !== imageId))
-                    }
+                    toast({
+                      title: "Image attached",
+                      description: "Will be analyzed when you send your message"
+                    })
                   }
 
                   reader.onerror = () => {
