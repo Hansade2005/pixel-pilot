@@ -155,6 +155,12 @@ const mistralProvider = createMistral({
   apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 });
 
+// Create Mistral provider with Vercel AI Gateway (for vision support)
+const mistralGatewayProvider = createMistral({
+  baseURL: 'https://ai-gateway.vercel.sh/v1',
+  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
+});
+
 const xaiProvider = createXai({
   apiKey: process.env.XAI_API_KEY || 'xai-your-api-key-here',
 });
@@ -293,14 +299,14 @@ export function needsMistralVisionProvider(modelId: string): boolean {
   return !!devstralVisionModels[modelId];
 }
 
-// Get the vision-capable model for Devstral (uses Mistral provider with correct model name)
+// Get the vision-capable model for Devstral (uses Mistral Gateway provider with correct model name)
 export function getDevstralVisionModel(modelId: string) {
   const mistralModelName = devstralVisionModels[modelId];
   if (!mistralModelName) {
     throw new Error(`Model ${modelId} is not a Devstral vision model`);
   }
-  console.log(`[AI Providers] Using Mistral provider for ${modelId} -> ${mistralModelName} (vision support)`);
-  return mistralProvider(mistralModelName);
+  console.log(`[AI Providers] Using Mistral Gateway provider for ${modelId} -> ${mistralModelName} (vision support)`);
+  return mistralGatewayProvider(mistralModelName);
 }
 
 // Export individual providers for direct use if needed
