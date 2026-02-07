@@ -988,6 +988,7 @@ interface TaggedComponent {
 }
 
 // Models that support direct vision/image input (no need for image description API)
+// These models can accept images directly via the Vercel AI SDK multimodal format
 const VISION_CAPABLE_MODELS = [
   // Anthropic models
   'anthropic/claude-sonnet-4.5',
@@ -1000,14 +1001,11 @@ const VISION_CAPABLE_MODELS = [
   // Google Gemini models
   'google/gemini-2.5-flash',
   'google/gemini-2.5-pro',
-  // Mistral Devstral models (vision capable)
+  // Mistral models - Devstral supports vision through Vercel AI Gateway
   'mistral/devstral-2',
   'mistral/devstral-small-2',
-  // GLM models
-  'xai/glm-4.7',
-  'zai/glm-4.7-flash',
-  // Pixtral (vision model)
   'pixtral-12b-2409',
+  'mistral/pixtral-large-2411',
 ]
 
 // Maximum number of images that can be attached

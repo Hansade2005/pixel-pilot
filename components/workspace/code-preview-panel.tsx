@@ -3145,7 +3145,15 @@ export default function TodoApp() {
               onAskAiToFix={(errors) => {
                 // Dispatch custom event to fill chat input with error debugging request
                 const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
-                const prompt = `Debug and fix these browser console errors:\n\n${errorList}\n\nPlease analyze these errors and provide fixes.`
+                const prompt = `Debug and fix these browser console errors:\n\n${errorList}\n\nPlease analyze these errors and use your file edit tools to fix them.`
+                window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
+                  detail: { prompt, errors }
+                }))
+              }}
+              onAskAiToFixTerminal={(errors) => {
+                // Dispatch custom event to fill chat input with terminal error debugging request
+                const errorList = errors.map((err, i) => `${i + 1}. ${err}`).join('\n')
+                const prompt = `Debug and fix these terminal errors:\n\n${errorList}\n\nPlease analyze these errors and use your file edit tools to fix them.`
                 window.dispatchEvent(new CustomEvent('ask-ai-to-fix', {
                   detail: { prompt, errors }
                 }))
