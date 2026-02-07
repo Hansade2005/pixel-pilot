@@ -291,6 +291,7 @@ const modelProviders: Record<string, any> = {
   'google/gemini-2.5-flash': vercelGateway('google/gemini-2.5-flash'),
   'google/gemini-2.5-pro': vercelGateway('google/gemini-2.5-pro'),
   'xai/glm-4.7': vercelGateway('xai/glm-4.7'),
+  'zai/glm-4.7-flash': vercelGateway('zai/glm-4.7-flash'),
   'minimax/minimax-m2.1': vercelGateway('minimax/minimax-m2.1'),
   'alibaba/qwen3-max': vercelGateway('alibaba/qwen3-max'),
   'openai/gpt-5.1-thinking': vercelGateway('openai/gpt-5.1-thinking'),

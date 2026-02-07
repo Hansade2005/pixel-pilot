@@ -4127,9 +4127,9 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
-      // For initial prompt, force use claude-haiku-4.5 model for UI prototyping
+      // For initial prompt, force use anthropic/claude-haiku-4.5 model for UI prototyping
       // Subsequent requests follow user/default model selection
-      const modelToUse = isInitialPrompt ? 'claude-haiku-4.5' : selectedModel
+      const modelToUse = isInitialPrompt ? 'anthropic/claude-haiku-4.5' : selectedModel
 
       console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
 
