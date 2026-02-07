@@ -10378,12 +10378,10 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
       return msg.content.some((part: any) => part.type === 'image');
     });
 
-    // For Devstral with images, we use Anthropic provider which requires Anthropic image format
-    const useAnthropicFormat = (isAnthropicModel || (isDevstralModel && messagesHaveImages));
+    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}`);
 
-    console.log(`[Chat-V2] Image preprocessing: hasImages=${messagesHaveImages}, isDevstral=${isDevstralModel}, useAnthropicFormat=${useAnthropicFormat}`);
-
-    // Preprocess messages to handle image formats for different providers
+    // Preprocess messages to ensure images are in Vercel AI SDK format
+    // The Anthropic provider handles conversion internally - do NOT manually convert to Anthropic format
     const preprocessedMessages = processedMessages.map((msg: any) => {
       if (msg.role !== 'user' || !Array.isArray(msg.content)) {
         return msg;
@@ -10395,7 +10393,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
         return msg;
       }
 
-      // Convert image parts based on provider requirements
+      // Ensure images are in proper Vercel AI SDK format (data URL)
       const convertedContent = msg.content.map((part: any) => {
         if (part.type !== 'image' || !part.image) {
           return part;
@@ -10410,24 +10408,7 @@ ${fileAnalysis.filter(file => file.score < 70).map(file => `- **${file.name}**: 
           }
         }
 
-        // For Anthropic models OR Devstral with images (via Anthropic provider), use Anthropic format
-        if (useAnthropicFormat) {
-          // Extract base64 and media type from data URL
-          const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            console.log(`[Chat-V2] Converting image to Anthropic format for ${modelId}`);
-            return {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: match[1],
-                data: match[2],
-              },
-            };
-          }
-        }
-
-        // For other models, keep original format
+        // Keep Vercel AI SDK format - the provider handles conversion internally
         return {
           type: 'image',
           image: imageUrl,
