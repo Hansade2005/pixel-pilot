@@ -253,10 +253,10 @@ const ExpandableUserMessage = ({
                   {images.map((img) => (
                     <img
                       key={img.id}
-                      src={`data:image/png;base64,${img.base64}`}
+                      src={img.base64}
                       alt={img.name}
                       className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
-                      onClick={() => setPreviewImage(`data:image/png;base64,${img.base64}`)}
+                      onClick={() => setPreviewImage(img.base64)}
                       title={img.name}
                     />
                   ))}
@@ -323,10 +323,10 @@ const ExpandableUserMessage = ({
               {images.map((img) => (
                 <img
                   key={img.id}
-                  src={`data:image/png;base64,${img.base64}`}
+                  src={img.base64}
                   alt={img.name}
                   className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
-                  onClick={() => setPreviewImage(`data:image/png;base64,${img.base64}`)}
+                  onClick={() => setPreviewImage(img.base64)}
                   title={img.name}
                 />
               ))}
