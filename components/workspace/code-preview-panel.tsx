@@ -54,10 +54,12 @@ import {
   DEVICE_PRESETS
 } from "@/components/ai-elements/web-preview";
 import { DatabaseTab } from "./database-tab";
-import { 
+import {
   VisualEditorWrapper,
   VisualEditorToggle,
 } from "./visual-editor-wrapper";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { ChatSessionSelector } from "@/components/ui/chat-session-selector";
 import type { StyleChange, Theme } from "@/lib/visual-editor";
 import dynamic from "next/dynamic";
 
@@ -132,6 +134,16 @@ interface CodePreviewPanelProps {
   onTagToChat?: (component: { id: string; tagName: string; sourceFile?: string; sourceLine?: number; className: string; textContent?: string }) => void;
   onPublish?: () => void;
   isAIStreaming?: boolean;
+  // Model selector props
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
+  userPlan?: string;
+  subscriptionStatus?: string;
+  // Chat session selector props
+  userId?: string;
+  currentSessionId?: string | null;
+  onSessionChange?: (sessionId: string) => void;
+  onNewSession?: () => void;
 }
 
 export interface CodePreviewPanelRef {
@@ -861,7 +873,7 @@ function PreviewEmptyState({ projectName, onStartPreview, disabled }: {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish, isAIStreaming = false }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange, onVisualEditorSave, onApplyTheme, onTagToChat, onPublish, isAIStreaming = false, selectedModel, onModelChange, userPlan, subscriptionStatus, userId, currentSessionId, onSessionChange, onNewSession }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -2888,8 +2900,31 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
+              {/* Model Selector and Chat Session Selector */}
+              {project && selectedModel && onModelChange && (
+                <div className="flex items-center gap-1 ml-2">
+                  <ModelSelector
+                    selectedModel={selectedModel}
+                    onModelChange={onModelChange}
+                    userPlan={userPlan}
+                    subscriptionStatus={subscriptionStatus}
+                    compact={true}
+                  />
+                  {userId && onSessionChange && (
+                    <ChatSessionSelector
+                      workspaceId={project.id}
+                      userId={userId}
+                      currentSessionId={currentSessionId || null}
+                      onSessionChange={onSessionChange}
+                      onNewSession={onNewSession}
+                      compact={true}
+                    />
+                  )}
+                </div>
+              )}
+
               <div className="flex-1" />
-              
+
               {/* Tab switching buttons */}
               <WebPreviewNavigationButton
                 onClick={() => onTabChange("code")}
