@@ -1136,11 +1136,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       </ResizablePanelGroup>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
-                      <CodePreviewPanel 
-                        ref={codePreviewRef} 
-                        project={selectedProject} 
-                        activeTab={activeTab} 
-                        onTabChange={setActiveTab} 
+                      <CodePreviewPanel
+                        ref={codePreviewRef}
+                        project={selectedProject}
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
                         previewViewMode={previewViewMode}
                         syncedUrl={syncedPreview.url || customUrl}
                         onUrlChange={setCustomUrl}
@@ -1158,6 +1158,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           codePreviewRef.current?.createPreview()
                         }}
                         isAIStreaming={isAIStreaming}
+                        selectedModel={selectedModel}
+                        onModelChange={setSelectedModel}
+                        userPlan={userPlan}
+                        subscriptionStatus={subscriptionStatus}
+                        userId={user.id}
+                        currentSessionId={currentChatSessionId}
+                        onSessionChange={(sessionId) => {
+                          setCurrentChatSessionId(sessionId)
+                          setChatSessionKey(prev => prev + 1)
+                        }}
+                        onNewSession={() => {
+                          setChatSessionKey(prev => prev + 1)
+                        }}
                       />
                     ) : activeTab === "cloud" ? (
                       /* Cloud Tab */
@@ -1634,6 +1647,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onVisualEditorSave={handleVisualEditorSave}
                       onApplyTheme={handleVisualEditorThemeSave}
                       isAIStreaming={isAIStreaming}
+                      selectedModel={selectedModel}
+                      onModelChange={setSelectedModel}
+                      userPlan={userPlan}
+                      subscriptionStatus={subscriptionStatus}
+                      userId={user.id}
+                      currentSessionId={currentChatSessionId}
+                      onSessionChange={(sessionId) => {
+                        setCurrentChatSessionId(sessionId)
+                        setChatSessionKey(prev => prev + 1)
+                      }}
+                      onNewSession={() => {
+                        setChatSessionKey(prev => prev + 1)
+                      }}
                     />
                   </div>
                 </TabsContent>
