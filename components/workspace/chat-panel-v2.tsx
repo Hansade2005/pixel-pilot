@@ -144,10 +144,18 @@ async function compressProjectFilesFallback(
   return arrayBuffer
 }
 
+// Image preview type for user messages
+interface MessageImagePreview {
+  id: string
+  name: string
+  base64: string
+}
+
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
   content,
   messageId,
+  images,
   onCopy,
   onDelete,
   onRetry,
@@ -159,6 +167,7 @@ const ExpandableUserMessage = ({
 }: {
   content: string
   messageId: string
+  images?: MessageImagePreview[]
   onCopy: (messageId: string, content: string) => void
   onDelete: (messageId: string) => void
   onRetry: (messageId: string, content: string) => void
@@ -168,6 +177,7 @@ const ExpandableUserMessage = ({
   isExpanded?: boolean
   onExpandedChange?: (expanded: boolean) => void
 }) => {
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [isExpanded, setIsExpanded] = useState(controlledExpanded ?? false)
   const [shouldTruncate, setShouldTruncate] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -233,13 +243,29 @@ const ExpandableUserMessage = ({
 
   if (!shouldTruncate) {
     return (
-      <div className="relative w-full">
-        <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
-          <div className="p-4 break-words overflow-wrap-anywhere">
-            <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-              {content}
-            </p>
-          </div>
+      <>
+        <div className="relative w-full">
+          <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
+            <div className="p-4 break-words overflow-wrap-anywhere">
+              {/* Image previews */}
+              {images && images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {images.map((img) => (
+                    <img
+                      key={img.id}
+                      src={`data:image/png;base64,${img.base64}`}
+                      alt={img.name}
+                      className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                      onClick={() => setPreviewImage(`data:image/png;base64,${img.base64}`)}
+                      title={img.name}
+                    />
+                  ))}
+                </div>
+              )}
+              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+                {content}
+              </p>
+            </div>
           <div className="px-4 pb-2 flex justify-end">
             <Actions>
               <Action tooltip="Retry message" onClick={handleIconClick}>
@@ -261,13 +287,51 @@ const ExpandableUserMessage = ({
           </div>
         </div>
       </div>
+
+      {/* Image preview modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 p-2 bg-secondary hover:bg-secondary/80 rounded-full transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+      </>
     )
   }
 
   return (
+    <>
     <div className="relative w-full">
       <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
         <div className="p-4 break-words overflow-wrap-anywhere">
+          {/* Image previews */}
+          {images && images.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {images.map((img) => (
+                <img
+                  key={img.id}
+                  src={`data:image/png;base64,${img.base64}`}
+                  alt={img.name}
+                  className="max-w-[120px] max-h-[90px] rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                  onClick={() => setPreviewImage(`data:image/png;base64,${img.base64}`)}
+                  title={img.name}
+                />
+              ))}
+            </div>
+          )}
           {/* Show truncated content when collapsed */}
           {!isExpanded ? (
             <div>
@@ -329,6 +393,28 @@ const ExpandableUserMessage = ({
         </div>
       </div>
     </div>
+
+    {/* Image preview modal */}
+    {previewImage && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        onClick={() => setPreviewImage(null)}
+      >
+        <button
+          onClick={() => setPreviewImage(null)}
+          className="absolute top-4 right-4 p-2 bg-secondary hover:bg-secondary/80 rounded-full transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <img
+          src={previewImage}
+          alt="Preview"
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    )}
+    </>
   )
 }
 
@@ -3967,6 +4053,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       }
     }
 
+    // Store image previews before clearing (for display in message)
+    const imagePreviews = attachedImages.map((img: AttachedImage) => ({
+      id: img.id,
+      name: img.name,
+      base64: img.base64
+    }))
+
     // Clear attachments
     setAttachedFiles([])
     setAttachedImages([])
@@ -3979,12 +4072,13 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
     // Clear any previous errors
     setError(null)
 
-    // Create user message
+    // Create user message with image previews
     const userMessageId = Date.now().toString()
     const userMessage = {
       id: userMessageId,
       role: 'user',
-      content: displayContent
+      content: displayContent,
+      images: imagePreviews.length > 0 ? imagePreviews : undefined
     }
 
     // Add user message to local state immediately for better UX
@@ -5078,6 +5172,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 <ExpandableUserMessage
                   content={message.content}
                   messageId={message.id}
+                  images={message.images}
                   onCopy={handleCopyMessage}
                   onDelete={handleDeleteMessage}
                   onRetry={handleRetryMessage}

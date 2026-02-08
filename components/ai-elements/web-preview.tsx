@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink, Terminal, Globe, Sparkles, Trash2, Copy, Check } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ComponentProps, ReactNode } from "react";
 import React, { createContext, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef, useMemo } from "react";
@@ -594,6 +594,32 @@ export const WebPreviewConsole = ({
 }: WebPreviewConsoleProps) => {
   const { consoleOpen, setConsoleOpen } = useWebPreview();
   const [activeTab, setActiveTab] = useState<"terminal" | "browser">("terminal");
+  const [copied, setCopied] = useState(false);
+
+  // Copy logs to clipboard
+  const handleCopyLogs = async () => {
+    let textToCopy = '';
+
+    if (activeTab === 'terminal') {
+      textToCopy = terminalLogs.join('\n');
+    } else {
+      // Format browser logs for copying
+      textToCopy = browserLogs.map((log) => {
+        try {
+          const parsed = JSON.parse(log) as RawBrowserLog;
+          return `[${parsed.method.toUpperCase()}] ${extractErrorMessage(parsed.data)}`;
+        } catch {
+          return log;
+        }
+      }).join('\n');
+    }
+
+    if (textToCopy) {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   // Extract terminal errors for "Ask AI to Fix" button
   const terminalErrors = useMemo(() => {
@@ -706,6 +732,28 @@ export const WebPreviewConsole = ({
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              {/* Copy logs button - shown when there are logs to copy */}
+              {((activeTab === "terminal" && terminalLogs.length > 0) ||
+                (activeTab === "browser" && consoleFeedLogs.length > 0)) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={handleCopyLogs}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-500" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              )}
               {activeTab === "terminal" && terminalErrors.length > 0 && onAskAiToFixTerminal && (
                 <Button
                   variant="outline"
