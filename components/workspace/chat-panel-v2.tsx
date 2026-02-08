@@ -5849,10 +5849,11 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
             ) : (
               <Button
                 ref={sendButtonRef}
-                type="submit"
+                type="button"
                 size="icon"
                 className="h-8 w-8"
                 disabled={(!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || attachedImages.some((img: AttachedImage) => img.isProcessing)}
+                onClick={handleEnhancedSubmit}
               >
                 <CornerDownLeft className="size-4" />
               </Button>
