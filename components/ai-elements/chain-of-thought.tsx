@@ -65,7 +65,7 @@ export const ChainOfThought = memo(
     return (
       <ChainOfThoughtContext.Provider value={chainOfThoughtContext}>
         <div
-          className={cn("not-prose max-w-prose space-y-4", className)}
+          className={cn("not-prose max-w-prose space-y-4 overflow-hidden", className)}
           {...props}
         >
           {children}
@@ -145,12 +145,12 @@ export const ChainOfThoughtStep = memo(
           <Icon className="size-4" />
           <div className="-mx-px absolute top-7 bottom-0 left-1/2 w-px bg-border" />
         </div>
-        <div className="flex-1 space-y-2">
-          <div>{label}</div>
+        <div className="flex-1 space-y-2 min-w-0 overflow-hidden">
+          <div className="break-words">{label}</div>
           {description && (
-            <div className="text-muted-foreground text-xs">{description}</div>
+            <div className="text-muted-foreground text-xs break-words">{description}</div>
           )}
-          {children}
+          <div className="break-words overflow-wrap-anywhere">{children}</div>
         </div>
       </div>
     );
@@ -191,7 +191,7 @@ export const ChainOfThoughtContent = memo(
       <Collapsible open={isOpen}>
         <CollapsibleContent
           className={cn(
-            "mt-2 space-y-3",
+            "mt-2 space-y-3 overflow-hidden",
             "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
             className
           )}

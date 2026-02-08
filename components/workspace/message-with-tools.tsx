@@ -542,13 +542,15 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
               >
                 <div className={cn(
                   'prose prose-sm dark:prose-invert max-w-none mt-2',
-                  'prose-pre:bg-muted prose-pre:text-foreground',
+                  'prose-pre:bg-muted prose-pre:text-foreground prose-pre:overflow-x-auto',
                   'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-                  'prose-p:text-muted-foreground',
+                  'prose-p:text-muted-foreground prose-p:break-words',
                   'prose-headings:text-foreground',
                   'prose-strong:text-foreground',
                   'prose-ul:text-muted-foreground',
-                  'prose-ol:text-muted-foreground'
+                  'prose-ol:text-muted-foreground',
+                  'prose-a:break-all',
+                  'overflow-hidden break-words [overflow-wrap:anywhere]'
                 )}>
                   {inlineToolCalls && inlineToolCalls.length > 0 ? (
                     <InterleavedContent
@@ -602,8 +604,10 @@ export function MessageWithTools({ message, projectId, isStreaming = false, onCo
       {hasResponse && (
         <div className={cn(
           'prose prose-sm dark:prose-invert max-w-none',
-          'prose-pre:bg-muted prose-pre:text-foreground',
-          'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded'
+          'prose-pre:bg-muted prose-pre:text-foreground prose-pre:overflow-x-auto',
+          'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
+          'prose-a:break-all',
+          'overflow-hidden break-words [overflow-wrap:anywhere]'
         )}>
           {(() => {
             // Filter out tools that were called during reasoning (not during text streaming)
