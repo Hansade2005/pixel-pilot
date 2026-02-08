@@ -1297,7 +1297,7 @@ User Request: ${currentPrompt}`
                 </div>
               )}
               {line.content && (
-                <p className="text-zinc-100 text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+                <p className="text-zinc-100 text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{displayContent}</p>
               )}
               {isLong && (
                 <button
@@ -1330,9 +1330,9 @@ User Request: ${currentPrompt}`
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shrink-0">
               <Bot className="h-4 w-4 text-white" />
             </div>
-            <div className="flex-1 min-w-0 pt-0.5">
+            <div className="flex-1 min-w-0 pt-0.5 overflow-hidden">
               <div className="relative">
-                <div className="prose prose-invert prose-sm max-w-none">
+                <div className="prose prose-invert prose-sm max-w-none break-words [overflow-wrap:anywhere] prose-a:break-all prose-pre:overflow-x-auto">
                   <Response className="text-zinc-300">
                     {line.content}
                   </Response>
@@ -1358,7 +1358,7 @@ User Request: ${currentPrompt}`
             <div className="h-7 w-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
               <span className="text-xs text-red-400 font-bold">!</span>
             </div>
-            <div className="flex-1 text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2 font-mono">
+            <div className="flex-1 text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2 font-mono break-words [overflow-wrap:anywhere]">
               {line.content}
             </div>
           </div>
@@ -1413,7 +1413,7 @@ User Request: ${currentPrompt}`
             >
               {/* Tool header */}
               <div
-                className={`flex items-center gap-2 px-3 py-2 ${hasExpandableContent ? 'cursor-pointer hover:bg-zinc-800/30' : ''}`}
+                className={`flex items-center gap-2 px-3 py-2 min-w-0 ${hasExpandableContent ? 'cursor-pointer hover:bg-zinc-800/30' : ''}`}
                 onClick={() => hasExpandableContent && toggleToolExpanded(index)}
               >
                 {/* Expand/collapse icon */}
@@ -1428,13 +1428,13 @@ User Request: ${currentPrompt}`
                 )}
 
                 {/* Tool badge */}
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getToolColor()}`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border shrink-0 ${getToolColor()}`}>
                   {getToolIcon()}
                   {toolName}
                 </span>
 
                 {/* Description */}
-                <span className="text-xs text-zinc-400 truncate flex-1 font-mono">
+                <span className="text-xs text-zinc-400 truncate flex-1 font-mono min-w-0">
                   {meta.fileName || meta.description || line.content}
                 </span>
 
@@ -1446,21 +1446,21 @@ User Request: ${currentPrompt}`
 
               {/* Expanded content */}
               {isExpanded && hasExpandableContent && (
-                <div className="border-t border-zinc-800/80">
+                <div className="border-t border-zinc-800/80 overflow-hidden">
                   {/* Bash: Show command and output */}
                   {toolName === 'Bash' && (
-                    <div className="text-xs font-mono">
+                    <div className="text-xs font-mono overflow-hidden">
                       {meta.command && (
-                        <div className="px-3 py-2 bg-zinc-950/50 border-b border-zinc-800/50">
-                          <div className="flex items-center gap-1.5 text-emerald-400/80 mb-1">
-                            <span className="text-zinc-500">$</span>
-                            <span className="break-all whitespace-pre-wrap">{meta.command}</span>
+                        <div className="px-3 py-2 bg-zinc-950/50 border-b border-zinc-800/50 overflow-hidden">
+                          <div className="flex items-start gap-1.5 text-emerald-400/80 mb-1">
+                            <span className="text-zinc-500 shrink-0">$</span>
+                            <span className="break-all whitespace-pre-wrap [overflow-wrap:anywhere]">{meta.command}</span>
                           </div>
                         </div>
                       )}
                       {meta.result && (
-                        <div className="px-3 py-2 text-zinc-400 max-h-60 overflow-y-auto">
-                          <pre className="whitespace-pre-wrap break-all text-[11px] leading-4">{meta.result}</pre>
+                        <div className="px-3 py-2 text-zinc-400 max-h-60 overflow-y-auto overflow-x-hidden">
+                          <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-[11px] leading-4">{meta.result}</pre>
                         </div>
                       )}
                     </div>
@@ -1468,27 +1468,27 @@ User Request: ${currentPrompt}`
 
                   {/* Edit: Show diff */}
                   {toolName === 'Edit' && (meta.oldString || meta.newString) && (
-                    <div className="text-xs font-mono">
+                    <div className="text-xs font-mono overflow-hidden">
                       {meta.oldString && (
-                        <div className="px-3 py-2 bg-red-500/5 border-b border-zinc-800/50">
+                        <div className="px-3 py-2 bg-red-500/5 border-b border-zinc-800/50 overflow-hidden">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <Minus className="h-3 w-3 text-red-400" />
+                            <Minus className="h-3 w-3 text-red-400 shrink-0" />
                             <span className="text-red-400/70 text-[10px]">old</span>
                           </div>
-                          <pre className="whitespace-pre-wrap break-all text-red-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto">{meta.oldString}</pre>
+                          <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-red-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto overflow-x-hidden">{meta.oldString}</pre>
                         </div>
                       )}
                       {meta.newString && (
-                        <div className="px-3 py-2 bg-emerald-500/5">
+                        <div className="px-3 py-2 bg-emerald-500/5 overflow-hidden">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <Plus className="h-3 w-3 text-emerald-400" />
+                            <Plus className="h-3 w-3 text-emerald-400 shrink-0" />
                             <span className="text-emerald-400/70 text-[10px]">new</span>
                           </div>
-                          <pre className="whitespace-pre-wrap break-all text-emerald-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto">{meta.newString}</pre>
+                          <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-emerald-300/70 text-[11px] leading-4 pl-4 max-h-40 overflow-y-auto overflow-x-hidden">{meta.newString}</pre>
                         </div>
                       )}
                       {meta.result && (
-                        <div className="px-3 py-1.5 text-zinc-500 text-[10px] border-t border-zinc-800/50">
+                        <div className="px-3 py-1.5 text-zinc-500 text-[10px] border-t border-zinc-800/50 break-words">
                           {meta.result.includes('successfully') ? '✓ Applied' : meta.result.substring(0, 100)}
                         </div>
                       )}
@@ -1497,36 +1497,36 @@ User Request: ${currentPrompt}`
 
                   {/* Write: Show file content preview */}
                   {toolName === 'Write' && meta.fileContent && (
-                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-60 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.fileContent}{meta.fileContent.length >= 500 ? '\n...' : ''}</pre>
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-60 overflow-y-auto overflow-x-hidden">
+                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-zinc-400 text-[11px] leading-4">{meta.fileContent}{meta.fileContent.length >= 500 ? '\n...' : ''}</pre>
                     </div>
                   )}
 
                   {/* Read: Show result */}
                   {toolName === 'Read' && meta.result && (
-                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-60 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-60 overflow-y-auto overflow-x-hidden">
+                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
                     </div>
                   )}
 
                   {/* Glob/Grep: Show results */}
                   {(toolName === 'Glob' || toolName === 'Grep') && meta.result && (
-                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto overflow-x-hidden">
+                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
                     </div>
                   )}
 
                   {/* WebSearch/WebFetch: Show results */}
                   {(toolName === 'WebSearch' || toolName === 'WebFetch') && meta.result && (
-                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto overflow-x-hidden">
+                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
                     </div>
                   )}
 
                   {/* Generic: Show result for any other tool with a result */}
                   {!['Bash', 'Edit', 'Write', 'Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'].includes(toolName) && meta.result && (
-                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-all text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
+                    <div className="text-xs font-mono px-3 py-2 bg-zinc-950/50 max-h-48 overflow-y-auto overflow-x-hidden">
+                      <pre className="whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-zinc-400 text-[11px] leading-4">{meta.result}</pre>
                     </div>
                   )}
                 </div>
