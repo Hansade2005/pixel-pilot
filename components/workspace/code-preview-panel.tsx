@@ -1008,6 +1008,22 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     checkProjectFramework()
   }, [project])
 
+  // Auto-load pipilot.dev preview URL for Vite projects when switching to preview tab
+  useEffect(() => {
+    if (
+      activeTab === 'preview' &&
+      isViteProject &&
+      !isExpoProject &&
+      project?.slug &&
+      !preview.url &&
+      !preview.isLoading
+    ) {
+      const vitePreviewUrl = `https://${project.slug}.pipilot.dev/`
+      console.log('[CodePreviewPanel] Auto-loading Vite project preview URL:', vitePreviewUrl)
+      setPreview(prev => ({ ...prev, url: vitePreviewUrl }))
+    }
+  }, [activeTab, isViteProject, isExpoProject, project?.slug, preview.url, preview.isLoading])
+
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
   const lastPreviewFilesHashRef = useRef<string | null>(null)

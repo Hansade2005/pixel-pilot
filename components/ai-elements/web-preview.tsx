@@ -272,22 +272,9 @@ export const WebPreviewDeviceSelector = ({
         <Button
           variant="outline"
           size="sm"
-          className={cn("h-8 gap-2", className)}
+          className={cn("h-8 w-8 p-0", className)}
         >
-          {device ? (
-            <>
-              {device.icon}
-              <span className="hidden sm:inline">{device.name}</span>
-              <span className="text-xs text-muted-foreground">
-          {device.width}×{device.height}
-              </span>
-            </>
-          ) : (
-            <>
-              <Monitor className="h-4 w-4" />
-              <span className="hidden sm:inline">Responsive</span>
-            </>
-          )}
+          {device ? device.icon : <Monitor className="h-4 w-4" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
