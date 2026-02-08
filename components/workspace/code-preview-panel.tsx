@@ -1014,15 +1014,28 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       activeTab === 'preview' &&
       isViteProject &&
       !isExpoProject &&
-      project?.slug &&
+      project?.id &&
       !preview.url &&
       !preview.isLoading
     ) {
-      const vitePreviewUrl = `https://${project.slug}.pipilot.dev/`
-      console.log('[CodePreviewPanel] Auto-loading Vite project preview URL:', vitePreviewUrl)
-      setPreview(prev => ({ ...prev, url: vitePreviewUrl }))
+      // Fetch the reserved preview slug from the sites table
+      const fetchPreviewSlug = async () => {
+        try {
+          const response = await fetch(`/api/projects/${project.id}/preview-slug`)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.previewUrl) {
+              console.log('[CodePreviewPanel] Auto-loading Vite project preview URL:', data.previewUrl)
+              setPreview(prev => ({ ...prev, url: data.previewUrl }))
+            }
+          }
+        } catch (error) {
+          console.error('[CodePreviewPanel] Error fetching preview slug:', error)
+        }
+      }
+      fetchPreviewSlug()
     }
-  }, [activeTab, isViteProject, isExpoProject, project?.slug, preview.url, preview.isLoading])
+  }, [activeTab, isViteProject, isExpoProject, project?.id, preview.url, preview.isLoading])
 
   // Track if files have changed since last preview was created
   const filesChangedSincePreviewRef = useRef(false)
