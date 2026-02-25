@@ -471,7 +471,7 @@ export default function ProjectPage() {
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 mb-6">
               <Button
-                onClick={() => router.push(`/pc-workspace/deployment?project=${project.id}`)}
+                onClick={() => router.push(`/workspace/hosting?project=${project.id}`)}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <Rocket className="h-4 w-4 mr-2" />

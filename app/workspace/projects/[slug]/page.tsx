@@ -61,6 +61,12 @@ import {
   AlertTriangle,
   Upload,
   Info,
+  BarChart3,
+  Camera,
+  Bot,
+  KeyRound,
+  Globe2,
+  ChevronRight,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -683,6 +689,38 @@ export default function ProjectPage() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="mt-0 space-y-6">
+            {/* Project Tools */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl">
+              <div className="px-5 py-4 border-b border-gray-800/50">
+                <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-orange-400" />
+                  Project Tools
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-4">
+                {[
+                  { href: `/workspace/usage`, icon: BarChart3, label: 'Usage Analytics', color: 'text-orange-400' },
+                  { href: `/workspace/code-reviews?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: FileCode, label: 'Code Reviews', color: 'text-blue-400' },
+                  { href: `/workspace/health?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: Activity, label: 'Health Score', color: 'text-emerald-400' },
+                  { href: `/workspace/snapshots?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: Camera, label: 'Snapshots', color: 'text-purple-400' },
+                  { href: `/workspace/secrets?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: KeyRound, label: 'Secrets Vault', color: 'text-yellow-400' },
+                  { href: `/workspace/personas`, icon: Bot, label: 'AI Personas', color: 'text-cyan-400' },
+                  { href: `/workspace/scheduled-tasks`, icon: Clock, label: 'Scheduled Tasks', color: 'text-pink-400' },
+                  { href: `/workspace/showcase?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: Globe2, label: 'Showcase', color: 'text-orange-300' },
+                ].map((tool) => (
+                  <button
+                    key={tool.label}
+                    onClick={() => router.push(tool.href)}
+                    className="flex items-center gap-2.5 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800 border border-gray-800 hover:border-orange-500/30 transition-all text-left group"
+                  >
+                    <tool.icon className={`h-4 w-4 ${tool.color} shrink-0`} />
+                    <span className="text-xs text-gray-300 group-hover:text-white truncate">{tool.label}</span>
+                    <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-gray-400 ml-auto shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Deployment Status */}
               <div className="bg-gray-900 border border-gray-800 rounded-xl">
