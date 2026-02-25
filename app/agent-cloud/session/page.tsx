@@ -2124,7 +2124,7 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                               </span>
                             </button>
                           </>
-                        ) : (
+                        ) : commandMenuView === 'mcp' ? (
                           <>
                             {/* MCP & Connectors submenu */}
                             <button
