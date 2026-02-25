@@ -1954,7 +1954,8 @@ export async function POST(req: Request) {
       stripeApiKey, // Stripe API key from client for payment operations
       mcpServers, // MCP server configurations from client [{url, name, headers?}]
       disabledToolCategories = [] as string[], // Tool categories disabled by user preferences
-      disabledTools = [] as string[] // Individual tools disabled by user
+      disabledTools = [] as string[], // Individual tools disabled by user
+      customPersona, // Custom AI persona instructions from user
     } = body || {}
 
     // For binary requests, extract metadata from compressed data
@@ -1977,6 +1978,7 @@ export async function POST(req: Request) {
       mcpServers = metadata.mcpServers || mcpServers
       disabledToolCategories = metadata.disabledToolCategories || disabledToolCategories
       disabledTools = metadata.disabledTools || disabledTools
+      customPersona = metadata.customPersona || customPersona
     }
 
     // Use fileTree from binary metadata if available, otherwise from JSON
@@ -2796,6 +2798,15 @@ The following services are NOT currently connected for this project. Do NOT atte
 ${unavailableServices.map(s => `- ${s}`).join('\n')}
 
 IMPORTANT: Focus on what you CAN do. Build the application fully using the tools available to you (file operations, code generation, web search, etc.). Do NOT stop early or declare the app "complete" just because some integrations are unavailable. Write all the code, create all the files, and implement the full feature set the user requested.`
+    }
+
+    // Inject custom AI persona instructions if provided
+    if (customPersona && typeof customPersona === 'string' && customPersona.trim()) {
+      systemPrompt += `\n\n## Custom Instructions (User Persona)
+The user has configured the following custom instructions for this project. You MUST follow these preferences and guidelines in all your responses:
+
+${customPersona.trim()}`
+      console.log('[Chat-V2] Custom AI persona injected into system prompt')
     }
 
     // Add continuation instructions if this is a continuation request
@@ -10239,6 +10250,68 @@ ${mergedRoadmapLines.join('\n')}
         }
       }),
 
+
+      create_snapshot: tool({
+        description: 'Create a snapshot of the current project state. Use this before making major changes so the user can rollback if needed. Captures all project files at their current state.',
+        inputSchema: z.object({
+          name: z.string().describe('Short name for the snapshot (e.g., "Before auth refactor", "v1.0 release")'),
+          description: z.string().optional().describe('Optional description of what state this captures'),
+        }),
+        execute: async ({ name, description }) => {
+          try {
+            // Collect all current project files from the file tree
+            const files: Array<{ path: string; content: string }> = []
+            if (fileTree && Array.isArray(fileTree)) {
+              const collectFiles = (items: any[], parentPath = '') => {
+                for (const item of items) {
+                  const fullPath = parentPath ? `${parentPath}/${item.name}` : item.name
+                  if (item.type === 'file' && item.content !== undefined) {
+                    files.push({ path: fullPath, content: item.content || '' })
+                  }
+                  if (item.children && Array.isArray(item.children)) {
+                    collectFiles(item.children, fullPath)
+                  }
+                }
+              }
+              collectFiles(fileTree)
+            }
+
+            if (files.length === 0) {
+              return { success: false, error: 'No files found in the project to snapshot' }
+            }
+
+            // Save snapshot via API
+            const snapshotResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'}/api/snapshots`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseAccessToken || ''}`,
+              },
+              body: JSON.stringify({
+                projectId: projectId || project?.id,
+                name,
+                description,
+                files,
+              }),
+            })
+
+            if (!snapshotResponse.ok) {
+              return { success: false, error: 'Failed to save snapshot' }
+            }
+
+            const result = await snapshotResponse.json()
+            return {
+              success: true,
+              snapshotId: result.snapshot?.id,
+              name,
+              fileCount: files.length,
+              message: `Snapshot "${name}" created with ${files.length} files`
+            }
+          } catch (error: any) {
+            return { success: false, error: error.message || 'Failed to create snapshot' }
+          }
+        }
+      }),
 
       code_quality_analysis: tool({
         description: 'Create or update code quality analysis documentation with detailed metrics, complexity scores, maintainability analysis, and improvement recommendations in markdown format.',

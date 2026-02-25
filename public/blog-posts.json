@@ -1800,6 +1800,207 @@
       },
       "related_posts": ["nextjs-vs-react-vite", "future-of-ai-development"],
       "status": "published"
+    },
+    {
+      "id": "pipilot-developer-power-tools-launch",
+      "title": "Introducing Developer Power Tools: 8 Features That Make PiPilot a Complete Dev Platform",
+      "slug": "pipilot-developer-power-tools-launch",
+      "excerpt": "PiPilot goes beyond AI code generation with 8 new developer power tools: encrypted secrets vault, AI code reviews, scheduled agent tasks, project health scores, and more. Here's everything that's new.",
+      "content": {
+        "introduction": "Today we're thrilled to announce the biggest feature drop in PiPilot's history. We've shipped 8 Developer Power Tools that transform PiPilot from an AI coding assistant into a complete development operations platform. These aren't incremental improvements - they're the features that make PiPilot the most automated AI coding platform available, period. Every tool is live, fully functional, and accessible from your workspace right now.",
+        "main_content": [
+          {
+            "heading": "Usage Analytics Dashboard: Know Exactly Where Your Credits Go",
+            "body": "Developers hate surprises on their bill. Our new Usage Analytics Dashboard gives you complete transparency into your AI usage, credit consumption, and development patterns. Track requests by model, see spending trends over time, and understand your peak development hours - all in real-time charts and tables.",
+            "key_points": [
+              "Real-time credit balance and plan details at a glance",
+              "AI request tracking with per-model breakdown (Grok, Claude, Mistral)",
+              "Full transaction history: purchases, usage deductions, and adjustments",
+              "Development pattern insights to optimize your workflow"
+            ],
+            "technical_highlights": [
+              "Built on the wallet, usage_logs, and transactions tables with Row Level Security",
+              "Server-side aggregation for fast dashboard loading even with thousands of records",
+              "Responsive chart visualizations that work on mobile and desktop"
+            ],
+            "benefits": [
+              "Never be surprised by credit usage again",
+              "Optimize which AI models you use based on actual cost/quality data",
+              "Track team usage patterns for better resource planning"
+            ]
+          },
+          {
+            "heading": "Project Snapshots & Rollback: Your Safety Net for Bold Experiments",
+            "body": "Every developer has had that moment - you ask the AI to make a big change, and something breaks. Project Snapshots solve this permanently. Create a point-in-time backup of your entire project with one click, then restore it instantly if things go wrong. It's like git stash, but for your entire project state including files, structure, and metadata.",
+            "key_points": [
+              "One-click snapshot creation capturing full project state",
+              "Instant rollback to any previous snapshot",
+              "Browsable snapshot history with timestamps and descriptions",
+              "Automatic snapshots before destructive AI operations"
+            ],
+            "technical_highlights": [
+              "Snapshots stored in project_snapshots table with JSONB for file data",
+              "Row Level Security ensures users can only access their own snapshots",
+              "Efficient delta storage for minimal database overhead"
+            ],
+            "benefits": [
+              "Experiment fearlessly knowing you can always roll back",
+              "Recover from AI mistakes in seconds, not minutes",
+              "Create checkpoints before major refactors or feature additions"
+            ]
+          },
+          {
+            "heading": "Custom AI Personas: Make the AI Code Like You",
+            "body": "Not every developer writes code the same way. Custom AI Personas let you create reusable instruction sets that shape how PiPilot's AI generates code. Prefer functional React over class components? Want all variables in camelCase with JSDoc comments? Create a persona for it and the AI follows your style guide every time.",
+            "key_points": [
+              "Define coding style, framework preferences, and naming conventions",
+              "Save and switch between multiple personas instantly",
+              "Assign different personas to different projects",
+              "Share persona configurations with your team"
+            ],
+            "technical_highlights": [
+              "Stored in ai_personas table with full CRUD API",
+              "Persona instructions injected into the AI system prompt",
+              "Per-user isolation with RLS policies"
+            ],
+            "benefits": [
+              "Consistent code style across all AI-generated code",
+              "Faster iterations because the AI already knows your preferences",
+              "Team standardization without lengthy style guide documents"
+            ]
+          },
+          {
+            "heading": "Project Health Score: Your Codebase's Report Card",
+            "body": "How healthy is your codebase? The Project Health Score gives you an instant A-F grade across 5 categories: Security, Performance, Accessibility, Maintainability, and Code Quality. It scans your files, identifies specific issues, and provides actionable recommendations - all rendered in a clean score ring visualization.",
+            "key_points": [
+              "5-category analysis with individual and overall scores",
+              "Visual A-F grading with color-coded score rings",
+              "Specific issue detection with file locations",
+              "Actionable improvement recommendations"
+            ],
+            "technical_highlights": [
+              "Client-side file analysis for instant results without server round-trips",
+              "Pattern matching for common security vulnerabilities (XSS, eval, hardcoded secrets)",
+              "Framework-aware checks for Next.js best practices"
+            ],
+            "benefits": [
+              "Catch security vulnerabilities before deployment",
+              "Maintain code quality as your project grows",
+              "Track improvement over time with historical scores"
+            ]
+          },
+          {
+            "heading": "Secrets Vault: Military-Grade Encryption for Your Environment Variables",
+            "body": "Storing API keys in .env files that accidentally get committed to git is a developer's nightmare. PiPilot's Secrets Vault encrypts every secret with AES-256-GCM before storing it in the database. Secrets are hidden by default, revealed only on demand with full audit logging, and can be synced directly to your Vercel deployment.",
+            "key_points": [
+              "AES-256-GCM encryption at rest for all secret values",
+              "Reveal-on-demand with comprehensive audit trail",
+              "One-click sync to Vercel environment variables",
+              "Bulk import from .env files"
+            ],
+            "technical_highlights": [
+              "Encryption key derived from SUPABASE_SERVICE_ROLE_KEY via SHA-256",
+              "Separate audit table (secret_access_logs) tracks every reveal/sync action",
+              "Vercel API integration with automatic fallback for existing env vars"
+            ],
+            "benefits": [
+              "Never accidentally commit secrets to version control again",
+              "Full compliance with security audit requirements",
+              "Seamless deployment workflow with Vercel sync"
+            ]
+          },
+          {
+            "heading": "Scheduled Agent Tasks: Automate Your AI Workflows",
+            "body": "Why manually trigger the same AI operation every day when you can schedule it? Scheduled Agent Tasks let you set up recurring AI operations with standard cron expressions. Whether it's a daily code review, weekly dependency check, or hourly health scan - set it once and let PiPilot handle the rest.",
+            "key_points": [
+              "Standard cron scheduling with visual presets",
+              "Create, edit, enable/disable, and delete tasks",
+              "Full execution history with status, output, and error logs",
+              "Custom JSON configuration per task"
+            ],
+            "technical_highlights": [
+              "Cron expression parser with human-readable descriptions",
+              "Next execution time calculation for common patterns",
+              "Execution tracking in dedicated task_executions table"
+            ],
+            "benefits": [
+              "Automate repetitive development operations",
+              "Catch issues early with scheduled code quality checks",
+              "Free up developer time for creative work"
+            ]
+          },
+          {
+            "heading": "AI Code Review: Static Analysis That Understands Context",
+            "body": "Get an instant AI-powered code review without waiting for a teammate. PiPilot's Code Review engine analyzes your files for security vulnerabilities, performance anti-patterns, and maintainability issues. Choose between a Full Review or focus on Security, Performance, or Maintainability specifically. Every review generates a score, detailed issue list, and actionable suggestions.",
+            "key_points": [
+              "4 review types: Full, Security, Performance, Maintainability",
+              "Score ring visualization with A-F grading",
+              "Issue detection with severity levels: Critical, High, Medium, Low",
+              "Review history to track improvement over time"
+            ],
+            "technical_highlights": [
+              "Pattern-based detection for hardcoded secrets, XSS, eval(), missing validation",
+              "Performance checks: unoptimized images, excessive useEffects, inline styles",
+              "Maintainability: file length analysis, any-type usage, nesting depth"
+            ],
+            "benefits": [
+              "Catch security issues before they reach production",
+              "Maintain consistent code quality across the project",
+              "Learn best practices through actionable suggestions"
+            ]
+          },
+          {
+            "heading": "Public Project Showcase: Share Your Work With the World",
+            "body": "Built something amazing with PiPilot? Publish it to the Project Showcase and let the community see what's possible. The Showcase is a public gallery where developers can browse, like, and discover community-built projects. Add your live demo URL, GitHub link, tech stack, and category - then watch the views and likes roll in.",
+            "key_points": [
+              "One-click publish from any project's context menu",
+              "Public gallery with sort and filter options",
+              "Social features: likes and view tracking",
+              "Category system: Web App, Mobile App, AI/ML, SaaS, and more"
+            ],
+            "technical_highlights": [
+              "showcase_projects table with status management (published/featured)",
+              "Public API endpoint for unauthenticated browsing",
+              "Optimistic UI updates for like/view increments"
+            ],
+            "benefits": [
+              "Build your developer portfolio with real projects",
+              "Get inspired by what others are building",
+              "Grow PiPilot's community through shared creativity"
+            ]
+          }
+        ],
+        "conclusion": "These 8 Developer Power Tools represent our commitment to making PiPilot the most complete AI development platform available. We're not just generating code - we're building the infrastructure that professional developers need to ship with confidence. Every feature is live today, fully functional, and built with the same attention to security, performance, and developer experience that defines PiPilot. This is just the beginning. We have an ambitious roadmap ahead, and we can't wait to show you what's next.",
+        "call_to_action": {
+          "text": "Ready to try the new Developer Power Tools?",
+          "buttons": [
+            {
+              "text": "Open Your Workspace",
+              "url": "/workspace",
+              "style": "primary"
+            },
+            {
+              "text": "Read the Documentation",
+              "url": "/docs",
+              "style": "secondary"
+            }
+          ]
+        }
+      },
+      "author": "Hans Ade",
+      "published_date": "2026-02-25",
+      "last_modified": "2026-02-25",
+      "category": "product-updates",
+      "tags": ["Product Launch", "Developer Tools", "Secrets Vault", "Code Review", "AI Automation", "Project Showcase", "Health Score", "Analytics"],
+      "featured_image": "/blog/developer-power-tools.jpg",
+      "reading_time": "8 min read",
+      "seo_meta": {
+        "title": "Introducing Developer Power Tools: 8 New Features on PiPilot | PiPilot Blog",
+        "description": "PiPilot launches 8 Developer Power Tools: encrypted secrets vault, AI code reviews, scheduled tasks, health scores, usage analytics, project snapshots, custom AI personas, and public showcase.",
+        "keywords": "PiPilot features, developer tools, AI code review, secrets vault, scheduled tasks, project showcase, code quality, developer productivity"
+      },
+      "related_posts": ["pipilot-mcp-server-launch", "future-of-ai-development", "ai-tools-comparison"],
+      "status": "published"
     }
   ],
   "categories": [
@@ -1856,6 +2057,12 @@
       "name": "Trends",
       "description": "Latest trends, innovations, and future directions in web development",
       "color": "yellow"
+    },
+    {
+      "id": "product-updates",
+      "name": "Product Updates",
+      "description": "New features, improvements, and product announcements from the PiPilot team",
+      "color": "orange"
     }
   ]
 }

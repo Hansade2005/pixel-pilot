@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { CheckCircle, Zap, Users, Globe, Database, Code, Smartphone, Shield, ClipboardList, FolderOpen, Key } from 'lucide-react'
+import { CheckCircle, Zap, Users, Globe, Database, Code, Smartphone, Shield, ClipboardList, FolderOpen, Key, BarChart3, Camera, Bot, Activity, KeyRound, Clock, FileCode, Star } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'PiPilot Features: AI-Powered App Builder with Advanced Tools | Build Apps with AI',
@@ -111,6 +111,37 @@ export default function FeaturesPage() {
             </ul>
           </div>
         ))}
+      </div>
+
+      {/* Developer Power Tools Section */}
+      <div className="mb-16">
+        <div className="text-center mb-12">
+          <span className="inline-block px-4 py-1.5 bg-orange-100 text-orange-700 text-sm font-semibold rounded-full mb-4">NEW</span>
+          <h2 className="text-4xl font-bold mb-4">Developer Power Tools</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            8 advanced tools that transform PiPilot from a code generator into a complete development operations platform.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { icon: <BarChart3 className="w-6 h-6 text-orange-500" />, title: "Usage Analytics", desc: "Real-time AI usage tracking, credit monitoring, and development pattern insights." },
+            { icon: <Camera className="w-6 h-6 text-orange-500" />, title: "Project Snapshots", desc: "One-click project backups with instant rollback to any previous state." },
+            { icon: <Bot className="w-6 h-6 text-orange-500" />, title: "Custom AI Personas", desc: "Reusable instruction sets that shape how the AI writes code for you." },
+            { icon: <Activity className="w-6 h-6 text-orange-500" />, title: "Health Score", desc: "Instant codebase quality grading across security, performance, and maintainability." },
+            { icon: <KeyRound className="w-6 h-6 text-orange-500" />, title: "Secrets Vault", desc: "AES-256-GCM encrypted environment variables with Vercel sync and audit trail." },
+            { icon: <Clock className="w-6 h-6 text-orange-500" />, title: "Scheduled Tasks", desc: "Cron-based automation for recurring AI operations and code quality checks." },
+            { icon: <FileCode className="w-6 h-6 text-orange-500" />, title: "AI Code Review", desc: "Static analysis with severity-graded issues, score rings, and review history." },
+            { icon: <Star className="w-6 h-6 text-orange-500" />, title: "Project Showcase", desc: "Publish projects to a public gallery with likes, views, and community discovery." },
+          ].map((tool, index) => (
+            <div key={index} className="bg-white border border-gray-100 p-5 rounded-lg hover:shadow-md hover:border-orange-200 transition-all">
+              <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-3">
+                {tool.icon}
+              </div>
+              <h3 className="font-bold mb-1.5">{tool.title}</h3>
+              <p className="text-sm text-gray-600">{tool.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-12 rounded-lg text-center">

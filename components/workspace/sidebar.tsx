@@ -70,7 +70,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import { timeAgo } from "@/lib/utils"
-import { Crown, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
+import { Crown, AlertTriangle, Shield, CheckCircle, Globe, Github, BarChart3, Camera, Bot, Activity, KeyRound, Clock, FileCode } from "lucide-react"
 
 interface SidebarProps {
   user: User
@@ -430,6 +430,19 @@ export function Sidebar({
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/workspace/usage')}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Usage Analytics
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/personas')}>
+                <Bot className="mr-2 h-4 w-4" />
+                AI Personas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/scheduled-tasks')}>
+                <Clock className="mr-2 h-4 w-4" />
+                Scheduled Tasks
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
@@ -670,7 +683,28 @@ export function Sidebar({
                           Clone
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/secrets?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Secrets Vault
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/snapshots?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <Camera className="mr-2 h-4 w-4" />
+                          Snapshots
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/health?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <Activity className="mr-2 h-4 w-4" />
+                          Health Score
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/code-reviews?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <FileCode className="mr-2 h-4 w-4" />
+                          Code Review
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/showcase?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <Globe className="mr-2 h-4 w-4" />
+                          Publish to Showcase
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
                           onClick={() => setDeleteProjectId(project.id)}
                           className="text-destructive focus:text-destructive"
                         >
@@ -753,7 +787,28 @@ export function Sidebar({
                           Clone
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/secrets?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Secrets Vault
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/snapshots?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <Camera className="mr-2 h-4 w-4" />
+                          Snapshots
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/health?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <Activity className="mr-2 h-4 w-4" />
+                          Health Score
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/code-reviews?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <FileCode className="mr-2 h-4 w-4" />
+                          Code Review
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/showcase?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <Globe className="mr-2 h-4 w-4" />
+                          Publish to Showcase
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
                           onClick={() => setDeleteProjectId(project.id)}
                           className="text-destructive focus:text-destructive"
                         >
@@ -801,6 +856,19 @@ export function Sidebar({
               <DropdownMenuItem onClick={() => router.push('/workspace/account')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Account
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/workspace/usage')}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Usage Analytics
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/personas')}>
+                <Bot className="mr-2 h-4 w-4" />
+                AI Personas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/scheduled-tasks')}>
+                <Clock className="mr-2 h-4 w-4" />
+                Scheduled Tasks
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>

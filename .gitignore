@@ -27,6 +27,7 @@ yarn-error.log*
 # vercel
 .vercel
 .vscode/mcp.json
+.mcp.json
 
 
 # typescript
@@ -59,3 +60,6 @@ playwright.config.ts
 /test-results/
 /screenshots/
 e2e/
+
+# Claude local rules (contains credentials, never commit)
+.claude/rules/local-*.md

@@ -1169,6 +1169,17 @@ export function ChatPanelV2({
   // Track the model used for planning so build execution uses the same model
   const planModelOverrideRef = useRef<string | null>(null)
 
+  // Custom AI Persona state - loaded from localStorage per-project
+  const [activePersona, setActivePersona] = useState<string>('')
+
+  // Load active persona from localStorage on mount
+  useEffect(() => {
+    if (project?.id) {
+      const stored = localStorage.getItem(`pipilot_persona_${project.id}`)
+      if (stored) setActivePersona(stored)
+    }
+  }, [project?.id])
+
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
     let timeout: NodeJS.Timeout
@@ -4817,6 +4828,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
         mcpServers: mcpServersForProject.length > 0 ? mcpServersForProject : undefined,
         disabledToolCategories: disabledToolCategories.length > 0 ? disabledToolCategories : undefined,
         disabledTools: disabledIndividualTools.length > 0 ? disabledIndividualTools : undefined,
+        customPersona: activePersona || undefined,
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 

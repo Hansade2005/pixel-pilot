@@ -580,6 +580,22 @@ if (process.env.SUPABASE_MCP_URL && process.env.SUPABASE_MCP_TOKEN) {
     }
   };
 }
+// Custom MCP servers (user-defined HTTP streamable servers)
+if (process.env.CUSTOM_MCP_SERVERS) {
+  try {
+    const customServers = JSON.parse(process.env.CUSTOM_MCP_SERVERS);
+    for (const server of customServers) {
+      const key = 'custom_' + server.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      mcpServers[key] = {
+        type: 'http',
+        url: server.url,
+        ...(server.headers && Object.keys(server.headers).length > 0 ? { headers: server.headers } : {})
+      };
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+}
 
 console.log(JSON.stringify({ type: 'start', timestamp: Date.now() }));
 
@@ -939,6 +955,12 @@ async function handleCreate(
       mcpUrl?: string
       fields: Record<string, string>
     }>
+    customMcpServers?: Array<{
+      id: string
+      name: string
+      url: string
+      headers?: Record<string, string>
+    }>
   }
 ) {
   // Cleanup old sandboxes first
@@ -1184,6 +1206,12 @@ async function handleCreate(
       }
     }
     console.log(`[Agent Cloud] Connectors configured: ${config.connectors.map(c => c.id).join(', ')}`)
+  }
+
+  // Pass custom MCP servers as JSON env var for the sandbox script to pick up
+  if (config?.customMcpServers && config.customMcpServers.length > 0) {
+    envs.CUSTOM_MCP_SERVERS = JSON.stringify(config.customMcpServers)
+    console.log(`[Agent Cloud] Custom MCP servers configured: ${config.customMcpServers.map(s => s.name).join(', ')}`)
   }
 
   // Use our custom E2B template (pipilot-agent) which has Claude Code + Playwright pre-installed
@@ -1480,7 +1508,10 @@ async function handleCreate(
     reconnected: false,
     messageCount: 0,
     mcpEnabled: !!mcpGatewayUrl,
-    mcpTools: ['tavily', 'playwright', 'context7', 'sequential-thinking'],
+    mcpTools: [
+      'tavily', 'playwright', 'context7', 'sequential-thinking',
+      ...(config?.customMcpServers?.map(s => s.name) || [])
+    ],
     workingBranch: createdWorkingBranch,
     message: config?.newProject
       ? `Sandbox created for new project: ${config.newProject.name} (MCP enabled)`
@@ -2242,6 +2273,20 @@ INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
       };
     }
     mcpServers['playwright'] = { command: 'npx', args: ['@playwright/mcp@latest'] };
+    // Custom MCP servers
+    if (process.env.CUSTOM_MCP_SERVERS) {
+      try {
+        const customServers = JSON.parse(process.env.CUSTOM_MCP_SERVERS);
+        for (const server of customServers) {
+          const key = 'custom_' + server.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+          mcpServers[key] = {
+            type: 'http',
+            url: server.url,
+            ...(server.headers && Object.keys(server.headers).length > 0 ? { headers: server.headers } : {})
+          };
+        }
+      } catch (e) { /* ignore */ }
+    }
 
     // Build prompt input
     let promptInput;
