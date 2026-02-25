@@ -162,9 +162,9 @@ export function ModernSidebar({
 
   const SidebarContent = () => (
     <>
-      <div className="flex flex-col flex-1 w-full">
+      <div className="flex flex-col flex-1 w-full min-h-0">
         {/* Header with Logo and Close Button */}
-        <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800/60 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
+        <div className={`flex items-center w-full h-14 px-3 border-b border-gray-800/60 shrink-0 ${shouldExpand ? 'justify-between' : 'justify-center'}`}>
           <div className="flex items-center cursor-pointer" onClick={() => window.location.href = '/'}>
             <div className="w-10 h-10 bg-gradient-to-br rounded-lg flex-shrink-0 flex items-center justify-center">
               <img src="https://pipilot.dev/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
@@ -187,7 +187,7 @@ export function ModernSidebar({
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex flex-col space-y-1 px-2 py-3">
+        <nav className="flex flex-col space-y-1 px-2 py-3 flex-1 overflow-y-auto min-h-0">
           {/* Home */}
           <button
             onClick={() => window.location.href = '/workspace'}
@@ -315,7 +315,7 @@ export function ModernSidebar({
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-2 pb-2">
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto">
                     {projects.map((project) => (
                       <button
                         key={project.id}
@@ -357,7 +357,7 @@ export function ModernSidebar({
       </div>
 
       {/* Bottom Navigation */}
-      <div className="flex flex-col space-y-1 px-2 pb-3 border-t border-gray-800/60 pt-3">
+      <div className="flex flex-col space-y-1 px-2 pb-3 border-t border-gray-800/60 pt-3 shrink-0">
         {/* Database */}
         <button
           onClick={() => handleNavigation('/database')}
@@ -405,7 +405,7 @@ export function ModernSidebar({
               {shouldExpand && <span className="ml-3 text-sm text-gray-400">Profile</span>}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-800 z-[100]">
+          <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-800 z-[100] max-h-[80vh] overflow-y-auto">
             <DropdownMenuItem
               onClick={() => {
                 handleNavigation('/workspace/account')
