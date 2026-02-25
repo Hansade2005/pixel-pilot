@@ -70,7 +70,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import { timeAgo } from "@/lib/utils"
-import { Crown, AlertTriangle, Shield, CheckCircle, Globe, Github, BarChart3, Camera, Bot, Activity } from "lucide-react"
+import { Crown, AlertTriangle, Shield, CheckCircle, Globe, Github, BarChart3, Camera, Bot, Activity, KeyRound } from "lucide-react"
 
 interface SidebarProps {
   user: User
@@ -679,6 +679,10 @@ export function Sidebar({
                           Clone
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/secrets?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Secrets Vault
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => router.push(`/workspace/snapshots?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
                           <Camera className="mr-2 h-4 w-4" />
                           Snapshots
@@ -771,6 +775,10 @@ export function Sidebar({
                           Clone
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => router.push(`/workspace/secrets?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Secrets Vault
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => router.push(`/workspace/snapshots?projectId=${project.id}&name=${encodeURIComponent(project.name)}`)}>
                           <Camera className="mr-2 h-4 w-4" />
                           Snapshots
