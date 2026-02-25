@@ -27,7 +27,7 @@ import { CloudTab } from "./cloud-tab"
 import { AuditTab } from "./audit-tab"
 import { ActivitySearchPanel } from "./activity-search-panel"
 import { ActivityChatPanel } from "./activity-chat-panel"
-import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder, BarChart3, Bot, CalendarClock, GitPullRequestArrow, HeartPulse, Archive, KeyRound, LayoutGrid } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -1753,34 +1753,41 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
             {/* Status Bar */}
             {selectedProject && (
-              <div className="h-8 flex-shrink-0 border-t border-gray-800/60 bg-gray-900/60 flex items-center justify-between px-4 text-xs text-gray-400">
-                <div className="flex items-center space-x-4">
+              <div className="h-7 flex-shrink-0 border-t border-gray-800/60 bg-gray-900/80 flex items-center justify-between px-2 text-[11px] text-gray-400 select-none">
+                {/* Left side - status indicators */}
+                <div className="flex items-center">
                   {/* GitHub Status */}
-                  <div className="flex items-center space-x-1">
+                  <button
+                    className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 transition-colors"
+                    title="GitHub Status"
+                  >
                     <Github className="h-3 w-3" />
                     <span>
-                      GitHub: {(() => {
+                      {(() => {
                         if (selectedProject?.githubRepoUrl && gitHubConnected) {
-                          return <span className="text-green-600 dark:text-green-400">Connected</span>
+                          return <span className="text-green-400">Connected</span>
                         }
                         if (gitHubConnected) {
-                          return <span className="text-orange-400">Account Connected</span>
+                          return <span className="text-orange-400">Linked</span>
                         }
-                        return <span className="text-gray-500">Not Connected</span>
+                        return <span className="text-gray-500">Off</span>
                       })()}
                     </span>
-                  </div>
+                  </button>
 
                   {/* Deployment Status */}
-                  <div className="flex items-center space-x-1">
+                  <button
+                    className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 transition-colors"
+                    title="Deployment Status"
+                  >
                     <Globe className="h-3 w-3" />
                     <span>
-                      Deployment: {(() => {
+                      {(() => {
                         switch (selectedProject?.deploymentStatus) {
                           case 'deployed':
                             return <span className="text-green-400">Live</span>
                           case 'in_progress':
-                            return <span className="text-yellow-400">In Progress</span>
+                            return <span className="text-yellow-400">Deploying</span>
                           case 'failed':
                             return <span className="text-red-400">Failed</span>
                           default:
@@ -1788,41 +1795,109 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         }
                       })()}
                     </span>
-                  </div>
+                  </button>
+
+                  {/* Separator */}
+                  <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+
+                  {/* VSCode-style quick access icons */}
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Usage Analytics"
+                    onClick={() => window.open('/workspace/usage', '_blank')}
+                  >
+                    <BarChart3 className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="AI Personas"
+                    onClick={() => window.open('/workspace/personas', '_blank')}
+                  >
+                    <Bot className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Scheduled Tasks"
+                    onClick={() => window.open('/workspace/scheduled-tasks', '_blank')}
+                  >
+                    <CalendarClock className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Code Reviews"
+                    onClick={() => window.open('/workspace/code-reviews', '_blank')}
+                  >
+                    <GitPullRequestArrow className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Health Score"
+                    onClick={() => window.open('/workspace/health', '_blank')}
+                  >
+                    <HeartPulse className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Snapshots"
+                    onClick={() => window.open('/workspace/snapshots', '_blank')}
+                  >
+                    <Archive className="h-3 w-3" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Secrets Vault"
+                    onClick={() => window.open('/workspace/secrets', '_blank')}
+                  >
+                    <KeyRound className="h-3 w-3" />
+                  </button>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                {/* Right side - action buttons */}
+                <div className="flex items-center">
                   {selectedProject?.vercelDeploymentUrl && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
+                    <button
+                      className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 hover:text-green-400 transition-colors"
+                      title="View Live Site"
                       onClick={() => window.open(selectedProject.vercelDeploymentUrl, '_blank')}
                     >
-                      View Live
-                    </Button>
+                      <ExternalLink className="h-3 w-3" />
+                      <span>Live</span>
+                    </button>
                   )}
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
+
+                  <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+
+                  {/* Manage - opens project slug page */}
+                  <button
+                    className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Project Settings"
+                    onClick={() => window.open(`/workspace/projects/${selectedProject?.slug}`, '_blank')}
+                  >
+                    <Settings className="h-3 w-3" />
+                    <span>Manage</span>
+                  </button>
+
+                  {/* Workspace Management */}
+                  <button
+                    className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Workspace Management"
                     onClick={() => window.open('/workspace/management', '_blank')}
                   >
-                    <Settings className="h-3 w-3 mr-1" />
-                    Manage
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
+                    <LayoutGrid className="h-3 w-3" />
+                    <span>Workspace</span>
+                  </button>
+
+                  <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+
+                  {/* Deploy */}
+                  <button
+                    className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
+                    title="Deploy Project"
                     onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
-                    disabled={!selectedProject}
                   >
-                    <Rocket className="h-3 w-3 mr-1" />
-                    Deploy
-                  </Button>
+                    <Rocket className="h-3 w-3" />
+                    <span>Deploy</span>
+                  </button>
                 </div>
               </div>
             )}
