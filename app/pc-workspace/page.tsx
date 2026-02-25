@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PcWorkspaceLayout } from "@/components/workspace/pc-workspace-layout"
+import { WorkspaceLayout as PcWorkspaceLayout } from "@/components/workspace/pc-workspace-layout"
 import { storageManager } from "@/lib/storage-manager"
 import type { Metadata } from 'next'
 

@@ -5,7 +5,8 @@ import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { CREDITS_PER_MESSAGE } from '@/lib/billing/credit-manager'
+// Average credits per message estimate (for log display only - billing is token-based)
+const CREDITS_PER_MESSAGE = 20
 import { Octokit } from '@octokit/rest'
 import { getOptimizedFileContext, getStagedChanges, getFileContent, applyIncrementalEdits } from './helpers'
 import JSZip from 'jszip'
