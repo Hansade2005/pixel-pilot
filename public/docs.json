@@ -294,6 +294,32 @@
         "custom provider",
         "own API key"
       ]
+    },
+    {
+      "title": "Developer Power Tools",
+      "overview": "PiPilot includes 8 powerful developer tools that go beyond code generation - from encrypted secrets management and AI code reviews to scheduled agent tasks and a public project showcase.",
+      "content": "# Developer Power Tools\n\nPiPilot's Developer Power Tools are a suite of 8 advanced features designed to give developers enterprise-grade capabilities right inside the workspace. These tools transform PiPilot from a code generation platform into a complete development operations hub.\n\n## Usage Analytics Dashboard\n\nTrack your development activity, AI usage, and credit consumption in real-time.\n\n- **Credit Monitoring**: View current balance, plan details, and spending trends\n- **Request Tracking**: See AI requests over time with model-level breakdown\n- **Transaction History**: Full ledger of credit purchases, usage, and adjustments\n- **Usage Patterns**: Understand your peak development hours and model preferences\n\n**Access**: Profile menu > Usage Analytics\n\n## Project Snapshots & Rollback\n\nCreate point-in-time backups of your entire project and restore them instantly.\n\n- **One-Click Snapshots**: Capture your full project state (all files, structure, metadata)\n- **Instant Rollback**: Restore any previous snapshot to recover from mistakes\n- **Snapshot History**: Browse and compare snapshots with timestamps and descriptions\n- **Auto-Snapshots**: Automatic snapshots before destructive operations\n\n**Access**: Project context menu > Snapshots\n\n## Custom AI Personas\n\nCreate reusable AI instruction sets that shape how the AI writes code for you.\n\n- **Custom System Prompts**: Define coding style, frameworks, naming conventions\n- **Persona Library**: Save and switch between multiple personas\n- **Per-Project Personas**: Assign different personas to different projects\n- **Shared Personas**: Share your best persona configurations with your team\n\n**Access**: Profile menu > AI Personas\n\n## Project Health Score\n\nGet an instant quality assessment of your codebase with actionable recommendations.\n\n- **5-Category Analysis**: Security, Performance, Accessibility, Maintainability, Code Quality\n- **Score Ring Visualization**: A-F grading with color-coded scores (0-100)\n- **Issue Detection**: Identifies specific problems with file locations\n- **Improvement Suggestions**: Actionable recommendations to raise your score\n\n**Access**: Project context menu > Health Score\n\n## Secrets Vault (Encrypted)\n\nStore and manage environment variables with AES-256-GCM encryption.\n\n- **Military-Grade Encryption**: AES-256-GCM encryption at rest for all secret values\n- **Reveal on Demand**: Secret values are hidden by default, revealed with audit logging\n- **Vercel Sync**: Push secrets directly to your Vercel project's environment variables\n- **.env Import**: Bulk import from .env files with automatic key-value parsing\n- **Audit Trail**: Every secret access is logged with timestamp and action type\n\n**Access**: Project context menu > Secrets Vault\n\n## Scheduled Agent Tasks\n\nAutomate recurring AI operations with cron-based scheduling.\n\n- **Cron Scheduling**: Standard cron expressions with visual presets (every 15 min, daily, weekly)\n- **Task Management**: Create, edit, enable/disable, and delete scheduled tasks\n- **Execution History**: View past runs with status (success/failed/running), output, and errors\n- **Custom Configuration**: JSON config for task-specific parameters\n\n**Access**: Profile menu > Scheduled Tasks\n\n## AI Code Review\n\nRun AI-powered static analysis on your codebase with detailed reports.\n\n- **Review Types**: Full, Security-only, Performance-only, or Maintainability-only\n- **Score Ring**: Visual score with A-F grading, color-coded by severity\n- **Issue Detection**: Finds hardcoded secrets, XSS risks, eval() usage, missing validation, unoptimized images, excessive hooks, deep nesting, and more\n- **Severity Levels**: Critical, High, Medium, Low - prioritized by impact\n- **Review History**: Track how your code quality improves over time\n\n**Access**: Project context menu > Code Review\n\n## Public Project Showcase\n\nPublish your projects to PiPilot's public gallery and discover community creations.\n\n- **One-Click Publish**: Share your project with title, description, category, and tech stack\n- **Project Gallery**: Browse community projects sorted by popular, recent, views, or featured\n- **Social Features**: Like counter and view tracking for published projects\n- **External Links**: Attach live demo URL and GitHub repository link\n- **Category System**: Organize by Web App, Mobile App, AI/ML, E-commerce, SaaS, and more\n\n**Access**: Project context menu > Publish to Showcase\n\n## Quick Access Guide\n\n| Feature | Where to Find It | Scope |\n|---------|-------------------|-------|\n| Usage Analytics | Profile dropdown | Account-wide |\n| AI Personas | Profile dropdown | Account-wide |\n| Scheduled Tasks | Profile dropdown | Account-wide |\n| Snapshots | Project context menu | Per-project |\n| Health Score | Project context menu | Per-project |\n| Secrets Vault | Project context menu | Per-project |\n| Code Review | Project context menu | Per-project |\n| Showcase | Project context menu | Per-project |",
+      "search_keywords": [
+        "developer tools",
+        "power tools",
+        "usage analytics",
+        "snapshots",
+        "rollback",
+        "AI personas",
+        "health score",
+        "secrets vault",
+        "encrypted secrets",
+        "environment variables",
+        "scheduled tasks",
+        "cron",
+        "automation",
+        "code review",
+        "static analysis",
+        "security review",
+        "showcase",
+        "publish project",
+        "project gallery"
+      ]
     }
   ]
 }
