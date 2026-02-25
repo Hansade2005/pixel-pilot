@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -241,9 +243,10 @@ export default function PersonasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-gray-950 pt-16">
+      <Navigation />
       {/* Header */}
-      <div className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-30">
+      <div className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-16 z-30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -443,6 +446,8 @@ export default function PersonasPage() {
           )}
         </div>
       </div>
+
+      <Footer />
     </div>
   )
 }
