@@ -13,16 +13,51 @@ import {
   Eye,
   EyeOff,
   ArrowLeft,
+  Server,
+  Plus,
+  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { useAgentCloud, DEFAULT_MCPS, ConnectorConfig } from "../layout"
+import { useAgentCloud, DEFAULT_MCPS, ConnectorConfig, CustomMcpServer } from "../layout"
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SettingsPage() {
   usePageTitle('Agent Cloud Settings')
   const router = useRouter()
-  const { connectors, setConnectors, storedTokens } = useAgentCloud()
+  const { connectors, setConnectors, storedTokens, customMcpServers, setCustomMcpServers } = useAgentCloud()
+
+  // Custom MCP form state
+  const [showAddMcp, setShowAddMcp] = useState(false)
+  const [newMcpName, setNewMcpName] = useState('')
+  const [newMcpUrl, setNewMcpUrl] = useState('')
+  const [newMcpHeaderKey, setNewMcpHeaderKey] = useState('')
+  const [newMcpHeaderValue, setNewMcpHeaderValue] = useState('')
+
+  const addCustomMcpServer = () => {
+    if (!newMcpName.trim() || !newMcpUrl.trim()) return
+    const headers: Record<string, string> = {}
+    if (newMcpHeaderKey.trim() && newMcpHeaderValue.trim()) {
+      headers[newMcpHeaderKey.trim()] = newMcpHeaderValue.trim()
+    }
+    setCustomMcpServers(prev => [...prev, {
+      id: crypto.randomUUID(),
+      name: newMcpName.trim(),
+      url: newMcpUrl.trim(),
+      ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    }])
+    setNewMcpName('')
+    setNewMcpUrl('')
+    setNewMcpHeaderKey('')
+    setNewMcpHeaderValue('')
+    setShowAddMcp(false)
+    toast.success(`Added custom MCP server: ${newMcpName.trim()}`)
+  }
+
+  const removeCustomMcpServer = (id: string) => {
+    setCustomMcpServers(prev => prev.filter(s => s.id !== id))
+    toast.success('Custom MCP server removed')
+  }
 
   // User info
   const [userEmail, setUserEmail] = useState<string>('')
@@ -172,6 +207,137 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Custom MCP Servers Section */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wide">Custom MCP Servers</h2>
+              <p className="text-xs text-zinc-600 mt-0.5">Add your own HTTP streamable MCP servers</p>
+            </div>
+            {customMcpServers.length > 0 && (
+              <Badge className="text-[10px] bg-green-500/10 text-green-400 border-green-500/20">
+                {customMcpServers.length} added
+              </Badge>
+            )}
+          </div>
+
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+            {/* Existing custom servers */}
+            {customMcpServers.length > 0 ? (
+              <div className="divide-y divide-zinc-800/50">
+                {customMcpServers.map(server => (
+                  <div key={server.id} className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors group">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Server className="h-4 w-4 text-green-400 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-zinc-200 block truncate">{server.name}</span>
+                        <span className="text-[11px] text-zinc-500 block truncate">{server.url}</span>
+                        {server.headers && Object.keys(server.headers).length > 0 && (
+                          <span className="text-[10px] text-zinc-600 block">
+                            Headers: {Object.keys(server.headers).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeCustomMcpServer(server.id)}
+                      className="p-1.5 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-red-500/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : !showAddMcp ? (
+              <div className="px-4 py-6 text-center">
+                <Server className="h-5 w-5 text-zinc-700 mx-auto mb-2" />
+                <p className="text-xs text-zinc-600">No custom MCP servers added yet</p>
+              </div>
+            ) : null}
+
+            {/* Add form */}
+            {showAddMcp ? (
+              <div className="p-4 border-t border-zinc-800/50 space-y-3">
+                <div>
+                  <label className="text-[11px] text-zinc-500 font-medium mb-1 block">Server Name</label>
+                  <input
+                    type="text"
+                    value={newMcpName}
+                    onChange={(e) => setNewMcpName(e.target.value)}
+                    placeholder="My HTTP API"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-zinc-500 font-medium mb-1 block">Server URL</label>
+                  <input
+                    type="text"
+                    value={newMcpUrl}
+                    onChange={(e) => setNewMcpUrl(e.target.value)}
+                    placeholder="https://your-server.com/mcp"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-zinc-500 font-medium mb-1 block">Header Key <span className="text-zinc-700">(optional)</span></label>
+                    <input
+                      type="text"
+                      value={newMcpHeaderKey}
+                      onChange={(e) => setNewMcpHeaderKey(e.target.value)}
+                      placeholder="Authorization"
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-zinc-500 font-medium mb-1 block">Header Value <span className="text-zinc-700">(optional)</span></label>
+                    <input
+                      type="password"
+                      value={newMcpHeaderValue}
+                      onChange={(e) => setNewMcpHeaderValue(e.target.value)}
+                      placeholder="Bearer sk-..."
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    onClick={addCustomMcpServer}
+                    disabled={!newMcpName.trim() || !newMcpUrl.trim()}
+                    className="bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm h-8 px-4"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Server
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setShowAddMcp(false)
+                      setNewMcpName('')
+                      setNewMcpUrl('')
+                      setNewMcpHeaderKey('')
+                      setNewMcpHeaderValue('')
+                    }}
+                    className="text-zinc-500 hover:text-zinc-300 text-sm h-8"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 border-t border-zinc-800/50">
+                <button
+                  onClick={() => setShowAddMcp(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 border border-dashed border-zinc-700 hover:border-orange-500/30 transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Custom MCP Server
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
