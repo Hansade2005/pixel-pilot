@@ -35,8 +35,9 @@ import {
   ImageIcon,
   Monitor,
   X,
+  Trash2,
 } from "lucide-react"
-import { useAgentCloud, MODELS, DEFAULT_MCPS, DEFAULT_CONNECTORS, type TerminalLine } from "../layout"
+import { useAgentCloud, MODELS, DEFAULT_MCPS, DEFAULT_CONNECTORS, type TerminalLine, type CustomMcpServer } from "../layout"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -259,6 +260,8 @@ function SessionPageInner() {
     storedTokens,
     connectors,
     setConnectors,
+    customMcpServers,
+    setCustomMcpServers,
     selectedModel,
     setSelectedModel,
     loadSessionMessages,
@@ -276,10 +279,14 @@ function SessionPageInner() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showCommandMenu, setShowCommandMenu] = useState(false)
-  const [commandMenuView, setCommandMenuView] = useState<'main' | 'mcp'>('main')
+  const [commandMenuView, setCommandMenuView] = useState<'main' | 'mcp' | 'add-mcp'>('main')
   const [mcpToggles, setMcpToggles] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DEFAULT_MCPS.map(mcp => [mcp.id, true]))
   )
+  const [newMcpName, setNewMcpName] = useState('')
+  const [newMcpUrl, setNewMcpUrl] = useState('')
+  const [newMcpHeaderKey, setNewMcpHeaderKey] = useState('')
+  const [newMcpHeaderValue, setNewMcpHeaderValue] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
   const abortControllerRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -2201,9 +2208,127 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                                   </div>
                                 </div>
                               ))}
+
+                              {/* Custom MCP Servers section */}
+                              <div className="px-4 pt-3 pb-1 border-t border-gray-700/40 mt-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Custom MCP Servers</span>
+                                  <button
+                                    onClick={() => setCommandMenuView('add-mcp')}
+                                    className="text-[10px] text-orange-400 hover:text-orange-300 transition-colors"
+                                  >
+                                    + Add
+                                  </button>
+                                </div>
+                              </div>
+                              {customMcpServers.length === 0 ? (
+                                <div className="px-4 py-2">
+                                  <p className="text-[10px] text-gray-600">No custom servers added yet</p>
+                                </div>
+                              ) : (
+                                customMcpServers.map(server => (
+                                  <div
+                                    key={server.id}
+                                    className="flex items-center hover:bg-gray-800 transition-colors"
+                                  >
+                                    <div className="flex-1 flex items-center gap-3 px-4 py-2 text-sm text-gray-200 min-w-0">
+                                      <Server className="size-4 flex-shrink-0 text-green-400" />
+                                      <div className="text-left min-w-0 flex-1">
+                                        <span className="text-gray-200 truncate block">{server.name}</span>
+                                        <div className="text-[10px] text-gray-600 truncate">{server.url}</div>
+                                      </div>
+                                    </div>
+                                    <div className="pr-3">
+                                      <button
+                                        onClick={() => setCustomMcpServers(prev => prev.filter(s => s.id !== server.id))}
+                                        className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </>
-                        )}
+                        ) : commandMenuView === 'add-mcp' ? (
+                          <>
+                            {/* Add Custom MCP Server form */}
+                            <button
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                              onClick={() => setCommandMenuView('mcp')}
+                            >
+                              <ChevronLeft className="size-4" />
+                              <span className="font-medium">Add MCP Server</span>
+                            </button>
+                            <div className="p-3 space-y-2.5">
+                              <div>
+                                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Name</label>
+                                <input
+                                  type="text"
+                                  value={newMcpName}
+                                  onChange={(e) => setNewMcpName(e.target.value)}
+                                  placeholder="My HTTP API"
+                                  className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-md text-sm text-gray-200 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Server URL</label>
+                                <input
+                                  type="text"
+                                  value={newMcpUrl}
+                                  onChange={(e) => setNewMcpUrl(e.target.value)}
+                                  placeholder="https://your-server.com/mcp"
+                                  className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-md text-sm text-gray-200 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Header Key (optional)</label>
+                                <input
+                                  type="text"
+                                  value={newMcpHeaderKey}
+                                  onChange={(e) => setNewMcpHeaderKey(e.target.value)}
+                                  placeholder="Authorization"
+                                  className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-md text-sm text-gray-200 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Header Value (optional)</label>
+                                <input
+                                  type="password"
+                                  value={newMcpHeaderValue}
+                                  onChange={(e) => setNewMcpHeaderValue(e.target.value)}
+                                  placeholder="Bearer sk-..."
+                                  className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-md text-sm text-gray-200 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                />
+                              </div>
+                              <button
+                                disabled={!newMcpName.trim() || !newMcpUrl.trim()}
+                                onClick={() => {
+                                  if (!newMcpName.trim() || !newMcpUrl.trim()) return
+                                  const headers: Record<string, string> = {}
+                                  if (newMcpHeaderKey.trim() && newMcpHeaderValue.trim()) {
+                                    headers[newMcpHeaderKey.trim()] = newMcpHeaderValue.trim()
+                                  }
+                                  setCustomMcpServers(prev => [...prev, {
+                                    id: crypto.randomUUID(),
+                                    name: newMcpName.trim(),
+                                    url: newMcpUrl.trim(),
+                                    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+                                  }])
+                                  setNewMcpName('')
+                                  setNewMcpUrl('')
+                                  setNewMcpHeaderKey('')
+                                  setNewMcpHeaderValue('')
+                                  setCommandMenuView('mcp')
+                                }}
+                                className="w-full py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Add Server
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
                       </div>
                     </div>
                   )}

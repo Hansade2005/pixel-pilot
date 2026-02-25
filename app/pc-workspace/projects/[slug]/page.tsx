@@ -26,7 +26,15 @@ import {
   GitBranch,
   Clock,
   Plus,
-  Database
+  Database,
+  BarChart3,
+  Camera,
+  Bot,
+  KeyRound,
+  FileCode,
+  Globe2,
+  Shield,
+  ChevronRight,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -463,7 +471,7 @@ export default function ProjectPage() {
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 mb-6">
               <Button
-                onClick={() => router.push(`/pc-workspace/deployment?project=${project.id}`)}
+                onClick={() => router.push(`/workspace/hosting?project=${project.id}`)}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <Rocket className="h-4 w-4 mr-2" />
@@ -511,6 +519,40 @@ export default function ProjectPage() {
                 View Repository
               </Button>
             </div>
+
+            {/* Project Tools */}
+            <Card className="bg-gray-800 border-gray-700 mb-6">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center space-x-2 text-white text-base">
+                  <Settings className="h-5 w-5 text-orange-400" />
+                  <span>Project Tools</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { href: `/workspace/usage`, icon: BarChart3, label: 'Usage', color: 'text-orange-400' },
+                    { href: `/workspace/code-reviews?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: FileCode, label: 'Code Review', color: 'text-blue-400' },
+                    { href: `/workspace/health?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: Activity, label: 'Health Score', color: 'text-emerald-400' },
+                    { href: `/workspace/snapshots?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: Camera, label: 'Snapshots', color: 'text-purple-400' },
+                    { href: `/workspace/secrets?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: KeyRound, label: 'Secrets', color: 'text-yellow-400' },
+                    { href: `/workspace/personas`, icon: Bot, label: 'AI Personas', color: 'text-cyan-400' },
+                    { href: `/workspace/scheduled-tasks`, icon: Clock, label: 'Tasks', color: 'text-pink-400' },
+                    { href: `/workspace/showcase?projectId=${project.id}&name=${encodeURIComponent(project.name)}`, icon: Globe2, label: 'Showcase', color: 'text-orange-300' },
+                  ].map((tool) => (
+                    <button
+                      key={tool.label}
+                      onClick={() => router.push(tool.href)}
+                      className="flex items-center gap-2 p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 border border-gray-600/50 hover:border-orange-500/30 transition-all text-left group"
+                    >
+                      <tool.icon className={`h-4 w-4 ${tool.color} shrink-0`} />
+                      <span className="text-xs text-gray-300 group-hover:text-white truncate">{tool.label}</span>
+                      <ChevronRight className="h-3 w-3 text-gray-600 group-hover:text-gray-400 ml-auto shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Project Details Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
