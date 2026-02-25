@@ -101,6 +101,14 @@ export interface Repository {
 // Connector configuration
 export type ConnectorType = 'mcp' | 'cli'
 
+// Custom HTTP streamable MCP server (user-defined)
+export interface CustomMcpServer {
+  id: string        // unique id (e.g. crypto.randomUUID())
+  name: string      // display name
+  url: string       // HTTP streamable server URL
+  headers?: Record<string, string> // optional auth/custom headers
+}
+
 export interface ConnectorConfig {
   id: string
   name: string
@@ -244,6 +252,8 @@ interface AgentCloudContextType {
   loadBranches: (repoFullName: string) => Promise<void>
   connectors: ConnectorConfig[]
   setConnectors: React.Dispatch<React.SetStateAction<ConnectorConfig[]>>
+  customMcpServers: CustomMcpServer[]
+  setCustomMcpServers: React.Dispatch<React.SetStateAction<CustomMcpServer[]>>
   createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
@@ -284,8 +294,11 @@ function AgentCloudLayoutInner({
   // Settings
   const [selectedModel, setSelectedModel] = useState<'sonnet' | 'opus' | 'haiku' | 'flash'>('sonnet')
 
-  // Connectors state (persisted to localStorage)
+  // Connectors state (persisted to Supabase)
   const [connectors, setConnectors] = useState<ConnectorConfig[]>(DEFAULT_CONNECTORS)
+
+  // Custom MCP servers (user-defined HTTP streamable servers, persisted to Supabase)
+  const [customMcpServers, setCustomMcpServers] = useState<CustomMcpServer[]>([])
 
   // Repository selection
   const [repos, setRepos] = useState<Repository[]>([])
@@ -358,6 +371,12 @@ function AgentCloudLayoutInner({
             return dc
           })
           setConnectors(merged)
+        }
+
+        // Load custom MCP servers from Supabase
+        const savedCustomMcps = await agentCloudStorage.loadCustomMcpServers()
+        if (savedCustomMcps.length > 0) {
+          setCustomMcpServers(savedCustomMcps)
         }
 
         // Load model preference from localStorage (small, keep local)
@@ -477,6 +496,23 @@ function AgentCloudLayoutInner({
 
     return () => clearTimeout(timeoutId)
   }, [connectors, isInitialLoadComplete])
+
+  // Save custom MCP servers to Supabase when they change
+  const customMcpsInitialized = useRef(false)
+  useEffect(() => {
+    if (!isInitialLoadComplete) return
+
+    if (!customMcpsInitialized.current) {
+      customMcpsInitialized.current = true
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      await agentCloudStorage.saveCustomMcpServers(customMcpServers)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [customMcpServers, isInitialLoadComplete])
 
   // Load stored deployment tokens
   const loadStoredTokens = async () => {
@@ -666,6 +702,7 @@ function AgentCloudLayoutInner({
             }),
             initialPrompt, // Pass the initial prompt for branch naming (first 4 words)
             connectors: enabledConnectors.length > 0 ? enabledConnectors : undefined,
+            customMcpServers: customMcpServers.length > 0 ? customMcpServers : undefined,
           }
         })
       })
@@ -960,6 +997,8 @@ function AgentCloudLayoutInner({
     isLoadingBranches,
     connectors,
     setConnectors,
+    customMcpServers,
+    setCustomMcpServers,
     loadBranches,
     createSession,
     terminateSession,

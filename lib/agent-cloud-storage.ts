@@ -10,7 +10,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { createAgentCloudClient } from '@/lib/supabase/agent-cloud-client'
-import type { Session, TerminalLine, ConnectorConfig } from '@/app/agent-cloud/layout'
+import type { Session, TerminalLine, ConnectorConfig, CustomMcpServer } from '@/app/agent-cloud/layout'
 import { saveImages, loadImagesBySession, deleteImagesBySession } from '@/lib/agent-cloud-image-db'
 
 // Database types
@@ -485,6 +485,63 @@ class AgentCloudStorage {
       return true
     } catch (error) {
       console.error('[AgentCloudStorage] Error in saveAllConnectors:', error)
+      return false
+    }
+  }
+
+  /**
+   * Load custom MCP servers for the current user.
+   * Stored as a single connector row with connector_id = '__custom_mcp_servers__'.
+   */
+  async loadCustomMcpServers(): Promise<CustomMcpServer[]> {
+    const userId = await this.getUserId()
+    if (!userId) return []
+
+    try {
+      const { data, error } = await this.storageClient
+        .from('agent_cloud_connectors')
+        .select('fields')
+        .eq('user_id', userId)
+        .eq('connector_id', '__custom_mcp_servers__')
+        .single()
+
+      if (error || !data) return []
+
+      const servers = data.fields?.servers
+      if (Array.isArray(servers)) return servers as CustomMcpServer[]
+      return []
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * Save custom MCP servers for the current user.
+   */
+  async saveCustomMcpServers(servers: CustomMcpServer[]): Promise<boolean> {
+    const userId = await this.getUserId()
+    if (!userId) return false
+
+    try {
+      const { error } = await this.storageClient
+        .from('agent_cloud_connectors')
+        .upsert({
+          user_id: userId,
+          connector_id: '__custom_mcp_servers__',
+          enabled: true,
+          fields: { servers },
+        }, {
+          onConflict: 'user_id,connector_id',
+        })
+
+      if (error) {
+        console.error('[AgentCloudStorage] Error saving custom MCP servers:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('[AgentCloudStorage] Error in saveCustomMcpServers:', error)
       return false
     }
   }
