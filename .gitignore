@@ -60,3 +60,6 @@ playwright.config.ts
 /test-results/
 /screenshots/
 e2e/
+
+# Claude local rules (contains credentials, never commit)
+.claude/rules/local-*.md

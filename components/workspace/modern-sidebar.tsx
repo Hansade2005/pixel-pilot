@@ -46,6 +46,9 @@ import {
   Bot,
   Activity,
   KeyRound,
+  Clock,
+  FileCode,
+  Globe2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -426,6 +429,13 @@ export function ModernSidebar({
             >
               <Bot className="mr-2 h-4 w-4" />
               AI Personas
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/scheduled-tasks')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              Scheduled Tasks
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-800" />
             <DropdownMenuItem
