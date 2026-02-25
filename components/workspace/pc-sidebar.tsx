@@ -41,15 +41,15 @@ import {
 } from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus, 
-  Search, 
-  Folder, 
-  Settings, 
-  LogOut, 
-  Sparkles, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+  Folder,
+  Settings,
+  LogOut,
+  Sparkles,
   PanelLeft,
   Trash2,
   Pin,
@@ -60,7 +60,15 @@ import {
   ArrowUpDown,
   Calendar,
   Star,
-  Home
+  Home,
+  BarChart3,
+  Camera,
+  Bot,
+  Activity,
+  KeyRound,
+  Clock,
+  FileCode,
+  Globe2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -320,10 +328,43 @@ export function PcSidebar({
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className={`${isMobile ? 'z-[70]' : 'z-50'}`}>
+            <DropdownMenuContent align="end" className={`w-56 ${isMobile ? 'z-[70]' : 'z-50'}`}>
               <DropdownMenuItem onClick={() => router.push('/workspace/account')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/workspace/usage')}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Usage Analytics
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/personas')}>
+                <Bot className="mr-2 h-4 w-4" />
+                AI Personas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/scheduled-tasks')}>
+                <Clock className="mr-2 h-4 w-4" />
+                Scheduled Tasks
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/code-reviews')}>
+                <FileCode className="mr-2 h-4 w-4" />
+                Code Reviews
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/health')}>
+                <Activity className="mr-2 h-4 w-4" />
+                Health Score
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/snapshots')}>
+                <Camera className="mr-2 h-4 w-4" />
+                Snapshots
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/secrets')}>
+                <KeyRound className="mr-2 h-4 w-4" />
+                Secrets Vault
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/showcase')}>
+                <Globe2 className="mr-2 h-4 w-4" />
+                Showcase
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>
@@ -754,6 +795,39 @@ export function PcSidebar({
               <DropdownMenuItem onClick={() => router.push('/workspace/account')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/workspace/usage')}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Usage Analytics
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/personas')}>
+                <Bot className="mr-2 h-4 w-4" />
+                AI Personas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/scheduled-tasks')}>
+                <Clock className="mr-2 h-4 w-4" />
+                Scheduled Tasks
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/code-reviews')}>
+                <FileCode className="mr-2 h-4 w-4" />
+                Code Reviews
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/health')}>
+                <Activity className="mr-2 h-4 w-4" />
+                Health Score
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/snapshots')}>
+                <Camera className="mr-2 h-4 w-4" />
+                Snapshots
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/secrets')}>
+                <KeyRound className="mr-2 h-4 w-4" />
+                Secrets Vault
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/workspace/showcase')}>
+                <Globe2 className="mr-2 h-4 w-4" />
+                Showcase
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>

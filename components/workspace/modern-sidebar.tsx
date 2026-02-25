@@ -437,6 +437,41 @@ export function ModernSidebar({
               <Clock className="mr-2 h-4 w-4" />
               Scheduled Tasks
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/code-reviews')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <FileCode className="mr-2 h-4 w-4" />
+              Code Reviews
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/health')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <Activity className="mr-2 h-4 w-4" />
+              Health Score
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/snapshots')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Snapshots
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/secrets')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <KeyRound className="mr-2 h-4 w-4" />
+              Secrets Vault
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/showcase')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <Globe2 className="mr-2 h-4 w-4" />
+              Showcase
+            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-800" />
             <DropdownMenuItem
               onClick={handleSignOut}

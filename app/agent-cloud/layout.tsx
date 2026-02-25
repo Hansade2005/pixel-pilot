@@ -18,6 +18,13 @@ import {
   GitBranch,
   ExternalLink,
   Settings,
+  BarChart3,
+  Camera,
+  Activity,
+  KeyRound,
+  Clock,
+  FileCode,
+  Globe2,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -963,15 +970,73 @@ function AgentCloudLayoutInner({
           )}
         </div>
 
-        {/* Bottom settings */}
-        <div className="p-3 border-t border-gray-800/50">
+        {/* Bottom navigation */}
+        <div className="p-2 border-t border-gray-800/50 space-y-0.5">
           <button
-            onClick={() => router.push('/agent-cloud/settings')}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+            onClick={() => router.push('/workspace/usage')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
           >
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
+            <BarChart3 className="h-3.5 w-3.5" />
+            <span>Usage Analytics</span>
           </button>
+          <button
+            onClick={() => router.push('/workspace/personas')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <Bot className="h-3.5 w-3.5" />
+            <span>AI Personas</span>
+          </button>
+          <button
+            onClick={() => router.push('/workspace/scheduled-tasks')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            <span>Scheduled Tasks</span>
+          </button>
+          <button
+            onClick={() => router.push('/workspace/code-reviews')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <FileCode className="h-3.5 w-3.5" />
+            <span>Code Reviews</span>
+          </button>
+          <button
+            onClick={() => router.push('/workspace/health')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <Activity className="h-3.5 w-3.5" />
+            <span>Health Score</span>
+          </button>
+          <button
+            onClick={() => router.push('/workspace/snapshots')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            <span>Snapshots</span>
+          </button>
+          <button
+            onClick={() => router.push('/workspace/secrets')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            <span>Secrets Vault</span>
+          </button>
+          <button
+            onClick={() => router.push('/workspace/showcase')}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+          >
+            <Globe2 className="h-3.5 w-3.5" />
+            <span>Showcase</span>
+          </button>
+          <div className="pt-1 mt-1 border-t border-gray-800/30">
+            <button
+              onClick={() => router.push('/agent-cloud/settings')}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition-colors"
+            >
+              <Settings className="h-4 w-4" />
+              <span>Settings</span>
+            </button>
+          </div>
         </div>
       </div>
     )
