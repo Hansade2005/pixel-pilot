@@ -40,7 +40,11 @@ import {
   AlertTriangle,
   Sparkles,
   Layout,
-  Github
+  Github,
+  BarChart3,
+  Camera,
+  Bot,
+  Activity,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -398,7 +402,7 @@ export function ModernSidebar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-800 z-[100]">
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => {
                 handleNavigation('/workspace/account')
               }}
@@ -408,7 +412,22 @@ export function ModernSidebar({
               Account
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-gray-800" />
-            <DropdownMenuItem 
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/usage')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Usage Analytics
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleNavigation('/workspace/personas')}
+              className="text-gray-300 hover:text-white hover:bg-gray-800"
+            >
+              <Bot className="mr-2 h-4 w-4" />
+              AI Personas
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-gray-800" />
+            <DropdownMenuItem
               onClick={handleSignOut}
               className="text-gray-300 hover:text-white hover:bg-gray-800"
             >
