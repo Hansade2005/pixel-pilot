@@ -27,7 +27,7 @@ import {
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
   CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
-  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor, ListTodo
+  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor, ListTodo, Bot, Shield, Palette
 } from 'lucide-react'
 import { ModelSelector } from '@/components/ui/model-selector'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
@@ -1171,14 +1171,84 @@ export function ChatPanelV2({
 
   // Custom AI Persona state - loaded from localStorage per-project
   const [activePersona, setActivePersona] = useState<string>('')
+  const [activePersonaName, setActivePersonaName] = useState<string>('')
+  const [loadedPersonas, setLoadedPersonas] = useState<Array<{ id: string; name: string; instructions: string; icon: string | null; project_id: string | null }>>([])
+  const [personasLoading, setPersonasLoading] = useState(false)
+
+  // Built-in persona presets (available without API)
+  const PERSONA_PRESETS = useMemo(() => [
+    { id: 'preset-backend', name: 'Backend Expert', icon: 'code', project_id: null, instructions: 'You are a backend-focused developer. Follow these preferences:\n- Always use TypeScript with strict mode enabled\n- Prefer Drizzle ORM over raw SQL queries\n- Use Zod for all input validation\n- Structure API routes with proper error handling and status codes\n- Write clean, modular code with small, focused functions\n- Always consider security: sanitize inputs, use parameterized queries\n- Add proper TypeScript types/interfaces for all data structures' },
+    { id: 'preset-uiux', name: 'UI/UX Designer', icon: 'palette', project_id: null, instructions: 'You are a UI/UX-focused developer. Follow these preferences:\n- Prioritize beautiful, polished interfaces with smooth animations\n- Use Framer Motion for transitions and micro-interactions\n- Follow modern design trends: glass morphism, subtle gradients, rounded corners\n- Ensure responsive design works flawlessly on mobile and desktop\n- Use consistent spacing (4px/8px grid system)\n- Add hover states, focus rings, and loading states to all interactive elements\n- Pay attention to typography hierarchy and color contrast' },
+    { id: 'preset-perf', name: 'Performance Engineer', icon: 'zap', project_id: null, instructions: 'You are a performance-focused developer. Follow these preferences:\n- Minimize bundle size: use dynamic imports and code splitting\n- Optimize images with next/image and proper sizing\n- Use React.memo, useMemo, useCallback strategically to prevent unnecessary re-renders\n- Implement virtualization for long lists (react-window or tanstack-virtual)\n- Prefer server components over client components when possible\n- Use Suspense boundaries with proper loading fallbacks\n- Avoid N+1 queries in database operations' },
+    { id: 'preset-security', name: 'Security First', icon: 'shield', project_id: null, instructions: 'You are a security-focused developer. Follow these preferences:\n- Always validate and sanitize user input on both client and server\n- Use CSRF protection for all form submissions\n- Implement proper authentication checks on every API route\n- Never expose sensitive data in client-side code or API responses\n- Use httpOnly, secure, sameSite cookies for session management\n- Apply principle of least privilege for database queries\n- Add rate limiting considerations to public-facing endpoints\n- Escape output to prevent XSS attacks' },
+  ], [])
 
   // Load active persona from localStorage on mount
   useEffect(() => {
     if (project?.id) {
       const stored = localStorage.getItem(`pipilot_persona_${project.id}`)
-      if (stored) setActivePersona(stored)
+      const storedName = localStorage.getItem(`pipilot_persona_name_${project.id}`)
+      if (stored) {
+        setActivePersona(stored)
+        setActivePersonaName(storedName || '')
+      }
     }
   }, [project?.id])
+
+  // Fetch user personas from API
+  const fetchPersonas = useCallback(async () => {
+    setPersonasLoading(true)
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch(`/api/personas${project?.id ? `?projectId=${project.id}` : ''}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setLoadedPersonas(json.personas || [])
+      }
+    } catch (err) {
+      console.error('[ChatPanelV2] Failed to fetch personas:', err)
+    } finally {
+      setPersonasLoading(false)
+    }
+  }, [project?.id])
+
+  // Select a persona
+  const selectPersona = useCallback((instructions: string, name: string) => {
+    setActivePersona(instructions)
+    setActivePersonaName(name)
+    if (project?.id) {
+      localStorage.setItem(`pipilot_persona_${project.id}`, instructions)
+      localStorage.setItem(`pipilot_persona_name_${project.id}`, name)
+    }
+  }, [project?.id])
+
+  // Clear active persona
+  const clearPersona = useCallback(() => {
+    setActivePersona('')
+    setActivePersonaName('')
+    if (project?.id) {
+      localStorage.removeItem(`pipilot_persona_${project.id}`)
+      localStorage.removeItem(`pipilot_persona_name_${project.id}`)
+    }
+  }, [project?.id])
+
+  // Persona icon helper
+  const getPersonaIcon = useCallback((icon: string | null) => {
+    switch (icon) {
+      case 'code': return <Code className="size-4" />
+      case 'palette': return <Palette className="size-4" />
+      case 'zap': return <Zap className="size-4" />
+      case 'shield': return <Shield className="size-4" />
+      case 'globe': return <Globe className="size-4" />
+      case 'sparkles': return <Sparkles className="size-4" />
+      default: return <Bot className="size-4" />
+    }
+  }, [])
 
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
@@ -1232,7 +1302,7 @@ export function ChatPanelV2({
 
   // Command Menu state (rich "+" palette)
   const [showCommandMenu, setShowCommandMenu] = useState(false)
-  const [commandMenuSubmenu, setCommandMenuSubmenu] = useState<'none' | 'mcp' | 'tools' | 'slash' | 'byok'>('none')
+  const [commandMenuSubmenu, setCommandMenuSubmenu] = useState<'none' | 'mcp' | 'tools' | 'slash' | 'byok' | 'persona'>('none')
   const commandMenuRef = useRef<HTMLDivElement>(null)
 
   // BYOK (Bring Your Own Key) state
@@ -6882,6 +6952,24 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                         </button>
                         <button
                           className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                          onClick={() => {
+                            setCommandMenuSubmenu('persona')
+                            fetchPersonas()
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Bot className="size-4 text-gray-400" />
+                            <span>AI Persona</span>
+                            {activePersonaName && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-orange-900/40 text-orange-400 rounded-full truncate max-w-[100px]">
+                                {activePersonaName}
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight className="size-4 text-gray-500" />
+                        </button>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
                           onClick={() => setCommandMenuSubmenu('tools')}
                         >
                           <div className="flex items-center gap-3">
@@ -7185,6 +7273,133 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                             </div>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* AI Persona Submenu */}
+                    {commandMenuSubmenu === 'persona' && (
+                      <div className="py-1.5">
+                        <button
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                          onClick={() => setCommandMenuSubmenu('none')}
+                        >
+                          <ChevronLeft className="size-4" />
+                          <span className="font-medium">AI Persona</span>
+                          {activePersonaName && (
+                            <span className="text-[11px] text-orange-400 ml-auto truncate max-w-[120px]">{activePersonaName}</span>
+                          )}
+                        </button>
+
+                        {/* Active persona indicator + clear */}
+                        {activePersonaName && (
+                          <div className="mx-3 mt-2 mb-1 flex items-center justify-between px-3 py-2 rounded-lg bg-orange-600/10 border border-orange-500/20">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Bot className="size-3.5 text-orange-400 flex-shrink-0" />
+                              <span className="text-[12px] text-orange-300 truncate">{activePersonaName}</span>
+                            </div>
+                            <button
+                              className="text-[11px] text-gray-500 hover:text-red-400 px-1.5 py-0.5 rounded hover:bg-red-500/10 transition-colors flex-shrink-0"
+                              onClick={() => {
+                                clearPersona()
+                                setShowCommandMenu(false)
+                              }}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Presets section */}
+                        <div className="px-4 pt-2 pb-1">
+                          <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider">Presets</span>
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto">
+                          {PERSONA_PRESETS.map((preset) => {
+                            const isActive = activePersonaName === preset.name
+                            return (
+                              <button
+                                key={preset.id}
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                  isActive ? 'bg-orange-600/10 text-orange-300' : 'text-gray-200 hover:bg-gray-800'
+                                }`}
+                                onClick={() => {
+                                  if (isActive) {
+                                    clearPersona()
+                                  } else {
+                                    selectPersona(preset.instructions, preset.name)
+                                  }
+                                  setShowCommandMenu(false)
+                                }}
+                              >
+                                <span className={isActive ? 'text-orange-400' : 'text-gray-500'}>
+                                  {getPersonaIcon(preset.icon)}
+                                </span>
+                                <span className="truncate">{preset.name}</span>
+                                {isActive && <Check className="size-4 text-orange-400 ml-auto flex-shrink-0" />}
+                              </button>
+                            )
+                          })}
+
+                          {/* User-created personas */}
+                          {loadedPersonas.length > 0 && (
+                            <>
+                              <div className="px-4 pt-3 pb-1">
+                                <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider">Your Personas</span>
+                              </div>
+                              {loadedPersonas.map((persona) => {
+                                const isActive = activePersonaName === persona.name
+                                return (
+                                  <button
+                                    key={persona.id}
+                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                      isActive ? 'bg-orange-600/10 text-orange-300' : 'text-gray-200 hover:bg-gray-800'
+                                    }`}
+                                    onClick={() => {
+                                      if (isActive) {
+                                        clearPersona()
+                                      } else {
+                                        selectPersona(persona.instructions, persona.name)
+                                      }
+                                      setShowCommandMenu(false)
+                                    }}
+                                  >
+                                    <span className={isActive ? 'text-orange-400' : 'text-gray-500'}>
+                                      {getPersonaIcon(persona.icon)}
+                                    </span>
+                                    <div className="text-left min-w-0 flex-1">
+                                      <span className="truncate block">{persona.name}</span>
+                                      {persona.project_id && (
+                                        <span className="text-[10px] text-gray-600">Project-specific</span>
+                                      )}
+                                    </div>
+                                    {isActive && <Check className="size-4 text-orange-400 flex-shrink-0" />}
+                                  </button>
+                                )
+                              })}
+                            </>
+                          )}
+
+                          {personasLoading && (
+                            <div className="px-4 py-3 flex items-center gap-2 text-gray-500">
+                              <Loader2 className="size-3.5 animate-spin" />
+                              <span className="text-[12px]">Loading personas...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer: manage link */}
+                        <div className="border-t border-gray-700/50 mt-1">
+                          <button
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-400 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                            onClick={() => {
+                              setShowCommandMenu(false)
+                              window.open('/workspace/personas', '_blank')
+                            }}
+                          >
+                            <ExternalLink className="size-4" />
+                            <span>Manage personas</span>
+                          </button>
+                        </div>
                       </div>
                     )}
 
