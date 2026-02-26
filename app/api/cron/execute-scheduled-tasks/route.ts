@@ -201,7 +201,7 @@ Rules:
           }
         }),
       },
-      maxSteps: 4,
+      maxSteps: 30,
     })
 
     const output = result.text || 'Task completed with no output.'
