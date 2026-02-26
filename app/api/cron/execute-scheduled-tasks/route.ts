@@ -284,15 +284,13 @@ export async function GET(request: NextRequest) {
       const status = execError ? 'failed' : 'success'
 
       // 3. Update execution record
-      const durationMs = Date.now() - taskStartTime
       await supabase
         .from('task_executions')
         .update({
           status,
           completed_at: completedAt,
           output: output.substring(0, 10000), // Cap output size
-          error_message: execError,
-          duration_ms: durationMs,
+          error: execError,
         })
         .eq('id', execution.id)
 
@@ -302,7 +300,7 @@ export async function GET(request: NextRequest) {
         .from('scheduled_tasks')
         .update({
           execution_count: (task.execution_count || 0) + 1,
-          last_executed_at: completedAt,
+          last_execution_at: completedAt,
           next_execution_at: nextExecution,
           updated_at: completedAt,
         })
