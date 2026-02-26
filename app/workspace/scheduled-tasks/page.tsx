@@ -48,6 +48,7 @@ import {
   Timer,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { Response } from "@/components/ai-elements/response"
 
 interface ScheduledTask {
   id: string
@@ -161,6 +162,9 @@ function ScheduledTasksContent() {
   // Toggling state
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
+  // Expanded execution results
+  const [expandedExecId, setExpandedExecId] = useState<string | null>(null)
+
   const getSession = useCallback(async () => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -214,8 +218,10 @@ function ScheduledTasksContent() {
     if (expandedId === taskId) {
       setExpandedId(null)
       setExecutions([])
+      setExpandedExecId(null)
     } else {
       setExpandedId(taskId)
+      setExpandedExecId(null)
       fetchExecutions(taskId)
     }
   }
@@ -647,41 +653,87 @@ function ScheduledTasksContent() {
                               Refresh
                             </Button>
                           </div>
-                          <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                            {executions.map((exec) => (
-                              <div
-                                key={exec.id}
-                                className="flex items-start gap-3 py-2 px-2.5 rounded-md bg-gray-800/30 hover:bg-gray-800/50 transition-colors"
-                              >
-                                <div className="shrink-0 mt-0.5">
-                                  {statusBadge(exec.status)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-3 text-[10px] text-gray-500">
-                                    <span>
-                                      Started:{" "}
-                                      {formatDate(exec.started_at)}
-                                    </span>
-                                    {exec.completed_at && (
-                                      <span>
-                                        Completed:{" "}
-                                        {formatDate(exec.completed_at)}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {exec.output && (
-                                    <p className="text-xs text-gray-400 mt-1 font-mono whitespace-pre-wrap line-clamp-3">
-                                      {exec.output}
-                                    </p>
+                          <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
+                            {executions.map((exec) => {
+                              const isExpanded = expandedExecId === exec.id
+                              return (
+                                <div
+                                  key={exec.id}
+                                  className="rounded-md bg-gray-800/30 hover:bg-gray-800/50 transition-colors"
+                                >
+                                  <button
+                                    onClick={() =>
+                                      setExpandedExecId(
+                                        isExpanded ? null : exec.id
+                                      )
+                                    }
+                                    className="flex items-start gap-3 py-2 px-2.5 w-full text-left"
+                                  >
+                                    <div className="shrink-0 mt-0.5">
+                                      {statusBadge(exec.status)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                                        <span>
+                                          Started:{" "}
+                                          {formatDate(exec.started_at)}
+                                        </span>
+                                        {exec.completed_at && (
+                                          <span>
+                                            Completed:{" "}
+                                            {formatDate(exec.completed_at)}
+                                          </span>
+                                        )}
+                                        {(exec.output || exec.error) && (
+                                          <span className="text-orange-400/70 ml-auto">
+                                            {isExpanded
+                                              ? "Hide results"
+                                              : "View results"}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {!isExpanded && exec.output && (
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                          {exec.output
+                                            .replace(/[#*_`>\-\[\]]/g, "")
+                                            .substring(0, 150)}
+                                        </p>
+                                      )}
+                                      {!isExpanded && exec.error && (
+                                        <p className="text-xs text-red-400 mt-1 line-clamp-2">
+                                          {exec.error}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="shrink-0 mt-0.5">
+                                      {isExpanded ? (
+                                        <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                                      ) : (
+                                        <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                                      )}
+                                    </div>
+                                  </button>
+                                  {isExpanded && (exec.output || exec.error) && (
+                                    <div className="px-2.5 pb-3 pt-1 border-t border-gray-700/40 mx-2.5">
+                                      {exec.output && (
+                                        <div className="text-sm text-gray-300 mt-2">
+                                          <Response>
+                                            {exec.output}
+                                          </Response>
+                                        </div>
+                                      )}
+                                      {exec.error && (
+                                        <div className="mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/20">
+                                          <p className="text-xs text-red-400 font-mono whitespace-pre-wrap">
+                                            {exec.error}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
-                                  {exec.error && (
-                                    <p className="text-xs text-red-400 mt-1 font-mono whitespace-pre-wrap line-clamp-3">
-                                      {exec.error}
-                                    </p>
-                                  )}
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </>
                       )}
