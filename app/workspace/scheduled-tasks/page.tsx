@@ -148,7 +148,7 @@ function ScheduledTasksContent() {
   const [formDescription, setFormDescription] = useState("")
   const [formCronPreset, setFormCronPreset] = useState("0 * * * *")
   const [formCronCustom, setFormCronCustom] = useState("")
-  const [formConfig, setFormConfig] = useState("{}")
+  const [formPrompt, setFormPrompt] = useState("")
 
   // Expanded task detail
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -227,22 +227,11 @@ function ScheduledTasksContent() {
 
   const handleCreate = async () => {
     const cronExpression = getEffectiveCron()
-    if (!formName.trim() || !cronExpression) return
+    if (!formName.trim() || !cronExpression || !formPrompt.trim()) return
     setSaving(true)
     try {
       const session = await getSession()
       if (!session) return
-
-      let configObj = null
-      if (formConfig.trim() && formConfig.trim() !== "{}") {
-        try {
-          configObj = JSON.parse(formConfig)
-        } catch {
-          alert("Invalid JSON in config field")
-          setSaving(false)
-          return
-        }
-      }
 
       const res = await fetch("/api/scheduled-tasks", {
         method: "POST",
@@ -254,7 +243,7 @@ function ScheduledTasksContent() {
           name: formName.trim(),
           description: formDescription.trim() || undefined,
           cron_expression: cronExpression,
-          config: configObj,
+          config: { prompt: formPrompt.trim() },
         }),
       })
 
@@ -276,22 +265,11 @@ function ScheduledTasksContent() {
   const handleUpdate = async () => {
     if (!editingTask) return
     const cronExpression = getEffectiveCron()
-    if (!formName.trim() || !cronExpression) return
+    if (!formName.trim() || !cronExpression || !formPrompt.trim()) return
     setSaving(true)
     try {
       const session = await getSession()
       if (!session) return
-
-      let configObj = null
-      if (formConfig.trim() && formConfig.trim() !== "{}") {
-        try {
-          configObj = JSON.parse(formConfig)
-        } catch {
-          alert("Invalid JSON in config field")
-          setSaving(false)
-          return
-        }
-      }
 
       const res = await fetch("/api/scheduled-tasks", {
         method: "PUT",
@@ -304,7 +282,7 @@ function ScheduledTasksContent() {
           name: formName.trim(),
           description: formDescription.trim() || undefined,
           cron_expression: cronExpression,
-          config: configObj,
+          config: { prompt: formPrompt.trim() },
         }),
       })
 
@@ -382,7 +360,7 @@ function ScheduledTasksContent() {
     setFormDescription("")
     setFormCronPreset("0 * * * *")
     setFormCronCustom("")
-    setFormConfig("{}")
+    setFormPrompt("")
   }
 
   const openCreateDialog = () => {
@@ -407,9 +385,7 @@ function ScheduledTasksContent() {
       setFormCronCustom(task.cron_expression)
     }
 
-    setFormConfig(
-      task.config ? JSON.stringify(task.config, null, 2) : "{}"
-    )
+    setFormPrompt(task.config?.prompt || "")
     setShowDialog(true)
   }
 
@@ -480,10 +456,11 @@ function ScheduledTasksContent() {
           <Settings className="h-4 w-4 text-orange-400 mt-0.5 shrink-0" />
           <div className="text-xs text-gray-400">
             <span className="text-orange-300 font-medium">
-              Automated agent tasks.
+              Automated AI research tasks.
             </span>{" "}
-            Schedule recurring AI agent operations with cron expressions. Tasks
-            run automatically in the background and you can monitor their
+            Schedule recurring prompts that an AI agent executes on a cron
+            schedule. The agent can search the web and extract page content
+            for research, monitoring, and analysis. View results in the
             execution history.
           </div>
         </div>
@@ -503,9 +480,9 @@ function ScheduledTasksContent() {
                 No scheduled tasks yet
               </p>
               <p className="text-xs text-gray-600 max-w-sm mx-auto mb-5">
-                Create automated agent tasks that run on a schedule. Set up
-                recurring operations like data syncs, health checks, or
-                automated builds.
+                Create AI research tasks that run on a schedule. Set up
+                recurring prompts for web monitoring, trend analysis,
+                competitor tracking, and more.
               </p>
               <Button
                 onClick={openCreateDialog}
@@ -564,8 +541,13 @@ function ScheduledTasksContent() {
                           </Badge>
                         </div>
                         {task.description && (
-                          <p className="text-xs text-gray-500 mb-1.5 pl-5 line-clamp-1">
+                          <p className="text-xs text-gray-500 mb-1 pl-5 line-clamp-1">
                             {task.description}
+                          </p>
+                        )}
+                        {task.config?.prompt && (
+                          <p className="text-[11px] text-gray-600 mb-1.5 pl-5 line-clamp-1 italic">
+                            &quot;{task.config.prompt}&quot;
                           </p>
                         )}
                         <div className="flex items-center gap-2 pl-5">
@@ -822,20 +804,20 @@ function ScheduledTasksContent() {
               </p>
             </div>
 
-            {/* Config JSON */}
+            {/* Prompt */}
             <div className="space-y-1.5">
               <Label className="text-xs text-gray-400">
-                Config (optional JSON)
+                AI Prompt <span className="text-red-400">*</span>
               </Label>
               <Textarea
-                value={formConfig}
-                onChange={(e) => setFormConfig(e.target.value)}
-                placeholder='{"key": "value"}'
-                rows={3}
-                className="bg-gray-800 border-gray-700 text-gray-100 text-sm font-mono resize-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                value={formPrompt}
+                onChange={(e) => setFormPrompt(e.target.value)}
+                placeholder="e.g., Search for the latest Next.js security advisories and summarize any critical vulnerabilities"
+                rows={4}
+                className="bg-gray-800 border-gray-700 text-gray-100 text-sm resize-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
               />
               <p className="text-[10px] text-gray-600">
-                Pass configuration data to the task as JSON.
+                What should the AI research agent do each time this task runs? The agent can search the web and extract page content.
               </p>
             </div>
           </div>
@@ -860,6 +842,7 @@ function ScheduledTasksContent() {
               disabled={
                 saving ||
                 !formName.trim() ||
+                !formPrompt.trim() ||
                 (formCronPreset === "custom" && !formCronCustom.trim()) ||
                 (!formCronPreset && !formCronCustom.trim())
               }
