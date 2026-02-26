@@ -14,23 +14,33 @@ async function getUser(request: NextRequest) {
 }
 
 function getNextExecution(cronExpr: string): string {
-  // Simple cron parser for common patterns
   const now = new Date()
   const parts = cronExpr.trim().split(/\s+/)
   if (parts.length !== 5) return new Date(now.getTime() + 86400000).toISOString()
 
   const [min, hour, dom, mon, dow] = parts
 
-  // Every N minutes
+  // Every N minutes: */N * * * *
   if (min.startsWith('*/')) {
     const interval = parseInt(min.slice(2)) || 15
     const next = new Date(now)
-    next.setMinutes(Math.ceil(next.getMinutes() / interval) * interval, 0, 0)
+    next.setSeconds(0, 0)
+    next.setMinutes(Math.ceil((next.getMinutes() + 1) / interval) * interval)
     if (next <= now) next.setMinutes(next.getMinutes() + interval)
     return next.toISOString()
   }
 
-  // Daily at specific time
+  // Every N hours: 0 */N * * *
+  if (hour.startsWith('*/')) {
+    const interval = parseInt(hour.slice(2)) || 6
+    const next = new Date(now)
+    next.setMinutes(parseInt(min) || 0, 0, 0)
+    next.setHours(Math.ceil((next.getHours() + 1) / interval) * interval)
+    if (next <= now) next.setHours(next.getHours() + interval)
+    return next.toISOString()
+  }
+
+  // Daily at specific time: M H * * *
   if (min !== '*' && hour !== '*' && dom === '*' && mon === '*' && dow === '*') {
     const next = new Date(now)
     next.setHours(parseInt(hour), parseInt(min), 0, 0)
@@ -38,7 +48,7 @@ function getNextExecution(cronExpr: string): string {
     return next.toISOString()
   }
 
-  // Weekly (dow specified)
+  // Weekly: M H * * D
   if (dow !== '*' && dom === '*') {
     const targetDow = parseInt(dow)
     const next = new Date(now)
@@ -49,7 +59,7 @@ function getNextExecution(cronExpr: string): string {
     return next.toISOString()
   }
 
-  // Default: next day
+  // Default: 24 hours from now
   return new Date(now.getTime() + 86400000).toISOString()
 }
 

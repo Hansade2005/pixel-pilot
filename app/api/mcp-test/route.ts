@@ -121,7 +121,7 @@ Use the available tools when they would help answer the user's question. Always 
       system: systemPrompt,
       messages,
       tools: allTools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(30),
       onFinish: async () => {
         // Close all MCP clients
         for (const { client } of mcpClients) {

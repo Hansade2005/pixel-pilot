@@ -1266,7 +1266,7 @@ export default function ProjectPage() {
                   ) : (
                     <div className="text-center py-4">
                       <p className="text-sm text-gray-500 mb-3">Deploy to Vercel for instant global hosting</p>
-                      <Button variant="outline" size="sm" onClick={() => deployProject(true)} className="bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800">
+                      <Button variant="outline" size="sm" onClick={() => router.push('/workspace/hosting')} className="bg-transparent border-gray-700 text-gray-300 hover:bg-gray-800">
                         <Rocket className="h-4 w-4 mr-2" />
                         Deploy to Vercel
                       </Button>

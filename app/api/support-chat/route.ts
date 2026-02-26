@@ -605,7 +605,7 @@ Remember: You represent PiPilot. Be professional, helpful, and make users feel s
           }
         })
       },
-      stopWhen: stepCountIs(3), // Stop when max steps reached
+      stopWhen: stepCountIs(30),
     })
 
     return result.toTextStreamResponse()

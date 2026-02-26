@@ -61,12 +61,7 @@ import {
   RotateCw,
   X,
   BarChart3,
-  Camera,
-  Bot,
-  Activity,
-  KeyRound,
   Globe2,
-  FileCode,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -611,11 +606,6 @@ export default function ManagementPage() {
           <div className="flex flex-wrap gap-2 mt-5">
             {[
               { href: '/workspace/usage', icon: BarChart3, label: 'Usage Analytics' },
-              { href: '/workspace/code-reviews', icon: FileCode, label: 'Code Reviews' },
-              { href: '/workspace/health', icon: Activity, label: 'Health Score' },
-              { href: '/workspace/snapshots', icon: Camera, label: 'Snapshots' },
-              { href: '/workspace/secrets', icon: KeyRound, label: 'Secrets Vault' },
-              { href: '/workspace/personas', icon: Bot, label: 'AI Personas' },
               { href: '/workspace/scheduled-tasks', icon: Clock, label: 'Scheduled Tasks' },
               { href: '/workspace/showcase', icon: Globe2, label: 'Showcase' },
             ].map((tool) => (
