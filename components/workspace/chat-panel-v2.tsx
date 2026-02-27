@@ -27,7 +27,8 @@ import {
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3,
   CreditCard, Coins, GitBranch, ChevronRight, ChevronLeft, Wrench,
-  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor, ListTodo, Bot, Shield, Palette
+  ToggleLeft, ToggleRight, Sparkles, FileUp, Hash, ExternalLink, Monitor, ListTodo, Bot, Shield, Palette,
+  Download, FileJson
 } from 'lucide-react'
 import { ModelSelector } from '@/components/ui/model-selector'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
@@ -4226,10 +4227,30 @@ export function ChatPanelV2({
       return
     }
 
-    const markdown = messages.map(msg => {
-      const role = msg.role === 'user' ? '**You:**' : '**Assistant:**'
-      return `${role}\n\n${msg.content}\n\n---\n`
+    const date = new Date()
+    const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    const totalMessages = messages.length
+    const userMessages = messages.filter(m => m.role === 'user').length
+    const assistantMessages = messages.filter(m => m.role === 'assistant').length
+
+    let markdown = `# PiPilot Chat Export\n\n`
+    markdown += `> Exported on ${dateStr} at ${date.toLocaleTimeString()}\n\n`
+    markdown += `| Detail | Value |\n|--------|-------|\n`
+    markdown += `| Total Messages | ${totalMessages} |\n`
+    markdown += `| User Messages | ${userMessages} |\n`
+    markdown += `| Assistant Messages | ${assistantMessages} |\n\n`
+    markdown += `---\n\n`
+
+    markdown += messages.map((msg, index) => {
+      const role = msg.role === 'user' ? 'You' : 'PiPilot'
+      const icon = msg.role === 'user' ? '**You:**' : '**PiPilot:**'
+      let entry = `### Message ${index + 1} - ${role}\n\n`
+      entry += `${msg.content}\n\n`
+      entry += `---\n`
+      return entry
     }).join('\n')
+
+    markdown += `\n*Exported from PiPilot - Canada\'s AI-Powered App Builder*\n`
 
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
@@ -4242,6 +4263,76 @@ export function ChatPanelV2({
     URL.revokeObjectURL(url)
 
     toast({ title: 'Exported', description: 'Chat exported as markdown file' })
+  }
+
+  // Download a single message as markdown
+  const downloadMessageAsMarkdown = (message: any) => {
+    if (!message.content || message.content.trim().length === 0) {
+      toast({ title: 'Nothing to download', description: 'This message has no content' })
+      return
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const role = message.role === 'user' ? 'You' : 'PiPilot'
+
+    // Build rich markdown content
+    let markdown = `# ${role} - Response\n\n`
+    markdown += `> Generated on ${new Date().toLocaleString()}\n\n`
+    markdown += `---\n\n`
+    markdown += message.content
+    markdown += `\n\n---\n\n`
+    markdown += `*Exported from PiPilot - Canada's AI-Powered App Builder*\n`
+
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pipilot-response-${timestamp}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast({ title: 'Downloaded', description: 'Message saved as Markdown file' })
+  }
+
+  // Download a single message as JSON
+  const downloadMessageAsJSON = (message: any) => {
+    if (!message.content || message.content.trim().length === 0) {
+      toast({ title: 'Nothing to download', description: 'This message has no content' })
+      return
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+
+    const jsonData = {
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        reasoning: (message as any).metadata?.reasoning || null,
+        toolInvocations: (message as any).metadata?.toolInvocations?.map((t: any) => ({
+          toolName: t.toolName,
+          status: t.state,
+          args: t.args || null,
+        })) || [],
+        durationSeconds: (message as any).metadata?.durationSeconds || null,
+      },
+      exportedFrom: 'PiPilot',
+    }
+
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pipilot-response-${timestamp}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast({ title: 'Downloaded', description: 'Message saved as JSON file' })
   }
 
   // Regenerate last response
@@ -6294,6 +6385,18 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                       onClick={() => handleCopyMessage(message.id, message.content)}
                     >
                       <Copy className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+                    </Action>
+                    <Action
+                      tooltip="Download as Markdown"
+                      onClick={() => downloadMessageAsMarkdown(message)}
+                    >
+                      <Download className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
+                    </Action>
+                    <Action
+                      tooltip="Download as JSON"
+                      onClick={() => downloadMessageAsJSON(message)}
+                    >
+                      <FileJson className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300" />
                     </Action>
                     <Action
                       tooltip="Delete message"
