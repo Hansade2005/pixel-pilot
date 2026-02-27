@@ -300,7 +300,7 @@ export async function GET(request: NextRequest) {
       const { output, error: execError } = await executeTask(task)
       const completedAt = new Date().toISOString()
       const durationMs = Date.now() - taskStartTime
-      const status = execError ? 'failed' : 'success'
+      const status = execError ? 'failed' : 'completed'
 
       // 3. Update execution record
       const { error: updateExecError } = await supabase

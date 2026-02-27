@@ -69,7 +69,7 @@ interface ScheduledTask {
 interface TaskExecution {
   id: string
   task_id: string
-  status: "success" | "failed" | "running" | "pending"
+  status: "completed" | "failed" | "running" | "pending"
   started_at: string
   completed_at: string | null
   output: string | null
@@ -398,10 +398,10 @@ function ScheduledTasksContent() {
 
   const statusBadge = (status: string) => {
     switch (status) {
-      case "success":
+      case "completed":
         return (
           <Badge className="text-[10px] bg-emerald-500/10 text-emerald-400 border-0">
-            Success
+            Completed
           </Badge>
         )
       case "failed":
