@@ -60,7 +60,7 @@ interface ScheduledTask {
   config: Record<string, any> | null
   enabled: boolean
   next_execution_at: string | null
-  last_execution_at: string | null
+  last_executed_at: string | null
   execution_count: number
   created_at: string
   updated_at: string
@@ -73,7 +73,8 @@ interface TaskExecution {
   started_at: string
   completed_at: string | null
   output: string | null
-  error: string | null
+  error_message: string | null
+  duration_ms: number | null
   created_at: string
 }
 
@@ -574,10 +575,10 @@ function ScheduledTasksContent() {
                             {task.execution_count} execution
                             {task.execution_count !== 1 ? "s" : ""}
                           </span>
-                          {task.last_execution_at && (
+                          {task.last_executed_at && (
                             <span className="flex items-center gap-1">
                               <RefreshCw className="h-3 w-3" />
-                              Last: {timeAgo(task.last_execution_at)}
+                              Last: {timeAgo(task.last_executed_at)}
                             </span>
                           )}
                         </div>
@@ -684,7 +685,7 @@ function ScheduledTasksContent() {
                                             {formatDate(exec.completed_at)}
                                           </span>
                                         )}
-                                        {(exec.output || exec.error) && (
+                                        {(exec.output || exec.error_message) && (
                                           <span className="text-orange-400/70 ml-auto">
                                             {isExpanded
                                               ? "Hide results"
@@ -699,9 +700,9 @@ function ScheduledTasksContent() {
                                             .substring(0, 150)}
                                         </p>
                                       )}
-                                      {!isExpanded && exec.error && (
+                                      {!isExpanded && exec.error_message && (
                                         <p className="text-xs text-red-400 mt-1 line-clamp-2">
-                                          {exec.error}
+                                          {exec.error_message}
                                         </p>
                                       )}
                                     </div>
@@ -713,7 +714,7 @@ function ScheduledTasksContent() {
                                       )}
                                     </div>
                                   </button>
-                                  {isExpanded && (exec.output || exec.error) && (
+                                  {isExpanded && (exec.output || exec.error_message) && (
                                     <div className="px-2.5 pb-3 pt-1 border-t border-gray-700/40 mx-2.5">
                                       {exec.output && (
                                         <div className="text-sm text-gray-300 mt-2">
@@ -722,10 +723,10 @@ function ScheduledTasksContent() {
                                           </Response>
                                         </div>
                                       )}
-                                      {exec.error && (
+                                      {exec.error_message && (
                                         <div className="mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/20">
                                           <p className="text-xs text-red-400 font-mono whitespace-pre-wrap">
-                                            {exec.error}
+                                            {exec.error_message}
                                           </p>
                                         </div>
                                       )}

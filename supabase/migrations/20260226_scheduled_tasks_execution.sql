@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.scheduled_tasks (
   config jsonb DEFAULT '{}'::jsonb,
   enabled boolean DEFAULT true,
   next_execution_at timestamptz,
-  last_execution_at timestamptz,
+  last_executed_at timestamptz,
   execution_count integer DEFAULT 0,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS public.task_executions (
   started_at timestamptz DEFAULT now(),
   completed_at timestamptz,
   output text,
-  error text,
+  error_message text,
+  duration_ms integer,
   created_at timestamptz DEFAULT now()
 );
 
