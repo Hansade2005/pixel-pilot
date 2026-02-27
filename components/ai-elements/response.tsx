@@ -26,6 +26,8 @@ export const Response = memo(
         "[&>h4]:mb-2 [&>h4]:text-base [&>h4]:font-medium",
         "[&>h5]:mb-2 [&>h5]:text-sm [&>h5]:font-medium",
         "[&>h6]:mb-2 [&>h6]:text-xs [&>h6]:font-medium",
+        // Image styling - responsive, rounded, spaced
+        "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_img]:border [&_img]:border-gray-700/50 [&_img]:shadow-md",
         className
       )}
       {...props}

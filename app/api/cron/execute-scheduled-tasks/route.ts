@@ -193,7 +193,7 @@ Your output saved via save_result MUST be a detailed, well-structured, presentab
 3. **Sections**: Organize content into \`## Sections\` and \`### Subsections\` with clear, descriptive headers
 4. **Detailed Paragraphs**: Each section MUST contain substantive paragraphs (not just bullet points). Provide context, explanations, and real-world implications. Minimum 2-3 sentences per paragraph.
 5. **Tables**: Use markdown tables (\`| Column | Column |\`) whenever comparing features, data points, metrics, options, or any multi-attribute information. Every research result should include at least one table.
-6. **Images**: When relevant, embed illustrative images using: \`![Description](https://api.a0.dev/assets/image?text={description}&aspect=16:9)\`
+6. **Images (MANDATORY)**: You MUST embed at least one illustrative image per result using: \`![Description](https://api.a0.dev/assets/image?text={url-encoded-description}&aspect=16:9)\`. Add images to visually represent the topic, key concepts, or data. Place them after section headings or alongside key findings. Use descriptive text in the URL for relevant visuals (e.g. \`![AI Market Growth](https://api.a0.dev/assets/image?text=artificial+intelligence+market+growth+chart&aspect=16:9)\`). For multiple topics, embed 2-3 images throughout the document.
 7. **Bullet & Numbered Lists**: Use bullet points for features/items and numbered lists for sequential steps, rankings, or priorities
 8. **Blockquotes**: Use \`>\` blockquotes for key takeaways, important warnings, or notable quotes from sources
 9. **Bold & Emphasis**: Use **bold** for key terms, metrics, and important data points. Use *italics* for definitions or emphasis.
@@ -209,6 +209,7 @@ Your output saved via save_result MUST be a detailed, well-structured, presentab
 ### Mandatory Sections:
 - \`# [Task Title]\` - Clear, descriptive title
 - \`> **Summary:** [1-2 sentence executive summary]\`
+- At least one \`![image](url)\` embedded image
 - Main content sections with \`##\` headings
 - At least one markdown table with relevant data
 - \`## Key Takeaways\` - Bulleted list of the most important findings
@@ -219,6 +220,8 @@ Your output saved via save_result MUST be a detailed, well-structured, presentab
 # [Research Topic]
 
 > **Summary:** [Brief executive summary of findings...]
+
+![Topic Overview](https://api.a0.dev/assets/image?text=topic+overview+illustration&aspect=16:9)
 
 ---
 
@@ -233,6 +236,8 @@ Your output saved via save_result MUST be a detailed, well-structured, presentab
 | Metric | Value | Change |
 |--------|-------|--------|
 | ...    | ...   | ...    |
+
+![Finding Visualization](https://api.a0.dev/assets/image?text=data+visualization+chart&aspect=16:9)
 
 ### [Finding 2]
 [Detailed paragraph...]
@@ -274,9 +279,9 @@ Your output saved via save_result MUST be a detailed, well-structured, presentab
           }
         }),
         save_result: tool({
-          description: 'Save the final task result. You MUST call this tool at the end of every task with your complete findings as a rich, detailed markdown document. This is how the results get stored and displayed to the user. The result must include: a # title, executive summary blockquote, ## sections with detailed paragraphs, at least one markdown table, ## Key Takeaways, and ## Sources.',
+          description: 'Save the final task result. You MUST call this tool at the end of every task with your complete findings as a rich, detailed markdown document. This is how the results get stored and displayed to the user. The result must include: a # title, executive summary blockquote, embedded ![images](url), ## sections with detailed paragraphs, at least one markdown table, ## Key Takeaways, and ## Sources.',
           parameters: z.object({
-            result: z.string().describe('The complete task result as a detailed markdown document. MUST include: # Title, > Summary blockquote, ## sections with paragraphs (not just bullets), at least one | table |, ## Key Takeaways, and ## Sources with [Name](URL) links. Minimum 400 words.')
+            result: z.string().describe('The complete task result as a detailed markdown document. MUST include: # Title, > Summary blockquote, at least one ![image](https://api.a0.dev/assets/image?text=description&aspect=16:9), ## sections with paragraphs (not just bullets), at least one | table |, ## Key Takeaways, and ## Sources with [Name](URL) links. Minimum 400 words.')
           }),
           execute: async ({ result: markdown }) => {
             // Save directly to DB so the result persists even if the function times out later
