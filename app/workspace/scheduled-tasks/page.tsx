@@ -956,7 +956,7 @@ function ScheduledTasksContent() {
                 onChange={(e) => setFormPrompt(e.target.value)}
                 placeholder="e.g., Search for the latest Next.js security advisories and summarize any critical vulnerabilities"
                 rows={4}
-                className="bg-gray-800 border-gray-700 text-gray-100 text-sm resize-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                className="bg-gray-800 border-gray-700 text-gray-100 text-sm resize-none max-h-[160px] overflow-y-auto focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
               />
               <p className="text-[10px] text-gray-600">
                 What should the AI research agent do each time this task runs? The agent can search the web and extract page content.
