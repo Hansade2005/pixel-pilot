@@ -1263,10 +1263,12 @@ export function ChatPanelV2({
   // Debounced textarea height adjustment to prevent lag during typing
   const debouncedHeightAdjustment = useCallback(
     debounce((textarea: HTMLTextAreaElement) => {
-      // Reset to baseline then expand up to the max
-      textarea.style.height = '44px';
-      const newHeight = Math.min(textarea.scrollHeight, 200)
+      // Reset to baseline then expand up to the max (90px)
+      textarea.style.height = '90px';
+      const newHeight = Math.min(textarea.scrollHeight, 140)
       textarea.style.height = newHeight + 'px';
+      // Only show a vertical scrollbar when content exceeds the max height
+      textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
     }, 50), // 50ms debounce for height adjustments
     []
   );
@@ -6682,7 +6684,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 }, 0)
               }}
               placeholder="Type, @ for files, paste images or URLs, or attach..."
-              className="min-h-[44px] max-h-[200px] overflow-y-auto resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 pt-3 pb-2 text-sm"
+              className="min-h-[44px] max-h-[140px] resize-none border-0 bg-transparent text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 pt-3 pb-2 text-sm"
               onKeyDown={(e: any) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
