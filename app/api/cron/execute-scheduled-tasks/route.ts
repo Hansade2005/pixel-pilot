@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText, tool, stepCountIs } from 'ai'
+import { streamText, tool, stepCountIs } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 import { z } from 'zod'
 
@@ -149,7 +149,11 @@ function getNextExecution(cronExpr: string): string {
 }
 
 // ─── Execute a single task ───────────────────────────────────────────────────
-async function executeTask(task: any): Promise<{ output: string; error: string | null }> {
+async function executeTask(
+  task: any,
+  executionId: string,
+  supabase: any
+): Promise<{ output: string; error: string | null }> {
   const prompt = task.config?.prompt
   if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
     return { output: '', error: 'Task has no prompt configured. Add a prompt in the task settings.' }
@@ -157,11 +161,11 @@ async function executeTask(task: any): Promise<{ output: string; error: string |
 
   const model = mistralProvider('mistral-small-latest')
 
-  // Capture the result from the save_result tool call
+  // Track whether save_result has persisted to DB
   let savedResult: string | null = null
 
   try {
-    const result = await generateText({
+    const result = streamText({
       model,
       temperature: 0.4,
       system: `You are a research assistant for PiPilot, an AI-powered app builder. You execute scheduled tasks that involve research, information gathering, monitoring, and analysis.
@@ -178,7 +182,7 @@ Rules:
 - If the task asks for monitoring/checking something, clearly state current status
 - Format output in clean markdown
 - Do NOT generate code or modify any files - you are research-only
-- Complete the task in as few tool calls as possible (max 3)
+- Complete the task in as few tool calls as possible (max 30)
 - IMPORTANT: When you have finished your research, you MUST call the save_result tool with your complete findings formatted in markdown. This is required to save the task output. Never skip calling save_result.
 - Current time: ${new Date().toISOString()}`,
       messages: [
@@ -209,7 +213,26 @@ Rules:
             result: z.string().describe('The complete task result in markdown format. Include headings, bullet points, links, and any relevant data you gathered.')
           }),
           execute: async ({ result: markdown }) => {
-            savedResult = markdown
+            // Save directly to DB so the result persists even if the function times out later
+            const trimmed = markdown.substring(0, 10000)
+            const { error } = await supabase
+              .from('task_executions')
+              .update({
+                output: trimmed,
+                status: 'completed',
+                completed_at: new Date().toISOString(),
+              })
+              .eq('id', executionId)
+
+            if (error) {
+              console.error(`[ScheduledTasks] save_result DB write failed for execution ${executionId}:`, error)
+              // Still keep in memory as fallback
+              savedResult = trimmed
+              return 'Result captured in memory (DB write failed).'
+            }
+
+            savedResult = trimmed
+            console.log(`[ScheduledTasks] save_result wrote ${trimmed.length} chars to execution ${executionId}`)
             return 'Result saved successfully.'
           }
         }),
@@ -217,8 +240,11 @@ Rules:
       stopWhen: stepCountIs(10),
     })
 
-    // Prefer the explicitly saved result from save_result tool, fall back to result.text
-    const output = savedResult || result.text || 'Task completed with no output.'
+    // Consume the stream to completion (executes all tool calls)
+    const finalText = await result.text
+
+    // Prefer the explicitly saved result from save_result tool, fall back to final text
+    const output = savedResult || finalText || 'Task completed with no output.'
     return { output, error: null }
   } catch (err: any) {
     console.error(`[ScheduledTasks] AI execution error for task ${task.id}:`, err)
@@ -296,19 +322,21 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      // 2. Execute the task
-      const { output, error: execError } = await executeTask(task)
+      // 2. Execute the task (save_result tool writes output directly to DB)
+      const { output, error: execError } = await executeTask(task, execution.id, supabase)
       const completedAt = new Date().toISOString()
       const durationMs = Date.now() - taskStartTime
       const status = execError ? 'failed' : 'completed'
 
-      // 3. Update execution record
+      // 3. Final update: set duration_ms and ensure status/output are persisted
+      //    (save_result already wrote output + status during AI execution,
+      //     this catches duration_ms and handles the error/fallback case)
       const { error: updateExecError } = await supabase
         .from('task_executions')
         .update({
           status,
           completed_at: completedAt,
-          output: output.substring(0, 10000), // Cap output size
+          output: output.substring(0, 10000),
           error_message: execError,
           duration_ms: durationMs,
         })
