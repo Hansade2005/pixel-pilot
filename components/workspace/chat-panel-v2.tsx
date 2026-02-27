@@ -6968,37 +6968,6 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                           <LinkIcon className="size-4 text-gray-400" />
                           <span>Attach URL</span>
                         </button>
-                        <button
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
-                          onClick={() => {
-                            setShowCommandMenu(false)
-                            // Trigger @ file dropdown
-                            if (textareaRef.current) {
-                              const currentVal = input
-                              setInput(currentVal + '@')
-                              textareaRef.current.focus()
-                              setTimeout(() => {
-                                if (textareaRef.current) {
-                                  const pos = textareaRef.current.value.length
-                                  textareaRef.current.selectionStart = pos
-                                  textareaRef.current.selectionEnd = pos
-                                  const atCmd = detectAtCommand(textareaRef.current.value, pos)
-                                  if (atCmd) {
-                                    setFileQuery(atCmd.query)
-                                    setAtCommandStartIndex(atCmd.startIndex)
-                                    const position = calculateDropdownPosition(textareaRef.current, atCmd.startIndex)
-                                    setDropdownPosition(position)
-                                    setShowFileDropdown(true)
-                                  }
-                                }
-                              }, 50)
-                            }
-                          }}
-                        >
-                          <FolderOpen className="size-4 text-gray-400" />
-                          <span>Browse project files</span>
-                        </button>
-
                         {/* Separator */}
                         <div className="my-1.5 border-t border-gray-700/50" />
 
