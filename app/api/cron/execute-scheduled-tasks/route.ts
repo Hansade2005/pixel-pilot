@@ -174,17 +174,83 @@ Your capabilities:
 - Search the web for current information
 - Extract content from web pages
 - Analyze and summarize findings
-- Provide structured reports
+- Provide structured, detailed reports
 
 Rules:
-- Be concise and factual
 - Always cite sources with URLs when using web search
 - If the task asks for monitoring/checking something, clearly state current status
-- Format output in clean markdown
 - Do NOT generate code or modify any files - you are research-only
 - Complete the task in as few tool calls as possible (max 30)
-- IMPORTANT: When you have finished your research, you MUST call the save_result tool with your complete findings formatted in markdown. This is required to save the task output. Never skip calling save_result.
-- Current time: ${new Date().toISOString()}`,
+- IMPORTANT: When you have finished your research, you MUST call the save_result tool with your complete findings. This is required to save the task output. Never skip calling save_result.
+- Current time: ${new Date().toISOString()}
+
+## RESULT FORMATTING (MANDATORY)
+Your output saved via save_result MUST be a detailed, well-structured, presentable markdown document. Follow these rules strictly:
+
+### Structure Requirements:
+1. **Title**: Start with a clear \`# Title\` heading that describes the research topic or task
+2. **Executive Summary**: A brief introductory paragraph (3-5 sentences) summarizing the key findings upfront
+3. **Sections**: Organize content into \`## Sections\` and \`### Subsections\` with clear, descriptive headers
+4. **Detailed Paragraphs**: Each section MUST contain substantive paragraphs (not just bullet points). Provide context, explanations, and real-world implications. Minimum 2-3 sentences per paragraph.
+5. **Tables**: Use markdown tables (\`| Column | Column |\`) whenever comparing features, data points, metrics, options, or any multi-attribute information. Every research result should include at least one table.
+6. **Images**: When relevant, embed illustrative images using: \`![Description](https://api.a0.dev/assets/image?text={description}&aspect=16:9)\`
+7. **Bullet & Numbered Lists**: Use bullet points for features/items and numbered lists for sequential steps, rankings, or priorities
+8. **Blockquotes**: Use \`>\` blockquotes for key takeaways, important warnings, or notable quotes from sources
+9. **Bold & Emphasis**: Use **bold** for key terms, metrics, and important data points. Use *italics* for definitions or emphasis.
+10. **Horizontal Rules**: Use \`---\` to separate major sections for visual clarity
+
+### Content Depth:
+- **Minimum 400 words** for any task result
+- Include specific data points, numbers, statistics, dates, and facts - never be vague
+- For comparisons: MUST include a comparison table with clear columns
+- For monitoring tasks: include a status table with current values and any changes detected
+- For research tasks: minimum 4 sections with detailed analysis
+
+### Mandatory Sections:
+- \`# [Task Title]\` - Clear, descriptive title
+- \`> **Summary:** [1-2 sentence executive summary]\`
+- Main content sections with \`##\` headings
+- At least one markdown table with relevant data
+- \`## Key Takeaways\` - Bulleted list of the most important findings
+- \`## Sources\` - List all web sources used as \`- [Source Title](URL)\`
+
+### Example Structure:
+\`\`\`
+# [Research Topic]
+
+> **Summary:** [Brief executive summary of findings...]
+
+---
+
+## Overview
+[Detailed contextual paragraph...]
+
+## Key Findings
+
+### [Finding 1]
+[Detailed paragraph with data points...]
+
+| Metric | Value | Change |
+|--------|-------|--------|
+| ...    | ...   | ...    |
+
+### [Finding 2]
+[Detailed paragraph...]
+
+> **Important:** [Key takeaway in blockquote]
+
+## Analysis
+[Deep analysis paragraphs...]
+
+## Key Takeaways
+- [Takeaway 1]
+- [Takeaway 2]
+- [Takeaway 3]
+
+## Sources
+- [Source 1](url)
+- [Source 2](url)
+\`\`\``,
       messages: [
         { role: 'user', content: prompt }
       ],
@@ -208,9 +274,9 @@ Rules:
           }
         }),
         save_result: tool({
-          description: 'Save the final task result. You MUST call this tool at the end of every task with your complete findings formatted in markdown. This is how the results get stored and displayed to the user.',
+          description: 'Save the final task result. You MUST call this tool at the end of every task with your complete findings as a rich, detailed markdown document. This is how the results get stored and displayed to the user. The result must include: a # title, executive summary blockquote, ## sections with detailed paragraphs, at least one markdown table, ## Key Takeaways, and ## Sources.',
           parameters: z.object({
-            result: z.string().describe('The complete task result in markdown format. Include headings, bullet points, links, and any relevant data you gathered.')
+            result: z.string().describe('The complete task result as a detailed markdown document. MUST include: # Title, > Summary blockquote, ## sections with paragraphs (not just bullets), at least one | table |, ## Key Takeaways, and ## Sources with [Name](URL) links. Minimum 400 words.')
           }),
           execute: async ({ result: markdown }) => {
             // Save directly to DB so the result persists even if the function times out later

@@ -46,6 +46,8 @@ import {
   X,
   Hash,
   Timer,
+  Download,
+  FileJson,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Response } from "@/components/ai-elements/response"
@@ -396,6 +398,64 @@ function ScheduledTasksContent() {
     setShowDialog(true)
   }
 
+  const downloadResultAsMarkdown = (exec: TaskExecution, taskName: string) => {
+    if (!exec.output) return
+    const timestamp = new Date(exec.started_at).toISOString().replace(/[:.]/g, "-")
+    const duration = exec.duration_ms ? `${(exec.duration_ms / 1000).toFixed(1)}s` : "N/A"
+
+    let markdown = exec.output
+    markdown += `\n\n---\n\n`
+    markdown += `| Detail | Value |\n|--------|-------|\n`
+    markdown += `| Task | ${taskName} |\n`
+    markdown += `| Status | ${exec.status} |\n`
+    markdown += `| Executed | ${new Date(exec.started_at).toLocaleString()} |\n`
+    markdown += `| Duration | ${duration} |\n\n`
+    markdown += `*Exported from PiPilot Scheduled Tasks*\n`
+
+    const blob = new Blob([markdown], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `task-result-${timestamp}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadResultAsJSON = (exec: TaskExecution, taskName: string) => {
+    if (!exec.output) return
+    const timestamp = new Date(exec.started_at).toISOString().replace(/[:.]/g, "-")
+
+    const jsonData = {
+      task: {
+        name: taskName,
+        executionId: exec.id,
+        taskId: exec.task_id,
+      },
+      execution: {
+        status: exec.status,
+        startedAt: exec.started_at,
+        completedAt: exec.completed_at,
+        durationMs: exec.duration_ms,
+      },
+      result: exec.output,
+      error: exec.error_message || null,
+      exportedFrom: "PiPilot Scheduled Tasks",
+      exportedAt: new Date().toISOString(),
+    }
+
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `task-result-${timestamp}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const statusBadge = (status: string) => {
     switch (status) {
       case "completed":
@@ -716,6 +776,35 @@ function ScheduledTasksContent() {
                                   </button>
                                   {isExpanded && (exec.output || exec.error_message) && (
                                     <div className="px-2.5 pb-3 pt-1 border-t border-gray-700/40 mx-2.5">
+                                      {/* Download buttons */}
+                                      {exec.output && (
+                                        <div className="flex items-center gap-1.5 mt-1.5 mb-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              downloadResultAsMarkdown(exec, task.name)
+                                            }}
+                                            className="h-6 px-2 text-[10px] text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 gap-1"
+                                          >
+                                            <Download className="h-3 w-3" />
+                                            Download MD
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              downloadResultAsJSON(exec, task.name)
+                                            }}
+                                            className="h-6 px-2 text-[10px] text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 gap-1"
+                                          >
+                                            <FileJson className="h-3 w-3" />
+                                            Download JSON
+                                          </Button>
+                                        </div>
+                                      )}
                                       {exec.output && (
                                         <div className="text-sm text-gray-300 mt-2">
                                           <Response>
