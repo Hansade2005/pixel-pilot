@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText, tool } from 'ai'
+import { generateText, tool, stepCountIs } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 import { z } from 'zod'
 
@@ -163,7 +163,6 @@ async function executeTask(task: any): Promise<{ output: string; error: string |
   try {
     const result = await generateText({
       model,
-      maxTokens: 2048,
       temperature: 0.4,
       system: `You are a research assistant for PiPilot, an AI-powered app builder. You execute scheduled tasks that involve research, information gathering, monitoring, and analysis.
 
@@ -215,7 +214,7 @@ Rules:
           }
         }),
       },
-      maxSteps: 30,
+      stopWhen: stepCountIs(10),
     })
 
     // Prefer the explicitly saved result from save_result tool, fall back to result.text
