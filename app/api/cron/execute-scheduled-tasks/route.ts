@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText, tool } from 'ai'
+import { generateText, tool, stepCountIs } from 'ai'
 import { createMistral } from '@ai-sdk/mistral'
 import { z } from 'zod'
 
@@ -157,10 +157,12 @@ async function executeTask(task: any): Promise<{ output: string; error: string |
 
   const model = mistralProvider('mistral-small-latest')
 
+  // Capture the result from the save_result tool call
+  let savedResult: string | null = null
+
   try {
     const result = await generateText({
       model,
-      maxTokens: 2048,
       temperature: 0.4,
       system: `You are a research assistant for PiPilot, an AI-powered app builder. You execute scheduled tasks that involve research, information gathering, monitoring, and analysis.
 
@@ -177,6 +179,7 @@ Rules:
 - Format output in clean markdown
 - Do NOT generate code or modify any files - you are research-only
 - Complete the task in as few tool calls as possible (max 3)
+- IMPORTANT: When you have finished your research, you MUST call the save_result tool with your complete findings formatted in markdown. This is required to save the task output. Never skip calling save_result.
 - Current time: ${new Date().toISOString()}`,
       messages: [
         { role: 'user', content: prompt }
@@ -200,14 +203,29 @@ Rules:
             return await extractWebContent(url)
           }
         }),
+        save_result: tool({
+          description: 'Save the final task result. You MUST call this tool at the end of every task with your complete findings formatted in markdown. This is how the results get stored and displayed to the user.',
+          parameters: z.object({
+            result: z.string().describe('The complete task result in markdown format. Include headings, bullet points, links, and any relevant data you gathered.')
+          }),
+          execute: async ({ result: markdown }) => {
+            savedResult = markdown
+            return 'Result saved successfully.'
+          }
+        }),
       },
-      maxSteps: 30,
+      stopWhen: stepCountIs(10),
     })
 
-    const output = result.text || 'Task completed with no output.'
+    // Prefer the explicitly saved result from save_result tool, fall back to result.text
+    const output = savedResult || result.text || 'Task completed with no output.'
     return { output, error: null }
   } catch (err: any) {
     console.error(`[ScheduledTasks] AI execution error for task ${task.id}:`, err)
+    // Still return savedResult if the tool was called before the error
+    if (savedResult) {
+      return { output: savedResult, error: null }
+    }
     return { output: '', error: err.message || 'AI execution failed' }
   }
 }
@@ -281,11 +299,11 @@ export async function GET(request: NextRequest) {
       // 2. Execute the task
       const { output, error: execError } = await executeTask(task)
       const completedAt = new Date().toISOString()
+      const durationMs = Date.now() - taskStartTime
       const status = execError ? 'failed' : 'success'
 
       // 3. Update execution record
-      const durationMs = Date.now() - taskStartTime
-      await supabase
+      const { error: updateExecError } = await supabase
         .from('task_executions')
         .update({
           status,
@@ -296,9 +314,13 @@ export async function GET(request: NextRequest) {
         })
         .eq('id', execution.id)
 
+      if (updateExecError) {
+        console.error(`[ScheduledTasks] Failed to update execution ${execution.id}:`, updateExecError)
+      }
+
       // 4. Update the task: increment count, set last_executed, recalculate next
       const nextExecution = getNextExecution(task.cron_expression)
-      await supabase
+      const { error: updateTaskError } = await supabase
         .from('scheduled_tasks')
         .update({
           execution_count: (task.execution_count || 0) + 1,
@@ -307,6 +329,10 @@ export async function GET(request: NextRequest) {
           updated_at: completedAt,
         })
         .eq('id', task.id)
+
+      if (updateTaskError) {
+        console.error(`[ScheduledTasks] Failed to update task ${task.id}:`, updateTaskError)
+      }
 
       results.push({
         taskId: task.id,
