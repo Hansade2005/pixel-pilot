@@ -22,7 +22,8 @@ let _mistralGatewayProvider: ReturnType<typeof createMistral> | null = null;
 let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
-let _ollamaCloudProvider: ReturnType<typeof createOllama> | null = null;
+// Ollama API key rotation: supports comma-separated keys in OLLAMA_API_KEY
+let _ollamaKeyIndex = 0;
 // Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
 let _bonsaiKeyIndex = 0;
 
@@ -116,13 +117,12 @@ function getOpenRouterProvider() {
 }
 
 function getOllamaCloudProvider() {
-  if (!_ollamaCloudProvider) {
-    _ollamaCloudProvider = createOllama({
-      baseURL: 'https://ollama.com/api',
-      apiKey: process.env.OLLAMA_API_KEY || '',
-    });
-  }
-  return _ollamaCloudProvider;
+  // Always create a fresh provider to pick the next rotated key.
+  // When only one key is configured this is equivalent to caching.
+  return createOllama({
+    baseURL: 'https://ollama.com/api',
+    apiKey: getNextOllamaKey(),
+  });
 }
 
 /**
@@ -136,6 +136,20 @@ export function getNextBonsaiKey(): string {
   if (keys.length === 0) return '';
   const key = keys[_bonsaiKeyIndex % keys.length];
   _bonsaiKeyIndex = (_bonsaiKeyIndex + 1) % keys.length;
+  return key;
+}
+
+/**
+ * Get the next Ollama API key using round-robin rotation.
+ * Supports comma-separated keys in OLLAMA_API_KEY env var.
+ * e.g. OLLAMA_API_KEY="key1,key2,key3"
+ */
+export function getNextOllamaKey(): string {
+  const raw = process.env.OLLAMA_API_KEY || '';
+  const keys = raw.split(',').map(k => k.trim()).filter(Boolean);
+  if (keys.length === 0) return '';
+  const key = keys[_ollamaKeyIndex % keys.length];
+  _ollamaKeyIndex = (_ollamaKeyIndex + 1) % keys.length;
   return key;
 }
 
