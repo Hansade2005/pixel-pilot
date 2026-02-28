@@ -71,6 +71,7 @@
     "@vercel/sdk": "^1.10.4",
     "ai": "^5.0.133",
     "ai-json-fixer": "^0.2.0",
+    "ai-sdk-ollama": "^2.2.0",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
