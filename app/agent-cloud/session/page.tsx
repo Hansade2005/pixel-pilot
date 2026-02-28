@@ -36,8 +36,9 @@ import {
   Monitor,
   X,
   Trash2,
+  Key,
 } from "lucide-react"
-import { useAgentCloud, MODELS, DEFAULT_MCPS, DEFAULT_CONNECTORS, type TerminalLine, type CustomMcpServer } from "../layout"
+import { useAgentCloud, MODELS, DEFAULT_MCPS, DEFAULT_CONNECTORS, AGENT_CLOUD_BYOK_PROVIDERS, type TerminalLine, type CustomMcpServer } from "../layout"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -265,6 +266,10 @@ function SessionPageInner() {
     selectedModel,
     setSelectedModel,
     loadSessionMessages,
+    byokEnabled,
+    setByokEnabled,
+    byokKeys,
+    setByokKeys,
   } = useAgentCloud()
 
   const [prompt, setPrompt] = useState('')
@@ -279,7 +284,7 @@ function SessionPageInner() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showCommandMenu, setShowCommandMenu] = useState(false)
-  const [commandMenuView, setCommandMenuView] = useState<'main' | 'mcp' | 'add-mcp'>('main')
+  const [commandMenuView, setCommandMenuView] = useState<'main' | 'mcp' | 'add-mcp' | 'byok' | 'add-byok'>('main')
   const [mcpToggles, setMcpToggles] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DEFAULT_MCPS.map(mcp => [mcp.id, true]))
   )
@@ -287,6 +292,8 @@ function SessionPageInner() {
   const [newMcpUrl, setNewMcpUrl] = useState('')
   const [newMcpHeaderKey, setNewMcpHeaderKey] = useState('')
   const [newMcpHeaderValue, setNewMcpHeaderValue] = useState('')
+  const [newByokProvider, setNewByokProvider] = useState('')
+  const [newByokKey, setNewByokKey] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
   const abortControllerRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -2123,6 +2130,21 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                                 <ChevronRight className="size-3.5" />
                               </span>
                             </button>
+
+                            {/* API Keys (BYOK) - drill into submenu */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+                              onClick={() => setCommandMenuView('byok')}
+                            >
+                              <Key className="size-4 text-gray-400" />
+                              <span>API Keys</span>
+                              <span className="ml-auto flex items-center gap-1.5 text-[11px] text-gray-500">
+                                {byokKeys.filter(k => k.enabled).length > 0 ? (
+                                  <span className={byokEnabled ? 'text-orange-400' : ''}>{byokKeys.filter(k => k.enabled).length}</span>
+                                ) : '0'}
+                                <ChevronRight className="size-3.5" />
+                              </span>
+                            </button>
                           </>
                         ) : commandMenuView === 'mcp' ? (
                           <>
@@ -2325,6 +2347,170 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                                 className="w-full py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                               >
                                 Add Server
+                              </button>
+                            </div>
+                          </>
+                        ) : commandMenuView === 'byok' ? (
+                          <>
+                            {/* BYOK API Keys submenu */}
+                            <button
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                              onClick={() => setCommandMenuView('main')}
+                            >
+                              <ChevronLeft className="size-4" />
+                              <span className="font-medium">API Keys</span>
+                              {byokKeys.length > 0 && (
+                                <div className="ml-auto flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-500">{byokEnabled ? 'On' : 'Off'}</span>
+                                  <Switch
+                                    checked={byokEnabled}
+                                    onCheckedChange={setByokEnabled}
+                                    className="h-4 w-7 flex-shrink-0 data-[state=checked]:bg-orange-600"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                              )}
+                            </button>
+                            <div className="max-h-[340px] overflow-y-auto">
+                              {/* Configured keys */}
+                              <div className="px-4 pt-2.5 pb-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Your Keys</span>
+                                  {AGENT_CLOUD_BYOK_PROVIDERS.filter(p => !byokKeys.some(k => k.providerId === p.id)).length > 0 && (
+                                    <button
+                                      onClick={() => setCommandMenuView('add-byok')}
+                                      className="text-[10px] text-orange-400 hover:text-orange-300 transition-colors"
+                                    >
+                                      + Add
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {byokKeys.length === 0 ? (
+                                <div className="px-4 py-3 text-center">
+                                  <Key className="size-4 text-gray-700 mx-auto mb-1.5" />
+                                  <p className="text-[10px] text-gray-600">No API keys added yet</p>
+                                  <p className="text-[10px] text-gray-700 mt-0.5">Add your own keys to bypass platform credits</p>
+                                </div>
+                              ) : (
+                                byokKeys.map(key => {
+                                  const provider = AGENT_CLOUD_BYOK_PROVIDERS.find(p => p.id === key.providerId)
+                                  const masked = key.apiKey.length >= 8
+                                    ? key.apiKey.slice(0, 4) + '****' + key.apiKey.slice(-4)
+                                    : '****'
+                                  return (
+                                    <div
+                                      key={key.providerId}
+                                      className="flex items-center hover:bg-gray-800 transition-colors group"
+                                    >
+                                      <button
+                                        className="flex-1 flex items-center gap-3 px-4 py-2 text-sm text-gray-200 min-w-0"
+                                        onClick={() => {
+                                          setByokKeys(prev => prev.map(k =>
+                                            k.providerId === key.providerId ? { ...k, enabled: !k.enabled } : k
+                                          ))
+                                        }}
+                                      >
+                                        <Key className={`size-4 flex-shrink-0 ${key.enabled && byokEnabled ? 'text-orange-400' : 'text-gray-500'}`} />
+                                        <div className="text-left min-w-0 flex-1">
+                                          <span className={`truncate block ${key.enabled && byokEnabled ? 'text-gray-200' : 'text-gray-500'}`}>
+                                            {provider?.name || key.providerId}
+                                          </span>
+                                          <div className="text-[10px] text-gray-600 truncate font-mono">{masked}</div>
+                                        </div>
+                                      </button>
+                                      <div className="pr-2 flex items-center gap-1">
+                                        <Switch
+                                          checked={key.enabled}
+                                          onCheckedChange={(checked) => {
+                                            setByokKeys(prev => prev.map(k =>
+                                              k.providerId === key.providerId ? { ...k, enabled: checked } : k
+                                            ))
+                                          }}
+                                          className="h-4 w-7 flex-shrink-0 data-[state=checked]:bg-orange-600"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <button
+                                          onClick={() => setByokKeys(prev => prev.filter(k => k.providerId !== key.providerId))}
+                                          className="p-1 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                        >
+                                          <Trash2 className="size-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              )}
+                            </div>
+                          </>
+                        ) : commandMenuView === 'add-byok' ? (
+                          <>
+                            {/* Add BYOK Key form */}
+                            <button
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 transition-colors border-b border-gray-700/50"
+                              onClick={() => { setCommandMenuView('byok'); setNewByokProvider(''); setNewByokKey('') }}
+                            >
+                              <ChevronLeft className="size-4" />
+                              <span className="font-medium">Add API Key</span>
+                            </button>
+                            <div className="p-3 space-y-2.5">
+                              <div>
+                                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Provider</label>
+                                <select
+                                  value={newByokProvider}
+                                  onChange={(e) => setNewByokProvider(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                >
+                                  <option value="" className="text-gray-500">Select a provider...</option>
+                                  {AGENT_CLOUD_BYOK_PROVIDERS
+                                    .filter(p => !byokKeys.some(k => k.providerId === p.id))
+                                    .map(p => (
+                                      <option key={p.id} value={p.id}>{p.name} - {p.description}</option>
+                                    ))
+                                  }
+                                </select>
+                              </div>
+                              {newByokProvider && (
+                                <div>
+                                  <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">API Key</label>
+                                  <input
+                                    type="password"
+                                    value={newByokKey}
+                                    onChange={(e) => setNewByokKey(e.target.value)}
+                                    placeholder={AGENT_CLOUD_BYOK_PROVIDERS.find(p => p.id === newByokProvider)?.placeholder || 'Enter API key...'}
+                                    className="w-full px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-md text-sm text-gray-200 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                                  />
+                                </div>
+                              )}
+                              <button
+                                disabled={!newByokProvider || !newByokKey.trim()}
+                                onClick={() => {
+                                  if (!newByokProvider || !newByokKey.trim()) return
+                                  const provider = AGENT_CLOUD_BYOK_PROVIDERS.find(p => p.id === newByokProvider)
+                                  setByokKeys(prev => {
+                                    const existing = prev.findIndex(k => k.providerId === newByokProvider)
+                                    const newEntry = {
+                                      providerId: newByokProvider,
+                                      apiKey: newByokKey.trim(),
+                                      enabled: true,
+                                      label: provider?.name || newByokProvider,
+                                      addedAt: new Date().toISOString(),
+                                    }
+                                    if (existing >= 0) {
+                                      const updated = [...prev]
+                                      updated[existing] = newEntry
+                                      return updated
+                                    }
+                                    return [...prev, newEntry]
+                                  })
+                                  setByokEnabled(true)
+                                  setNewByokProvider('')
+                                  setNewByokKey('')
+                                  setCommandMenuView('byok')
+                                }}
+                                className="w-full py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Add Key
                               </button>
                             </div>
                           </>
