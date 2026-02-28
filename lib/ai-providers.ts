@@ -429,6 +429,7 @@ export interface ByokKeySet {
   ollama?: string
   openrouter?: string
   'vercel-gateway'?: string
+  bonsai?: string
   // Custom providers: keyed by custom provider ID
   [key: string]: string | undefined | {
     apiKey: string
@@ -460,6 +461,9 @@ export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): stri
       return key // Custom provider ID
     }
   }
+
+  // Bonsai as universal fallback (can handle any model via gateway)
+  if (byokKeys.bonsai) return 'bonsai'
 
   // OpenRouter as universal fallback (can handle any model)
   if (byokKeys.openrouter) return 'openrouter'
@@ -550,6 +554,14 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       })
       const bare = stripPrefix(modelId, 'ollama/')
       return provider(bare)
+    }
+    case 'bonsai': {
+      // Bonsai uses Anthropic-compatible API at go.trybons.ai
+      const provider = createAnthropic({
+        apiKey,
+        baseURL: 'https://go.trybons.ai',
+      })
+      return provider(modelId)
     }
     case 'openrouter': {
       const provider = createOpenAICompatible({
