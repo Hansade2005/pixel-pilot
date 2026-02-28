@@ -3,7 +3,6 @@ import { createMistral } from '@ai-sdk/mistral';
 import { createXai } from '@ai-sdk/xai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOllama } from 'ai-sdk-ollama';
 
 // =============================================================================
 // PROVIDER FACTORIES (lazy - created on first use to avoid webpack TDZ issues)
@@ -119,7 +118,8 @@ function getOpenRouterProvider() {
 function getOllamaCloudProvider() {
   // Always create a fresh provider to pick the next rotated key.
   // When only one key is configured this is equivalent to caching.
-  return createOllama({
+  return createOpenAICompatible({
+    name: 'ollama-cloud',
     baseURL: 'https://ollama.com/api',
     apiKey: getNextOllamaKey(),
   });
@@ -543,7 +543,8 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       return provider(bare)
     }
     case 'ollama': {
-      const provider = createOllama({
+      const provider = createOpenAICompatible({
+        name: 'byok-ollama',
         baseURL: 'https://ollama.com/api',
         apiKey,
       })
