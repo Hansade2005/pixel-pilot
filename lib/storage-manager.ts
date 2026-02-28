@@ -373,7 +373,6 @@ export const BYOK_PROVIDERS = [
   { id: 'ollama', name: 'Ollama Cloud', placeholder: 'your-ollama-key', description: 'Kimi, DeepSeek, GLM, MiniMax via Ollama' },
   { id: 'openrouter', name: 'OpenRouter', placeholder: 'sk-or-v1-...', description: 'Access 100+ models via proxy' },
   { id: 'vercel-gateway', name: 'Vercel AI Gateway', placeholder: 'your-gateway-key', description: 'Your own Vercel AI Gateway' },
-  { id: 'bonsai', name: 'Bonsai', placeholder: 'your-bonsai-key', description: 'Access all models via Bonsai gateway' },
 ] as const
 
 // Tool execution tracking interface for preventing duplicate executions
