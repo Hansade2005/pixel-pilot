@@ -231,12 +231,6 @@ export const MODELS = [
 
 // BYOK provider definitions for Agent Cloud
 export const AGENT_CLOUD_BYOK_PROVIDERS = [
-  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...', description: 'Use your own Anthropic key for Claude models' },
-  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...', description: 'Use your own OpenAI key for GPT models' },
-  { id: 'openrouter', name: 'OpenRouter', placeholder: 'sk-or-v1-...', description: 'Access 100+ models via your OpenRouter key' },
-  { id: 'google', name: 'Google AI', placeholder: 'AIza...', description: 'Gemini models via your Google API key' },
-  { id: 'mistral', name: 'Mistral', placeholder: 'your-mistral-key', description: 'Devstral, Codestral, Pixtral' },
-  { id: 'xai', name: 'xAI', placeholder: 'xai-...', description: 'Grok models via your xAI key' },
   { id: 'bonsai', name: 'Bonsai', placeholder: 'your-bonsai-key', description: 'Access all models via your Bonsai gateway key' },
 ]
 
