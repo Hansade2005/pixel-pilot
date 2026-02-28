@@ -1,12 +1,14 @@
 import { streamText, tool, stepCountIs } from 'ai'
-import { createMistral } from '@ai-sdk/mistral'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { z } from 'zod'
 import { promises as fs } from 'fs'
 import path from 'path'
 
-// Create Mistral provider for Pixtral (supports vision)
-const mistralProvider = createMistral({
-  apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
+// Use Devstral Small via Vercel AI Gateway (replaces rate-limited Pixtral)
+const vercelGateway = createOpenAICompatible({
+  name: 'vercel-gateway',
+  baseURL: 'https://ai-gateway.vercel.sh/v1',
+  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
 })
 
 // Interface for docs.json structure
@@ -602,8 +604,8 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json() as { messages: Message[] }
 
-    // Get Mistral Pixtral model (supports vision)
-    const model = mistralProvider('pixtral-12b-2409')
+    // Use Devstral Small via Vercel AI Gateway
+    const model = vercelGateway('mistral/devstral-small-2')
 
     // Load docs data for tools
     const docsData = await loadDocsData()
@@ -626,7 +628,7 @@ IMPORTANT GUIDELINES:
 10. When users share screenshots, carefully analyze them to understand their issue and provide specific help
 
 SUPPORTED AI MODELS (from Knowledge Base):
-- **Mistral Pixtral**: Advanced vision and language processing (used for this chat)
+- **Devstral Small**: Fast code and language processing (used for this chat)
 - **Grok Code Fast 1**: Specialized fast code generation
 - **Claude Sonnet 4.5**: High-quality code generation and analysis
 
