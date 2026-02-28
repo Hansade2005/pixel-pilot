@@ -16,16 +16,18 @@ import {
   Server,
   Plus,
   Trash2,
+  Key,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { useAgentCloud, DEFAULT_MCPS, ConnectorConfig, CustomMcpServer } from "../layout"
+import { useAgentCloud, DEFAULT_MCPS, AGENT_CLOUD_BYOK_PROVIDERS, ConnectorConfig, CustomMcpServer } from "../layout"
+import type { AgentCloudByokKey } from "@/lib/agent-cloud-storage"
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export default function SettingsPage() {
   usePageTitle('Agent Cloud Settings')
   const router = useRouter()
-  const { connectors, setConnectors, storedTokens, customMcpServers, setCustomMcpServers } = useAgentCloud()
+  const { connectors, setConnectors, storedTokens, customMcpServers, setCustomMcpServers, byokEnabled, setByokEnabled, byokKeys, setByokKeys } = useAgentCloud()
 
   // Custom MCP form state
   const [showAddMcp, setShowAddMcp] = useState(false)
@@ -58,6 +60,63 @@ export default function SettingsPage() {
     setCustomMcpServers(prev => prev.filter(s => s.id !== id))
     toast.success('Custom MCP server removed')
   }
+
+  // BYOK form state
+  const [showAddByok, setShowAddByok] = useState(false)
+  const [newByokProvider, setNewByokProvider] = useState('')
+  const [newByokKey, setNewByokKey] = useState('')
+
+  // Mask API key for display
+  const maskKey = (key: string) => {
+    if (!key || key.length < 8) return '****'
+    return key.slice(0, 4) + '****' + key.slice(-4)
+  }
+
+  const addByokKey = () => {
+    if (!newByokProvider || !newByokKey.trim()) return
+
+    const provider = AGENT_CLOUD_BYOK_PROVIDERS.find(p => p.id === newByokProvider)
+    const newKey: AgentCloudByokKey = {
+      providerId: newByokProvider,
+      apiKey: newByokKey.trim(),
+      enabled: true,
+      label: provider?.name || newByokProvider,
+      addedAt: new Date().toISOString(),
+    }
+
+    setByokKeys(prev => {
+      // Replace if provider already exists, otherwise add
+      const existing = prev.findIndex(k => k.providerId === newByokProvider)
+      if (existing >= 0) {
+        const updated = [...prev]
+        updated[existing] = newKey
+        return updated
+      }
+      return [...prev, newKey]
+    })
+
+    setNewByokProvider('')
+    setNewByokKey('')
+    setShowAddByok(false)
+    setByokEnabled(true)
+    toast.success(`Added ${provider?.name || newByokProvider} API key`)
+  }
+
+  const removeByokKey = (providerId: string) => {
+    setByokKeys(prev => prev.filter(k => k.providerId !== providerId))
+    toast.success('API key removed')
+  }
+
+  const toggleByokKey = (providerId: string) => {
+    setByokKeys(prev => prev.map(k =>
+      k.providerId === providerId ? { ...k, enabled: !k.enabled } : k
+    ))
+  }
+
+  // Providers not yet added
+  const availableProviders = AGENT_CLOUD_BYOK_PROVIDERS.filter(
+    p => !byokKeys.some(k => k.providerId === p.id)
+  )
 
   // User info
   const [userEmail, setUserEmail] = useState<string>('')
@@ -191,6 +250,176 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* BYOK Section */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wide">API Keys (BYOK)</h2>
+              <p className="text-xs text-zinc-600 mt-0.5">Bring your own API keys to use your preferred AI providers</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {byokKeys.length > 0 && (
+                <Badge className="text-[10px] bg-orange-500/10 text-orange-400 border-orange-500/20">
+                  {byokKeys.filter(k => k.enabled).length} active
+                </Badge>
+              )}
+              {/* Global BYOK toggle */}
+              {byokKeys.length > 0 && (
+                <button
+                  onClick={() => setByokEnabled(!byokEnabled)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                    byokEnabled ? 'bg-orange-500' : 'bg-zinc-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                      byokEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+            {/* Existing BYOK keys */}
+            {byokKeys.length > 0 ? (
+              <div className="divide-y divide-zinc-800/50">
+                {byokKeys.map(key => {
+                  const provider = AGENT_CLOUD_BYOK_PROVIDERS.find(p => p.id === key.providerId)
+                  const fieldId = `byok-${key.providerId}`
+                  const isVisible = visibleFields.has(fieldId)
+                  return (
+                    <div key={key.providerId} className="px-4 py-3 hover:bg-zinc-800/30 transition-colors group">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Key className={`h-4 w-4 shrink-0 ${key.enabled && byokEnabled ? 'text-orange-400' : 'text-zinc-500'}`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-zinc-200">{provider?.name || key.providerId}</span>
+                              {key.enabled && byokEnabled && (
+                                <Badge className="text-[9px] px-1.5 py-0 bg-green-500/10 text-green-400 border-green-500/20">Active</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-[11px] text-zinc-500 font-mono">
+                                {isVisible ? key.apiKey : maskKey(key.apiKey)}
+                              </span>
+                              <button
+                                onClick={() => toggleFieldVisibility('byok', key.providerId)}
+                                className="text-zinc-600 hover:text-zinc-400 p-0.5"
+                              >
+                                {isVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Per-key toggle */}
+                          <button
+                            onClick={() => toggleByokKey(key.providerId)}
+                            className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                              key.enabled ? 'bg-orange-500' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                key.enabled ? 'translate-x-[13px]' : 'translate-x-[2px]'
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={() => removeByokKey(key.providerId)}
+                            className="p-1.5 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : !showAddByok ? (
+              <div className="px-4 py-6 text-center">
+                <Key className="h-5 w-5 text-zinc-700 mx-auto mb-2" />
+                <p className="text-xs text-zinc-600">No API keys added yet</p>
+                <p className="text-[11px] text-zinc-700 mt-1">Add your own keys to bypass platform credits</p>
+              </div>
+            ) : null}
+
+            {/* Add key form */}
+            {showAddByok ? (
+              <div className="p-4 border-t border-zinc-800/50 space-y-3">
+                <div>
+                  <label className="text-[11px] text-zinc-500 font-medium mb-1 block">Provider</label>
+                  <select
+                    value={newByokProvider}
+                    onChange={(e) => setNewByokProvider(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                  >
+                    <option value="" className="text-zinc-500">Select a provider...</option>
+                    {availableProviders.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} - {p.description}</option>
+                    ))}
+                  </select>
+                </div>
+                {newByokProvider && (
+                  <div>
+                    <label className="text-[11px] text-zinc-500 font-medium mb-1 block">API Key</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={newByokKey}
+                        onChange={(e) => setNewByokKey(e.target.value)}
+                        placeholder={AGENT_CLOUD_BYOK_PROVIDERS.find(p => p.id === newByokProvider)?.placeholder || 'Enter API key...'}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    onClick={addByokKey}
+                    disabled={!newByokProvider || !newByokKey.trim()}
+                    className="bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm h-8 px-4"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Key
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setShowAddByok(false)
+                      setNewByokProvider('')
+                      setNewByokKey('')
+                    }}
+                    className="text-zinc-500 hover:text-zinc-300 text-sm h-8"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : availableProviders.length > 0 ? (
+              <div className="p-3 border-t border-zinc-800/50">
+                <button
+                  onClick={() => setShowAddByok(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 border border-dashed border-zinc-700 hover:border-orange-500/30 transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add API Key
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {byokEnabled && byokKeys.length > 0 && (
+            <p className="text-[11px] text-zinc-600 mt-2">
+              When BYOK is enabled, Agent Cloud will use your API keys directly instead of consuming platform credits. Keys are stored securely in your account.
+            </p>
+          )}
         </section>
 
         {/* Default MCPs Section */}

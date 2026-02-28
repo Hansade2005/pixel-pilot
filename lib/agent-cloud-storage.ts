@@ -13,6 +13,18 @@ import { createAgentCloudClient } from '@/lib/supabase/agent-cloud-client'
 import type { Session, TerminalLine, ConnectorConfig, CustomMcpServer } from '@/app/agent-cloud/layout'
 import { saveImages, loadImagesBySession, deleteImagesBySession } from '@/lib/agent-cloud-image-db'
 
+// BYOK key type for Agent Cloud
+export interface AgentCloudByokKey {
+  providerId: string
+  apiKey: string
+  enabled: boolean
+  label?: string
+  baseUrl?: string
+  providerType?: 'openai-compatible' | 'anthropic-compatible'
+  addedAt: string
+  lastUsedAt?: string
+}
+
 // Database types
 interface DbSession {
   id: string
@@ -542,6 +554,154 @@ class AgentCloudStorage {
       return true
     } catch (error) {
       console.error('[AgentCloudStorage] Error in saveCustomMcpServers:', error)
+      return false
+    }
+  }
+
+  // =========================================================================
+  // BYOK (Bring Your Own Key) methods
+  // =========================================================================
+
+  /**
+   * Load BYOK keys for the current user
+   */
+  async loadByokKeys(): Promise<AgentCloudByokKey[]> {
+    const userId = await this.getUserId()
+    if (!userId) return []
+
+    try {
+      const { data, error } = await this.storageClient
+        .from('agent_cloud_byok_keys')
+        .select('*')
+        .eq('user_id', userId)
+        .order('added_at', { ascending: true })
+
+      if (error) {
+        console.error('[AgentCloudStorage] Error loading BYOK keys:', error)
+        return []
+      }
+
+      return (data || []).map(row => ({
+        providerId: row.provider_id,
+        apiKey: row.encrypted_api_key,
+        enabled: row.enabled ?? true,
+        label: row.label || undefined,
+        baseUrl: row.base_url || undefined,
+        providerType: (row.provider_type as 'openai-compatible' | 'anthropic-compatible') || 'openai-compatible',
+        addedAt: row.added_at,
+        lastUsedAt: row.last_used_at || undefined,
+      }))
+    } catch (error) {
+      console.error('[AgentCloudStorage] Error in loadByokKeys:', error)
+      return []
+    }
+  }
+
+  /**
+   * Save (upsert) a single BYOK key
+   */
+  async saveByokKey(key: AgentCloudByokKey): Promise<boolean> {
+    const userId = await this.getUserId()
+    if (!userId) return false
+
+    try {
+      const { error } = await this.storageClient
+        .from('agent_cloud_byok_keys')
+        .upsert({
+          user_id: userId,
+          provider_id: key.providerId,
+          encrypted_api_key: key.apiKey,
+          enabled: key.enabled,
+          label: key.label || null,
+          base_url: key.baseUrl || null,
+          provider_type: key.providerType || 'openai-compatible',
+        }, {
+          onConflict: 'user_id,provider_id',
+        })
+
+      if (error) {
+        console.error('[AgentCloudStorage] Error saving BYOK key:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('[AgentCloudStorage] Error in saveByokKey:', error)
+      return false
+    }
+  }
+
+  /**
+   * Save all BYOK keys at once (upsert)
+   */
+  async saveAllByokKeys(keys: AgentCloudByokKey[]): Promise<boolean> {
+    const userId = await this.getUserId()
+    if (!userId) return false
+
+    try {
+      // Delete keys that are no longer in the list
+      const { error: deleteError } = await this.storageClient
+        .from('agent_cloud_byok_keys')
+        .delete()
+        .eq('user_id', userId)
+        .not('provider_id', 'in', `(${keys.map(k => k.providerId).join(',')})`)
+
+      if (deleteError) {
+        console.error('[AgentCloudStorage] Error cleaning BYOK keys:', deleteError)
+      }
+
+      if (keys.length === 0) return true
+
+      const rows = keys.map(key => ({
+        user_id: userId,
+        provider_id: key.providerId,
+        encrypted_api_key: key.apiKey,
+        enabled: key.enabled,
+        label: key.label || null,
+        base_url: key.baseUrl || null,
+        provider_type: key.providerType || 'openai-compatible',
+      }))
+
+      const { error } = await this.storageClient
+        .from('agent_cloud_byok_keys')
+        .upsert(rows, {
+          onConflict: 'user_id,provider_id',
+        })
+
+      if (error) {
+        console.error('[AgentCloudStorage] Error saving BYOK keys:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('[AgentCloudStorage] Error in saveAllByokKeys:', error)
+      return false
+    }
+  }
+
+  /**
+   * Delete a single BYOK key
+   */
+  async deleteByokKey(providerId: string): Promise<boolean> {
+    const userId = await this.getUserId()
+    if (!userId) return false
+
+    try {
+      const { error } = await this.storageClient
+        .from('agent_cloud_byok_keys')
+        .delete()
+        .eq('user_id', userId)
+        .eq('provider_id', providerId)
+
+      if (error) {
+        console.error('[AgentCloudStorage] Error deleting BYOK key:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('[AgentCloudStorage] Error in deleteByokKey:', error)
       return false
     }
   }

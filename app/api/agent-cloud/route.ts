@@ -329,13 +329,8 @@ async function doStreaming(
   }
 
   // Get Bonsai API key (round-robin rotation for load distribution)
+  // Not required if sandbox is running in BYOK mode (key checked later)
   const aiGatewayKey = getNextBonsaiKey()
-  if (!aiGatewayKey) {
-    return NextResponse.json(
-      { error: 'BONSAI_API_KEY not configured' },
-      { status: 500 }
-    )
-  }
 
   // Find sandbox entry by sandboxId
   let sandboxEntry: (typeof activeSandboxes extends Map<string, infer V> ? V : never) | undefined = undefined
@@ -738,23 +733,50 @@ try {
         }, 15000) // Send heartbeat every 15 seconds
 
         try {
+          // Build env vars for the streaming command (respects sandbox-level BYOK config)
+          const streamEnvs: Record<string, string> = {
+            // Selected model goes into sonnet slot (Claude Code's default tier)
+            ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS[(sandboxEntry!.model as keyof typeof AVAILABLE_MODELS) || 'sonnet'] || AVAILABLE_MODELS.sonnet,
+            ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
+            ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
+            // Playwright browser path (0 = use node_modules local install)
+            PLAYWRIGHT_BROWSERS_PATH: '0',
+            // MCP gateway - Tavily HTTP MCP for web search
+            ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
+          }
+
+          // Check if sandbox was created with BYOK keys (stored in sandbox env)
+          // We check the sandbox envs that were set during creation
+          // If ANTHROPIC_API_KEY is set (non-empty), it's BYOK mode
+          try {
+            const checkResult = await sandbox.commands.run('echo "$ANTHROPIC_API_KEY"', { timeoutMs: 3000 })
+            const existingKey = checkResult.stdout?.trim()
+            if (existingKey) {
+              // BYOK mode: sandbox already has user's key
+              streamEnvs.ANTHROPIC_API_KEY = existingKey
+              // Check for custom base URL
+              const baseResult = await sandbox.commands.run('echo "$ANTHROPIC_BASE_URL"', { timeoutMs: 3000 })
+              const existingBase = baseResult.stdout?.trim()
+              if (existingBase) {
+                streamEnvs.ANTHROPIC_BASE_URL = existingBase
+              }
+            } else {
+              // Platform mode: use Bonsai gateway
+              streamEnvs.ANTHROPIC_BASE_URL = AI_GATEWAY_BASE_URL
+              streamEnvs.ANTHROPIC_AUTH_TOKEN = aiGatewayKey
+              streamEnvs.ANTHROPIC_API_KEY = '' // Must be empty
+            }
+          } catch {
+            // Fallback: use Bonsai gateway
+            streamEnvs.ANTHROPIC_BASE_URL = AI_GATEWAY_BASE_URL
+            streamEnvs.ANTHROPIC_AUTH_TOKEN = aiGatewayKey
+            streamEnvs.ANTHROPIC_API_KEY = ''
+          }
+
           const result = await sandbox.commands.run(command, {
             cwd: SYSTEM_DIR, // Run from system dir where SDK is installed
             timeoutMs: 0, // No timeout
-            envs: {
-              // Pass environment variables for Claude Agent SDK
-              ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
-              ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
-              ANTHROPIC_API_KEY: '', // Must be empty
-              // Selected model goes into sonnet slot (Claude Code's default tier)
-              ANTHROPIC_DEFAULT_SONNET_MODEL: AVAILABLE_MODELS[(sandboxEntry!.model as keyof typeof AVAILABLE_MODELS) || 'sonnet'] || AVAILABLE_MODELS.sonnet,
-              ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
-              ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
-              // Playwright browser path (0 = use node_modules local install)
-              PLAYWRIGHT_BROWSERS_PATH: '0',
-              // MCP gateway - Tavily HTTP MCP for web search
-              ...(sandboxEntry!.mcpGatewayUrl ? { MCP_GATEWAY_URL: sandboxEntry!.mcpGatewayUrl } : {}),
-            },
+            envs: streamEnvs,
             onStdout: (data) => {
               if (isClosed) return
               fullOutput += data
@@ -963,6 +985,13 @@ async function handleCreate(
       url: string
       headers?: Record<string, string>
     }>
+    byokKeys?: Array<{
+      providerId: string
+      apiKey: string
+      enabled: boolean
+      baseUrl?: string
+      providerType?: 'openai-compatible' | 'anthropic-compatible'
+    }>
   }
 ) {
   // Cleanup old sandboxes first
@@ -1149,22 +1178,63 @@ async function handleCreate(
     console.log(`[Agent Cloud] GitHub token available: ${!!githubToken}`)
   }
 
-  // Configure environment variables for Claude Code with Bonsai AI Gateway
+  // Check for BYOK (Bring Your Own Key) mode
+  const byokKeys = config?.byokKeys?.filter(k => k.enabled && k.apiKey) || []
+  const byokAnthropicKey = byokKeys.find(k => k.providerId === 'anthropic')
+  const byokOpenaiKey = byokKeys.find(k => k.providerId === 'openai')
+  const byokOpenrouterKey = byokKeys.find(k => k.providerId === 'openrouter')
+  const isByokMode = byokKeys.length > 0
+
+  if (isByokMode) {
+    console.log(`[Agent Cloud] BYOK mode active - providers: ${byokKeys.map(k => k.providerId).join(', ')}`)
+  }
+
+  // Configure environment variables for Claude Code
   // The user's selected model becomes the sonnet tier (Claude Code's default)
   const selectedModelId = AVAILABLE_MODELS[(config?.model || 'sonnet') as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS.sonnet
-  const envs: Record<string, string> = {
-    // Bonsai AI Gateway configuration
-    ANTHROPIC_BASE_URL: AI_GATEWAY_BASE_URL,
-    ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
-    ANTHROPIC_API_KEY: '', // Must be empty - Claude Code checks this first
 
-    // Model overrides via Bonsai - selected model goes into sonnet slot (default tier)
+  // Determine API configuration: BYOK key or Bonsai gateway
+  let apiBaseUrl = AI_GATEWAY_BASE_URL
+  let apiAuthToken = aiGatewayKey
+  let apiKey = ''
+
+  if (byokAnthropicKey) {
+    // Direct Anthropic API with user's own key
+    apiBaseUrl = ''  // Use default Anthropic URL
+    apiAuthToken = '' // Not needed for direct
+    apiKey = byokAnthropicKey.apiKey
+    console.log(`[Agent Cloud] BYOK: Using user's Anthropic API key`)
+  } else if (byokOpenrouterKey) {
+    // OpenRouter as Anthropic-compatible proxy
+    apiBaseUrl = 'https://openrouter.ai/api/v1'
+    apiAuthToken = ''
+    apiKey = byokOpenrouterKey.apiKey
+    console.log(`[Agent Cloud] BYOK: Using user's OpenRouter API key`)
+  }
+
+  const envs: Record<string, string> = {
+    // AI Gateway configuration (Bonsai or BYOK direct)
+    ...(apiBaseUrl ? { ANTHROPIC_BASE_URL: apiBaseUrl } : {}),
+    ...(apiAuthToken ? { ANTHROPIC_AUTH_TOKEN: apiAuthToken } : {}),
+    ANTHROPIC_API_KEY: apiKey, // Empty for Bonsai, set for BYOK
+
+    // Model overrides - selected model goes into sonnet slot (default tier)
     ANTHROPIC_DEFAULT_SONNET_MODEL: selectedModelId,
     ANTHROPIC_DEFAULT_OPUS_MODEL: AVAILABLE_MODELS.opus,
     ANTHROPIC_DEFAULT_HAIKU_MODEL: AVAILABLE_MODELS.haiku,
 
     // Playwright configuration
     PLAYWRIGHT_BROWSERS_PATH: '0',
+  }
+
+  // Add additional BYOK provider keys as env vars for potential tool use
+  if (byokOpenaiKey) {
+    envs.OPENAI_API_KEY = byokOpenaiKey.apiKey
+  }
+  for (const bk of byokKeys) {
+    if (bk.providerId === 'google') envs.GOOGLE_API_KEY = bk.apiKey
+    if (bk.providerId === 'mistral') envs.MISTRAL_API_KEY = bk.apiKey
+    if (bk.providerId === 'xai') envs.XAI_API_KEY = bk.apiKey
   }
 
   // Add GitHub token if available (set both for gh CLI and git/SDK compatibility)
@@ -1502,7 +1572,7 @@ async function handleCreate(
     success: true,
     sandboxId,
     model: AVAILABLE_MODELS[selectedModel],
-    gateway: AI_GATEWAY_BASE_URL,
+    gateway: isByokMode ? 'byok' : AI_GATEWAY_BASE_URL,
     repoCloned,
     isNewProject: !!config?.newProject,
     newProjectName: config?.newProject?.name,
@@ -1515,11 +1585,13 @@ async function handleCreate(
       ...(config?.customMcpServers?.map(s => s.name) || [])
     ],
     workingBranch: createdWorkingBranch,
+    byokMode: isByokMode,
+    byokProviders: isByokMode ? byokKeys.map(k => k.providerId) : undefined,
     message: config?.newProject
-      ? `Sandbox created for new project: ${config.newProject.name} (MCP enabled)`
+      ? `Sandbox created for new project: ${config.newProject.name}${isByokMode ? ' (BYOK)' : ' (MCP enabled)'}`
       : repoCloned
-        ? `Sandbox created with ${config?.repo?.full_name} cloned (MCP enabled)`
-        : 'Sandbox created with Bonsai AI Gateway (MCP enabled)',
+        ? `Sandbox created with ${config?.repo?.full_name} cloned${isByokMode ? ' (BYOK)' : ' (MCP enabled)'}`
+        : `Sandbox created${isByokMode ? ' with BYOK keys' : ' with Bonsai AI Gateway'} (MCP enabled)`,
   })
 }
 

@@ -60,6 +60,8 @@ export default function NewSessionPage() {
     setConnectors,
     customMcpServers,
     setCustomMcpServers,
+    byokEnabled,
+    byokKeys,
     createSession,
     setActiveSessionId,
     isCreating,
@@ -932,6 +934,13 @@ Use the Playwright MCP server for browser automation, interaction, and visual te
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* BYOK indicator */}
+              {byokEnabled && byokKeys.some(k => k.enabled) && (
+                <span className="flex items-center gap-1 text-[10px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-md">
+                  BYOK
+                </span>
+              )}
             </div>
 
             {/* Submit button */}

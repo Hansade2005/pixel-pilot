@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
-import { agentCloudStorage } from "@/lib/agent-cloud-storage"
+import { agentCloudStorage, type AgentCloudByokKey } from "@/lib/agent-cloud-storage"
 
 // Storage key for localStorage (used for migration only)
 const STORAGE_KEY = 'pipilot_agent_cloud_v3'
@@ -229,6 +229,16 @@ export const MODELS = [
   { id: 'flash', name: 'GLM 4.6', provider: 'ZAI', description: 'Fast inference via Bonsai' },
 ] as const
 
+// BYOK provider definitions for Agent Cloud
+export const AGENT_CLOUD_BYOK_PROVIDERS = [
+  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...', description: 'Use your own Anthropic key for Claude models' },
+  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...', description: 'Use your own OpenAI key for GPT models' },
+  { id: 'openrouter', name: 'OpenRouter', placeholder: 'sk-or-v1-...', description: 'Access 100+ models via your OpenRouter key' },
+  { id: 'google', name: 'Google AI', placeholder: 'AIza...', description: 'Gemini models via your Google API key' },
+  { id: 'mistral', name: 'Mistral', placeholder: 'your-mistral-key', description: 'Devstral, Codestral, Pixtral' },
+  { id: 'xai', name: 'xAI', placeholder: 'xai-...', description: 'Grok models via your xAI key' },
+]
+
 // Context for sharing state across pages
 interface AgentCloudContextType {
   sessions: Session[]
@@ -253,6 +263,10 @@ interface AgentCloudContextType {
   setConnectors: React.Dispatch<React.SetStateAction<ConnectorConfig[]>>
   customMcpServers: CustomMcpServer[]
   setCustomMcpServers: React.Dispatch<React.SetStateAction<CustomMcpServer[]>>
+  byokEnabled: boolean
+  setByokEnabled: React.Dispatch<React.SetStateAction<boolean>>
+  byokKeys: AgentCloudByokKey[]
+  setByokKeys: React.Dispatch<React.SetStateAction<AgentCloudByokKey[]>>
   createSession: (initialPrompt: string, images?: Array<{ data: string; type: string; name: string }>, newProject?: { name: string }) => Promise<Session | null>
   terminateSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
@@ -298,6 +312,10 @@ function AgentCloudLayoutInner({
 
   // Custom MCP servers (user-defined HTTP streamable servers, persisted to Supabase)
   const [customMcpServers, setCustomMcpServers] = useState<CustomMcpServer[]>([])
+
+  // BYOK (Bring Your Own Key) state
+  const [byokEnabled, setByokEnabled] = useState(false)
+  const [byokKeys, setByokKeys] = useState<AgentCloudByokKey[]>([])
 
   // Repository selection
   const [repos, setRepos] = useState<Repository[]>([])
@@ -376,6 +394,25 @@ function AgentCloudLayoutInner({
         const savedCustomMcps = await agentCloudStorage.loadCustomMcpServers()
         if (savedCustomMcps.length > 0) {
           setCustomMcpServers(savedCustomMcps)
+        }
+
+        // Load BYOK keys from Supabase
+        const savedByokKeys = await agentCloudStorage.loadByokKeys()
+        if (savedByokKeys.length > 0) {
+          setByokKeys(savedByokKeys)
+          // Enable BYOK if at least one key is active
+          const hasActiveKey = savedByokKeys.some(k => k.enabled && k.apiKey)
+          setByokEnabled(hasActiveKey)
+        }
+
+        // Load BYOK enabled preference from localStorage
+        try {
+          const storedByokEnabled = localStorage.getItem('pipilot_agent_cloud_byok_enabled')
+          if (storedByokEnabled !== null) {
+            setByokEnabled(JSON.parse(storedByokEnabled))
+          }
+        } catch (e) {
+          // Ignore
         }
 
         // Load model preference from localStorage (small, keep local)
@@ -512,6 +549,32 @@ function AgentCloudLayoutInner({
 
     return () => clearTimeout(timeoutId)
   }, [customMcpServers, isInitialLoadComplete])
+
+  // Save BYOK keys to Supabase when they change
+  const byokInitialized = useRef(false)
+  useEffect(() => {
+    if (!isInitialLoadComplete) return
+
+    if (!byokInitialized.current) {
+      byokInitialized.current = true
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      await agentCloudStorage.saveAllByokKeys(byokKeys)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [byokKeys, isInitialLoadComplete])
+
+  // Save BYOK enabled state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pipilot_agent_cloud_byok_enabled', JSON.stringify(byokEnabled))
+    } catch (e) {
+      // Ignore
+    }
+  }, [byokEnabled])
 
   // Load stored deployment tokens
   const loadStoredTokens = async () => {
@@ -684,6 +747,11 @@ function AgentCloudLayoutInner({
           fields: Object.fromEntries(c.fields.map(f => [f.key, f.value]))
         }))
 
+      // Gather active BYOK keys if enabled
+      const activeByokKeys = byokEnabled
+        ? byokKeys.filter(k => k.enabled && k.apiKey)
+        : []
+
       const response = await fetch('/api/agent-cloud', {
         method: 'POST',
         headers,
@@ -702,6 +770,7 @@ function AgentCloudLayoutInner({
             initialPrompt, // Pass the initial prompt for branch naming (first 4 words)
             connectors: enabledConnectors.length > 0 ? enabledConnectors : undefined,
             customMcpServers: customMcpServers.length > 0 ? customMcpServers : undefined,
+            byokKeys: activeByokKeys.length > 0 ? activeByokKeys : undefined,
           }
         })
       })
@@ -1000,6 +1069,10 @@ function AgentCloudLayoutInner({
     setConnectors,
     customMcpServers,
     setCustomMcpServers,
+    byokEnabled,
+    setByokEnabled,
+    byokKeys,
+    setByokKeys,
     loadBranches,
     createSession,
     terminateSession,
