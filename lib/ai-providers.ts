@@ -120,7 +120,7 @@ function getOllamaCloudProvider() {
   // When only one key is configured this is equivalent to caching.
   return createOpenAICompatible({
     name: 'ollama-cloud',
-    baseURL: 'https://ollama.com/api',
+    baseURL: 'https://ollama.com/v1',
     apiKey: getNextOllamaKey(),
   });
 }
@@ -545,7 +545,7 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
     case 'ollama': {
       const provider = createOpenAICompatible({
         name: 'byok-ollama',
-        baseURL: 'https://ollama.com/api',
+        baseURL: 'https://ollama.com/v1',
         apiKey,
       })
       const bare = stripPrefix(modelId, 'ollama/')
