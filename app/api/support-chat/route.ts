@@ -464,6 +464,97 @@ The PiPilot MCP HTTP Server provides AI agents with seamless access to PiPilot d
 - pipilot_update_record
 - pipilot_delete_record
 
+## Browser Testing
+
+PiPilot's Browser Testing feature lets the AI automatically test your live preview using Playwright browser automation - navigating pages, clicking elements, filling forms, taking screenshots, and detecting runtime errors.
+
+### Capabilities
+- Navigate URLs and take screenshots to verify visual output
+- Click elements, fill forms, select dropdowns, toggle checkboxes
+- Read console logs and detect runtime errors (JS errors, uncaught promise rejections, network failures)
+- Test responsive layouts: Mobile (375px), Tablet (768px), Desktop (1280px), and custom dimensions
+
+### How It Works
+1. AI writes or edits code
+2. Live preview updates automatically
+3. AI uses the browse_web tool to navigate the preview
+4. Takes screenshots to verify visual output
+5. Clicks through flows to test interactivity
+6. Reports any errors found
+
+## Conversation Branching
+
+Create alternative conversation paths from any point in chat history to explore different approaches without losing context - like Git branches for conversations.
+
+### How to Create a Branch
+- Hover over a user message and click the branch icon, then enter a name and description
+- Or use the chat session dropdown and select "New Branch from Here"
+
+### Features
+- All messages up to the branch point are copied automatically
+- View, switch between, rename, or delete branches
+- Great for exploring alternatives, A/B testing solutions, and safe experimentation
+
+## Project Plan
+
+PiPilot automatically generates structured, step-by-step implementation plans for every build request and tracks progress in real time.
+
+### How It Works
+1. **Research** - AI analyzes request and reviews codebase
+2. **Plan** - Comprehensive step-by-step plan is generated
+3. **Build** - AI implements each step in order
+4. **Track** - Each completed step is marked done in real time
+
+Plans are stored in \`.pipilot/plan.md\` and persist across sessions. Multi-session builds are supported.
+
+## Project Context
+
+PiPilot automatically creates and maintains a comprehensive document (\`.pipilot/project.md\`) describing your entire project so the AI understands your codebase across sessions.
+
+### What It Includes
+- Project overview, tech stack, architecture
+- Features built, design decisions, database schema, API endpoints
+
+### Why It Matters
+- AI generates code matching existing patterns and avoids duplication
+- Cross-session continuity: the AI remembers your tech stack and architecture
+- Always up-to-date documentation
+
+## BYOK (Bring Your Own Key)
+
+Connect your own AI provider API keys to unlock additional models.
+
+### Supported Providers
+- **OpenAI** (GPT-4o, o1, o3)
+- **Anthropic** (Claude Sonnet, Opus, Haiku)
+- **Mistral** (Devstral, Pixtral, Codestral)
+- **xAI** (Grok models)
+- **Google AI** (Gemini)
+- **OpenRouter** (100+ models from all providers)
+- **Vercel AI Gateway** (custom model routing)
+- Custom OpenAI-compatible and Anthropic-compatible endpoints
+
+### Setup
+1. Open Settings > API Keys (BYOK)
+2. Toggle "Enable BYOK"
+3. Click "Add Provider", select provider, paste API key, and save
+4. Select model in chat header (appears with key icon)
+
+Keys are stored in your browser's localStorage only - never on PiPilot servers.
+
+## Developer Power Tools
+
+PiPilot includes 8 powerful developer tools beyond code generation:
+
+1. **Usage Analytics Dashboard** - Track credit balance, AI requests over time, transaction history (Profile menu > Usage Analytics)
+2. **Project Snapshots & Rollback** - One-click snapshots to capture full project state with instant rollback (Project context menu > Snapshots)
+3. **Custom AI Personas** - Define custom system prompts and switch between them per-project (Profile menu > AI Personas)
+4. **Project Health Score** - 5-category analysis (Security, Performance, Accessibility, Maintainability, Code Quality) with A-F grading (Project context menu > Health Score)
+5. **Secrets Vault** - AES-256-GCM encrypted secrets with audit logging and Vercel sync (Project context menu > Secrets Vault)
+6. **Scheduled Agent Tasks** - Cron-based scheduling with visual presets and execution history (Profile menu > Scheduled Tasks)
+7. **AI Code Review** - Full/Security/Performance/Maintainability reviews with severity levels and score visualization (Project context menu > Code Review)
+8. **Public Project Showcase** - One-click publish with category system, like/view tracking, and demo URLs (Project context menu > Publish to Showcase)
+
 ## Security
 
 - Encrypted storage for all API tokens
@@ -598,7 +689,7 @@ Remember: You represent PiPilot. Be professional, helpful, and make users feel s
         get_section_content: tool({
           description: 'Get the full content of a specific documentation section by its title. Use this when you need detailed information from a specific section.',
           parameters: z.object({
-            sectionTitle: z.string().describe('The exact title of the section (e.g., "PiPilot Features", "Supported Frameworks", "Integration System")')
+            sectionTitle: z.string().describe('The exact title of the section (e.g., "PiPilot Features", "Supported Frameworks", "Integration System", "Browser Testing", "Developer Power Tools", "Conversation Branching", "Project Plan", "Project Context", "BYOK (Bring Your Own Key)")')
           }),
           execute: async ({ sectionTitle }) => {
             return getSectionContent(docsData, sectionTitle)
