@@ -43,6 +43,15 @@ const shortNameMap = new Map<string, string>([
   ['openai/gpt-5.1-thinking', 'GPT-5.1'],
   ['openai/gpt-5.2-codex', 'Codex 5.2'],
   ['openai/o3', 'O3'],
+  ['ollama/devstral-2:123b', 'Devstral 123B'],
+  ['ollama/deepseek-v3.2', 'DeepSeek V3.2'],
+  ['ollama/glm-4.6', 'GLM 4.6 (O)'],
+  ['ollama/glm-4.7', 'GLM 4.7 (O)'],
+  ['ollama/kimi-k2.5', 'Kimi K2.5'],
+  ['ollama/kimi-k2-thinking', 'Kimi K2 (O)'],
+  ['ollama/minimax-m2.5', 'MiniMax M2.5'],
+  ['ollama/minimax-m2.1', 'MiniMax M2.1 (O)'],
+  ['ollama/kimi-k2:1t', 'Kimi K2 1T'],
 ])
 
 // Descriptions for dropdown
@@ -69,6 +78,15 @@ const descriptionMap = new Map<string, string>([
   ['openai/gpt-5.1-thinking', 'Deep reasoning by OpenAI'],
   ['openai/gpt-5.2-codex', 'Specialized for code'],
   ['openai/o3', 'Advanced reasoning model'],
+  ['ollama/devstral-2:123b', 'Devstral 123B via Ollama Cloud'],
+  ['ollama/deepseek-v3.2', 'DeepSeek V3.2 via Ollama Cloud'],
+  ['ollama/glm-4.6', 'GLM 4.6 via Ollama Cloud'],
+  ['ollama/glm-4.7', 'GLM 4.7 via Ollama Cloud'],
+  ['ollama/kimi-k2.5', 'Kimi K2.5 - 262K context'],
+  ['ollama/kimi-k2-thinking', 'Kimi K2 Thinking via Ollama'],
+  ['ollama/minimax-m2.5', 'MiniMax M2.5 via Ollama Cloud'],
+  ['ollama/minimax-m2.1', 'MiniMax M2.1 via Ollama Cloud'],
+  ['ollama/kimi-k2:1t', 'Kimi K2 1T params via Ollama'],
 ])
 
 // Map BYOK provider IDs to model ID prefixes
@@ -78,6 +96,7 @@ const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
   mistral: ['mistral/'],
   xai: ['xai/'],
   google: ['google/'],
+  ollama: ['ollama/'],
   openrouter: [], // OpenRouter unlocks all models
   'vercel-gateway': [], // Vercel Gateway unlocks all models
 }
@@ -171,7 +190,10 @@ export function ModelSelector({
       'kwaipilot/kat-coder-pro-v1', 'alibaba/qwen3-max',
       'alibaba/qwen3-vl-thinking',
       'anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4.5',
-      'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3'
+      'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
+      'ollama/devstral-2:123b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
+      'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+      'ollama/kimi-k2:1t'
     ]
   } else {
     const userLimits = getLimits(userPlan)
@@ -224,6 +246,9 @@ export function ModelSelector({
     'zai/glm-4.7-flash', 'zai/glm-4.6',
     'moonshotai/kimi-k2-thinking', 'minimax/minimax-m2.1', 'kwaipilot/kat-coder-pro-v1',
     'alibaba/qwen3-max', 'alibaba/qwen3-vl-thinking',
+    'ollama/devstral-2:123b', 'ollama/deepseek-v3.2', 'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking',
+    'ollama/kimi-k2:1t', 'ollama/glm-4.6', 'ollama/glm-4.7',
+    'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))

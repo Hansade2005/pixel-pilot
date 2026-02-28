@@ -3,6 +3,7 @@ import { createMistral } from '@ai-sdk/mistral';
 import { createXai } from '@ai-sdk/xai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOllama } from 'ai-sdk-ollama';
 
 // =============================================================================
 // PROVIDER FACTORIES (lazy - created on first use to avoid webpack TDZ issues)
@@ -21,6 +22,7 @@ let _mistralGatewayProvider: ReturnType<typeof createMistral> | null = null;
 let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
+let _ollamaCloudProvider: ReturnType<typeof createOllama> | null = null;
 // Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
 let _bonsaiKeyIndex = 0;
 
@@ -111,6 +113,16 @@ function getOpenRouterProvider() {
     });
   }
   return _openrouterProvider;
+}
+
+function getOllamaCloudProvider() {
+  if (!_ollamaCloudProvider) {
+    _ollamaCloudProvider = createOllama({
+      baseURL: 'https://ollama.com/api',
+      apiKey: process.env.OLLAMA_API_KEY || '',
+    });
+  }
+  return _ollamaCloudProvider;
 }
 
 /**
@@ -286,6 +298,20 @@ function createModelInstance(modelId: string): any {
     case 'anthropic/claude-opus-4.5':
       return getAnthropicProvider()('anthropic/claude-opus-4.5');
 
+    // Ollama Cloud models
+    case 'ollama/devstral-2:123b':
+    case 'ollama/deepseek-v3.2':
+    case 'ollama/glm-4.6':
+    case 'ollama/glm-4.7':
+    case 'ollama/kimi-k2.5':
+    case 'ollama/kimi-k2-thinking':
+    case 'ollama/minimax-m2.5':
+    case 'ollama/minimax-m2.1':
+    case 'ollama/kimi-k2:1t': {
+      const ollamaModelName = modelId.replace('ollama/', '');
+      return getOllamaCloudProvider()(ollamaModelName);
+    }
+
     // All other models go through Vercel AI Gateway
     default: {
       // Vercel gateway models use the provider/model format
@@ -386,6 +412,7 @@ export interface ByokKeySet {
   mistral?: string
   xai?: string
   google?: string
+  ollama?: string
   openrouter?: string
   'vercel-gateway'?: string
   // Custom providers: keyed by custom provider ID
@@ -407,6 +434,7 @@ export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): stri
   if (modelId.startsWith('mistral/') && byokKeys.mistral) return 'mistral'
   if (modelId.startsWith('xai/') && byokKeys.xai) return 'xai'
   if (modelId.startsWith('google/') && byokKeys.google) return 'google'
+  if (modelId.startsWith('ollama/') && byokKeys.ollama) return 'ollama'
 
   // Direct model names
   if ((modelId === 'pixtral-12b-2409' || modelId === 'codestral-latest') && byokKeys.mistral) return 'mistral'
@@ -498,6 +526,14 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
         apiKey,
       })
       const bare = stripPrefix(modelId, 'google/')
+      return provider(bare)
+    }
+    case 'ollama': {
+      const provider = createOllama({
+        baseURL: 'https://ollama.com/api',
+        apiKey,
+      })
+      const bare = stripPrefix(modelId, 'ollama/')
       return provider(bare)
     }
     case 'openrouter': {
