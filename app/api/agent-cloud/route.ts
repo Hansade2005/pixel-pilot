@@ -1183,6 +1183,7 @@ async function handleCreate(
   const byokAnthropicKey = byokKeys.find(k => k.providerId === 'anthropic')
   const byokOpenaiKey = byokKeys.find(k => k.providerId === 'openai')
   const byokOpenrouterKey = byokKeys.find(k => k.providerId === 'openrouter')
+  const byokBonsaiKey = byokKeys.find(k => k.providerId === 'bonsai')
   const isByokMode = byokKeys.length > 0
 
   if (isByokMode) {
@@ -1204,6 +1205,12 @@ async function handleCreate(
     apiAuthToken = '' // Not needed for direct
     apiKey = byokAnthropicKey.apiKey
     console.log(`[Agent Cloud] BYOK: Using user's Anthropic API key`)
+  } else if (byokBonsaiKey) {
+    // Bonsai gateway with user's own key (same URL, their key)
+    apiBaseUrl = AI_GATEWAY_BASE_URL  // Same Bonsai gateway URL
+    apiAuthToken = byokBonsaiKey.apiKey // User's Bonsai key as auth token
+    apiKey = '' // Not needed - Bonsai uses auth token
+    console.log(`[Agent Cloud] BYOK: Using user's Bonsai API key`)
   } else if (byokOpenrouterKey) {
     // OpenRouter as Anthropic-compatible proxy
     apiBaseUrl = 'https://openrouter.ai/api/v1'

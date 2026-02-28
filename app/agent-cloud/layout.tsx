@@ -237,6 +237,7 @@ export const AGENT_CLOUD_BYOK_PROVIDERS = [
   { id: 'google', name: 'Google AI', placeholder: 'AIza...', description: 'Gemini models via your Google API key' },
   { id: 'mistral', name: 'Mistral', placeholder: 'your-mistral-key', description: 'Devstral, Codestral, Pixtral' },
   { id: 'xai', name: 'xAI', placeholder: 'xai-...', description: 'Grok models via your xAI key' },
+  { id: 'bonsai', name: 'Bonsai', placeholder: 'your-bonsai-key', description: 'Access all models via your Bonsai gateway key' },
 ]
 
 // Context for sharing state across pages

@@ -99,6 +99,7 @@ const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
   ollama: ['ollama/'],
   openrouter: [], // OpenRouter unlocks all models
   'vercel-gateway': [], // Vercel Gateway unlocks all models
+  bonsai: [], // Bonsai unlocks all models via gateway
 }
 
 export function ModelSelector({
