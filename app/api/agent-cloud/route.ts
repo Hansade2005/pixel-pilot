@@ -449,6 +449,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
 INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
 - Do NOT wait until you finish everything to commit. Commit and push INCREMENTALLY as you build.
+- HARD RULE: After writing or modifying 4-5 files, STOP and commit+push immediately before continuing. Do not accumulate more than 5 uncommitted file changes at any time.
 - After completing each meaningful unit of work (e.g. a new component, a feature, a config change, a bug fix), immediately:
   1. git add the relevant files
   2. git commit -m "descriptive message of what was done"
@@ -460,6 +461,7 @@ INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
   - After implementing each feature or fixing each bug
   - After adding styles or updating layouts
   - Before starting a risky or complex change
+  - After every 4-5 file writes/edits, regardless of whether a "unit of work" is complete
 - This protects the user's work if the session disconnects, credits run out, or the sandbox closes.
 - The user can always recover from the last pushed commit on reconnection.
 - After ALL work is complete, use the GitHub MCP tools to create a pull request (you have GitHub MCP installed with authentication)
@@ -2244,6 +2246,7 @@ IMPORTANT GIT WORKFLOW INSTRUCTIONS:
 
 INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
 - Do NOT wait until you finish everything to commit. Commit and push INCREMENTALLY as you build.
+- HARD RULE: After writing or modifying 4-5 files, STOP and commit+push immediately before continuing. Do not accumulate more than 5 uncommitted file changes at any time.
 - After completing each meaningful unit of work (e.g. a new component, a feature, a config change, a bug fix), immediately:
   1. git add the relevant files
   2. git commit -m "descriptive message of what was done"
@@ -2255,6 +2258,7 @@ INCREMENTAL COMMIT & PUSH (CRITICAL - prevents work loss):
   - After implementing each feature or fixing each bug
   - After adding styles or updating layouts
   - Before starting a risky or complex change
+  - After every 4-5 file writes/edits, regardless of whether a "unit of work" is complete
 - This protects the user's work if the session disconnects, credits run out, or the sandbox closes.
 - The user can always recover from the last pushed commit on reconnection.
 - A .gitignore file exists in the project to prevent committing node_modules and other artifacts

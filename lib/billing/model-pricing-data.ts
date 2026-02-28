@@ -2220,6 +2220,163 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 80,
   },
 
+  // =============================================================================
+  // OLLAMA CLOUD
+  // =============================================================================
+
+  'ollama/devstral-2:123b': {
+    name: 'Devstral 2 123B',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000030,     // $0.30/M (estimated)
+    outputPerToken: 0.0000012,     // $1.20/M (estimated)
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.5,
+    throughputTps: 60,
+  },
+
+  'ollama/deepseek-v3.2': {
+    name: 'DeepSeek V3.2',
+    provider: 'ollama',
+    contextWindow: 128_000,
+    maxOutput: 32_000,
+    inputPerToken: 0.00000027,     // $0.27/M (estimated)
+    outputPerToken: 0.0000011,     // $1.10/M (estimated)
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.2,
+    throughputTps: 70,
+  },
+
+  'ollama/glm-4.6': {
+    name: 'GLM 4.6 (Ollama)',
+    provider: 'ollama',
+    contextWindow: 200_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000022,     // $0.22/M
+    outputPerToken: 0.00000088,    // $0.88/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.8,
+    throughputTps: 90,
+  },
+
+  'ollama/glm-4.7': {
+    name: 'GLM 4.7 (Ollama)',
+    provider: 'ollama',
+    contextWindow: 131_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000025,     // $0.25/M
+    outputPerToken: 0.00000069,    // $0.69/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.5,
+    throughputTps: 120,
+  },
+
+  'ollama/kimi-k2.5': {
+    name: 'Kimi K2.5 (Ollama)',
+    provider: 'ollama',
+    contextWindow: 262_000,
+    maxOutput: 262_000,
+    inputPerToken: 0.0000005,      // $0.50/M
+    outputPerToken: 0.0000028,     // $2.80/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 100,
+  },
+
+  'ollama/kimi-k2-thinking': {
+    name: 'Kimi K2 Thinking (Ollama)',
+    provider: 'ollama',
+    contextWindow: 262_000,
+    maxOutput: 262_000,
+    inputPerToken: 0.00000060,     // $0.60/M
+    outputPerToken: 0.0000025,     // $2.50/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.8,
+    throughputTps: 30,
+  },
+
+  'ollama/minimax-m2.5': {
+    name: 'MiniMax M2.5 (Ollama)',
+    provider: 'ollama',
+    contextWindow: 205_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000045,     // $0.45/M
+    outputPerToken: 0.0000018,     // $1.80/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 150,
+  },
+
+  'ollama/minimax-m2.1': {
+    name: 'MiniMax M2.1 (Ollama)',
+    provider: 'ollama',
+    contextWindow: 205_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000030,     // $0.30/M
+    outputPerToken: 0.0000012,     // $1.20/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.2,
+    throughputTps: 40,
+  },
+
+  'ollama/kimi-k2:1t': {
+    name: 'Kimi K2 1T (Ollama)',
+    provider: 'ollama',
+    contextWindow: 131_000,
+    maxOutput: 131_000,
+    inputPerToken: 0.00000015,     // $0.15/M
+    outputPerToken: 0.0000015,     // $1.50/M
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.6,
+    throughputTps: 80,
+  },
+
 }
 
 // =============================================================================

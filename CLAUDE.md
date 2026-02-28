@@ -180,10 +180,15 @@ OPENAI_API_KEY           # OpenAI fallback
 
 ---
 
+## Package Manager
+
+**pnpm** is the project's package manager. Always use `pnpm` (not npm or yarn) for installing dependencies, running scripts, and managing the lockfile (`pnpm-lock.yaml`).
+
 ## Quick Commands
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run lint     # Run linter
+pnpm dev      # Start development server
+pnpm build    # Build for production
+pnpm lint     # Run linter
+pnpm add <pkg>  # Install a dependency
 ```

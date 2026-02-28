@@ -46,6 +46,7 @@ import {
   ClipboardList,
   FolderOpen,
   Key,
+  Wrench,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -117,7 +118,7 @@ const sectionGroups: SectionGroup[] = [
   },
   {
     label: "Developer Tools",
-    items: ["PiPilot MCP Server", "PiPilot SDK"]
+    items: ["PiPilot MCP Server", "PiPilot SDK", "Developer Power Tools"]
   },
   {
     label: "Integrations",
@@ -154,6 +155,7 @@ const sectionIcons: Record<string, any> = {
   'Project Plan': ClipboardList,
   'Project Context': FolderOpen,
   'BYOK (Bring Your Own Key)': Key,
+  'Developer Power Tools': Wrench,
 }
 
 // Extract headings from markdown content for TOC

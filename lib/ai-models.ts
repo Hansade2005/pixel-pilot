@@ -183,6 +183,63 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
 
+  // Ollama Cloud Models
+  {
+    id: 'ollama/devstral-2:123b',
+    name: 'Devstral 2 123B',
+    description: 'Devstral 2 123B via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/deepseek-v3.2',
+    name: 'DeepSeek V3.2',
+    description: 'DeepSeek V3.2 via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/glm-4.6',
+    name: 'GLM 4.6',
+    description: 'GLM 4.6 via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/glm-4.7',
+    name: 'GLM 4.7',
+    description: 'GLM 4.7 via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/kimi-k2.5',
+    name: 'Kimi K2.5',
+    description: 'Kimi K2.5 via Ollama Cloud - 262K context',
+    provider: 'ollama',
+    supportsVision: true,
+  },
+  {
+    id: 'ollama/kimi-k2-thinking',
+    name: 'Kimi K2 Thinking',
+    description: 'Kimi K2 Thinking via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/minimax-m2.5',
+    name: 'MiniMax M2.5',
+    description: 'MiniMax M2.5 via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/minimax-m2.1',
+    name: 'MiniMax M2.1',
+    description: 'MiniMax M2.1 via Ollama Cloud',
+    provider: 'ollama',
+  },
+  {
+    id: 'ollama/kimi-k2:1t',
+    name: 'Kimi K2 1T',
+    description: 'Kimi K2 1T parameter model via Ollama Cloud',
+    provider: 'ollama',
+  },
+
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {
