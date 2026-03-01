@@ -1,7 +1,14 @@
 import { generateText } from 'ai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { getModel } from '@/lib/ai-providers'
+
+// Use Devstral Small via Vercel AI Gateway (same as support chat)
+const vercelGateway = createOpenAICompatible({
+  name: 'vercel-gateway',
+  baseURL: 'https://ai-gateway.vercel.sh/v1',
+  apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY || '',
+})
 
 // Input validation schema
 const generateProjectSuggestionSchema = z.object({
@@ -36,12 +43,12 @@ export async function POST(request: Request) {
 
     console.log('🎯 Generating project suggestion for prompt:', prompt)
 
-    // Get Pixtral model for natural language understanding
-    const pixtralModel = getModel('pixtral-12b-2409')
+    // Use Devstral Small via Vercel AI Gateway
+    const model = vercelGateway('mistral/devstral-small-2')
 
-    // Generate project name and description using Pixtral
+    // Generate project name and description using Devstral Small
     const result = await generateText({
-      model: pixtralModel,
+      model,
       prompt: `You are an expert product naming specialist and technical writer. Your task is to generate a professional, memorable project name and a clear, comprehensive description based on the user's request.
 
 # User Request
@@ -215,7 +222,7 @@ Now, generate a professional project name and description for the user's request
       temperature: 0.85,
     })
 
-    console.log('🤖 Pixtral response:', result.text)
+    console.log('🤖 Devstral response:', result.text)
 
     // Parse the AI response as JSON
     let suggestion
