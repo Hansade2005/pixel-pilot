@@ -1015,13 +1015,26 @@ async function handleStreamingPreview(req: Request) {
           const hasAnyFrameworkConfig = hasViteConfig || hasNextConfig || hasExpoConfig || hasNuxtConfig
           const hasAnyFrameworkDeps = !!hasExpoDepInPkg || !!hasViteDepInPkg
 
-          // HTML/static project = EITHER:
-          // 1. Has index.html with no framework configs/deps (original check), OR
-          // 2. Has NO package.json AND no framework config files (nothing to install/build)
-          const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-            (!packageJson && !hasAnyFrameworkConfig)
+          // Detect classic HTML template pattern (script.js + styles.css in root)
+          const hasRootScriptJs = files.some((f: any) => {
+            const p = (f.path || '').replace(/^\.\//, '')
+            return p === 'script.js'
+          })
+          const hasRootStylesCss = files.some((f: any) => {
+            const p = (f.path || '').replace(/^\.\//, '')
+            return p === 'styles.css' || p === 'style.css'
+          })
+          const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-          console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
+          // HTML/static project = ANY of:
+          // 1. Has index.html with no framework configs/deps
+          // 2. No package.json at all (nothing to install/build)
+          // 3. Classic HTML template pattern (script.js + styles.css in root)
+          const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+            !packageJson ||
+            isClassicHtmlTemplate
+
+          console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
           console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
           if (isHtmlProject) {
@@ -1682,13 +1695,26 @@ async function handleRegularPreview(req: Request) {
     const hasAnyFrameworkConfig = hasViteConfig || hasNextConfig || hasExpoConfig || hasNuxtConfig
     const hasAnyFrameworkDeps = !!hasExpoDepInPkg || !!hasViteDepInPkg
 
-    // HTML/static project = EITHER:
-    // 1. Has index.html with no framework configs/deps (original check), OR
-    // 2. Has NO package.json AND no framework config files (nothing to install/build)
-    const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
-      (!packageJson && !hasAnyFrameworkConfig)
+    // Detect classic HTML template pattern (script.js + styles.css in root)
+    const hasRootScriptJs = files.some((f: any) => {
+      const p = (f.path || '').replace(/^\.\//, '')
+      return p === 'script.js'
+    })
+    const hasRootStylesCss = files.some((f: any) => {
+      const p = (f.path || '').replace(/^\.\//, '')
+      return p === 'styles.css' || p === 'style.css'
+    })
+    const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
 
-    console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
+    // HTML/static project = ANY of:
+    // 1. Has index.html with no framework configs/deps
+    // 2. No package.json at all (nothing to install/build)
+    // 3. Classic HTML template pattern (script.js + styles.css in root)
+    const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+      !packageJson ||
+      isClassicHtmlTemplate
+
+    console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
     console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
     if (isHtmlProject) {
