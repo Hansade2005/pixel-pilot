@@ -696,23 +696,14 @@ async function uploadHtmlProjectToSupabase(files: any[], projectSlug: string, su
       const relativePath = file.path.startsWith('/') ? file.path.substring(1) : file.path
 
       try {
-        // Process HTML files to add SEO metadata and PiPilot badge
+        // Process HTML files - only inject badge (skip SEO/AI preprocessing for speed)
         let processedContent = file.content
         if (relativePath.endsWith('.html')) {
-          console.log(`[HTML Hosting] Processing HTML file ${relativePath} with SEO enhancement...`)
-
-          // Add comprehensive SEO metadata
-          processedContent = await addSEOMetadata(processedContent, projectSlug)
-
           // Only inject badge for preview sites (not production)
           if (!isProduction) {
             processedContent = injectPiPilotBadge(processedContent)
             console.log(`[HTML Hosting] Badge injected for preview site: ${relativePath}`)
-          } else {
-            console.log(`[HTML Hosting] Skipping badge injection for production site: ${relativePath}`)
           }
-
-          console.log(`[HTML Hosting] SEO enhanced for ${relativePath}`)
         }
 
         // Determine content type
