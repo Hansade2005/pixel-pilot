@@ -5764,7 +5764,6 @@ A modern, responsive HTML website powered by Tailwind CSS via CDN, ready for ins
 ├── styles.css      # Custom CSS (animations, scrollbar, etc.)
 ├── script.js       # Vanilla JavaScript
 ├── vercel.json     # Vercel deployment config
-├── package.json    # NPM scripts
 └── README.md       # This file
 \`\`\`
 

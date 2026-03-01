@@ -991,7 +991,10 @@ async function handleStreamingPreview(req: Request) {
           }
 
           // 🔹 Early HTML project detection - skip sandbox, deps, and build entirely
-          const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+          const hasIndexHtml = files.some((f: any) => {
+            const p = (f.path || '').replace(/^\.\//, '')
+            return p === 'index.html' || p.toLowerCase() === 'index.html'
+          })
           const hasViteConfig = files.some((f: any) =>
             f.path === 'vite.config.js' ||
             f.path === 'vite.config.ts' ||
@@ -1009,8 +1012,30 @@ async function handleStreamingPreview(req: Request) {
             f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
           )
 
-          // HTML project = has index.html but NO framework build configs and NO framework deps
-          const isHtmlProject = hasIndexHtml && !hasViteConfig && !hasNextConfig && !hasExpoConfig && !hasNuxtConfig && !hasExpoDepInPkg && !hasViteDepInPkg
+          const hasAnyFrameworkConfig = hasViteConfig || hasNextConfig || hasExpoConfig || hasNuxtConfig
+          const hasAnyFrameworkDeps = !!hasExpoDepInPkg || !!hasViteDepInPkg
+
+          // Detect classic HTML template pattern (script.js + styles.css in root)
+          const hasRootScriptJs = files.some((f: any) => {
+            const p = (f.path || '').replace(/^\.\//, '')
+            return p === 'script.js'
+          })
+          const hasRootStylesCss = files.some((f: any) => {
+            const p = (f.path || '').replace(/^\.\//, '')
+            return p === 'styles.css' || p === 'style.css'
+          })
+          const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
+
+          // HTML/static project = ANY of:
+          // 1. Has index.html with no framework configs/deps
+          // 2. No package.json at all (nothing to install/build)
+          // 3. Classic HTML template pattern (script.js + styles.css in root)
+          const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+            !packageJson ||
+            isClassicHtmlTemplate
+
+          console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+          console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
           if (isHtmlProject) {
             // HTML project - upload static files directly to Supabase storage (no sandbox needed)
@@ -1646,7 +1671,10 @@ async function handleRegularPreview(req: Request) {
     }
 
     // 🔹 Early HTML project detection - skip sandbox, deps, and build entirely
-    const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+    const hasIndexHtml = files.some((f: any) => {
+      const p = (f.path || '').replace(/^\.\//, '')
+      return p === 'index.html' || p.toLowerCase() === 'index.html'
+    })
     const hasViteConfig = files.some((f: any) =>
       f.path === 'vite.config.js' ||
       f.path === 'vite.config.ts' ||
@@ -1664,8 +1692,30 @@ async function handleRegularPreview(req: Request) {
       f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
     )
 
-    // HTML project = has index.html but NO framework build configs and NO framework deps
-    const isHtmlProject = hasIndexHtml && !hasViteConfig && !hasNextConfig && !hasExpoConfig && !hasNuxtConfig && !hasExpoDepInPkg && !hasViteDepInPkg
+    const hasAnyFrameworkConfig = hasViteConfig || hasNextConfig || hasExpoConfig || hasNuxtConfig
+    const hasAnyFrameworkDeps = !!hasExpoDepInPkg || !!hasViteDepInPkg
+
+    // Detect classic HTML template pattern (script.js + styles.css in root)
+    const hasRootScriptJs = files.some((f: any) => {
+      const p = (f.path || '').replace(/^\.\//, '')
+      return p === 'script.js'
+    })
+    const hasRootStylesCss = files.some((f: any) => {
+      const p = (f.path || '').replace(/^\.\//, '')
+      return p === 'styles.css' || p === 'style.css'
+    })
+    const isClassicHtmlTemplate = hasRootScriptJs && hasRootStylesCss
+
+    // HTML/static project = ANY of:
+    // 1. Has index.html with no framework configs/deps
+    // 2. No package.json at all (nothing to install/build)
+    // 3. Classic HTML template pattern (script.js + styles.css in root)
+    const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+      !packageJson ||
+      isClassicHtmlTemplate
+
+    console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isClassicHtmlTemplate=${isClassicHtmlTemplate}, isHtmlProject=${isHtmlProject}`)
+    console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
     if (isHtmlProject) {
       // HTML project - upload static files directly to Supabase storage (no sandbox needed)
