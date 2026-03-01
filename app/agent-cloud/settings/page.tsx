@@ -81,6 +81,8 @@ export default function SettingsPage() {
       apiKey: newByokKey.trim(),
       enabled: true,
       label: provider?.name || newByokProvider,
+      ...('defaultBaseUrl' in (provider || {}) && { baseUrl: (provider as any).defaultBaseUrl }),
+      ...('providerType' in (provider || {}) && { providerType: (provider as any).providerType }),
       addedAt: new Date().toISOString(),
     }
 
