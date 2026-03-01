@@ -991,7 +991,10 @@ async function handleStreamingPreview(req: Request) {
           }
 
           // 🔹 Early HTML project detection - skip sandbox, deps, and build entirely
-          const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+          const hasIndexHtml = files.some((f: any) => {
+            const p = (f.path || '').replace(/^\.\//, '')
+            return p === 'index.html' || p.toLowerCase() === 'index.html'
+          })
           const hasViteConfig = files.some((f: any) =>
             f.path === 'vite.config.js' ||
             f.path === 'vite.config.ts' ||
@@ -1009,8 +1012,17 @@ async function handleStreamingPreview(req: Request) {
             f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
           )
 
-          // HTML project = has index.html but NO framework build configs and NO framework deps
-          const isHtmlProject = hasIndexHtml && !hasViteConfig && !hasNextConfig && !hasExpoConfig && !hasNuxtConfig && !hasExpoDepInPkg && !hasViteDepInPkg
+          const hasAnyFrameworkConfig = hasViteConfig || hasNextConfig || hasExpoConfig || hasNuxtConfig
+          const hasAnyFrameworkDeps = !!hasExpoDepInPkg || !!hasViteDepInPkg
+
+          // HTML/static project = EITHER:
+          // 1. Has index.html with no framework configs/deps (original check), OR
+          // 2. Has NO package.json AND no framework config files (nothing to install/build)
+          const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+            (!packageJson && !hasAnyFrameworkConfig)
+
+          console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
+          console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
           if (isHtmlProject) {
             // HTML project - upload static files directly to Supabase storage (no sandbox needed)
@@ -1646,7 +1658,10 @@ async function handleRegularPreview(req: Request) {
     }
 
     // 🔹 Early HTML project detection - skip sandbox, deps, and build entirely
-    const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+    const hasIndexHtml = files.some((f: any) => {
+      const p = (f.path || '').replace(/^\.\//, '')
+      return p === 'index.html' || p.toLowerCase() === 'index.html'
+    })
     const hasViteConfig = files.some((f: any) =>
       f.path === 'vite.config.js' ||
       f.path === 'vite.config.ts' ||
@@ -1664,8 +1679,17 @@ async function handleRegularPreview(req: Request) {
       f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
     )
 
-    // HTML project = has index.html but NO framework build configs and NO framework deps
-    const isHtmlProject = hasIndexHtml && !hasViteConfig && !hasNextConfig && !hasExpoConfig && !hasNuxtConfig && !hasExpoDepInPkg && !hasViteDepInPkg
+    const hasAnyFrameworkConfig = hasViteConfig || hasNextConfig || hasExpoConfig || hasNuxtConfig
+    const hasAnyFrameworkDeps = !!hasExpoDepInPkg || !!hasViteDepInPkg
+
+    // HTML/static project = EITHER:
+    // 1. Has index.html with no framework configs/deps (original check), OR
+    // 2. Has NO package.json AND no framework config files (nothing to install/build)
+    const isHtmlProject = (hasIndexHtml && !hasAnyFrameworkConfig && !hasAnyFrameworkDeps) ||
+      (!packageJson && !hasAnyFrameworkConfig)
+
+    console.log(`[Preview] Project detection: hasIndexHtml=${hasIndexHtml}, hasViteConfig=${hasViteConfig}, hasNextConfig=${hasNextConfig}, hasExpoConfig=${hasExpoConfig}, hasNuxtConfig=${hasNuxtConfig}, hasPackageJson=${!!packageJson}, isHtmlProject=${isHtmlProject}`)
+    console.log(`[Preview] File paths: ${files.map((f: any) => f.path).join(', ')}`)
 
     if (isHtmlProject) {
       // HTML project - upload static files directly to Supabase storage (no sandbox needed)
