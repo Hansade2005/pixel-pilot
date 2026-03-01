@@ -232,6 +232,7 @@ export const MODELS = [
 // BYOK provider definitions for Agent Cloud
 export const AGENT_CLOUD_BYOK_PROVIDERS = [
   { id: 'bonsai', name: 'Bonsai', placeholder: 'your-bonsai-key', description: 'Access all models via your Bonsai gateway key' },
+  { id: 'vercel-gateway', name: 'Vercel AI Gateway', placeholder: 'your-ai-gateway-api-key', description: 'Route to 7+ providers (Qwen, Gemini, Claude, Grok, etc.)', defaultBaseUrl: 'https://ai-gateway.vercel.sh', providerType: 'anthropic-compatible' as const },
 ]
 
 // Context for sharing state across pages
