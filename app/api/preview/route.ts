@@ -998,10 +998,136 @@ async function handleStreamingPreview(req: Request) {
               console.warn('[Preview] Failed to parse package.json, using default commands')
             }
           }
-          const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
+
+          // 🔹 Early HTML project detection - skip sandbox, deps, and build entirely
+          const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+          const hasViteConfig = files.some((f: any) =>
+            f.path === 'vite.config.js' ||
+            f.path === 'vite.config.ts' ||
+            f.path === 'vite.config.mjs'
+          )
+          const hasNextConfig = files.some((f: any) =>
+            f.path === 'next.config.js' ||
+            f.path === 'next.config.mjs' ||
+            f.path === 'next.config.ts'
+          )
+          const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
+          const hasExpoDepInPkg = packageJson && packageJson.dependencies && packageJson.dependencies['expo']
+          const hasViteDepInPkg = packageJson && packageJson.dependencies && (packageJson.dependencies['vite'] || packageJson.dependencies['react'])
+          const hasNuxtConfig = files.some((f: any) =>
+            f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
+          )
+
+          // HTML project = has index.html but NO framework build configs and NO framework deps
+          const isHtmlProject = hasIndexHtml && !hasViteConfig && !hasNextConfig && !hasExpoConfig && !hasNuxtConfig && !hasExpoDepInPkg && !hasViteDepInPkg
+
+          if (isHtmlProject) {
+            // HTML project - upload static files directly to Supabase storage (no sandbox needed)
+            send({ type: "log", message: "Detected HTML project, uploading static files directly..." })
+
+            // Upload HTML project files to Supabase using the final slug
+            const uploadSuccess = await uploadHtmlProjectToSupabase(files, finalSlug, externalSupabase, isProduction)
+
+            if (!uploadSuccess) {
+              send({ type: "error", message: "Failed to upload HTML files to hosting" })
+              throw new Error('Failed to upload HTML files to hosting')
+            }
+
+            // Return hosted URL with final slug
+            const hostedUrl = `https://${finalSlug}.pipilot.dev/`
+
+            send({ type: "log", message: `HTML project hosted at: ${hostedUrl}` })
+
+            // Create or update site record in the sites table
+            if (authUserId) {
+              try {
+                const siteType = isProduction ? 'production' : 'preview';
+                const autoDelete = !isProduction;
+
+                const { data: existingSite } = await externalSupabase
+                  .from('sites')
+                  .select('*')
+                  .eq('project_id', projectId)
+                  .eq('site_type', siteType)
+                  .eq('user_id', authUserId)
+                  .maybeSingle();
+
+                if (existingSite) {
+                  await externalSupabase
+                    .from('sites')
+                    .update({
+                      url: hostedUrl,
+                      project_slug: finalSlug,
+                      custom_domain_id: customDomainId || null,
+                      last_updated: new Date().toISOString(),
+                      is_active: true
+                    })
+                    .eq('id', existingSite.id);
+
+                  send({ type: "log", message: `Updated ${siteType} site record` });
+                } else {
+                  await externalSupabase
+                    .from('sites')
+                    .insert({
+                      user_id: authUserId,
+                      project_id: projectId,
+                      project_slug: finalSlug,
+                      site_type: siteType,
+                      url: hostedUrl,
+                      custom_domain_id: customDomainId || null,
+                      is_active: true,
+                      auto_delete: autoDelete,
+                      deployed_at: new Date().toISOString(),
+                      metadata: { framework: 'html', deployed_from: 'pixelpilot' }
+                    });
+
+                  send({ type: "log", message: `Created ${siteType} site record` });
+                }
+
+                if (customDomainId) {
+                  await externalSupabase
+                    .from('custom_domains')
+                    .update({ site_id: existingSite?.id })
+                    .eq('id', customDomainId);
+                }
+              } catch (siteError) {
+                send({ type: "error", message: `Site record error: ${siteError}` });
+              }
+            }
+
+            send({
+              type: "ready",
+              message: "HTML project hosted successfully",
+              sandboxId: null,
+              url: hostedUrl,
+              finalSlug: finalSlug,
+              originalSlug: originalSlug,
+              processId: null,
+              hosted: true,
+              isProduction: isProduction
+            })
+
+            // Keep-alive heartbeat for hosted projects too
+            const hostedHeartbeat = setInterval(() => {
+              send({ type: "heartbeat", message: "alive" })
+            }, 30000)
+
+            const hostedOriginalClose = controller.close.bind(controller)
+            controller.close = () => {
+              isClosed = true
+              clearInterval(hostedHeartbeat)
+              hostedOriginalClose()
+            }
+
+            // Exit the function early for HTML projects - no sandbox needed
+            controller.close()
+            return
+          }
+
+          const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
           const template = "pipilot-expo"
 
-          // 🔹 Create sandbox
+          // 🔹 Create sandbox (only for non-HTML projects)
           const sandbox = await createEnhancedSandbox({
             template,
             timeoutMs: 600000,
@@ -1156,13 +1282,8 @@ async function handleStreamingPreview(req: Request) {
             send({ type: "log", message: "📦 All dependency fixes completed, starting dev server..." })
           }
           let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
-          const hasViteConfig = files.some((f: any) => 
-            f.path === 'vite.config.js' || 
-            f.path === 'vite.config.ts' || 
-            f.path === 'vite.config.mjs'
-          )
-          
-          if (hasViteConfig || packageJson?.scripts?.preview) {
+
+          if (hasViteConfig) {
             // Vite project - build and host on Supabase storage
             send({ type: "log", message: "Detected Vite project, will build and host on pipilot" })
             
@@ -1283,121 +1404,7 @@ async function handleStreamingPreview(req: Request) {
             return
           }
 
-          // Check for HTML projects (has index.html but no Vite/Next.js/Expo configs)
-          const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
-          const hasNoBuildConfigs = !files.some((f: any) =>
-            f.path === 'vite.config.js' ||
-            f.path === 'vite.config.ts' ||
-            f.path === 'vite.config.mjs' ||
-            f.path === 'next.config.js' ||
-            f.path === 'next.config.mjs' ||
-            f.path === 'app.json' ||
-            f.path === 'nuxt.config.js' ||
-            f.path === 'nuxt.config.ts'
-          )
-
-          if (hasIndexHtml && hasNoBuildConfigs) {
-            // HTML project - upload static files directly to Supabase storage
-            send({ type: "log", message: "Detected HTML project, will host static files on Supabase" })
-
-            // Upload HTML project files to Supabase using the final slug
-            const uploadSuccess = await uploadHtmlProjectToSupabase(files, finalSlug, externalSupabase, isProduction)
-
-            if (!uploadSuccess) {
-              send({ type: "error", message: "Failed to upload HTML files to hosting" })
-              throw new Error('Failed to upload HTML files to hosting')
-            }
-
-            // Return hosted URL with final slug
-            const hostedUrl = `https://${finalSlug}.pipilot.dev/`
-
-            send({ type: "log", message: `HTML project hosted at: ${hostedUrl}` })
-
-            // Create or update site record in the sites table
-            if (authUserId) {
-              try {
-                const siteType = isProduction ? 'production' : 'preview';
-                const autoDelete = !isProduction;
-
-                const { data: existingSite } = await externalSupabase
-                  .from('sites')
-                  .select('*')
-                  .eq('project_id', projectId)
-                  .eq('site_type', siteType)
-                  .eq('user_id', authUserId)
-                  .maybeSingle();
-
-                if (existingSite) {
-                  await externalSupabase
-                    .from('sites')
-                    .update({
-                      url: hostedUrl,
-                      project_slug: finalSlug,
-                      custom_domain_id: customDomainId || null,
-                      last_updated: new Date().toISOString(),
-                      is_active: true
-                    })
-                    .eq('id', existingSite.id);
-
-                  send({ type: "log", message: `Updated ${siteType} site record` });
-                } else {
-                  await externalSupabase
-                    .from('sites')
-                    .insert({
-                      user_id: authUserId,
-                      project_id: projectId,
-                      project_slug: finalSlug,
-                      site_type: siteType,
-                      url: hostedUrl,
-                      custom_domain_id: customDomainId || null,
-                      is_active: true,
-                      auto_delete: autoDelete,
-                      deployed_at: new Date().toISOString(),
-                      metadata: { framework: 'html', deployed_from: 'pixelpilot' }
-                    });
-
-                  send({ type: "log", message: `Created ${siteType} site record` });
-                }
-
-                if (customDomainId) {
-                  await externalSupabase
-                    .from('custom_domains')
-                    .update({ site_id: existingSite?.id })
-                    .eq('id', customDomainId);
-                }
-              } catch (siteError) {
-                send({ type: "error", message: `Site record error: ${siteError}` });
-              }
-            }
-
-            send({
-              type: "ready",
-              message: "HTML project hosted successfully",
-              sandboxId: sandbox.id,
-              url: hostedUrl,
-              finalSlug: finalSlug,
-              originalSlug: originalSlug,
-              processId: null,
-              hosted: true,
-              isProduction: isProduction
-            })
-
-            // Keep-alive heartbeat for hosted projects too
-            const hostedHeartbeat = setInterval(() => {
-              send({ type: "heartbeat", message: "alive" })
-            }, 30000)
-
-            const hostedOriginalClose = controller.close.bind(controller)
-            controller.close = () => {
-              isClosed = true
-              clearInterval(hostedHeartbeat)
-              hostedOriginalClose()
-            }
-
-            // Exit the function early for hosted projects
-            controller.close()
-            return
-          } else if (isExpoProject) {
+          if (isExpoProject) {
             // Expo project - run dev server directly with npx (no dependency on package.json scripts)
             send({ type: "log", message: "Detected Expo project, starting Expo dev server" })
             
@@ -1646,10 +1653,110 @@ async function handleRegularPreview(req: Request) {
         console.warn('[Preview] Failed to parse package.json, using default commands')
       }
     }
-    const isExpoProject = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js' || (packageJson && packageJson.dependencies && packageJson.dependencies['expo']))
+
+    // 🔹 Early HTML project detection - skip sandbox, deps, and build entirely
+    const hasIndexHtml = files.some((f: any) => f.path === 'index.html')
+    const hasViteConfig = files.some((f: any) =>
+      f.path === 'vite.config.js' ||
+      f.path === 'vite.config.ts' ||
+      f.path === 'vite.config.mjs'
+    )
+    const hasNextConfig = files.some((f: any) =>
+      f.path === 'next.config.js' ||
+      f.path === 'next.config.mjs' ||
+      f.path === 'next.config.ts'
+    )
+    const hasExpoConfig = files.some((f: any) => f.path === 'app.json' || f.path === 'app.config.js')
+    const hasExpoDepInPkg = packageJson && packageJson.dependencies && packageJson.dependencies['expo']
+    const hasViteDepInPkg = packageJson && packageJson.dependencies && (packageJson.dependencies['vite'] || packageJson.dependencies['react'])
+    const hasNuxtConfig = files.some((f: any) =>
+      f.path === 'nuxt.config.js' || f.path === 'nuxt.config.ts'
+    )
+
+    // HTML project = has index.html but NO framework build configs and NO framework deps
+    const isHtmlProject = hasIndexHtml && !hasViteConfig && !hasNextConfig && !hasExpoConfig && !hasNuxtConfig && !hasExpoDepInPkg && !hasViteDepInPkg
+
+    if (isHtmlProject) {
+      // HTML project - upload static files directly to Supabase storage (no sandbox needed)
+      console.log('[Preview] Detected HTML project, uploading static files directly...')
+
+      const uploadSuccess = await uploadHtmlProjectToSupabase(files, finalSlug, externalSupabase, isProduction)
+
+      if (!uploadSuccess) {
+        return Response.json({ error: 'Failed to upload HTML files to hosting' }, { status: 500 })
+      }
+
+      const hostedUrl = `https://${finalSlug}.pipilot.dev/`
+      console.log(`[Preview] HTML project hosted at: ${hostedUrl}`)
+
+      // Create or update site record
+      if (authUserId) {
+        try {
+          const siteType = isProduction ? 'production' : 'preview';
+          const autoDelete = !isProduction;
+
+          const { data: existingSite } = await externalSupabase
+            .from('sites')
+            .select('*')
+            .eq('project_id', projectId)
+            .eq('site_type', siteType)
+            .eq('user_id', authUserId)
+            .maybeSingle();
+
+          if (existingSite) {
+            await externalSupabase
+              .from('sites')
+              .update({
+                url: hostedUrl,
+                project_slug: finalSlug,
+                custom_domain_id: customDomainId || null,
+                last_updated: new Date().toISOString(),
+                is_active: true
+              })
+              .eq('id', existingSite.id);
+          } else {
+            await externalSupabase
+              .from('sites')
+              .insert({
+                user_id: authUserId,
+                project_id: projectId,
+                project_slug: finalSlug,
+                site_type: siteType,
+                url: hostedUrl,
+                custom_domain_id: customDomainId || null,
+                is_active: true,
+                auto_delete: autoDelete,
+                deployed_at: new Date().toISOString(),
+                metadata: { framework: 'html', deployed_from: 'pixelpilot' }
+              });
+          }
+
+          if (customDomainId) {
+            await externalSupabase
+              .from('custom_domains')
+              .update({ site_id: existingSite?.id })
+              .eq('id', customDomainId);
+          }
+        } catch (siteError) {
+          console.error('[Site Record] Error:', siteError);
+        }
+      }
+
+      return Response.json({
+        sandboxId: null,
+        url: hostedUrl,
+        finalSlug: finalSlug,
+        originalSlug: originalSlug,
+        processId: null,
+        hosted: true,
+        isProduction: isProduction
+      })
+    }
+
+    const isExpoProject = hasExpoConfig || !!hasExpoDepInPkg
     const template = "pipilot-expo"
 
-    // Create enhanced E2B sandbox with environment variables
+    // Create enhanced E2B sandbox with environment variables (only for non-HTML projects)
     let sandbox
     try {
       sandbox = await createEnhancedSandbox({
@@ -1828,18 +1935,13 @@ devDependencies:
         }
       }
       let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
-      const hasViteConfig = files.some((f: any) => 
-        f.path === 'vite.config.js' || 
-        f.path === 'vite.config.ts' || 
-        f.path === 'vite.config.mjs'
-      )
-      
+
       // Detect package manager
       const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml')
       const hasYarnLock = files.some(f => f.path === 'yarn.lock')
       const packageManager = hasPnpmLock ? 'pnpm' : hasYarnLock ? 'yarn' : 'npm'
-      
-      if (hasViteConfig || packageJson?.scripts?.preview) {
+
+      if (hasViteConfig) {
         // Vite project - build and host on Supabase storage
         console.log('[Preview] Detected Vite project, will build and host')
         

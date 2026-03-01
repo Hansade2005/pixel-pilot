@@ -5340,33 +5340,6 @@ yarn-error.*
   // HTML + CSS + JavaScript template files
   private static readonly HTML_TEMPLATE_FILES: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[] = [
     {
-      name: 'package.json',
-      path: 'package.json',
-      content: `{
-  "name": "html-vercel-site",
-  "version": "1.0.0",
-  "description": "A pure HTML, CSS, and JavaScript website optimized for Vercel deployment",
-  "main": "index.html",
-  "scripts": {
-    "dev": "python3 -m http.server 3000 || npx serve . -p 3000",
-    "build": "echo 'No build step required for static HTML site'",
-    "preview": "npx serve . -p 3000",
-    "deploy": "vercel --prod",
-    "vercel-deploy": "vercel"
-  },
-  "keywords": ["html", "css", "javascript", "vercel", "static-site"],
-  "author": "PiPilot AI",
-  "license": "MIT",
-  "devDependencies": {
-    "serve": "^14.2.1"
-  }
-}`,
-      fileType: 'json',
-      type: 'text',
-      size: 0,
-      isDirectory: false
-    },
-    {
       name: 'index.html',
       path: 'index.html',
       content: `<!DOCTYPE html>
