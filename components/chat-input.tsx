@@ -177,14 +177,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Get user subscription for model availability
   const { plan: userPlan, status: subscriptionStatus } = useSubscriptionCache(user?.id)
 
-  // Set default model based on user plan: Haiku 4.5 for premium, Grok Fast for free
+  // Set default model: MiniMax M2.5 via Ollama for all users
   useEffect(() => {
-    const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
-    if (isPremium) {
-      setSelectedModel('anthropic/claude-haiku-4.5')
-    } else {
-      setSelectedModel('xai/grok-code-fast-1')
-    }
+    setSelectedModel('ollama/minimax-m2.5')
   }, [userPlan])
 
   // Save prompt to localStorage whenever it changes

@@ -118,7 +118,7 @@ export function ModelSelector({
 
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   const isPremium = ['pro', 'creator', 'teams', 'collaborate', 'enterprise', 'scale'].includes(userPlan)
-  const defaultSelectedModel: string = isPremium ? 'anthropic/claude-sonnet-4.5' : 'xai/grok-code-fast-1'
+  const defaultSelectedModel: string = 'ollama/minimax-m2.5'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
 
   // Determine active BYOK providers
