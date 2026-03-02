@@ -131,6 +131,9 @@ const CATEGORY_ICONS: Record<string, any> = {
   Accessibility: Eye,
   "Best Practices": Sparkles,
   "Code Style": Palette,
+  General: FileWarning,
+  "React Patterns": Code,
+  TypeScript: FileCode,
 }
 
 // ---------------------------------------------------------------------------
