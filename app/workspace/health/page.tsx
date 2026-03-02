@@ -30,6 +30,9 @@ import {
   BarChart3,
   TrendingUp,
   FileCode,
+  TestTube2,
+  GitBranch,
+  Package,
 } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 
@@ -106,6 +109,9 @@ const DIMENSION_CONFIG: Record<
   seo: { label: "SEO", icon: Globe, description: "Metadata, sitemap, semantic HTML" },
   errorHandling: { label: "Error Handling", icon: ShieldAlert, description: "Try/catch, boundaries, states" },
   bestPractices: { label: "Best Practices", icon: Sparkles, description: "React patterns, conventions" },
+  testing: { label: "Testing", icon: TestTube2, description: "Test coverage, quality, frameworks" },
+  devops: { label: "DevOps & CI/CD", icon: GitBranch, description: "Pipelines, Docker, deployment" },
+  dependencies: { label: "Dependencies", icon: Package, description: "Outdated, duplicates, security" },
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
