@@ -6,6 +6,7 @@ export interface ChatModel {
   description: string;
   provider: string;
   supportsVision?: boolean; // Whether model can process images directly
+  premiumOnly?: boolean; // Whether model requires a paid plan
 }
 
 export const chatModels: Array<ChatModel> = [
@@ -152,6 +153,7 @@ export const chatModels: Array<ChatModel> = [
     name: 'Anthropic Claude Sonnet 4.5',
     description: 'Anthropic Claude Sonnet 4.5 via Vercel AI Gateway with Reasoning',
     provider: 'anthropic',
+    premiumOnly: true,
     supportsVision: true,
   },
   {

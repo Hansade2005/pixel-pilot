@@ -60,6 +60,8 @@ import { PlanCard } from './plan-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
 import { createClient } from '@/lib/supabase/client'
+import { checkUserBlocked } from '@/lib/user-block-check'
+import { chatModels } from '@/lib/ai-models'
 import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
 import { uploadLargePayload } from '@/lib/cloud-sync'
@@ -4634,6 +4636,39 @@ export function ChatPanelV2({
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Check if user is blocked - must upgrade before continuing
+    try {
+      const supabaseClient = createClient()
+      const { data: { user: currentUser } } = await supabaseClient.auth.getUser()
+      if (currentUser) {
+        const blockStatus = await checkUserBlocked(currentUser.id)
+        if (blockStatus.isBlocked) {
+          toast({
+            title: '⛔ Account Blocked',
+            description: blockStatus.reason || 'Your account requires an upgrade. Please upgrade your plan to continue.',
+            variant: 'destructive',
+          })
+          window.open('/pricing?blocked=true', '_blank')
+          return
+        }
+      }
+    } catch (err) {
+      // Don't block on check failure
+    }
+
+    // Check if selected model is premium-only and user is on free plan
+    if (selectedModel && userPlan === 'free') {
+      const modelInfo = chatModels.find(m => m.id === selectedModel)
+      if (modelInfo?.premiumOnly) {
+        toast({
+          title: '💎 Premium Model',
+          description: `${modelInfo.name} requires a paid plan. Please upgrade to use this model.`,
+          variant: 'destructive',
+        })
+        return
+      }
+    }
 
     if (!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) {
       return
