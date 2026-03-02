@@ -2132,24 +2132,76 @@ export async function POST(req: Request) {
     }
 
     // ============================================================================
-    // BLOCKED USER CHECK - Must upgrade before continuing
+    // DAILY MESSAGE LIMIT CHECK
     // ============================================================================
-    const BLOCKED_USER_IDS = new Set([
-      '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
-    ])
+    const DAILY_LIMITS: Record<string, number> = { free: 10, creator: 100, collaborate: 300, scale: 1000 }
 
-    if (BLOCKED_USER_IDS.has(user.id)) {
-      console.warn(`[Chat-V2] Blocked user attempted access: ${user.id} (${user.email})`)
-      return NextResponse.json(
-        {
-          error: {
-            message: 'Your account has been suspended. Please upgrade your plan to continue using PiPilot.',
-            code: 'ACCOUNT_SUSPENDED',
-            type: 'credit_error'
-          }
-        },
-        { status: 403 }
-      )
+    {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('type', 'usage')
+        .gte('created_at', todayStart.toISOString())
+
+      // Get user plan from wallet
+      const { data: walletRow } = await supabase
+        .from('wallet')
+        .select('current_plan')
+        .eq('user_id', user.id)
+        .single()
+      const plan = walletRow?.current_plan || 'free'
+      const limit = DAILY_LIMITS[plan] || DAILY_LIMITS.free
+      const used = count || 0
+
+      if (used >= limit) {
+        console.warn(`[Chat-V2] Daily limit reached for user ${user.id}: ${used}/${limit} (plan: ${plan})`)
+        return NextResponse.json(
+          {
+            error: {
+              message: plan === 'free'
+                ? `Daily message limit reached (${limit} messages). Upgrade to Pro for more daily messages.`
+                : `Daily message limit reached (${limit} messages). Your limit resets at midnight.`,
+              code: 'DAILY_LIMIT_REACHED',
+              type: 'credit_error',
+              dailyUsed: used,
+              dailyLimit: limit,
+            }
+          },
+          { status: 429 }
+        )
+      }
+    }
+
+    // ============================================================================
+    // PREMIUM MODEL GATE - Claude Sonnet 4.5 requires a paid plan
+    // ============================================================================
+    {
+      const { data: walletRow } = await supabase
+        .from('wallet')
+        .select('current_plan')
+        .eq('user_id', user.id)
+        .single()
+      const plan = walletRow?.current_plan || 'free'
+
+      if (plan === 'free' && modelId) {
+        const modelInfo = (await import('@/lib/ai-models')).getModelById(modelId)
+        if (modelInfo?.premiumOnly) {
+          console.warn(`[Chat-V2] Free user ${user.id} attempted premium model: ${modelId}`)
+          return NextResponse.json(
+            {
+              error: {
+                message: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / MiniMax M2.5.`,
+                code: 'PREMIUM_MODEL_REQUIRED',
+                type: 'credit_error',
+              }
+            },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     // ============================================================================

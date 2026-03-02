@@ -61,11 +61,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // auto-restore once per page load — not while the user is actively working.
 let hasAutoRestoredThisSession = false
 
-// Blocked users - must upgrade before continuing
-const BLOCKED_USER_IDS = new Set([
-  '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
-])
-
 interface WorkspaceLayoutProps {
   user: User
   projects: Workspace[]
@@ -1156,39 +1151,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     if (codePreviewRef.current) {
       codePreviewRef.current.cleanupSandbox()
     }
-  }
-
-  // Blocked user check
-  const isBlockedUser = BLOCKED_USER_IDS.has(user.id)
-
-  if (isBlockedUser) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-950">
-        <div className="max-w-md mx-auto p-8 bg-gray-900 border border-gray-800/60 rounded-2xl text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
-            <AlertTriangle className="h-8 w-8 text-red-400" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-100 mb-2">Account Suspended</h2>
-          <p className="text-gray-400 mb-6">
-            Your account has been suspended due to usage policy violations. Please upgrade your plan to continue using PiPilot.
-          </p>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => window.open('/pricing', '_blank')}
-              className="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors"
-            >
-              Upgrade Plan
-            </button>
-            <button
-              onClick={() => window.open('mailto:hello@pipilot.dev', '_blank')}
-              className="w-full px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
-            >
-              Contact Support
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
