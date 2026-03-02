@@ -2132,6 +2132,27 @@ export async function POST(req: Request) {
     }
 
     // ============================================================================
+    // BLOCKED USER CHECK - Must upgrade before continuing
+    // ============================================================================
+    const BLOCKED_USER_IDS = new Set([
+      '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
+    ])
+
+    if (BLOCKED_USER_IDS.has(user.id)) {
+      console.warn(`[Chat-V2] Blocked user attempted access: ${user.id} (${user.email})`)
+      return NextResponse.json(
+        {
+          error: {
+            message: 'Your account has been suspended. Please upgrade your plan to continue using PiPilot.',
+            code: 'ACCOUNT_SUSPENDED',
+            type: 'credit_error'
+          }
+        },
+        { status: 403 }
+      )
+    }
+
+    // ============================================================================
     // ABE CREDIT SYSTEM - Authenticate and check credits
     // ============================================================================
     startTime = Date.now()

@@ -1131,6 +1131,11 @@ interface MCPServerConfig {
   enabled: boolean
 }
 
+// Blocked users - must upgrade before continuing
+const BLOCKED_USER_IDS = new Set([
+  '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
+])
+
 interface ChatPanelV2Props {
   project: any
   isMobile?: boolean
@@ -1782,6 +1787,7 @@ export function ChatPanelV2({
   const [topUpAmount, setTopUpAmount] = useState('10')
   const [processingTopUp, setProcessingTopUp] = useState(false)
   const [showCreditExhaustionModal, setShowCreditExhaustionModal] = useState(false)
+  const [isBlockedUser, setIsBlockedUser] = useState(false)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -2979,6 +2985,21 @@ export function ChatPanelV2({
                 newMap.set(originalAssistantMessageId, updatedCalls)
                 return newMap
               })
+            } else if (parsed.type === 'step_progress' || parsed.type === 'credits_exhausted') {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('token-usage-update', {
+                  detail: {
+                    step: parsed.step,
+                    maxSteps: parsed.maxSteps,
+                    stepTokens: parsed.stepTokens,
+                    totalTokens: parsed.totalTokens,
+                    creditsDeducted: parsed.creditsDeducted,
+                    totalCreditsDeducted: parsed.totalCreditsDeducted,
+                    remainingBalance: parsed.type === 'credits_exhausted' ? 0 : parsed.remainingBalance,
+                    creditsExhausted: parsed.type === 'credits_exhausted',
+                  }
+                }))
+              }
             }
           } catch (e) {
             console.error('[ChatPanelV2][Continuation] ❌ Failed to parse continuation chunk:', e)
@@ -3451,6 +3472,11 @@ export function ChatPanelV2({
           return
         }
 
+        // Check if user is blocked
+        if (BLOCKED_USER_IDS.has(user.id)) {
+          setIsBlockedUser(true)
+        }
+
         // Use getWalletBalance function instead of direct query
         const wallet = await getWalletBalance(user.id, supabase)
 
@@ -3645,6 +3671,21 @@ export function ChatPanelV2({
               }
             } else if (parsed.type === 'tool-result') {
               console.log('[ChatPanelV2][ClientTool][Continuation] Tool result received:', parsed.toolName)
+            } else if (parsed.type === 'step_progress' || parsed.type === 'credits_exhausted') {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('token-usage-update', {
+                  detail: {
+                    step: parsed.step,
+                    maxSteps: parsed.maxSteps,
+                    stepTokens: parsed.stepTokens,
+                    totalTokens: parsed.totalTokens,
+                    creditsDeducted: parsed.creditsDeducted,
+                    totalCreditsDeducted: parsed.totalCreditsDeducted,
+                    remainingBalance: parsed.type === 'credits_exhausted' ? 0 : parsed.remainingBalance,
+                    creditsExhausted: parsed.type === 'credits_exhausted',
+                  }
+                }))
+              }
             }
           } catch (e) {
             console.error('[ChatPanelV2][ClientTool] ❌ Failed to parse continuation chunk:', e)
@@ -4099,6 +4140,21 @@ export function ChatPanelV2({
               if (idx !== -1) {
                 continuationToolCalls[idx].status = parsed.result?.error ? 'failed' : 'completed'
                 setStreamingToolCalls([...continuationToolCalls])
+              }
+            } else if (parsed.type === 'step_progress' || parsed.type === 'credits_exhausted') {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('token-usage-update', {
+                  detail: {
+                    step: parsed.step,
+                    maxSteps: parsed.maxSteps,
+                    stepTokens: parsed.stepTokens,
+                    totalTokens: parsed.totalTokens,
+                    creditsDeducted: parsed.creditsDeducted,
+                    totalCreditsDeducted: parsed.totalCreditsDeducted,
+                    remainingBalance: parsed.type === 'credits_exhausted' ? 0 : parsed.remainingBalance,
+                    creditsExhausted: parsed.type === 'credits_exhausted',
+                  }
+                }))
               }
             }
           } catch (e) {
@@ -4706,6 +4762,16 @@ export function ChatPanelV2({
       toast({
         title: 'URLs processing',
         description: 'Please wait for URLs to finish processing',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Check if user is blocked - must upgrade
+    if (isBlockedUser) {
+      toast({
+        title: 'Account Suspended',
+        description: 'Your account has been suspended. Please upgrade your plan to continue using PiPilot.',
         variant: 'destructive'
       })
       return
@@ -5477,7 +5543,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               if (localTool) {
                 localTool.status = resultStatus
               }
-              
+
               // Update streaming state for handleStop access
               setStreamingToolCalls([...localToolCalls])
 
@@ -5493,6 +5559,33 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 newMap.set(assistantMessageId, updatedCalls)
                 return newMap
               })
+            } else if (parsed.type === 'step_progress') {
+              // Token usage progress from server - broadcast to status bar
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('token-usage-update', {
+                  detail: {
+                    step: parsed.step,
+                    maxSteps: parsed.maxSteps,
+                    stepTokens: parsed.stepTokens,
+                    totalTokens: parsed.totalTokens,
+                    creditsDeducted: parsed.creditsDeducted,
+                    totalCreditsDeducted: parsed.totalCreditsDeducted,
+                    remainingBalance: parsed.remainingBalance,
+                  }
+                }))
+              }
+            } else if (parsed.type === 'credits_exhausted') {
+              // Credits exhausted - broadcast to status bar
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('token-usage-update', {
+                  detail: {
+                    step: parsed.step,
+                    creditsExhausted: true,
+                    totalCreditsDeducted: parsed.totalCreditsDeducted,
+                    remainingBalance: 0,
+                  }
+                }))
+              }
             }
           } catch (e) {
             // Log error details to help debug parsing issues

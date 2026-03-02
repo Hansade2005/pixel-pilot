@@ -61,6 +61,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // auto-restore once per page load — not while the user is actively working.
 let hasAutoRestoredThisSession = false
 
+// Blocked users - must upgrade before continuing
+const BLOCKED_USER_IDS = new Set([
+  '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
+])
+
 interface WorkspaceLayoutProps {
   user: User
   projects: Workspace[]
@@ -131,6 +136,37 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     className: string;
     textContent?: string;
   } | null>(null)
+
+  // Token usage tracking (from chat stream step_progress events)
+  const [tokenUsage, setTokenUsage] = useState<{
+    totalTokens: { input: number; output: number } | null;
+    totalCreditsDeducted: number;
+    remainingBalance: number | null;
+    lastStep: number;
+    creditsExhausted: boolean;
+  }>({
+    totalTokens: null,
+    totalCreditsDeducted: 0,
+    remainingBalance: null,
+    lastStep: 0,
+    creditsExhausted: false,
+  })
+
+  // Listen for token usage events from chat panel
+  useEffect(() => {
+    const handleTokenUsage = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      setTokenUsage({
+        totalTokens: detail.totalTokens || null,
+        totalCreditsDeducted: detail.totalCreditsDeducted || 0,
+        remainingBalance: detail.remainingBalance ?? null,
+        lastStep: detail.step || 0,
+        creditsExhausted: detail.creditsExhausted || false,
+      })
+    }
+    window.addEventListener('token-usage-update', handleTokenUsage)
+    return () => window.removeEventListener('token-usage-update', handleTokenUsage)
+  }, [])
 
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
@@ -1122,6 +1158,39 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
+  // Blocked user check
+  const isBlockedUser = BLOCKED_USER_IDS.has(user.id)
+
+  if (isBlockedUser) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-950">
+        <div className="max-w-md mx-auto p-8 bg-gray-900 border border-gray-800/60 rounded-2xl text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+            <AlertTriangle className="h-8 w-8 text-red-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-100 mb-2">Account Suspended</h2>
+          <p className="text-gray-400 mb-6">
+            Your account has been suspended due to usage policy violations. Please upgrade your plan to continue using PiPilot.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => window.open('/pricing', '_blank')}
+              className="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors"
+            >
+              Upgrade Plan
+            </button>
+            <button
+              onClick={() => window.open('mailto:hello@pipilot.dev', '_blank')}
+              className="w-full px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
+            >
+              Contact Support
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen flex bg-gray-950 relative">
       {/* Desktop Layout */}
@@ -1852,8 +1921,38 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   </button>
                 </div>
 
-                {/* Right side - action buttons */}
+                {/* Right side - token usage + action buttons */}
                 <div className="flex items-center">
+                  {/* Token/Credit Usage */}
+                  {tokenUsage.totalTokens && (
+                    <>
+                      <button
+                        className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 transition-colors"
+                        title={`Tokens: ${(tokenUsage.totalTokens.input + tokenUsage.totalTokens.output).toLocaleString()} total (${tokenUsage.totalTokens.input.toLocaleString()} in / ${tokenUsage.totalTokens.output.toLocaleString()} out) | Step ${tokenUsage.lastStep}`}
+                        onClick={() => window.open('/workspace/usage', '_blank')}
+                      >
+                        <Zap className="h-3 w-3 text-orange-400" />
+                        <span className="text-orange-300">
+                          {((tokenUsage.totalTokens.input + tokenUsage.totalTokens.output) / 1000).toFixed(1)}k
+                        </span>
+                      </button>
+                      <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+                    </>
+                  )}
+                  {tokenUsage.remainingBalance !== null && (
+                    <>
+                      <button
+                        className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 transition-colors"
+                        title={`Credits: ${tokenUsage.remainingBalance.toFixed(2)} remaining | ${tokenUsage.totalCreditsDeducted.toFixed(2)} used this request`}
+                        onClick={() => window.open('/workspace/usage', '_blank')}
+                      >
+                        <span className={tokenUsage.creditsExhausted ? 'text-red-400' : tokenUsage.remainingBalance < 10 ? 'text-yellow-400' : 'text-green-400'}>
+                          {tokenUsage.remainingBalance.toFixed(1)} credits
+                        </span>
+                      </button>
+                      <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+                    </>
+                  )}
                   {selectedProject?.vercelDeploymentUrl && (
                     <button
                       className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 hover:text-green-400 transition-colors"
