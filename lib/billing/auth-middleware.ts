@@ -7,6 +7,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
 import { getWalletBalance, deductCredits, calculateCreditsFromTokens } from './credit-manager'
+import { isUserBlocked, getBlockReason } from '@/lib/blocked-users'
 
 export interface UserAuthContext {
   userId: string
@@ -48,6 +49,20 @@ export async function authenticateUser(request: Request, isByok: boolean = false
           message: 'Authentication required. Please sign in.',
           code: 'UNAUTHORIZED',
           statusCode: 401
+        }
+      }
+    }
+
+    // Check if user is blocked/suspended
+    if (isUserBlocked(user.id)) {
+      const reason = getBlockReason(user.id)
+      console.warn(`[AuthMiddleware] ⛔ Blocked user: ${user.id} (${user.email})`)
+      return {
+        success: false,
+        error: {
+          message: reason || 'Account suspended. Please upgrade your plan to continue.',
+          code: 'INSUFFICIENT_CREDITS',
+          statusCode: 403
         }
       }
     }
