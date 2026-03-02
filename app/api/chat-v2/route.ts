@@ -12,7 +12,6 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { isUserBlocked, getBlockReason } from '@/lib/blocked-users'
 import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
@@ -2169,23 +2168,6 @@ export async function POST(req: Request) {
     }
 
     authContext = authResult.context
-
-    // Check if user is blocked
-    if (isUserBlocked(authContext.userId)) {
-      const reason = getBlockReason(authContext.userId)
-      console.warn(`[Chat-V2] ⛔ Blocked user attempted access: ${authContext.userId}`)
-      return NextResponse.json(
-        {
-          error: {
-            message: reason || 'Account suspended. Please upgrade your plan to continue.',
-            code: 'INSUFFICIENT_CREDITS',
-            type: 'credit_error'
-          }
-        },
-        { status: 403 }
-      )
-    }
-
     console.log(
       `[Chat-V2] ✅ Authenticated: User ${authContext.userId}, Plan: ${authContext.currentPlan}, Balance: ${authContext.creditsBalance} credits${isByokMode ? ' (BYOK - credits not consumed)' : ''}`
     )
