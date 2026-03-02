@@ -2991,6 +2991,18 @@ export function ChatPanelV2({
                 newMap.set(originalAssistantMessageId, updatedCalls)
                 return newMap
               })
+            } else if (parsed.type === 'step_progress') {
+              onTokenUsage?.({
+                step: parsed.step,
+                maxSteps: parsed.maxSteps,
+                toolsUsed: parsed.toolsUsed || [],
+                progressMessage: parsed.progressMessage || '',
+                stepTokens: parsed.stepTokens || { input: 0, output: 0 },
+                totalTokens: parsed.totalTokens || { input: 0, output: 0 },
+                creditsDeducted: parsed.creditsDeducted || 0,
+                totalCreditsDeducted: parsed.totalCreditsDeducted || 0,
+                remainingBalance: parsed.remainingBalance || 0,
+              })
             }
           } catch (e) {
             console.error('[ChatPanelV2][Continuation] ❌ Failed to parse continuation chunk:', e)
@@ -3657,6 +3669,18 @@ export function ChatPanelV2({
               }
             } else if (parsed.type === 'tool-result') {
               console.log('[ChatPanelV2][ClientTool][Continuation] Tool result received:', parsed.toolName)
+            } else if (parsed.type === 'step_progress') {
+              onTokenUsage?.({
+                step: parsed.step,
+                maxSteps: parsed.maxSteps,
+                toolsUsed: parsed.toolsUsed || [],
+                progressMessage: parsed.progressMessage || '',
+                stepTokens: parsed.stepTokens || { input: 0, output: 0 },
+                totalTokens: parsed.totalTokens || { input: 0, output: 0 },
+                creditsDeducted: parsed.creditsDeducted || 0,
+                totalCreditsDeducted: parsed.totalCreditsDeducted || 0,
+                remainingBalance: parsed.remainingBalance || 0,
+              })
             }
           } catch (e) {
             console.error('[ChatPanelV2][ClientTool] ❌ Failed to parse continuation chunk:', e)
@@ -4112,6 +4136,18 @@ export function ChatPanelV2({
                 continuationToolCalls[idx].status = parsed.result?.error ? 'failed' : 'completed'
                 setStreamingToolCalls([...continuationToolCalls])
               }
+            } else if (parsed.type === 'step_progress') {
+              onTokenUsage?.({
+                step: parsed.step,
+                maxSteps: parsed.maxSteps,
+                toolsUsed: parsed.toolsUsed || [],
+                progressMessage: parsed.progressMessage || '',
+                stepTokens: parsed.stepTokens || { input: 0, output: 0 },
+                totalTokens: parsed.totalTokens || { input: 0, output: 0 },
+                creditsDeducted: parsed.creditsDeducted || 0,
+                totalCreditsDeducted: parsed.totalCreditsDeducted || 0,
+                remainingBalance: parsed.remainingBalance || 0,
+              })
             }
           } catch (e) {
             // Skip malformed JSON
