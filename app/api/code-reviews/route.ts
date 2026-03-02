@@ -662,6 +662,177 @@ function checkCodeStyle(file: { path: string; content: string }, lines: string[]
 }
 
 // ---------------------------------------------------------------------------
+// TYPESCRIPT QUALITY rules (new category)
+// ---------------------------------------------------------------------------
+
+function checkTypeScriptQuality(file: { path: string; content: string }, lines: string[]): Issue[] {
+  const issues: Issue[] = []
+  const fp = file.path
+  const ext = file.path.split('.').pop()?.toLowerCase()
+  if (!['ts', 'tsx'].includes(ext || '')) return issues
+
+  // 1. Excessive 'any' usage
+  const anyCount = (file.content.match(/:\s*any\b/g) || []).length
+  if (anyCount > 5) {
+    issues.push({ severity: 'high', category: 'TypeScript', message: `${anyCount} uses of 'any' type - significantly weakens type safety`, file: fp, rule: 'no-excessive-any' })
+  } else if (anyCount > 2) {
+    issues.push({ severity: 'medium', category: 'TypeScript', message: `${anyCount} uses of 'any' type - replace with proper interfaces`, file: fp, rule: 'no-excessive-any' })
+  }
+
+  // 2. Type assertions (as any)
+  const asAnyCount = (file.content.match(/as\s+any\b/g) || []).length
+  if (asAnyCount > 2) {
+    issues.push({ severity: 'medium', category: 'TypeScript', message: `${asAnyCount} 'as any' assertions - use proper type narrowing`, file: fp, rule: 'no-as-any' })
+  }
+
+  // 3. Non-null assertions (!)
+  const nonNullCount = (file.content.match(/\w+!/g) || []).length - (file.content.match(/!=|!==|!\s/g) || []).length
+  if (nonNullCount > 5) {
+    issues.push({ severity: 'low', category: 'TypeScript', message: `${nonNullCount} non-null assertions (!) - prefer optional chaining or proper checks`, file: fp, rule: 'no-non-null-assertion' })
+  }
+
+  // 4. Missing return types on exported functions
+  const exportedFns = scanLines(lines, /export\s+(?:async\s+)?function\s+\w+\s*\([^)]*\)\s*\{/)
+  const exportedFnsWithReturn = scanLines(lines, /export\s+(?:async\s+)?function\s+\w+\s*\([^)]*\)\s*:\s*\w/)
+  if (exportedFns.length > 3 && exportedFnsWithReturn.length < exportedFns.length / 2) {
+    issues.push({ severity: 'low', category: 'TypeScript', message: `${exportedFns.length - exportedFnsWithReturn.length} exported functions without return type annotation`, file: fp, rule: 'explicit-return-types' })
+  }
+
+  // 5. Using object/Object/Function types
+  for (const ln of scanLines(lines, /:\s*(?:object|Object|Function)\b/)) {
+    issues.push({ severity: 'medium', category: 'TypeScript', message: 'Avoid generic object/Object/Function types - use specific interfaces', file: fp, line: ln, rule: 'no-generic-types' })
+  }
+
+  // 6. Type imports not using 'import type'
+  const regularTypeImports = scanLines(lines, /import\s+\{[^}]*(?:Interface|Type|Props|State|Config|Options)\b[^}]*\}\s+from/)
+  const typeImports = scanLines(lines, /import\s+type\s+/)
+  if (regularTypeImports.length > 3 && typeImports.length === 0) {
+    issues.push({ severity: 'info', category: 'TypeScript', message: 'Type-only imports not using "import type" - helps with tree-shaking', file: fp, rule: 'prefer-import-type' })
+  }
+
+  // 7. Enum usage (prefer const objects or union types)
+  for (const ln of scanLines(lines, /\benum\s+\w+/)) {
+    issues.push({ severity: 'info', category: 'TypeScript', message: 'Enum usage - consider "as const" objects or union types for better tree-shaking', file: fp, line: ln, rule: 'prefer-union-types' })
+  }
+
+  // 8. @ts-ignore without explanation
+  for (const ln of scanLines(lines, /\/\/\s*@ts-ignore(?!\s+\S)/)) {
+    issues.push({ severity: 'medium', category: 'TypeScript', message: '@ts-ignore without explanation - use @ts-expect-error with reason', file: fp, line: ln, rule: 'no-ts-ignore' })
+  }
+
+  // 9. Unused type parameters
+  for (const ln of scanLines(lines, /<\w+>\s*\(/)) {
+    // Basic check for generic functions that don't use the type param
+    const context = lines.slice(ln - 1, Math.min(ln + 10, lines.length)).join('\n')
+    const typeParam = lines[ln - 1].match(/<(\w+)>/)?.[1]
+    if (typeParam && !context.slice(context.indexOf('>')).includes(typeParam)) {
+      issues.push({ severity: 'info', category: 'TypeScript', message: `Potentially unused type parameter <${typeParam}>`, file: fp, line: ln, rule: 'no-unused-type-params' })
+    }
+  }
+
+  return issues
+}
+
+// ---------------------------------------------------------------------------
+// REACT/NEXT.JS PATTERNS rules (new category)
+// ---------------------------------------------------------------------------
+
+function checkReactPatterns(file: { path: string; content: string }, lines: string[]): Issue[] {
+  const issues: Issue[] = []
+  const fp = file.path
+  const ext = file.path.split('.').pop()?.toLowerCase()
+  if (!['tsx', 'jsx'].includes(ext || '')) return issues
+
+  // 1. Component too large (render function complexity)
+  const componentLines = lines.length
+  if (componentLines > 400) {
+    issues.push({ severity: 'high', category: 'React Patterns', message: `Component has ${componentLines} lines - split into smaller components`, file: fp, rule: 'component-too-large' })
+  } else if (componentLines > 250) {
+    issues.push({ severity: 'medium', category: 'React Patterns', message: `Component has ${componentLines} lines - consider splitting`, file: fp, rule: 'component-getting-large' })
+  }
+
+  // 2. Prop drilling detection
+  for (const ln of scanLines(lines, /<\w+\s/)) {
+    const componentCall = lines.slice(ln - 1, Math.min(ln + 5, lines.length)).join(' ')
+    const propMatches = componentCall.match(/\w+=\{/g)
+    if (propMatches && propMatches.length > 8) {
+      issues.push({ severity: 'medium', category: 'React Patterns', message: `Component receives ${propMatches.length} props - consider context or composition`, file: fp, line: ln, rule: 'excessive-props' })
+    }
+  }
+
+  // 3. useEffect for data fetching (should use React Query/SWR or Server Components)
+  for (const ln of scanLines(lines, /useEffect\s*\(\s*(?:async|\(\)\s*=>\s*\{[^}]*fetch)/)) {
+    issues.push({ severity: 'medium', category: 'React Patterns', message: 'Data fetching in useEffect - consider React Query, SWR, or Server Components', file: fp, line: ln, rule: 'use-data-fetching-lib' })
+  }
+  // Additional check for fetch inside useEffect
+  for (const ln of scanLines(lines, /useEffect\s*\(/)) {
+    const effectBody = lines.slice(ln - 1, Math.min(ln + 15, lines.length)).join('\n')
+    if (/fetch\(|axios|\.get\(|\.post\(/.test(effectBody) && /useEffect/.test(effectBody)) {
+      if (!issues.some(i => i.line === ln && i.rule === 'use-data-fetching-lib')) {
+        issues.push({ severity: 'low', category: 'React Patterns', message: 'Data fetching in useEffect - prefer dedicated data fetching patterns', file: fp, line: ln, rule: 'use-data-fetching-lib' })
+      }
+    }
+  }
+
+  // 4. Missing error boundary for Suspense
+  if (file.content.includes('Suspense') && !/ErrorBoundary|error\.tsx/.test(file.content)) {
+    issues.push({ severity: 'medium', category: 'React Patterns', message: 'Suspense without ErrorBoundary - unhandled errors will crash the tree', file: fp, rule: 'suspense-needs-boundary' })
+  }
+
+  // 5. Client component that could be server component
+  if ((file.content.includes('"use client"') || file.content.includes("'use client'")) &&
+      !/useState|useEffect|useCallback|useMemo|useRef|useContext|onClick|onChange|onSubmit|useRouter|useSearchParams|usePathname/.test(file.content)) {
+    issues.push({ severity: 'medium', category: 'React Patterns', message: '"use client" directive but no client-side hooks/handlers detected - may work as Server Component', file: fp, rule: 'unnecessary-use-client' })
+  }
+
+  // 6. Inline function definitions in JSX props (causes re-renders)
+  const inlineFnCount = (file.content.match(/=\{\s*\(\s*\)\s*=>\s*|=\{\s*function\s*\(/g) || []).length
+  if (inlineFnCount > 5) {
+    issues.push({ severity: 'low', category: 'React Patterns', message: `${inlineFnCount} inline functions in JSX - extract to useCallback for performance`, file: fp, rule: 'no-inline-jsx-functions' })
+  }
+
+  // 7. Missing display name for forwardRef/memo components
+  if (/forwardRef|React\.memo/.test(file.content) && !/displayName/.test(file.content)) {
+    issues.push({ severity: 'info', category: 'React Patterns', message: 'forwardRef/memo component without displayName - harder to debug', file: fp, rule: 'has-display-name' })
+  }
+
+  // 8. Conditional hook calls
+  for (const ln of scanLines(lines, /if\s*\([^)]*\)\s*\{[^}]*use[A-Z]/)) {
+    issues.push({ severity: 'critical', category: 'React Patterns', message: 'Conditional hook call - violates Rules of Hooks', file: fp, line: ln, rule: 'no-conditional-hooks' })
+  }
+
+  // 9. Multiple state updates that should be batched
+  for (const ln of scanLines(lines, /set\w+\(/)) {
+    const context = lines.slice(ln - 1, Math.min(ln + 5, lines.length)).join('\n')
+    const setCount = (context.match(/set\w+\(/g) || []).length
+    if (setCount > 3 && !/startTransition|flushSync/.test(context)) {
+      issues.push({ severity: 'info', category: 'React Patterns', message: 'Multiple sequential state updates - consider useReducer for complex state', file: fp, line: ln, rule: 'batch-state-updates' })
+      break // Only flag once per file
+    }
+  }
+
+  // 10. Server action patterns
+  if (fp.includes('action') && /^'use server'|"use server"/m.test(file.content)) {
+    if (!/z\.\w+|zod|validate|schema/.test(file.content)) {
+      issues.push({ severity: 'medium', category: 'React Patterns', message: 'Server Action without input validation (use Zod)', file: fp, rule: 'server-action-validation' })
+    }
+  }
+
+  // 11. Context overuse (too many providers nesting)
+  const providerCount = (file.content.match(/<\w+Provider\b/g) || []).length
+  if (providerCount > 4) {
+    issues.push({ severity: 'low', category: 'React Patterns', message: `${providerCount} context providers nested - consider combining or using Zustand/Jotai`, file: fp, rule: 'provider-hell' })
+  }
+
+  // 12. Missing key in fragments with children
+  for (const ln of scanLines(lines, /<>\s*\{.*\.map/)) {
+    issues.push({ severity: 'medium', category: 'React Patterns', message: 'Mapping inside Fragment (<>) - children need key props, use <Fragment key={...}>', file: fp, line: ln, rule: 'fragment-key' })
+  }
+
+  return issues
+}
+
+// ---------------------------------------------------------------------------
 // Main analysis orchestrator
 // ---------------------------------------------------------------------------
 
@@ -714,6 +885,14 @@ function analyzeCode(files: Array<{ path: string; content: string }>, reviewType
       fileIssues.push(...checkCodeStyle(file, lines))
       rulesChecked += 6
     }
+    if (reviewType === 'full' || reviewType === 'typescript') {
+      fileIssues.push(...checkTypeScriptQuality(file, lines))
+      rulesChecked += 9
+    }
+    if (reviewType === 'full' || reviewType === 'react-patterns') {
+      fileIssues.push(...checkReactPatterns(file, lines))
+      rulesChecked += 12
+    }
 
     allIssues.push(...fileIssues)
 
@@ -741,7 +920,7 @@ function analyzeCode(files: Array<{ path: string; content: string }>, reviewType
 
   // Build category summaries
   const categories: Record<string, CategorySummary> = {}
-  const categoryNames = ['Security', 'Performance', 'Maintainability', 'Accessibility', 'Best Practices', 'Code Style']
+  const categoryNames = ['Security', 'Performance', 'Maintainability', 'Accessibility', 'Best Practices', 'Code Style', 'TypeScript', 'React Patterns']
   for (const cat of categoryNames) {
     const catIssues = allIssues.filter(i => i.category === cat)
     const catDeductions = catIssues.reduce((s, i) => s + SEVERITY_WEIGHT[i.severity], 0)
@@ -780,7 +959,7 @@ function analyzeCode(files: Array<{ path: string; content: string }>, reviewType
       totalLines,
       totalFunctions,
       avgComplexity,
-      rulesChecked: Math.min(rulesChecked, 64),
+      rulesChecked: Math.min(rulesChecked, 85),
     },
   }
 }
@@ -847,6 +1026,31 @@ function generateSuggestions(issues: Issue[], categories: Record<string, Categor
   // Code Style
   if (issues.some(i => i.rule === 'no-var')) {
     suggestions.push({ category: 'Code Style', message: 'Migrate var declarations to const/let for better scoping', priority: 'low' })
+  }
+
+  // TypeScript Quality
+  if (issues.some(i => i.rule === 'no-excessive-any' || i.rule === 'no-as-any')) {
+    suggestions.push({ category: 'TypeScript', message: 'Replace `any` types and `as any` assertions with proper interfaces and type narrowing', priority: 'medium' })
+  }
+  if (issues.some(i => i.rule === 'no-ts-ignore')) {
+    suggestions.push({ category: 'TypeScript', message: 'Replace @ts-ignore with @ts-expect-error and add explanation comments', priority: 'low' })
+  }
+  if (issues.some(i => i.rule === 'explicit-return-types')) {
+    suggestions.push({ category: 'TypeScript', message: 'Add explicit return type annotations to exported functions', priority: 'low' })
+  }
+
+  // React Patterns
+  if (issues.some(i => i.rule === 'component-too-large' || i.rule === 'component-getting-large')) {
+    suggestions.push({ category: 'React Patterns', message: 'Break large components into smaller, composable sub-components', priority: 'high' })
+  }
+  if (issues.some(i => i.rule === 'use-data-fetching-lib')) {
+    suggestions.push({ category: 'React Patterns', message: 'Use React Query, SWR, or Server Components for data fetching instead of raw useEffect', priority: 'medium' })
+  }
+  if (issues.some(i => i.rule === 'unnecessary-use-client')) {
+    suggestions.push({ category: 'React Patterns', message: 'Convert unnecessary client components to Server Components for better performance', priority: 'medium' })
+  }
+  if (issues.some(i => i.rule === 'no-conditional-hooks')) {
+    suggestions.push({ category: 'React Patterns', message: 'Fix conditional hook calls - hooks must be called at the top level of components', priority: 'high' })
   }
 
   // If no issues
