@@ -3,7 +3,7 @@ import { experimental_createMCPClient as createMCPClient } from '@ai-sdk/mcp'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel, needsMistralVisionProvider, getDevstralVisionModel, getFallbackModel, isProviderError, FALLBACK_MODEL_ID, parseByokKeysFromHeader, createByokModel, resolveByokProvider } from '@/lib/ai-providers'
-import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision } from '@/lib/ai-models'
+import { DEFAULT_CHAT_MODEL, getModelById, modelSupportsVision, chatModels } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
 import { filterUnwantedFiles } from '@/lib/utils'
@@ -2189,6 +2189,23 @@ export async function POST(req: Request) {
             }
           },
           { status: 429 }
+        )
+      }
+    }
+
+    // Check if user is trying to use a premium-only model on a free plan
+    if (modelId && authContext.currentPlan === 'free') {
+      const selectedModelInfo = chatModels.find(m => m.id === modelId)
+      if (selectedModelInfo?.premiumOnly) {
+        return NextResponse.json(
+          {
+            error: {
+              message: `${selectedModelInfo.name} is a premium model. Please upgrade your plan to use this model.`,
+              code: 'PREMIUM_MODEL_REQUIRED',
+              type: 'credit_error'
+            }
+          },
+          { status: 403 }
         )
       }
     }

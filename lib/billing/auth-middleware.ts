@@ -7,6 +7,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
 import { getWalletBalance, deductCredits, calculateCreditsFromTokens } from './credit-manager'
+import { checkUserBlockedServer } from '@/lib/user-block-check-server'
 
 export interface UserAuthContext {
   userId: string
@@ -22,7 +23,7 @@ export interface AuthResult {
   context?: UserAuthContext
   error?: {
     message: string
-    code: 'UNAUTHORIZED' | 'INSUFFICIENT_CREDITS' | 'NO_WALLET' | 'INVALID_SESSION'
+    code: 'UNAUTHORIZED' | 'INSUFFICIENT_CREDITS' | 'NO_WALLET' | 'INVALID_SESSION' | 'ACCOUNT_BLOCKED' | 'PREMIUM_MODEL_REQUIRED'
     statusCode: number
   }
 }
@@ -48,6 +49,19 @@ export async function authenticateUser(request: Request, isByok: boolean = false
           message: 'Authentication required. Please sign in.',
           code: 'UNAUTHORIZED',
           statusCode: 401
+        }
+      }
+    }
+
+    // Check if user is blocked
+    const blockStatus = await checkUserBlockedServer(user.id)
+    if (blockStatus.isBlocked) {
+      return {
+        success: false,
+        error: {
+          message: blockStatus.reason || 'Your account has been blocked. Please upgrade your plan to continue using the platform.',
+          code: 'ACCOUNT_BLOCKED',
+          statusCode: 403
         }
       }
     }
