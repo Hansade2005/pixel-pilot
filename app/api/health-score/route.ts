@@ -804,6 +804,361 @@ function analyzeBestPractices(files: FileInput[]): HealthDimension {
 }
 
 // ---------------------------------------------------------------------------
+// 9. TESTING
+// ---------------------------------------------------------------------------
+
+function analyzeTesting(files: FileInput[]): HealthDimension {
+  const issues: HealthIssue[] = []
+  const suggestions: string[] = []
+
+  let hasTestFiles = false
+  let hasTestConfig = false
+  let hasTestingLib = false
+  let testFileCount = 0
+  let codeFileCount = 0
+  let hasE2e = false
+  let hasCypressOrPlaywright = false
+
+  for (const file of files) {
+    if (!file.content || !file.path) continue
+    const lowerPath = file.path.toLowerCase()
+    const ext = file.path.split('.').pop()?.toLowerCase() || ''
+
+    if (isCodeFile(ext) && !lowerPath.includes('test') && !lowerPath.includes('spec') && !lowerPath.includes('__mocks__')) {
+      codeFileCount++
+    }
+
+    // Test file detection
+    if (/\.(test|spec)\.(ts|tsx|js|jsx)$/.test(file.path)) {
+      hasTestFiles = true
+      testFileCount++
+    }
+
+    // Test config
+    if (/jest\.config|vitest\.config|playwright\.config|cypress\.config/.test(lowerPath)) {
+      hasTestConfig = true
+    }
+    if (lowerPath.includes('cypress') || lowerPath.includes('playwright') || lowerPath.includes('e2e')) {
+      hasE2e = true
+      hasCypressOrPlaywright = true
+    }
+
+    // Testing library imports
+    if (/@testing-library|enzyme|vitest|jest|cypress|playwright/.test(file.content)) {
+      hasTestingLib = true
+    }
+
+    // Test quality checks
+    if (/\.(test|spec)\.(ts|tsx|js|jsx)$/.test(file.path) && isCodeFile(ext)) {
+      const lines = file.content.split('\n')
+
+      // Tests without assertions
+      if (/it\(|test\(/.test(file.content) && !/expect\(|assert\./.test(file.content)) {
+        issues.push({ severity: 'high', message: 'Test file without assertions (expect/assert)', file: file.path, rule: 'test-has-assertions' })
+      }
+
+      // Skipped tests
+      const skippedCount = (file.content.match(/\.skip\(|xit\(|xdescribe\(|xtest\(/g) || []).length
+      if (skippedCount > 0) {
+        issues.push({ severity: 'medium', message: `${skippedCount} skipped test(s)`, file: file.path, rule: 'no-skipped-tests' })
+      }
+
+      // Test-only focused tests
+      const onlyCount = (file.content.match(/\.only\(|fit\(|fdescribe\(/g) || []).length
+      if (onlyCount > 0) {
+        issues.push({ severity: 'high', message: `${onlyCount} focused (.only) test(s) - will skip other tests in CI`, file: file.path, rule: 'no-focused-tests' })
+      }
+
+      // Very large test files
+      if (lines.length > 500) {
+        issues.push({ severity: 'low', message: `Test file has ${lines.length} lines - consider splitting`, file: file.path, rule: 'test-file-size' })
+      }
+
+      // Hardcoded test data (magic strings/numbers in assertions)
+      const hardcodedAssertions = scanLines(lines, /expect\([^)]+\)\.\w+\(\s*['"`]\w{20,}/)
+      if (hardcodedAssertions.length > 3) {
+        issues.push({ severity: 'low', message: 'Many hardcoded values in assertions - use test fixtures', file: file.path, rule: 'test-fixtures' })
+      }
+
+      // Missing cleanup
+      if (/addEventListener|setInterval|setTimeout/.test(file.content) && !/afterEach|afterAll|cleanup/.test(file.content)) {
+        issues.push({ severity: 'medium', message: 'Test with side effects but no cleanup (afterEach/afterAll)', file: file.path, rule: 'test-cleanup' })
+      }
+    }
+  }
+
+  // Project-level testing checks
+  if (!hasTestFiles && codeFileCount > 5) {
+    issues.push({ severity: 'critical', message: 'No test files found in the project', rule: 'has-tests' })
+    suggestions.push('Add unit tests with Jest/Vitest and React Testing Library')
+  }
+
+  if (hasTestFiles && codeFileCount > 0) {
+    const coverageRatio = testFileCount / codeFileCount
+    if (coverageRatio < 0.1) {
+      issues.push({ severity: 'high', message: `Low test coverage: ${testFileCount} test files for ${codeFileCount} code files (${Math.round(coverageRatio * 100)}%)`, rule: 'test-coverage-low' })
+      suggestions.push('Aim for at least 1 test file per 3 code files')
+    } else if (coverageRatio < 0.3) {
+      issues.push({ severity: 'medium', message: `Moderate test coverage: ${testFileCount} test files for ${codeFileCount} code files`, rule: 'test-coverage-moderate' })
+    }
+  }
+
+  if (!hasTestConfig && codeFileCount > 5) {
+    issues.push({ severity: 'medium', message: 'No test configuration (jest.config/vitest.config) found', rule: 'has-test-config' })
+    suggestions.push('Add a test runner configuration file')
+  }
+
+  if (!hasE2e && codeFileCount > 15) {
+    issues.push({ severity: 'low', message: 'No end-to-end tests found (Playwright/Cypress)', rule: 'has-e2e' })
+    suggestions.push('Add E2E tests with Playwright or Cypress for critical user flows')
+  }
+
+  if (issues.length === 0) suggestions.push('Good testing practices!')
+  if (hasTestingLib) suggestions.push('Testing library detected - great setup!')
+  if (hasCypressOrPlaywright) suggestions.push('E2E testing configured - excellent coverage strategy!')
+
+  const score = calcScore(issues)
+  return { score, grade: getGrade(score), issues: issues.slice(0, 15), suggestions }
+}
+
+// ---------------------------------------------------------------------------
+// 10. DEVOPS & CI
+// ---------------------------------------------------------------------------
+
+function analyzeDevOps(files: FileInput[]): HealthDimension {
+  const issues: HealthIssue[] = []
+  const suggestions: string[] = []
+
+  let hasCI = false
+  let hasDockerfile = false
+  let hasGitignore = false
+  let hasLintStaged = false
+  let hasHusky = false
+  let hasEnvTypes = false
+  let hasNextConfig = false
+  let hasTsConfig = false
+  let hasPackageLock = false
+  let hasBundleAnalysis = false
+
+  for (const file of files) {
+    if (!file.content || !file.path) continue
+    const lowerPath = file.path.toLowerCase()
+
+    // CI/CD
+    if (lowerPath.includes('.github/workflows') || lowerPath.includes('.gitlab-ci') || lowerPath.includes('Jenkinsfile') || lowerPath.includes('.circleci')) {
+      hasCI = true
+
+      // Check CI quality
+      if (lowerPath.includes('.github/workflows') && file.content) {
+        if (!/cache|actions\/cache/.test(file.content)) {
+          issues.push({ severity: 'low', message: 'CI workflow without caching - slower builds', file: file.path, rule: 'ci-cache' })
+        }
+        if (!/test|jest|vitest|playwright/.test(file.content)) {
+          issues.push({ severity: 'medium', message: 'CI workflow without test step', file: file.path, rule: 'ci-has-tests' })
+        }
+        if (!/lint|eslint/.test(file.content)) {
+          issues.push({ severity: 'low', message: 'CI workflow without lint step', file: file.path, rule: 'ci-has-lint' })
+        }
+        if (!/typecheck|tsc|type-check/.test(file.content)) {
+          issues.push({ severity: 'low', message: 'CI workflow without type check step', file: file.path, rule: 'ci-has-typecheck' })
+        }
+      }
+    }
+
+    if (lowerPath.includes('dockerfile') || lowerPath.includes('docker-compose')) hasDockerfile = true
+    if (lowerPath.includes('.gitignore')) hasGitignore = true
+    if (lowerPath.includes('lint-staged') || /lint-staged/.test(file.content || '')) hasLintStaged = true
+    if (lowerPath.includes('.husky') || lowerPath.includes('husky')) hasHusky = true
+    if (lowerPath.includes('env.d.ts') || lowerPath.includes('env.mjs')) hasEnvTypes = true
+    if (lowerPath.includes('next.config')) {
+      hasNextConfig = true
+      // Check Next.js config quality
+      if (file.content && !/headers|poweredByHeader|compress/.test(file.content)) {
+        issues.push({ severity: 'low', message: 'next.config without security headers configuration', file: file.path, rule: 'nextjs-security-headers' })
+      }
+      if (file.content && /experimental/.test(file.content)) {
+        issues.push({ severity: 'low', message: 'Experimental Next.js features in use - may break on upgrade', file: file.path, rule: 'nextjs-experimental' })
+      }
+    }
+    if (lowerPath.includes('tsconfig')) hasTsConfig = true
+    if (lowerPath.includes('pnpm-lock') || lowerPath.includes('package-lock') || lowerPath.includes('yarn.lock')) hasPackageLock = true
+    if (lowerPath.includes('bundle-analyzer') || /withBundleAnalyzer|ANALYZE/.test(file.content || '')) hasBundleAnalysis = true
+
+    // Check package.json for scripts
+    if (lowerPath.endsWith('package.json') && !lowerPath.includes('node_modules')) {
+      try {
+        const pkg = JSON.parse(file.content)
+        const scripts = pkg.scripts || {}
+        if (!scripts.lint && !scripts['lint:fix']) {
+          issues.push({ severity: 'low', message: 'No lint script in package.json', file: file.path, rule: 'has-lint-script' })
+        }
+        if (!scripts.test) {
+          issues.push({ severity: 'medium', message: 'No test script in package.json', file: file.path, rule: 'has-test-script' })
+        }
+        if (!scripts.build) {
+          issues.push({ severity: 'medium', message: 'No build script in package.json', file: file.path, rule: 'has-build-script' })
+        }
+        if (!scripts.typecheck && !scripts['type-check'] && !scripts.tsc) {
+          issues.push({ severity: 'low', message: 'No typecheck script in package.json', file: file.path, rule: 'has-typecheck-script' })
+        }
+
+        // Check for pinned dependencies
+        const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+        const unpinnedCount = Object.values(deps || {}).filter((v: any) => /^\^|^~/.test(v)).length
+        if (unpinnedCount > 20) {
+          issues.push({ severity: 'low', message: `${unpinnedCount} dependencies with loose version ranges (^/~)`, file: file.path, rule: 'pin-dependencies' })
+        }
+      } catch {
+        // Invalid JSON - skip
+      }
+    }
+  }
+
+  // Project-level checks
+  if (!hasCI && files.length > 10) {
+    issues.push({ severity: 'high', message: 'No CI/CD configuration found', rule: 'has-ci' })
+    suggestions.push('Add GitHub Actions or similar CI/CD pipeline')
+  }
+  if (!hasGitignore) {
+    issues.push({ severity: 'high', message: 'No .gitignore file found', rule: 'has-gitignore' })
+    suggestions.push('Add .gitignore to prevent committing node_modules and secrets')
+  }
+  if (!hasLintStaged && !hasHusky && files.length > 10) {
+    issues.push({ severity: 'low', message: 'No pre-commit hooks (lint-staged/husky)', rule: 'has-pre-commit' })
+    suggestions.push('Add lint-staged + husky for automated code quality on commit')
+  }
+  if (!hasTsConfig && files.some(f => f.path?.endsWith('.ts') || f.path?.endsWith('.tsx'))) {
+    issues.push({ severity: 'medium', message: 'TypeScript files without tsconfig.json', rule: 'has-tsconfig' })
+  }
+  if (!hasPackageLock) {
+    issues.push({ severity: 'medium', message: 'No lockfile found (pnpm-lock/package-lock/yarn.lock)', rule: 'has-lockfile' })
+    suggestions.push('Commit lockfile for deterministic dependency resolution')
+  }
+
+  if (issues.length === 0) suggestions.push('DevOps configuration is solid!')
+  if (hasCI) suggestions.push('CI/CD pipeline configured - great!')
+  if (hasDockerfile) suggestions.push('Docker support detected - ready for containerized deployment')
+  if (hasLintStaged || hasHusky) suggestions.push('Pre-commit hooks configured - automated quality gates')
+
+  const score = calcScore(issues)
+  return { score, grade: getGrade(score), issues: issues.slice(0, 15), suggestions }
+}
+
+// ---------------------------------------------------------------------------
+// 11. DEPENDENCY HEALTH
+// ---------------------------------------------------------------------------
+
+function analyzeDependencies(files: FileInput[]): HealthDimension {
+  const issues: HealthIssue[] = []
+  const suggestions: string[] = []
+
+  const knownVulnerable: Record<string, string> = {
+    'event-stream': 'Supply chain attack package',
+    'flatmap-stream': 'Malicious package',
+    'ua-parser-js': 'Versions <0.7.32 had malicious code',
+    'colors': 'Versions 1.4.1+ contain protest code',
+    'faker': 'Versions 6.6.6+ contain protest code',
+    'node-ipc': 'Versions 10.1.1+ contain protestware',
+  }
+
+  const heavyDeps: Record<string, { alt: string; threshold: string }> = {
+    'moment': { alt: 'date-fns or dayjs (90% smaller)', threshold: '300KB' },
+    'lodash': { alt: 'lodash-es or native methods (tree-shakeable)', threshold: '70KB' },
+    'jquery': { alt: 'native DOM APIs', threshold: '90KB' },
+    'underscore': { alt: 'native methods', threshold: '25KB' },
+    'rxjs': { alt: 'smaller reactive libraries or native async', threshold: '45KB' },
+    'axios': { alt: 'native fetch API (built into modern Node/browsers)', threshold: '14KB' },
+    'request': { alt: 'native fetch or undici', threshold: 'deprecated' },
+    'bluebird': { alt: 'native Promises', threshold: '80KB' },
+  }
+
+  const duplicateApis: Record<string, string[]> = {
+    'http-client': ['axios', 'got', 'node-fetch', 'superagent', 'request', 'undici'],
+    'date-library': ['moment', 'dayjs', 'date-fns', 'luxon'],
+    'state-management': ['redux', 'zustand', 'jotai', 'recoil', 'mobx', 'valtio'],
+    'css-framework': ['tailwindcss', 'styled-components', 'emotion', 'sass', 'less'],
+    'form-library': ['react-hook-form', 'formik', 'final-form'],
+    'testing': ['jest', 'vitest', 'mocha', 'ava'],
+  }
+
+  for (const file of files) {
+    if (!file.content || !file.path) continue
+    const lowerPath = file.path.toLowerCase()
+
+    if (lowerPath.endsWith('package.json') && !lowerPath.includes('node_modules')) {
+      try {
+        const pkg = JSON.parse(file.content)
+        const allDeps = { ...pkg.dependencies, ...pkg.devDependencies }
+        const depNames = Object.keys(allDeps)
+
+        // Check for known vulnerable packages
+        for (const dep of depNames) {
+          if (knownVulnerable[dep]) {
+            issues.push({ severity: 'critical', message: `Potentially dangerous dependency: ${dep} - ${knownVulnerable[dep]}`, file: file.path, rule: 'no-vulnerable-deps' })
+          }
+        }
+
+        // Check for heavy dependencies
+        for (const dep of depNames) {
+          if (heavyDeps[dep] && !allDeps[dep]?.includes('dev')) {
+            const info = heavyDeps[dep]
+            issues.push({ severity: 'medium', message: `Heavy dependency '${dep}' (${info.threshold}) - consider ${info.alt}`, file: file.path, rule: 'no-heavy-deps' })
+          }
+        }
+
+        // Check for duplicate purpose dependencies
+        for (const [category, pkgs] of Object.entries(duplicateApis)) {
+          const found = pkgs.filter(p => depNames.includes(p))
+          if (found.length > 1) {
+            issues.push({ severity: 'medium', message: `Multiple ${category} libraries: ${found.join(', ')} - consider standardizing on one`, file: file.path, rule: 'no-duplicate-purpose-deps' })
+          }
+        }
+
+        // Total dependency count
+        const prodDeps = Object.keys(pkg.dependencies || {}).length
+        const devDeps = Object.keys(pkg.devDependencies || {}).length
+        if (prodDeps > 50) {
+          issues.push({ severity: 'medium', message: `${prodDeps} production dependencies - large dependency tree increases bundle size and security surface`, file: file.path, rule: 'dep-count-high' })
+        } else if (prodDeps > 30) {
+          issues.push({ severity: 'low', message: `${prodDeps} production dependencies - review for unused packages`, file: file.path, rule: 'dep-count-moderate' })
+        }
+
+        // Check for missing TypeScript types
+        const depsWithoutTypes = Object.keys(pkg.dependencies || {}).filter(dep => {
+          const typesPackage = `@types/${dep.replace('@', '').replace('/', '__')}`
+          return !depNames.includes(typesPackage) && !dep.startsWith('@types/')
+        })
+        // Only flag if TypeScript project and many missing types
+        if (depNames.some(d => d === 'typescript') && depsWithoutTypes.length > 10) {
+          issues.push({ severity: 'low', message: `${depsWithoutTypes.length} dependencies may be missing @types packages`, file: file.path, rule: 'has-type-definitions' })
+        }
+
+        // Check engines field
+        if (!pkg.engines) {
+          issues.push({ severity: 'low', message: 'No engines field in package.json - specify Node.js version', file: file.path, rule: 'has-engines' })
+        }
+
+        // Check for deprecated lifecycle scripts
+        if (pkg.scripts?.prepublish) {
+          issues.push({ severity: 'low', message: 'Deprecated "prepublish" script - use "prepublishOnly"', file: file.path, rule: 'no-deprecated-scripts' })
+        }
+
+      } catch {
+        issues.push({ severity: 'low', message: 'Invalid package.json format', file: file.path, rule: 'valid-package-json' })
+      }
+    }
+  }
+
+  if (issues.length === 0) suggestions.push('Dependencies look healthy!')
+  if (issues.some(i => i.rule === 'no-heavy-deps')) suggestions.push('Replace heavy packages with lightweight alternatives to reduce bundle size')
+  if (issues.some(i => i.rule === 'no-duplicate-purpose-deps')) suggestions.push('Standardize on one library per purpose to reduce bloat')
+  if (issues.some(i => i.rule === 'no-vulnerable-deps')) suggestions.push('Remove or replace known vulnerable dependencies immediately')
+
+  const score = calcScore(issues)
+  return { score, grade: getGrade(score), issues: issues.slice(0, 15), suggestions }
+}
+
+// ---------------------------------------------------------------------------
 // File Hotspot Detection
 // ---------------------------------------------------------------------------
 
@@ -881,7 +1236,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Files array is required' }, { status: 400 })
     }
 
-    // Run all 8 dimension analyzers
+    // Run all 11 dimension analyzers
     const codeQuality = analyzeCodeQuality(files)
     const security = analyzeSecurity(files)
     const performance = analyzePerformance(files)
@@ -890,6 +1245,9 @@ export async function POST(request: NextRequest) {
     const seo = analyzeSEO(files)
     const errorHandling = analyzeErrorHandling(files)
     const bestPractices = analyzeBestPractices(files)
+    const testing = analyzeTesting(files)
+    const devops = analyzeDevOps(files)
+    const dependencies = analyzeDependencies(files)
 
     const dimensions = {
       codeQuality,
@@ -900,10 +1258,13 @@ export async function POST(request: NextRequest) {
       seo,
       errorHandling,
       bestPractices,
+      testing,
+      devops,
+      dependencies,
     }
 
-    // Weighted overall score (security and error handling weigh more)
-    const weights = {
+    // Weighted overall score
+    const weights: Record<string, number> = {
       codeQuality: 1.0,
       security: 1.5,
       performance: 1.0,
@@ -912,6 +1273,9 @@ export async function POST(request: NextRequest) {
       seo: 0.7,
       errorHandling: 1.2,
       bestPractices: 0.8,
+      testing: 1.3,
+      devops: 0.9,
+      dependencies: 1.1,
     }
 
     let weightedSum = 0
