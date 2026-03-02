@@ -1170,6 +1170,26 @@ export function ChatPanelV2({
   // Track the model used for planning so build execution uses the same model
   const planModelOverrideRef = useRef<string | null>(null)
 
+  // Blocked user state - checked from database via API
+  const [isUserBlocked, setIsUserBlocked] = useState(false)
+  const [blockedMessage, setBlockedMessage] = useState('')
+
+  useEffect(() => {
+    async function checkBlocked() {
+      try {
+        const res = await fetch('/api/user-status')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.blocked) {
+            setIsUserBlocked(true)
+            setBlockedMessage(data.message || 'Your account has been restricted. Please upgrade your plan to continue.')
+          }
+        }
+      } catch {}
+    }
+    checkBlocked()
+  }, [])
+
   // Custom AI Persona state - loaded from localStorage per-project
   const [activePersona, setActivePersona] = useState<string>('')
   const [activePersonaName, setActivePersonaName] = useState<string>('')
@@ -4635,6 +4655,16 @@ export function ChatPanelV2({
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Check if user is blocked - must upgrade before continuing
+    if (isUserBlocked) {
+      toast({
+        title: 'Account Restricted',
+        description: blockedMessage || 'Your account has been restricted. Please upgrade your plan to continue.',
+        variant: 'destructive'
+      })
+      return
+    }
+
     if (!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) {
       return
     }
@@ -6028,6 +6058,19 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
 
   return (
     <div className={`flex flex-col overflow-hidden ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`} style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}>
+      {/* Blocked user banner */}
+      {isUserBlocked && (
+        <div className="bg-red-900/80 border-b border-red-700 px-4 py-3 flex items-center gap-3">
+          <Shield className="size-5 text-red-300 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-200">Account Restricted</p>
+            <p className="text-xs text-red-300/80">{blockedMessage || 'Please upgrade your plan to continue using the platform.'}</p>
+          </div>
+          <a href="/pricing" className="px-3 py-1.5 text-xs font-medium bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors flex-shrink-0">
+            Upgrade Plan
+          </a>
+        </div>
+      )}
       {/* Messages Area - Scrollable container */}
       <div className="relative flex-1 min-h-0">
         <div

@@ -7,6 +7,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
 import { getWalletBalance, deductCredits, calculateCreditsFromTokens } from './credit-manager'
+import { checkUserBlocked } from '@/lib/blocked-users'
 
 export interface UserAuthContext {
   userId: string
@@ -22,7 +23,7 @@ export interface AuthResult {
   context?: UserAuthContext
   error?: {
     message: string
-    code: 'UNAUTHORIZED' | 'INSUFFICIENT_CREDITS' | 'NO_WALLET' | 'INVALID_SESSION'
+    code: 'UNAUTHORIZED' | 'INSUFFICIENT_CREDITS' | 'NO_WALLET' | 'INVALID_SESSION' | 'USER_BLOCKED'
     statusCode: number
   }
 }
@@ -48,6 +49,19 @@ export async function authenticateUser(request: Request, isByok: boolean = false
           message: 'Authentication required. Please sign in.',
           code: 'UNAUTHORIZED',
           statusCode: 401
+        }
+      }
+    }
+
+    // Check if user is blocked (admin-managed)
+    const blockStatus = await checkUserBlocked(user.id, supabase)
+    if (blockStatus.isBlocked) {
+      return {
+        success: false,
+        error: {
+          message: blockStatus.notes || 'Your account has been restricted. Please upgrade your plan to continue using the platform.',
+          code: 'USER_BLOCKED',
+          statusCode: 403
         }
       }
     }

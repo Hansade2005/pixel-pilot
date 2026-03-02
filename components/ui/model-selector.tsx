@@ -179,7 +179,7 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5'
+      'google/gemini-2.5-flash', 'zai/glm-4.7-flash'
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [

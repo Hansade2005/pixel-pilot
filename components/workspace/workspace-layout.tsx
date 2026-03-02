@@ -98,6 +98,26 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [aiMode, setAiMode] = useState<AIMode>('agent')
   const [projectFiles, setProjectFiles] = useState<File[]>([])
 
+  // Blocked user state - workspace-level check
+  const [isUserBlocked, setIsUserBlocked] = useState(false)
+  const [blockedMessage, setBlockedMessage] = useState('')
+
+  useEffect(() => {
+    async function checkBlocked() {
+      try {
+        const res = await fetch('/api/user-status')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.blocked) {
+            setIsUserBlocked(true)
+            setBlockedMessage(data.message || 'Your account has been restricted. Please upgrade your plan to continue.')
+          }
+        }
+      } catch {}
+    }
+    checkBlocked()
+  }, [])
+
   // Chat panel toggle (desktop)
   const [chatPanelVisible, setChatPanelVisible] = useState(true)
 
@@ -1124,6 +1144,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   return (
     <div className="h-screen flex bg-gray-950 relative">
+      {/* Blocked user full-screen overlay */}
+      {isUserBlocked && (
+        <div className="absolute inset-0 z-[9999] bg-gray-950/95 flex items-center justify-center">
+          <div className="max-w-md mx-auto text-center p-8 bg-gray-900 border border-red-800/50 rounded-2xl shadow-2xl">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-900/30 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Account Restricted</h2>
+            <p className="text-gray-400 text-sm mb-6">{blockedMessage}</p>
+            <a href="/pricing" className="inline-block px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-xl transition-colors">
+              Upgrade Your Plan
+            </a>
+          </div>
+        </div>
+      )}
       {/* Desktop Layout */}
       {!isMobile && (
         <>
