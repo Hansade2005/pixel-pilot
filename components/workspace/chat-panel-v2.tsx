@@ -1129,6 +1129,18 @@ interface MCPServerConfig {
   enabled: boolean
 }
 
+export interface TokenUsageData {
+  step: number
+  maxSteps: number
+  toolsUsed: string[]
+  progressMessage: string
+  stepTokens: { input: number; output: number }
+  totalTokens: { input: number; output: number }
+  creditsDeducted: number
+  totalCreditsDeducted: number
+  remainingBalance: number
+}
+
 interface ChatPanelV2Props {
   project: any
   isMobile?: boolean
@@ -1143,6 +1155,7 @@ interface ChatPanelV2Props {
   initialChatMode?: 'plan' | 'agent'
   taggedComponent?: TaggedComponent | null
   onClearTaggedComponent?: () => void
+  onTokenUsage?: (data: TokenUsageData) => void
 }
 
 export function ChatPanelV2({
@@ -1158,7 +1171,8 @@ export function ChatPanelV2({
   initialPrompt,
   initialChatMode,
   taggedComponent,
-  onClearTaggedComponent
+  onClearTaggedComponent,
+  onTokenUsage
 }: ChatPanelV2Props) {
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -5442,7 +5456,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
               if (localTool) {
                 localTool.status = resultStatus
               }
-              
+
               // Update streaming state for handleStop access
               setStreamingToolCalls([...localToolCalls])
 
@@ -5457,6 +5471,24 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                 )
                 newMap.set(assistantMessageId, updatedCalls)
                 return newMap
+              })
+            } else if (parsed.type === 'step_progress') {
+              // Token usage / billing progress from server
+              console.log('[ChatPanelV2][DataStream] Step progress:', {
+                step: parsed.step,
+                totalTokens: parsed.totalTokens,
+                creditsDeducted: parsed.creditsDeducted
+              })
+              onTokenUsage?.({
+                step: parsed.step,
+                maxSteps: parsed.maxSteps,
+                toolsUsed: parsed.toolsUsed || [],
+                progressMessage: parsed.progressMessage || '',
+                stepTokens: parsed.stepTokens || { input: 0, output: 0 },
+                totalTokens: parsed.totalTokens || { input: 0, output: 0 },
+                creditsDeducted: parsed.creditsDeducted || 0,
+                totalCreditsDeducted: parsed.totalCreditsDeducted || 0,
+                remainingBalance: parsed.remainingBalance || 0,
               })
             }
           } catch (e) {

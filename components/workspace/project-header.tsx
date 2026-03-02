@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud } from "lucide-react"
+import { Play, GitBranch, Share2, Settings, Plus, Rocket, Upload, Database, Zap, Cloud, Coins } from "lucide-react"
+import type { TokenUsageData } from "./chat-panel-v2"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -41,6 +42,8 @@ interface ProjectHeaderProps {
   initialName?: string
   initialDescription?: string
   onDialogOpenChange?: (open: boolean) => void
+  // Token usage from AI streaming
+  tokenUsage?: TokenUsageData | null
   // Chat session props
   currentChatSessionId?: string | null
   onChatSessionChange?: (sessionId: string) => void
@@ -63,6 +66,7 @@ export function ProjectHeader({
   initialName,
   initialDescription,
   onDialogOpenChange,
+  tokenUsage,
   currentChatSessionId,
   onChatSessionChange,
   onNewChatSession,
@@ -362,6 +366,53 @@ export function ProjectHeader({
           />
         )}
       </div>
+
+      {/* Token Usage Display */}
+      {tokenUsage && (
+        <div className="hidden md:flex items-center space-x-3 px-3 py-1.5 bg-gray-800/60 rounded-lg border border-gray-700/50">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center space-x-1.5 text-xs text-gray-400">
+                  <Zap className="h-3 w-3 text-yellow-500" />
+                  <span className="font-medium text-gray-300">
+                    {((tokenUsage.totalTokens.input + tokenUsage.totalTokens.output) / 1000).toFixed(1)}k
+                  </span>
+                  <span className="text-gray-500">tokens</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-gray-800 border-gray-700">
+                <div className="text-xs space-y-1">
+                  <p>Input: {tokenUsage.totalTokens.input.toLocaleString()} tokens</p>
+                  <p>Output: {tokenUsage.totalTokens.output.toLocaleString()} tokens</p>
+                  <p>Step {tokenUsage.step}/{tokenUsage.maxSteps}</p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <div className="w-px h-4 bg-gray-700" />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center space-x-1.5 text-xs text-gray-400">
+                  <Coins className="h-3 w-3 text-orange-500" />
+                  <span className="font-medium text-gray-300">
+                    {tokenUsage.totalCreditsDeducted.toFixed(2)}
+                  </span>
+                  <span className="text-gray-500">credits</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="bg-gray-800 border-gray-700">
+                <div className="text-xs space-y-1">
+                  <p>Credits used: {tokenUsage.totalCreditsDeducted.toFixed(4)}</p>
+                  <p>Remaining: {tokenUsage.remainingBalance.toFixed(2)}</p>
+                  {tokenUsage.progressMessage && <p className="text-gray-400">{tokenUsage.progressMessage}</p>}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
 
       <div className="flex items-center space-x-2">
            {/* Create project button */}

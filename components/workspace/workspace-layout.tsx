@@ -16,7 +16,7 @@ import { TemplatesView } from "./templates-view"
 import { TemplateEarningsView } from "./template-earnings-view"
 import { RepoAgentView } from "./repo-agent-view"
 import { ChatPanel } from "./chat-panel"
-import { ChatPanelV2 } from "./chat-panel-v2"
+import { ChatPanelV2, type TokenUsageData } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
@@ -86,6 +86,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [fileExplorerKey, setFileExplorerKey] = useState<number>(0) // Force file explorer refresh
   
+  // Token usage tracking from chat streaming
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null)
+
   // Modern sidebar state
   const [useModernSidebar, setUseModernSidebar] = useState(true)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -1160,6 +1163,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 }
               }}
               user={user}
+              tokenUsage={tokenUsage}
               openDialog={openProjectHeaderDialog}
               initialName={projectHeaderInitialName}
               initialDescription={projectHeaderInitialDescription}
@@ -1254,6 +1258,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           initialChatMode={initialChatMode}
                           taggedComponent={taggedComponent}
                           onClearTaggedComponent={() => setTaggedComponent(null)}
+                          onTokenUsage={setTokenUsage}
                         />
                       </div>
                     </ResizablePanel>
@@ -2187,6 +2192,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       initialChatMode={initialChatMode}
                       taggedComponent={taggedComponent}
                       onClearTaggedComponent={() => setTaggedComponent(null)}
+                      onTokenUsage={setTokenUsage}
                     />
                   </div>
                 </TabsContent>
