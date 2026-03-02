@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, Suspense } from "react"
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import ReactMarkdown from "react-markdown"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,8 @@ import {
   BarChart3,
   TrendingUp,
   Info,
+  Brain,
+  StopCircle,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
@@ -263,8 +266,16 @@ function CodeReviewsContent() {
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"overview" | "issues" | "files" | "suggestions">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "issues" | "files" | "suggestions" | "ai-insights">("overview")
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // AI Insights state
+  const [aiInsights, setAiInsights] = useState("")
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
+  const [aiInsightsError, setAiInsightsError] = useState<string | null>(null)
+  const aiAbortRef = useRef<AbortController | null>(null)
+  const cachedFilesRef = useRef<Array<{ path: string; content: string }>>([])
+  const aiScrollRef = useRef<HTMLDivElement | null>(null)
 
   const getSession = useCallback(async () => {
     const supabase = createClient()
@@ -308,6 +319,9 @@ function CodeReviewsContent() {
     setLatestAnalysis(null)
     setSelectedReviewId(null)
     setActiveTab("overview")
+    setAiInsights("")
+    setAiInsightsError(null)
+    if (aiAbortRef.current) aiAbortRef.current.abort()
 
     try {
       const session = await getSession()
@@ -336,6 +350,9 @@ function CodeReviewsContent() {
         setRunning(false)
         return
       }
+
+      // Cache files for AI insights
+      cachedFilesRef.current = codeFiles
 
       const res = await fetch("/api/code-reviews", {
         method: "POST",
@@ -409,6 +426,76 @@ function CodeReviewsContent() {
     setExpandedContent(true)
     setActiveTab("overview")
   }
+
+  // AI Insights streaming function
+  const runAiInsights = useCallback(async (analysis: ReviewAnalysis) => {
+    if (cachedFilesRef.current.length === 0) return
+    setAiInsights("")
+    setAiInsightsLoading(true)
+    setAiInsightsError(null)
+
+    // Abort previous request if any
+    if (aiAbortRef.current) aiAbortRef.current.abort()
+    const controller = new AbortController()
+    aiAbortRef.current = controller
+
+    try {
+      const session = await getSession()
+      if (!session) return
+
+      const res = await fetch("/api/code-reviews/ai-insights", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          files: cachedFilesRef.current,
+          staticAnalysis: analysis,
+          reviewType,
+        }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null)
+        throw new Error(errData?.error || "AI analysis failed")
+      }
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error("No response stream")
+
+      const decoder = new TextDecoder()
+      let accumulated = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        accumulated += chunk
+        setAiInsights(accumulated)
+
+        // Auto-scroll to bottom
+        if (aiScrollRef.current) {
+          aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight
+        }
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError") return
+      setAiInsightsError(err.message || "AI analysis failed")
+    } finally {
+      setAiInsightsLoading(false)
+      aiAbortRef.current = null
+    }
+  }, [getSession, reviewType])
+
+  const stopAiInsights = useCallback(() => {
+    if (aiAbortRef.current) {
+      aiAbortRef.current.abort()
+      aiAbortRef.current = null
+    }
+    setAiInsightsLoading(false)
+  }, [])
 
   const selectedReview = reviews.find((r) => r.id === selectedReviewId)
 
@@ -582,15 +669,16 @@ function CodeReviewsContent() {
             </Card>
 
             {/* Tab Navigation */}
-            {latestAnalysis.issues.length > 0 && (
+            {(latestAnalysis.issues.length > 0 || latestAnalysis.stats.totalFiles > 0) && (
               <div className="flex gap-1 bg-gray-900/50 rounded-lg p-1">
                 {(
                   [
-                    { key: "overview", label: "Categories", icon: BarChart3 },
-                    { key: "issues", label: `Issues (${latestAnalysis.issues.length})`, icon: AlertTriangle },
-                    { key: "files", label: "File Hotspots", icon: FileWarning },
-                    { key: "suggestions", label: "Recommendations", icon: Sparkles },
-                  ] as const
+                    { key: "overview" as const, label: "Categories", icon: BarChart3 },
+                    { key: "issues" as const, label: `Issues (${latestAnalysis.issues.length})`, icon: AlertTriangle },
+                    { key: "files" as const, label: "File Hotspots", icon: FileWarning },
+                    { key: "suggestions" as const, label: "Recommendations", icon: Sparkles },
+                    { key: "ai-insights" as const, label: "AI Insights", icon: Brain },
+                  ]
                 ).map((tab) => (
                   <button
                     key={tab.key}
@@ -827,6 +915,119 @@ function CodeReviewsContent() {
               </Card>
             )}
 
+            {/* Tab: AI Insights */}
+            {activeTab === "ai-insights" && (
+              <Card className="bg-gray-900/80 border-gray-800/60">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-gray-200 flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-orange-400" />
+                      AI-Powered Deep Analysis
+                      <Badge className="text-[9px] bg-orange-500/10 text-orange-400 border-0">
+                        Devstral
+                      </Badge>
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      {aiInsightsLoading && (
+                        <Button
+                          onClick={stopAiInsights}
+                          size="sm"
+                          className="h-7 bg-red-500 hover:bg-red-600 text-white text-[10px] px-2"
+                        >
+                          <StopCircle className="h-3 w-3 mr-1" />
+                          Stop
+                        </Button>
+                      )}
+                      {!aiInsightsLoading && (
+                        <Button
+                          onClick={() => latestAnalysis && runAiInsights(latestAnalysis)}
+                          disabled={cachedFilesRef.current.length === 0}
+                          size="sm"
+                          className="h-7 bg-orange-600 hover:bg-orange-500 text-white text-[10px] px-2 disabled:opacity-30"
+                        >
+                          <Brain className="h-3 w-3 mr-1" />
+                          {aiInsights ? "Re-analyze" : "Run AI Analysis"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Not started yet */}
+                  {!aiInsights && !aiInsightsLoading && !aiInsightsError && (
+                    <div className="text-center py-8">
+                      <Brain className="h-10 w-10 text-gray-700 mx-auto mb-3" />
+                      <p className="text-sm text-gray-400 mb-1">Get AI-Powered Code Review Insights</p>
+                      <p className="text-xs text-gray-600 mb-4 max-w-md mx-auto">
+                        Devstral AI will analyze your code beyond static rules - finding architectural issues,
+                        suggesting design patterns, and providing specific code improvements with before/after examples.
+                      </p>
+                      <Button
+                        onClick={() => latestAnalysis && runAiInsights(latestAnalysis)}
+                        disabled={cachedFilesRef.current.length === 0}
+                        className="bg-orange-600 hover:bg-orange-500 text-white text-xs disabled:opacity-30"
+                      >
+                        <Brain className="h-3.5 w-3.5 mr-1.5" />
+                        Generate AI Insights
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {aiInsightsError && (
+                    <div className="text-center py-6">
+                      <XCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-300 mb-3">{aiInsightsError}</p>
+                      <Button
+                        onClick={() => latestAnalysis && runAiInsights(latestAnalysis)}
+                        size="sm"
+                        className="bg-orange-600 hover:bg-orange-500 text-white text-xs"
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Loading state */}
+                  {aiInsightsLoading && !aiInsights && (
+                    <div className="flex flex-col items-center justify-center py-10">
+                      <Loader2 className="h-6 w-6 animate-spin text-orange-500 mb-3" />
+                      <p className="text-xs text-gray-400">AI is analyzing your codebase...</p>
+                      <p className="text-[10px] text-gray-600 mt-1">This may take 10-30 seconds</p>
+                    </div>
+                  )}
+
+                  {/* Streaming / completed content */}
+                  {aiInsights && (
+                    <div
+                      ref={aiScrollRef}
+                      className="max-h-[700px] overflow-y-auto rounded-lg bg-gray-800/30 p-4"
+                    >
+                      <div className="prose prose-invert prose-sm max-w-none
+                        prose-headings:text-gray-100 prose-headings:font-semibold prose-headings:border-b prose-headings:border-gray-800/60 prose-headings:pb-2 prose-headings:mb-3
+                        prose-h2:text-base prose-h2:mt-6
+                        prose-h3:text-sm prose-h3:mt-4
+                        prose-p:text-gray-300 prose-p:text-xs prose-p:leading-relaxed
+                        prose-li:text-gray-300 prose-li:text-xs
+                        prose-strong:text-orange-400
+                        prose-code:text-orange-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[11px]
+                        prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700/60 prose-pre:rounded-lg prose-pre:text-[11px]
+                        prose-a:text-orange-400 prose-a:no-underline hover:prose-a:underline
+                      ">
+                        <ReactMarkdown>{aiInsights}</ReactMarkdown>
+                      </div>
+                      {aiInsightsLoading && (
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800/60">
+                          <Loader2 className="h-3 w-3 animate-spin text-orange-500" />
+                          <span className="text-[10px] text-gray-500">AI is writing...</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Review Content (Markdown) */}
             {selectedReview?.content && (
               <Card className="bg-gray-900/80 border-gray-800/60">
@@ -863,7 +1064,7 @@ function CodeReviewsContent() {
               <FileCode className="h-12 w-12 text-gray-700 mx-auto mb-4" />
               <h2 className="text-lg font-medium text-gray-300 mb-2">No Code Reviews Yet</h2>
               <p className="text-sm text-gray-500 mb-2 max-w-md mx-auto">
-                Run a professional AI-powered code review to analyze your project across 6 categories with 64+ rules.
+                Run a professional code review: 64+ static rules across 6 categories, plus AI-powered deep analysis by Devstral with actionable code improvements.
               </p>
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 {["Security", "Performance", "Accessibility", "Maintainability", "Best Practices", "Code Style"].map((cat) => (
