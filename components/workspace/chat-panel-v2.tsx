@@ -1148,7 +1148,7 @@ interface ChatPanelV2Props {
 export function ChatPanelV2({
   project,
   isMobile = false,
-  selectedModel = 'gpt-4o',
+  selectedModel = 'ollama/minimax-m2.5',
   onModelChange,
   userPlan = 'free',
   subscriptionStatus,
@@ -4993,17 +4993,16 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
-      // For initial prompt, force use anthropic/claude-haiku-4.5 model for UI prototyping
+      // Always respect the user's selected model - no forced overrides
       // For plan build execution, use the same model that generated the plan
-      // Subsequent requests follow user/default model selection
       const planOverride = planModelOverrideRef.current
-      const modelToUse = isInitialPrompt ? 'anthropic/claude-haiku-4.5' : (planOverride || selectedModel)
+      const modelToUse = planOverride || selectedModel
       // Clear the plan model override after using it (one-time use for build execution)
       if (planOverride) {
         planModelOverrideRef.current = null
       }
 
-      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : planOverride ? 'plan build override' : 'user selection'})`)
+      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${planOverride ? 'plan build override' : 'user selection'})`)
 
       // Check compressed data size and use storage for large payloads (> 1MB)
       const compressedSize = compressedData.byteLength

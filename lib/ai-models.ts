@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'mistral/devstral-2';
+export const DEFAULT_CHAT_MODEL: string = 'ollama/minimax-m2.5';
 
 export interface ChatModel {
   id: string;
