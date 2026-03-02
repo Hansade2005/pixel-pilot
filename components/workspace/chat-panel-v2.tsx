@@ -6,6 +6,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { isUserBlocked, getBlockReason } from '@/lib/blocked-users'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -4634,6 +4635,16 @@ export function ChatPanelV2({
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Block suspended users
+    if (project?.userId && isUserBlocked(project.userId)) {
+      setBillingError({
+        type: 'INSUFFICIENT_CREDITS',
+        message: getBlockReason(project.userId) || 'Account suspended. Please upgrade your plan to continue.',
+        currentPlan: userPlan
+      })
+      return
+    }
 
     if (!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) {
       return

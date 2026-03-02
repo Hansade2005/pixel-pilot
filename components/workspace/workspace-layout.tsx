@@ -38,6 +38,9 @@ import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
 
+import { TokenStatusBar } from "./token-status-bar"
+import { BlockedUserOverlay } from "./blocked-user-overlay"
+import { isUserBlocked, getBlockReason } from "@/lib/blocked-users"
 import { ChatSessionSelector } from "@/components/ui/chat-session-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -1122,8 +1125,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
+  // Check if user is blocked
+  const userBlocked = isUserBlocked(user.id)
+  const blockReason = getBlockReason(user.id)
+
   return (
     <div className="h-screen flex bg-gray-950 relative">
+      {/* Blocked user overlay */}
+      {userBlocked && <BlockedUserOverlay reason={blockReason ?? undefined} />}
+
       {/* Desktop Layout */}
       {!isMobile && (
         <>
@@ -1901,6 +1911,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 </div>
               </div>
             )}
+
+            {/* Token/Credit Usage Status Bar */}
+            <TokenStatusBar userId={user.id} userPlan={userPlan} />
           </div>
         </>
       )}
