@@ -1825,28 +1825,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   <button
                     className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
                     title="Code Reviews"
-                    onClick={() => window.open('/workspace/code-reviews', '_blank')}
+                    onClick={() => window.open(selectedProject ? `/workspace/code-reviews?projectId=${selectedProject.id}&name=${encodeURIComponent(selectedProject.name)}` : '/workspace/code-reviews', '_blank')}
                   >
                     <GitPullRequestArrow className="h-3 w-3" />
                   </button>
                   <button
                     className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
                     title="Health Score"
-                    onClick={() => window.open('/workspace/health', '_blank')}
+                    onClick={() => window.open(selectedProject ? `/workspace/health?projectId=${selectedProject.id}&name=${encodeURIComponent(selectedProject.name)}` : '/workspace/health', '_blank')}
                   >
                     <HeartPulse className="h-3 w-3" />
                   </button>
                   <button
                     className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
                     title="Snapshots"
-                    onClick={() => window.open('/workspace/snapshots', '_blank')}
+                    onClick={() => window.open(selectedProject ? `/workspace/snapshots?projectId=${selectedProject.id}&name=${encodeURIComponent(selectedProject.name)}` : '/workspace/snapshots', '_blank')}
                   >
                     <Archive className="h-3 w-3" />
                   </button>
                   <button
                     className="flex items-center gap-1 px-1.5 h-7 hover:bg-gray-800/60 hover:text-orange-400 transition-colors"
                     title="Secrets Vault"
-                    onClick={() => window.open('/workspace/secrets', '_blank')}
+                    onClick={() => window.open(selectedProject ? `/workspace/secrets?projectId=${selectedProject.id}&name=${encodeURIComponent(selectedProject.name)}` : '/workspace/secrets', '_blank')}
                   >
                     <KeyRound className="h-3 w-3" />
                   </button>
