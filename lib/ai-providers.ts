@@ -21,10 +21,13 @@ let _mistralGatewayProvider: ReturnType<typeof createMistral> | null = null;
 let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
+let _kiloGateway: ReturnType<typeof createOpenAI> | null = null;
 // Ollama API key rotation: supports comma-separated keys in OLLAMA_API_KEY
 let _ollamaKeyIndex = 0;
 // Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
 let _bonsaiKeyIndex = 0;
+// Kilo API key rotation: supports comma-separated keys in KILO_API_KEY
+let _kiloKeyIndex = 0;
 
 function getA0DevProvider() {
   if (!_a0devProvider) _a0devProvider = createA0Dev();
@@ -115,6 +118,14 @@ function getOpenRouterProvider() {
   return _openrouterProvider;
 }
 
+function getKiloGateway() {
+  // Always create fresh to pick the next rotated key.
+  return createOpenAI({
+    baseURL: 'https://api.kilo.ai/api/gateway',
+    apiKey: getNextKiloKey(),
+  });
+}
+
 function getOllamaCloudProvider() {
   // Always create a fresh provider to pick the next rotated key.
   // When only one key is configured this is equivalent to caching.
@@ -136,6 +147,20 @@ export function getNextBonsaiKey(): string {
   if (keys.length === 0) return '';
   const key = keys[_bonsaiKeyIndex % keys.length];
   _bonsaiKeyIndex = (_bonsaiKeyIndex + 1) % keys.length;
+  return key;
+}
+
+/**
+ * Get the next Kilo API key using round-robin rotation.
+ * Supports comma-separated keys in KILO_API_KEY env var.
+ * e.g. KILO_API_KEY="key1,key2,key3"
+ */
+export function getNextKiloKey(): string {
+  const raw = process.env.KILO_API_KEY || '';
+  const keys = raw.split(',').map(k => k.trim()).filter(Boolean);
+  if (keys.length === 0) return '';
+  const key = keys[_kiloKeyIndex % keys.length];
+  _kiloKeyIndex = (_kiloKeyIndex + 1) % keys.length;
   return key;
 }
 
@@ -312,6 +337,18 @@ function createModelInstance(modelId: string): any {
     case 'anthropic/claude-opus-4.5':
       return getAnthropicProvider()('anthropic/claude-opus-4.5');
 
+    // Kilo AI Gateway models (free tier)
+    case 'kilo/auto-free':
+      return getKiloGateway()('kilo/auto-free');
+    case 'kilo/minimax-m2.5-free':
+      return getKiloGateway()('minimax/minimax-m2.5:free');
+    case 'kilo/kimi-k2.5-free':
+      return getKiloGateway()('moonshotai/kimi-k2.5:free');
+    case 'kilo/giga-potato':
+      return getKiloGateway()('giga-potato-thinking');
+    case 'kilo/step-3.5-flash-free':
+      return getKiloGateway()('stepfun/step-3.5-flash:free');
+
     // Ollama Cloud models
     case 'ollama/devstral-2:123b':
     case 'ollama/deepseek-v3.2':
@@ -427,6 +464,7 @@ export interface ByokKeySet {
   xai?: string
   google?: string
   ollama?: string
+  kilo?: string
   openrouter?: string
   'vercel-gateway'?: string
   // Custom providers: keyed by custom provider ID
@@ -449,6 +487,7 @@ export function resolveByokProvider(modelId: string, byokKeys: ByokKeySet): stri
   if (modelId.startsWith('xai/') && byokKeys.xai) return 'xai'
   if (modelId.startsWith('google/') && byokKeys.google) return 'google'
   if (modelId.startsWith('ollama/') && byokKeys.ollama) return 'ollama'
+  if (modelId.startsWith('kilo/') && byokKeys.kilo) return 'kilo'
 
   // Direct model names
   if ((modelId === 'pixtral-12b-2409' || modelId === 'codestral-latest') && byokKeys.mistral) return 'mistral'
@@ -550,6 +589,22 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       })
       const bare = stripPrefix(modelId, 'ollama/')
       return provider(bare)
+    }
+    case 'kilo': {
+      const provider = createOpenAI({
+        baseURL: 'https://api.kilo.ai/api/gateway',
+        apiKey,
+      })
+      // Map internal model IDs to Kilo gateway model IDs
+      const kiloModelMap: Record<string, string> = {
+        'kilo/auto-free': 'kilo/auto-free',
+        'kilo/minimax-m2.5-free': 'minimax/minimax-m2.5:free',
+        'kilo/kimi-k2.5-free': 'moonshotai/kimi-k2.5:free',
+        'kilo/giga-potato': 'giga-potato-thinking',
+        'kilo/step-3.5-flash-free': 'stepfun/step-3.5-flash:free',
+      }
+      const kiloModel = kiloModelMap[modelId] || modelId.replace('kilo/', '')
+      return provider(kiloModel)
     }
     case 'openrouter': {
       const provider = createOpenAICompatible({

@@ -2428,6 +2428,95 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     throughputTps: 80,
   },
 
+  // =============================================================================
+  // KILO AI GATEWAY - FREE MODELS
+  // =============================================================================
+
+  'kilo/auto-free': {
+    name: 'Kilo Auto Free',
+    provider: 'kilo',
+    contextWindow: 204_800,
+    maxOutput: 64_000,
+    inputPerToken: 0,
+    outputPerToken: 0,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.8,
+    throughputTps: 80,
+  },
+
+  'kilo/minimax-m2.5-free': {
+    name: 'MiniMax M2.5 Free (Kilo)',
+    provider: 'kilo',
+    contextWindow: 204_800,
+    maxOutput: 64_000,
+    inputPerToken: 0,
+    outputPerToken: 0,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.6,
+    throughputTps: 90,
+  },
+
+  'kilo/kimi-k2.5-free': {
+    name: 'Kimi K2.5 Free (Kilo)',
+    provider: 'kilo',
+    contextWindow: 262_144,
+    maxOutput: 64_000,
+    inputPerToken: 0,
+    outputPerToken: 0,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.7,
+    throughputTps: 85,
+  },
+
+  'kilo/giga-potato': {
+    name: 'Giga Potato Thinking (Kilo)',
+    provider: 'kilo',
+    contextWindow: 256_000,
+    maxOutput: 64_000,
+    inputPerToken: 0,
+    outputPerToken: 0,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.0,
+    throughputTps: 70,
+  },
+
+  'kilo/step-3.5-flash-free': {
+    name: 'Step 3.5 Flash Free (Kilo)',
+    provider: 'kilo',
+    contextWindow: 256_000,
+    maxOutput: 64_000,
+    inputPerToken: 0,
+    outputPerToken: 0,
+    cacheReadPerToken: 0,
+    cacheWritePerToken: 0,
+    webSearchPer1K: 0,
+    supportsImageInput: false,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.5,
+    throughputTps: 100,
+  },
+
 }
 
 // =============================================================================
