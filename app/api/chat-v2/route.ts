@@ -11278,6 +11278,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let accumulatedUsage = { inputTokens: 0, outputTokens: 0 }
           let accumulatedSteps = 0
           let currentStepTools: string[] = []
+          let stepContentLength = 0  // Track text generated per step for token estimation
 
           // Per-step billing: deduct credits after each step using real token usage
           let perStepBillingActive = false
@@ -11346,24 +11347,46 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               if (part.type === 'text-delta') {
                 if (part.text) {
                   accumulatedContent += part.text
+                  stepContentLength += part.text.length
                 }
               } else if (part.type === 'reasoning-delta') {
                 if (part.text) {
                   accumulatedReasoning += part.text
+                  stepContentLength += part.text.length
                 }
               } else if (part.type === 'tool-call') {
                 toolResults.push(part);
                 currentStepTools.push((part as any).toolName || 'unknown')
+                stepContentLength += JSON.stringify((part as any).args || {}).length
               } else if (part.type === 'tool-result') {
                 toolResults.push(part);
-              } else if (part.type === 'step-finish' && (part as any).usage) {
+              } else if (part.type === 'step-finish') {
                 // Capture per-step usage
-                const stepUsage = (part as any).usage
-                const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
-                const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                const stepUsage = (part as any).usage || {}
+                let stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                let stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                let usageEstimated = false
+
+                // Provider didn't report usage (common with OpenAI-compatible providers
+                // like Ollama Cloud, OpenRouter, etc.) - estimate from content length
+                if (stepInput === 0 && stepOutput === 0 && stepContentLength > 0) {
+                  // Estimate input tokens from context (messages + system prompt)
+                  const contextLength = processedMessages.reduce((sum: number, m: any) => {
+                    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                    return sum + content.length
+                  }, 0) + (systemPrompt?.length || 0)
+                  stepInput = Math.ceil(contextLength / 4)  // ~4 chars per token
+                  stepOutput = Math.ceil(stepContentLength / 4)
+                  usageEstimated = true
+                  console.log(`[Chat-V2] Provider reported 0 tokens - estimated: ~${stepInput} input + ~${stepOutput} output (from ${stepContentLength} chars output)`)
+                }
+
                 accumulatedUsage.inputTokens += stepInput
                 accumulatedUsage.outputTokens += stepOutput
                 accumulatedSteps++
+
+                // Reset per-step content tracker
+                stepContentLength = 0
 
                 // Build human-readable progress label from tools used this step
                 const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
@@ -11525,20 +11548,36 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
 
                   if (part.type === 'text-delta' && part.text) {
                     accumulatedContent += part.text
+                    stepContentLength += part.text.length
                   } else if (part.type === 'reasoning-delta' && part.text) {
                     accumulatedReasoning += part.text
+                    stepContentLength += part.text.length
                   } else if (part.type === 'tool-call') {
                     toolResults.push(part)
                     currentStepTools.push((part as any).toolName || 'unknown')
+                    stepContentLength += JSON.stringify((part as any).args || {}).length
                   } else if (part.type === 'tool-result') {
                     toolResults.push(part)
-                  } else if (part.type === 'step-finish' && (part as any).usage) {
-                    const stepUsage = (part as any).usage
-                    const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
-                    const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                  } else if (part.type === 'step-finish') {
+                    const stepUsage = (part as any).usage || {}
+                    let stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                    let stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+
+                    // Estimate when provider reports 0 tokens
+                    if (stepInput === 0 && stepOutput === 0 && stepContentLength > 0) {
+                      const contextLength = processedMessages.reduce((sum: number, m: any) => {
+                        const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                        return sum + content.length
+                      }, 0) + (systemPrompt?.length || 0)
+                      stepInput = Math.ceil(contextLength / 4)
+                      stepOutput = Math.ceil(stepContentLength / 4)
+                      console.log(`[Chat-V2] [Fallback] Provider reported 0 tokens - estimated: ~${stepInput} input + ~${stepOutput} output`)
+                    }
+
                     accumulatedUsage.inputTokens += stepInput
                     accumulatedUsage.outputTokens += stepOutput
                     accumulatedSteps++
+                    stepContentLength = 0
 
                     const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
                     const progressMessage = progressActions.length > 0
@@ -11767,8 +11806,31 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 }
               }
 
-              // Bill if we have usage data
-              if (totalUsage && (totalUsage.inputTokens > 0 || totalUsage.outputTokens > 0)) {
+              // If per-step billing already handled everything (including estimated usage),
+              // skip final billing to avoid double-charging
+              if (perStepBillingActive && totalCreditsDeducted > 0) {
+                console.log(`[Chat-V2] Per-step billing already deducted ${totalCreditsDeducted} credits - skipping final billing`)
+              } else if (!totalUsage || (totalUsage.inputTokens === 0 && totalUsage.outputTokens === 0)) {
+                // result.usage returned 0 AND per-step billing didn't fire
+                // Last resort: estimate from accumulated content
+                if (accumulatedContent.length > 0 || accumulatedReasoning.length > 0) {
+                  const estimatedInputTokens = Math.ceil(processedMessages.reduce((sum: number, m: any) => {
+                    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                    return sum + content.length / 4
+                  }, 0) + (systemPrompt?.length || 0) / 4)
+                  const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 4) + Math.ceil(accumulatedReasoning.length / 4)
+                  if (estimatedOutputTokens > 0) {
+                    totalUsage = { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens }
+                    stepsCount = Math.max(1, accumulatedSteps)
+                    console.log(`[Chat-V2] 📊 Final billing fallback (estimated): ~${totalUsage.inputTokens} input + ~${totalUsage.outputTokens} output (${stepsCount} steps)`)
+                  } else {
+                    console.log('[Chat-V2] ⚠️ No output produced - skipping billing')
+                  }
+                }
+              }
+
+              // Bill if we have usage data (and per-step billing didn't already handle it)
+              if (!perStepBillingActive && totalUsage && (totalUsage.inputTokens > 0 || totalUsage.outputTokens > 0)) {
                 const supabase = await createClient()
 
                 const billingResult = await deductCreditsFromUsage(
