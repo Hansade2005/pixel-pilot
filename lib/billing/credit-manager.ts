@@ -83,6 +83,92 @@ export function estimateCreditsPerStep(model: string): number {
   return Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
 }
 
+// ─── Tool classification for per-step billing ───────────────────────────
+// File tools run in-memory via constructToolResult (cheap, no external calls)
+const CONSTRUCT_TOOL_RESULT_TOOLS = new Set([
+  'write_file', 'read_file', 'delete_file', 'delete_folder',
+  'edit_file', 'client_replace_string_in_file', 'remove_package',
+  'pipilotdb_create_database', 'request_supabase_connection',
+  'continue_backend_implementation',
+])
+
+// Direct-execute tools that do real work (external APIs, search, etc.)
+const DIRECT_EXECUTE_TOOLS = new Set([
+  'semantic_code_navigator', 'grep_search', 'list_files',
+  'web_search', 'web_extract', 'browse_web',
+  'check_dev_errors', 'node_machine', 'install_packages',
+  'generate_image', 'generate_plan', 'code_review',
+  'code_quality_analysis', 'auto_documentation', 'update_plan_progress',
+  'update_project_context',
+  // Database tools
+  'pipilotdb_query_database', 'pipilotdb_manipulate_table_data',
+  'pipilotdb_manage_api_keys', 'pipilotdb_list_tables',
+  'pipilotdb_read_table', 'pipilotdb_delete_table',
+  'pipilotdb_create_table',
+  // Supabase tools
+  'supabase_fetch_api_keys', 'supabase_create_table',
+  'supabase_insert_data', 'supabase_delete_data',
+  'supabase_read_table', 'supabase_drop_table',
+  'supabase_execute_sql', 'supabase_list_tables_rls',
+  // Stripe tools
+  'stripe_validate_key', 'stripe_list_products',
+  'stripe_create_product', 'stripe_list_prices',
+  'stripe_list_customers', 'stripe_list_subscriptions',
+])
+
+export type StepType = 'tool-call-file' | 'tool-call-direct' | 'text-generation' | 'mixed'
+
+/**
+ * Classify a step based on the tools it used.
+ */
+export function classifyStep(toolsUsed: string[]): StepType {
+  if (toolsUsed.length === 0) return 'text-generation'
+
+  const hasFileTools = toolsUsed.some(t => CONSTRUCT_TOOL_RESULT_TOOLS.has(t))
+  const hasDirectTools = toolsUsed.some(t => DIRECT_EXECUTE_TOOLS.has(t) || !CONSTRUCT_TOOL_RESULT_TOOLS.has(t))
+
+  if (hasFileTools && hasDirectTools) return 'mixed'
+  if (hasFileTools) return 'tool-call-file'
+  return 'tool-call-direct'
+}
+
+/**
+ * Estimate tokens for a step when the provider reports 0 usage.
+ * Uses step type + content length for accurate estimation.
+ *
+ * - text-generation: full context re-sent as input, output from generated text
+ * - tool-call-file: context re-sent, output = tool args + small result (in-memory)
+ * - tool-call-direct: context re-sent, output = tool args + larger result
+ * - mixed: combination of both
+ */
+export function estimateStepTokens(
+  stepType: StepType,
+  contextChars: number,
+  outputChars: number,
+  toolResultChars: number = 0
+): { inputTokens: number; outputTokens: number } {
+  // Input: the full conversation context is re-sent every step (~4 chars/token)
+  const inputTokens = Math.ceil(contextChars / 4)
+
+  // Output: AI-generated text + tool call arguments (~4 chars/token)
+  let outputTokens = Math.ceil(outputChars / 4)
+
+  // Tool results count as input tokens for the NEXT step, but we charge
+  // them here since this step triggered the tool execution
+  if (toolResultChars > 0) {
+    // Tool results are typically verbose (file contents, search results, etc.)
+    // Count them at input token rate since they get fed back as context
+    outputTokens += Math.ceil(toolResultChars / 4)
+  }
+
+  // Minimum output: even a pure tool-call step generates the function call JSON
+  if (outputTokens === 0 && stepType !== 'text-generation') {
+    outputTokens = 50  // Minimum for a tool call invocation
+  }
+
+  return { inputTokens, outputTokens }
+}
+
 /**
  * Calculate the max steps a user can afford for a given model.
  * Uses the flat plan step limit - billing deducts actual token cost after each request.
