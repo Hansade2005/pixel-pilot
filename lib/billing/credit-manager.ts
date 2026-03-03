@@ -17,18 +17,11 @@ import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-dat
 // 1 credit = $0.01 (with 4x markup on API costs for profit margin)
 export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 
-// Monthly credits per plan - sustainable allocations
-// Formula: plan_price / CREDIT_TO_USD_RATE * coverage_ratio
-// Coverage ratio ensures we never give more credit value than revenue
-//
-// Real usage per request (with model-aware step limits):
-// - Cheap models (Devstral/Grok): ~5-15 credits/request  -> Creator gets ~65-200 requests
-// - Claude Sonnet 4.5 ($3/$15):   ~40-100 credits/request -> Creator gets ~10-25 requests
-// - Claude Opus 4.5 ($15/$75):    ~200-500 credits/request -> needs Scale plan
-export const FREE_PLAN_MONTHLY_CREDITS = 150       // ~3-10 tasks with cheap models, ~1-3 with Claude
-export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, charge $25 (10x margin)
-export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, charge $75 (12x margin)
-export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, charge $150 (12x margin)
+// Monthly credits per plan
+export const FREE_PLAN_MONTHLY_CREDITS = 150
+export const CREATOR_PLAN_MONTHLY_CREDITS = 1000
+export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500
+export const SCALE_PLAN_MONTHLY_CREDITS = 5000
 
 // Per-model API pricing is now sourced from the comprehensive model-pricing-data.ts
 // which contains 100+ models with full Vercel AI Gateway pricing, verified 2026-02-14.
@@ -40,7 +33,7 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   ])
 )
 
-// 4x markup for sustainable profit margin (covers infrastructure, Vercel hosting, support, development)
+// 4x markup for profit margin (covers infrastructure, Vercel hosting, support, development)
 const MARKUP_MULTIPLIER = 4
 
 // Per-request credit budget per plan (max credits ONE request can consume)
@@ -88,6 +81,92 @@ export function estimateCreditsPerStep(model: string): number {
   const typicalOutputTokens = 400
   const apiCost = (typicalInputTokens * pricing.input) + (typicalOutputTokens * pricing.output)
   return Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
+}
+
+// ─── Tool classification for per-step billing ───────────────────────────
+// File tools run in-memory via constructToolResult (cheap, no external calls)
+const CONSTRUCT_TOOL_RESULT_TOOLS = new Set([
+  'write_file', 'read_file', 'delete_file', 'delete_folder',
+  'edit_file', 'client_replace_string_in_file', 'remove_package',
+  'pipilotdb_create_database', 'request_supabase_connection',
+  'continue_backend_implementation',
+])
+
+// Direct-execute tools that do real work (external APIs, search, etc.)
+const DIRECT_EXECUTE_TOOLS = new Set([
+  'semantic_code_navigator', 'grep_search', 'list_files',
+  'web_search', 'web_extract', 'browse_web',
+  'check_dev_errors', 'node_machine', 'install_packages',
+  'generate_image', 'generate_plan', 'code_review',
+  'code_quality_analysis', 'auto_documentation', 'update_plan_progress',
+  'update_project_context',
+  // Database tools
+  'pipilotdb_query_database', 'pipilotdb_manipulate_table_data',
+  'pipilotdb_manage_api_keys', 'pipilotdb_list_tables',
+  'pipilotdb_read_table', 'pipilotdb_delete_table',
+  'pipilotdb_create_table',
+  // Supabase tools
+  'supabase_fetch_api_keys', 'supabase_create_table',
+  'supabase_insert_data', 'supabase_delete_data',
+  'supabase_read_table', 'supabase_drop_table',
+  'supabase_execute_sql', 'supabase_list_tables_rls',
+  // Stripe tools
+  'stripe_validate_key', 'stripe_list_products',
+  'stripe_create_product', 'stripe_list_prices',
+  'stripe_list_customers', 'stripe_list_subscriptions',
+])
+
+export type StepType = 'tool-call-file' | 'tool-call-direct' | 'text-generation' | 'mixed'
+
+/**
+ * Classify a step based on the tools it used.
+ */
+export function classifyStep(toolsUsed: string[]): StepType {
+  if (toolsUsed.length === 0) return 'text-generation'
+
+  const hasFileTools = toolsUsed.some(t => CONSTRUCT_TOOL_RESULT_TOOLS.has(t))
+  const hasDirectTools = toolsUsed.some(t => DIRECT_EXECUTE_TOOLS.has(t) || !CONSTRUCT_TOOL_RESULT_TOOLS.has(t))
+
+  if (hasFileTools && hasDirectTools) return 'mixed'
+  if (hasFileTools) return 'tool-call-file'
+  return 'tool-call-direct'
+}
+
+/**
+ * Estimate tokens for a step when the provider reports 0 usage.
+ * Uses step type + content length for accurate estimation.
+ *
+ * - text-generation: full context re-sent as input, output from generated text
+ * - tool-call-file: context re-sent, output = tool args + small result (in-memory)
+ * - tool-call-direct: context re-sent, output = tool args + larger result
+ * - mixed: combination of both
+ */
+export function estimateStepTokens(
+  stepType: StepType,
+  contextChars: number,
+  outputChars: number,
+  toolResultChars: number = 0
+): { inputTokens: number; outputTokens: number } {
+  // Input: the full conversation context is re-sent every step (~4 chars/token)
+  const inputTokens = Math.ceil(contextChars / 4)
+
+  // Output: AI-generated text + tool call arguments (~4 chars/token)
+  let outputTokens = Math.ceil(outputChars / 4)
+
+  // Tool results count as input tokens for the NEXT step, but we charge
+  // them here since this step triggered the tool execution
+  if (toolResultChars > 0) {
+    // Tool results are typically verbose (file contents, search results, etc.)
+    // Count them at input token rate since they get fed back as context
+    outputTokens += Math.ceil(toolResultChars / 4)
+  }
+
+  // Minimum output: even a pure tool-call step generates the function call JSON
+  if (outputTokens === 0 && stepType !== 'text-generation') {
+    outputTokens = 50  // Minimum for a tool call invocation
+  }
+
+  return { inputTokens, outputTokens }
 }
 
 /**
@@ -180,12 +259,11 @@ export function calculateCreditsFromTokens(
   completionTokens: number,
   model: string = 'anthropic/claude-sonnet-4.5'
 ): number {
-  // Get model-specific pricing
+  // Get model-specific per-token pricing (USD per token)
   const pricing = getModelPricing(model)
 
   // Calculate actual API cost in USD using model-specific rates
-  const apiCost = (promptTokens * pricing.input) +
-                  (completionTokens * pricing.output)
+  const apiCost = (promptTokens * pricing.input) + (completionTokens * pricing.output)
 
   // Convert to credits: API cost in dollars * 100 (to get cents) * 4x markup
   const credits = Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
@@ -475,7 +553,7 @@ export async function deductCreditsFromUsage(
     }
   }
 
-  // Calculate actual credits based on token usage with markup
+  // Calculate actual credits based on token usage with 4x markup
   const creditsToDeduct = calculateCreditsFromTokens(
     usage.promptTokens,
     usage.completionTokens,

@@ -60,7 +60,6 @@ import { PlanCard } from './plan-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
 import { createClient } from '@/lib/supabase/client'
-import { checkUserBlocked } from '@/lib/user-block-check'
 import { chatModels } from '@/lib/ai-models'
 import { getWalletBalance } from '@/lib/billing/credit-manager'
 import { PRODUCT_CONFIGS } from '@/lib/stripe-config'
@@ -1131,10 +1130,13 @@ interface MCPServerConfig {
   enabled: boolean
 }
 
-// Blocked users - must upgrade before continuing
-const BLOCKED_USER_IDS = new Set([
-  '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
-])
+// Daily message limits per plan
+const DAILY_MESSAGE_LIMITS: Record<string, number> = {
+  free: 10,
+  creator: 100,
+  collaborate: 300,
+  scale: 1000,
+}
 
 interface ChatPanelV2Props {
   project: any
@@ -1787,7 +1789,8 @@ export function ChatPanelV2({
   const [topUpAmount, setTopUpAmount] = useState('10')
   const [processingTopUp, setProcessingTopUp] = useState(false)
   const [showCreditExhaustionModal, setShowCreditExhaustionModal] = useState(false)
-  const [isBlockedUser, setIsBlockedUser] = useState(false)
+  const [dailyMessagesUsed, setDailyMessagesUsed] = useState(0)
+  const [dailyMessageLimit, setDailyMessageLimit] = useState(10)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -3472,18 +3475,25 @@ export function ChatPanelV2({
           return
         }
 
-        // Check if user is blocked
-        if (BLOCKED_USER_IDS.has(user.id)) {
-          setIsBlockedUser(true)
-        }
-
         // Use getWalletBalance function instead of direct query
         const wallet = await getWalletBalance(user.id, supabase)
 
         if (wallet) {
           setCreditBalance(wallet.creditsBalance)
           setCurrentPlan(wallet.currentPlan)
+          setDailyMessageLimit(DAILY_MESSAGE_LIMITS[wallet.currentPlan] || DAILY_MESSAGE_LIMITS.free)
         }
+
+        // Count today's messages from transactions table
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const { count } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('type', 'usage')
+          .gte('created_at', todayStart.toISOString())
+        setDailyMessagesUsed(count || 0)
       } catch (error) {
         console.error('[ChatPanelV2] Exception fetching credit balance:', error)
       } finally {
@@ -4693,37 +4703,27 @@ export function ChatPanelV2({
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Check if user is blocked - must upgrade before continuing
-    try {
-      const supabaseClient = createClient()
-      const { data: { user: currentUser } } = await supabaseClient.auth.getUser()
-      if (currentUser) {
-        const blockStatus = await checkUserBlocked(currentUser.id)
-        if (blockStatus.isBlocked) {
-          toast({
-            title: '⛔ Account Blocked',
-            description: blockStatus.reason || 'Your account requires an upgrade. Please upgrade your plan to continue.',
-            variant: 'destructive',
-          })
-          window.open('/pricing?blocked=true', '_blank')
-          return
-        }
-      }
-    } catch (err) {
-      // Don't block on check failure
-    }
-
     // Check if selected model is premium-only and user is on free plan
-    if (selectedModel && userPlan === 'free') {
+    if (selectedModel && currentPlan === 'free') {
       const modelInfo = chatModels.find(m => m.id === selectedModel)
       if (modelInfo?.premiumOnly) {
         toast({
-          title: '💎 Premium Model',
-          description: `${modelInfo.name} requires a paid plan. Please upgrade to use this model.`,
+          title: 'Pro Model',
+          description: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / MiniMax M2.5.`,
           variant: 'destructive',
         })
         return
       }
+    }
+
+    // Check daily message limit
+    if (dailyMessagesUsed >= dailyMessageLimit) {
+      toast({
+        title: 'Daily Limit Reached',
+        description: `You've used ${dailyMessagesUsed}/${dailyMessageLimit} messages today. ${currentPlan === 'free' ? 'Upgrade for more daily messages.' : 'Your limit resets at midnight.'}`,
+        variant: 'destructive',
+      })
+      return
     }
 
     if (!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) {
@@ -4762,16 +4762,6 @@ export function ChatPanelV2({
       toast({
         title: 'URLs processing',
         description: 'Please wait for URLs to finish processing',
-        variant: 'destructive'
-      })
-      return
-    }
-
-    // Check if user is blocked - must upgrade
-    if (isBlockedUser) {
-      toast({
-        title: 'Account Suspended',
-        description: 'Your account has been suspended. Please upgrade your plan to continue using PiPilot.',
         variant: 'destructive'
       })
       return

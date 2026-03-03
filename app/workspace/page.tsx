@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { WorkspaceLayout } from "@/components/workspace/workspace-layout"
 import { storageManager } from "@/lib/storage-manager"
-import { checkUserBlockedServer } from "@/lib/user-block-check-server"
 import type { Metadata } from 'next'
 
 
@@ -27,12 +26,6 @@ export default async function WorkspacePage({
 
   if (error || !user) {
     redirect("/auth/login")
-  }
-
-  // Check if user is blocked
-  const blockStatus = await checkUserBlockedServer(user.id)
-  if (blockStatus.isBlocked) {
-    redirect("/pricing?blocked=true&reason=" + encodeURIComponent(blockStatus.reason || 'Account requires upgrade'))
   }
 
   // Server-side rendering - always return empty projects array

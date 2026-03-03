@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing, classifyStep, estimateStepTokens } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -2132,24 +2132,76 @@ export async function POST(req: Request) {
     }
 
     // ============================================================================
-    // BLOCKED USER CHECK - Must upgrade before continuing
+    // DAILY MESSAGE LIMIT CHECK
     // ============================================================================
-    const BLOCKED_USER_IDS = new Set([
-      '613b7089-0587-4458-a570-a0f76598b510', // sliverfurwerewolf858ad@gmail.com
-    ])
+    const DAILY_LIMITS: Record<string, number> = { free: 10, creator: 100, collaborate: 300, scale: 1000 }
 
-    if (BLOCKED_USER_IDS.has(user.id)) {
-      console.warn(`[Chat-V2] Blocked user attempted access: ${user.id} (${user.email})`)
-      return NextResponse.json(
-        {
-          error: {
-            message: 'Your account has been suspended. Please upgrade your plan to continue using PiPilot.',
-            code: 'ACCOUNT_SUSPENDED',
-            type: 'credit_error'
-          }
-        },
-        { status: 403 }
-      )
+    {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('type', 'usage')
+        .gte('created_at', todayStart.toISOString())
+
+      // Get user plan from wallet
+      const { data: walletRow } = await supabase
+        .from('wallet')
+        .select('current_plan')
+        .eq('user_id', user.id)
+        .single()
+      const plan = walletRow?.current_plan || 'free'
+      const limit = DAILY_LIMITS[plan] || DAILY_LIMITS.free
+      const used = count || 0
+
+      if (used >= limit) {
+        console.warn(`[Chat-V2] Daily limit reached for user ${user.id}: ${used}/${limit} (plan: ${plan})`)
+        return NextResponse.json(
+          {
+            error: {
+              message: plan === 'free'
+                ? `Daily message limit reached (${limit} messages). Upgrade to Pro for more daily messages.`
+                : `Daily message limit reached (${limit} messages). Your limit resets at midnight.`,
+              code: 'DAILY_LIMIT_REACHED',
+              type: 'credit_error',
+              dailyUsed: used,
+              dailyLimit: limit,
+            }
+          },
+          { status: 429 }
+        )
+      }
+    }
+
+    // ============================================================================
+    // PREMIUM MODEL GATE - Claude Sonnet 4.5 requires a paid plan
+    // ============================================================================
+    {
+      const { data: walletRow } = await supabase
+        .from('wallet')
+        .select('current_plan')
+        .eq('user_id', user.id)
+        .single()
+      const plan = walletRow?.current_plan || 'free'
+
+      if (plan === 'free' && modelId) {
+        const modelInfo = (await import('@/lib/ai-models')).getModelById(modelId)
+        if (modelInfo?.premiumOnly) {
+          console.warn(`[Chat-V2] Free user ${user.id} attempted premium model: ${modelId}`)
+          return NextResponse.json(
+            {
+              error: {
+                message: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / MiniMax M2.5.`,
+                code: 'PREMIUM_MODEL_REQUIRED',
+                type: 'credit_error',
+              }
+            },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     // ============================================================================
@@ -11226,6 +11278,14 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           let accumulatedUsage = { inputTokens: 0, outputTokens: 0 }
           let accumulatedSteps = 0
           let currentStepTools: string[] = []
+          let stepContentLength = 0    // Track AI output chars per step (text + tool args)
+          let stepToolResultLength = 0 // Track tool result chars per step
+
+          // Pre-compute context length for token estimation (messages + system prompt)
+          const contextChars = processedMessages.reduce((sum: number, m: any) => {
+            const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+            return sum + content.length
+          }, 0) + (systemPrompt?.length || 0)
 
           // Per-step billing: deduct credits after each step using real token usage
           let perStepBillingActive = false
@@ -11294,24 +11354,54 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
               if (part.type === 'text-delta') {
                 if (part.text) {
                   accumulatedContent += part.text
+                  stepContentLength += part.text.length
                 }
               } else if (part.type === 'reasoning-delta') {
                 if (part.text) {
                   accumulatedReasoning += part.text
+                  stepContentLength += part.text.length
                 }
               } else if (part.type === 'tool-call') {
                 toolResults.push(part);
                 currentStepTools.push((part as any).toolName || 'unknown')
+                stepContentLength += JSON.stringify((part as any).args || {}).length
               } else if (part.type === 'tool-result') {
                 toolResults.push(part);
-              } else if (part.type === 'step-finish' && (part as any).usage) {
-                // Capture per-step usage
-                const stepUsage = (part as any).usage
-                const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
-                const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                // Track tool result size for billing (constructToolResult file ops vs direct execute)
+                const resultStr = typeof (part as any).result === 'string'
+                  ? (part as any).result
+                  : JSON.stringify((part as any).result || {})
+                stepToolResultLength += resultStr.length
+              } else if (part.type === 'step-finish') {
+                // ── Classify this step ──
+                const stepType = classifyStep(currentStepTools)
+
+                // ── Get token usage (provider-reported or estimated) ──
+                const stepUsage = (part as any).usage || {}
+                let stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                let stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+
+                // Provider didn't report usage (common with OpenAI-compatible providers
+                // like Ollama Cloud, OpenRouter, etc.) - estimate based on step type
+                if (stepInput === 0 && stepOutput === 0 && (stepContentLength > 0 || currentStepTools.length > 0)) {
+                  const estimated = estimateStepTokens(
+                    stepType,
+                    contextChars,
+                    stepContentLength,
+                    stepToolResultLength
+                  )
+                  stepInput = estimated.inputTokens
+                  stepOutput = estimated.outputTokens
+                  console.log(`[Chat-V2] Provider reported 0 tokens [${stepType}] - estimated: ~${stepInput} input + ~${stepOutput} output (content=${stepContentLength}ch, toolResult=${stepToolResultLength}ch, tools=[${currentStepTools.join(',')}])`)
+                }
+
                 accumulatedUsage.inputTokens += stepInput
                 accumulatedUsage.outputTokens += stepOutput
                 accumulatedSteps++
+
+                // Reset per-step trackers
+                stepContentLength = 0
+                stepToolResultLength = 0
 
                 // Build human-readable progress label from tools used this step
                 const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
@@ -11319,7 +11409,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   ? progressActions.join(', ')
                   : 'Thinking'
 
-                // --- Per-step credit deduction ---
+                // ── Per-step credit deduction ──
                 let stepCreditsDeducted = 0
                 if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
                   try {
@@ -11330,7 +11420,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       { promptTokens: stepInput, completionTokens: stepOutput },
                       {
                         model: activeModelId,
-                        requestType: 'chat-step',
+                        requestType: `chat-step-${stepType}`,
                         endpoint: '/api/chat-v2',
                         steps: 1,
                         status: 'success',
@@ -11343,7 +11433,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       totalCreditsDeducted += billingResult.creditsUsed
                       currentBalance = isByokMode ? -1 : billingResult.newBalance
                       if (!isByokMode) {
-                        console.log(`[Chat-V2] 💰 Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                        console.log(`[Chat-V2] 💰 Step ${accumulatedSteps} [${stepType}]: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
                       }
                     }
                   } catch (billingErr) {
@@ -11356,6 +11446,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   type: 'step_progress',
                   step: accumulatedSteps,
                   maxSteps: maxStepsAllowed,
+                  stepType,
                   toolsUsed: currentStepTools,
                   progressMessage,
                   stepTokens: { input: stepInput, output: stepOutput },
@@ -11473,27 +11564,48 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
 
                   if (part.type === 'text-delta' && part.text) {
                     accumulatedContent += part.text
+                    stepContentLength += part.text.length
                   } else if (part.type === 'reasoning-delta' && part.text) {
                     accumulatedReasoning += part.text
+                    stepContentLength += part.text.length
                   } else if (part.type === 'tool-call') {
                     toolResults.push(part)
                     currentStepTools.push((part as any).toolName || 'unknown')
+                    stepContentLength += JSON.stringify((part as any).args || {}).length
                   } else if (part.type === 'tool-result') {
                     toolResults.push(part)
-                  } else if (part.type === 'step-finish' && (part as any).usage) {
-                    const stepUsage = (part as any).usage
-                    const stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
-                    const stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+                    const resultStr = typeof (part as any).result === 'string'
+                      ? (part as any).result
+                      : JSON.stringify((part as any).result || {})
+                    stepToolResultLength += resultStr.length
+                  } else if (part.type === 'step-finish') {
+                    // ── Classify this step ──
+                    const stepType = classifyStep(currentStepTools)
+
+                    const stepUsage = (part as any).usage || {}
+                    let stepInput = stepUsage.inputTokens || stepUsage.promptTokens || 0
+                    let stepOutput = stepUsage.outputTokens || stepUsage.completionTokens || 0
+
+                    // Estimate when provider reports 0 tokens
+                    if (stepInput === 0 && stepOutput === 0 && (stepContentLength > 0 || currentStepTools.length > 0)) {
+                      const estimated = estimateStepTokens(stepType, contextChars, stepContentLength, stepToolResultLength)
+                      stepInput = estimated.inputTokens
+                      stepOutput = estimated.outputTokens
+                      console.log(`[Chat-V2] [Fallback] Provider reported 0 tokens [${stepType}] - estimated: ~${stepInput} input + ~${stepOutput} output`)
+                    }
+
                     accumulatedUsage.inputTokens += stepInput
                     accumulatedUsage.outputTokens += stepOutput
                     accumulatedSteps++
+                    stepContentLength = 0
+                    stepToolResultLength = 0
 
                     const progressActions = currentStepTools.map(t => toolProgressLabels[t] || t)
                     const progressMessage = progressActions.length > 0
                       ? progressActions.join(', ')
                       : 'Thinking'
 
-                    // --- Per-step credit deduction (fallback stream) ---
+                    // ── Per-step credit deduction (fallback stream) ──
                     let stepCreditsDeducted = 0
                     if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
                       try {
@@ -11504,7 +11616,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                           { promptTokens: stepInput, completionTokens: stepOutput },
                           {
                             model: activeModelId,
-                            requestType: 'chat-step',
+                            requestType: `chat-step-${stepType}`,
                             endpoint: '/api/chat-v2',
                             steps: 1,
                             status: 'success',
@@ -11517,7 +11629,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                           totalCreditsDeducted += billingResult.creditsUsed
                           currentBalance = isByokMode ? -1 : billingResult.newBalance
                           if (!isByokMode) {
-                            console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+                            console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps} [${stepType}]: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
                           }
                         }
                       } catch (billingErr) {
@@ -11529,6 +11641,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       type: 'step_progress',
                       step: accumulatedSteps,
                       maxSteps: maxStepsAllowed,
+                      stepType,
                       toolsUsed: currentStepTools,
                       progressMessage,
                       stepTokens: { input: stepInput, output: stepOutput },
@@ -11673,13 +11786,13 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   } catch {
                     // result.usage didn't resolve (expected for errored streams)
                     // Estimate usage from accumulated content to ensure billing isn't skipped entirely
-                    const estimatedInputTokens = Math.ceil(processedMessages.reduce((sum: number, m: any) => {
-                      const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-                      return sum + content.length / 4
-                    }, 0))
-                    const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 4) + Math.ceil(accumulatedReasoning.length / 4)
-                    if (estimatedOutputTokens > 0) {
-                      totalUsage = { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens }
+                    const estimated = estimateStepTokens(
+                      'text-generation',
+                      contextChars,
+                      accumulatedContent.length + accumulatedReasoning.length
+                    )
+                    if (estimated.outputTokens > 0) {
+                      totalUsage = { inputTokens: estimated.inputTokens, outputTokens: estimated.outputTokens }
                       stepsCount = Math.max(1, accumulatedSteps)
                       console.log(`[Chat-V2] 📊 Using estimated usage (stream errored, no step data): ~${totalUsage.inputTokens} input + ~${totalUsage.outputTokens} output (${stepsCount} steps)`)
                     } else {
@@ -11715,8 +11828,31 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 }
               }
 
-              // Bill if we have usage data
-              if (totalUsage && (totalUsage.inputTokens > 0 || totalUsage.outputTokens > 0)) {
+              // If per-step billing already handled everything (including estimated usage),
+              // skip final billing to avoid double-charging
+              if (perStepBillingActive && totalCreditsDeducted > 0) {
+                console.log(`[Chat-V2] Per-step billing already deducted ${totalCreditsDeducted} credits across ${accumulatedSteps} steps - skipping final billing`)
+              } else if (!totalUsage || (totalUsage.inputTokens === 0 && totalUsage.outputTokens === 0)) {
+                // result.usage returned 0 AND per-step billing didn't fire
+                // Last resort: estimate from accumulated content using step-aware estimation
+                if (accumulatedContent.length > 0 || accumulatedReasoning.length > 0) {
+                  const estimated = estimateStepTokens(
+                    'text-generation',
+                    contextChars,
+                    accumulatedContent.length + accumulatedReasoning.length
+                  )
+                  if (estimated.outputTokens > 0) {
+                    totalUsage = { inputTokens: estimated.inputTokens, outputTokens: estimated.outputTokens }
+                    stepsCount = Math.max(1, accumulatedSteps)
+                    console.log(`[Chat-V2] 📊 Final billing fallback (estimated): ~${totalUsage.inputTokens} input + ~${totalUsage.outputTokens} output (${stepsCount} steps)`)
+                  } else {
+                    console.log('[Chat-V2] ⚠️ No output produced - skipping billing')
+                  }
+                }
+              }
+
+              // Bill if we have usage data (and per-step billing didn't already handle it)
+              if (!perStepBillingActive && totalUsage && (totalUsage.inputTokens > 0 || totalUsage.outputTokens > 0)) {
                 const supabase = await createClient()
 
                 const billingResult = await deductCreditsFromUsage(
