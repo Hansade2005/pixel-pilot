@@ -60,7 +60,7 @@ export const STEP_CREDITS_BY_TIER: Record<StepPricingTier, number> = {
   ultra: 50,     // $0.50/step - Top-tier models (API cost: ~$0.15-0.25)
 }
 
-// Model-to-tier mapping. Models not listed fall back to token-based billing.
+// Model-to-tier mapping. Every model gets a tier for per-step billing.
 const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
   // Kilo free models (API cost: $0)
   'kilo/auto-free': 'free',
@@ -70,6 +70,9 @@ const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
   'kilo/step-3.5-flash-free': 'free',
 
   // Economy tier (cheap API models, ~$0.005-0.02 per step)
+  'auto': 'economy',
+  'a0-dev-llm': 'economy',
+  'pixtral-12b-2409': 'economy',
   'mistral/devstral-2': 'economy',
   'mistral/devstral-small-2': 'economy',
   'xai/grok-code-fast-1': 'economy',

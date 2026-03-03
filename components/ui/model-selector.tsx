@@ -52,10 +52,10 @@ const shortNameMap = new Map<string, string>([
   ['ollama/minimax-m2.5', 'MiniMax M2.5'],
   ['ollama/minimax-m2.1', 'MiniMax M2.1 (O)'],
   ['ollama/kimi-k2:1t', 'Kimi K2 1T'],
-  // Kilo AI Gateway - Free models
+  // Kilo AI Gateway models
   ['kilo/auto-free', 'Kilo Auto'],
-  ['kilo/minimax-m2.5-free', 'M2.5 Free'],
-  ['kilo/kimi-k2.5-free', 'Kimi Free'],
+  ['kilo/minimax-m2.5-free', 'MiniMax M2.5'],
+  ['kilo/kimi-k2.5-free', 'Kimi K2.5'],
   ['kilo/giga-potato', 'Giga Potato'],
   ['kilo/step-3.5-flash-free', 'Step Flash'],
 ])
@@ -93,12 +93,12 @@ const descriptionMap = new Map<string, string>([
   ['ollama/minimax-m2.5', 'MiniMax M2.5 via Ollama Cloud'],
   ['ollama/minimax-m2.1', 'MiniMax M2.1 via Ollama Cloud'],
   ['ollama/kimi-k2:1t', 'Kimi K2 1T params via Ollama'],
-  // Kilo AI Gateway - Free models
-  ['kilo/auto-free', 'Free - Auto-picks best model'],
-  ['kilo/minimax-m2.5-free', 'Free - 80.2% SWE-Bench'],
-  ['kilo/kimi-k2.5-free', 'Free - Multimodal coding'],
-  ['kilo/giga-potato', 'Free - Agentic programming'],
-  ['kilo/step-3.5-flash-free', 'Free - Fast reasoning'],
+  // Kilo AI Gateway models
+  ['kilo/auto-free', 'Auto-picks best model via Kilo'],
+  ['kilo/minimax-m2.5-free', 'MiniMax M2.5 via Kilo'],
+  ['kilo/kimi-k2.5-free', 'Kimi K2.5 multimodal via Kilo'],
+  ['kilo/giga-potato', 'Agentic programming via Kilo'],
+  ['kilo/step-3.5-flash-free', 'Fast reasoning via Kilo'],
 ])
 
 // Map BYOK provider IDs to model ID prefixes
@@ -299,8 +299,6 @@ export function ModelSelector({
               const name = shortNameMap.get(modelId) || modelId
               const desc = descriptionMap.get(modelId) || ''
 
-              const isKiloFree = modelId.startsWith('kilo/')
-
               return (
                 <button
                   key={modelId}
@@ -315,11 +313,8 @@ export function ModelSelector({
                   disabled={!allowed}
                 >
                   <div className="min-w-0">
-                    <div className={`text-sm font-medium flex items-center gap-1.5 ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                    <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {name}
-                      {isKiloFree && (
-                        <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-green-500/20 text-green-400 uppercase leading-none">Free</span>
-                      )}
                     </div>
                     <div className="text-[11px] text-gray-500 truncate">
                       {byokOnly ? `${desc} (BYOK)` : desc}
