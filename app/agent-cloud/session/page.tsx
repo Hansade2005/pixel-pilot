@@ -438,6 +438,7 @@ function SessionPageInner() {
               } : undefined,
             }),
             initialPrompt: activeSession.title || activeSession.lines.find(l => l.type === 'input')?.content || 'resumed-session',
+            existingWorkingBranch: activeSession.workingBranch, // Reuse same branch on reconnection
             connectors: connectors
               .filter(c => c.enabled && c.fields.every(f => f.value.trim()))
               .map(c => ({
