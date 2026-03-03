@@ -11375,8 +11375,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
                     return sum + content.length
                   }, 0) + (systemPrompt?.length || 0)
-                  stepInput = Math.ceil(contextLength / 4)  // ~4 chars per token
-                  stepOutput = Math.ceil(stepContentLength / 4)
+                  stepInput = Math.ceil(contextLength / 3)  // ~3 chars per token (conservative)
+                  stepOutput = Math.ceil(stepContentLength / 3)
                   usageEstimated = true
                   console.log(`[Chat-V2] Provider reported 0 tokens - estimated: ~${stepInput} input + ~${stepOutput} output (from ${stepContentLength} chars output)`)
                 }
@@ -11569,8 +11569,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                         const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
                         return sum + content.length
                       }, 0) + (systemPrompt?.length || 0)
-                      stepInput = Math.ceil(contextLength / 4)
-                      stepOutput = Math.ceil(stepContentLength / 4)
+                      stepInput = Math.ceil(contextLength / 3)
+                      stepOutput = Math.ceil(stepContentLength / 3)
                       console.log(`[Chat-V2] [Fallback] Provider reported 0 tokens - estimated: ~${stepInput} input + ~${stepOutput} output`)
                     }
 
@@ -11766,9 +11766,9 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     // Estimate usage from accumulated content to ensure billing isn't skipped entirely
                     const estimatedInputTokens = Math.ceil(processedMessages.reduce((sum: number, m: any) => {
                       const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-                      return sum + content.length / 4
+                      return sum + content.length / 3
                     }, 0))
-                    const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 4) + Math.ceil(accumulatedReasoning.length / 4)
+                    const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 3) + Math.ceil(accumulatedReasoning.length / 3)
                     if (estimatedOutputTokens > 0) {
                       totalUsage = { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens }
                       stepsCount = Math.max(1, accumulatedSteps)
@@ -11816,9 +11816,9 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 if (accumulatedContent.length > 0 || accumulatedReasoning.length > 0) {
                   const estimatedInputTokens = Math.ceil(processedMessages.reduce((sum: number, m: any) => {
                     const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-                    return sum + content.length / 4
-                  }, 0) + (systemPrompt?.length || 0) / 4)
-                  const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 4) + Math.ceil(accumulatedReasoning.length / 4)
+                    return sum + content.length / 3
+                  }, 0) + (systemPrompt?.length || 0) / 3)
+                  const estimatedOutputTokens = Math.ceil(accumulatedContent.length / 3) + Math.ceil(accumulatedReasoning.length / 3)
                   if (estimatedOutputTokens > 0) {
                     totalUsage = { inputTokens: estimatedInputTokens, outputTokens: estimatedOutputTokens }
                     stepsCount = Math.max(1, accumulatedSteps)
