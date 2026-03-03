@@ -7,28 +7,22 @@
  * - Polar: Backup payment system (1 credit = $1, Product ID: 09991226-466e-4983-b409-c986577a8599)
  *
  * Credit Conversion Rate: 1 credit = $0.01 USD
- * Markup: 4x on actual API costs for profit margin + infrastructure
+ * Simple debit: credits_needed = ceil(cost_in_usd / 0.01)
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-data'
 
 // Credit constants - Token-based pricing system
-// 1 credit = $0.01 (with 4x markup on API costs for profit margin)
+// 1 credit = $0.01 USD — simple debit, no markup
 export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 
-// Monthly credits per plan - sustainable allocations
-// Formula: plan_price / CREDIT_TO_USD_RATE * coverage_ratio
-// Coverage ratio ensures we never give more credit value than revenue
-//
-// Real usage per request (with model-aware step limits):
-// - Cheap models (Devstral/Grok): ~5-15 credits/request  -> Creator gets ~65-200 requests
-// - Claude Sonnet 4.5 ($3/$15):   ~40-100 credits/request -> Creator gets ~10-25 requests
-// - Claude Opus 4.5 ($15/$75):    ~200-500 credits/request -> needs Scale plan
-export const FREE_PLAN_MONTHLY_CREDITS = 150       // ~3-10 tasks with cheap models, ~1-3 with Claude
-export const CREATOR_PLAN_MONTHLY_CREDITS = 1000   // ~$2.50 API cost, charge $25 (10x margin)
-export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500 // ~$6.25 API cost, charge $75 (12x margin)
-export const SCALE_PLAN_MONTHLY_CREDITS = 5000     // ~$12.50 API cost, charge $150 (12x margin)
+// Monthly credits per plan
+// 1 credit = $0.01, credits_needed = ceil(api_cost_usd / 0.01)
+export const FREE_PLAN_MONTHLY_CREDITS = 150
+export const CREATOR_PLAN_MONTHLY_CREDITS = 1000
+export const COLLABORATE_PLAN_MONTHLY_CREDITS = 2500
+export const SCALE_PLAN_MONTHLY_CREDITS = 5000
 
 // Per-model API pricing is now sourced from the comprehensive model-pricing-data.ts
 // which contains 100+ models with full Vercel AI Gateway pricing, verified 2026-02-14.
@@ -39,9 +33,6 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
     { input: entry.inputPerToken, output: entry.outputPerToken }
   ])
 )
-
-// 4x markup for sustainable profit margin (covers infrastructure, Vercel hosting, support, development)
-const MARKUP_MULTIPLIER = 4
 
 // Per-request credit budget per plan (max credits ONE request can consume)
 // Set high enough that the agent can actually finish tasks without being cut short.
@@ -86,8 +77,8 @@ export function estimateCreditsPerStep(model: string): number {
   // Typical agent step: ~35K input tokens (growing context), ~400 output tokens
   const typicalInputTokens = 35000
   const typicalOutputTokens = 400
-  const apiCost = (typicalInputTokens * pricing.input) + (typicalOutputTokens * pricing.output)
-  return Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
+  const costInUsd = (typicalInputTokens * pricing.input) + (typicalOutputTokens * pricing.output)
+  return Math.ceil(costInUsd / CREDIT_TO_USD_RATE)
 }
 
 /**
@@ -173,22 +164,21 @@ export function getModelPricing(model: string): { input: number; output: number 
 
 /**
  * Calculate credits from actual token usage (AI SDK integration)
- * Returns credit cost based on real API usage with per-model pricing and 4x markup
+ * Simple debit: credits_needed = ceil(cost_in_usd / CREDIT_VALUE_USD)
  */
 export function calculateCreditsFromTokens(
   promptTokens: number,
   completionTokens: number,
   model: string = 'anthropic/claude-sonnet-4.5'
 ): number {
-  // Get model-specific pricing
+  // Get model-specific per-token pricing (USD per token)
   const pricing = getModelPricing(model)
 
-  // Calculate actual API cost in USD using model-specific rates
-  const apiCost = (promptTokens * pricing.input) +
-                  (completionTokens * pricing.output)
+  // Calculate actual API cost in USD
+  const costInUsd = (promptTokens * pricing.input) + (completionTokens * pricing.output)
 
-  // Convert to credits: API cost in dollars * 100 (to get cents) * 4x markup
-  const credits = Math.ceil(apiCost * 100 * MARKUP_MULTIPLIER)
+  // Convert to credits: ceil(cost_in_usd / 0.01)
+  const credits = Math.ceil(costInUsd / CREDIT_TO_USD_RATE)
 
   // Minimum 1 credit per request to prevent free usage
   return Math.max(1, credits)
@@ -475,7 +465,7 @@ export async function deductCreditsFromUsage(
     }
   }
 
-  // Calculate actual credits based on token usage with markup
+  // Calculate actual credits based on token usage (no markup)
   const creditsToDeduct = calculateCreditsFromTokens(
     usage.promptTokens,
     usage.completionTokens,

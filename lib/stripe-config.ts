@@ -223,7 +223,7 @@ export const EXTRA_CREDITS_PRODUCT = {
   id: 'extra-credits',
   name: 'Extra Credits',
   description: 'Purchase additional credits for paid plans',
-  stripePriceId: 'price_1SZ9923G7U0M1bp18UU5eKQ8',
+  stripePriceId: 'price_1T6lsK3G7U0M1bp19R0ZutUh',
   pricePerCredit: 1
 }
 

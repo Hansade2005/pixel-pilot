@@ -74,10 +74,10 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     provider: 'anthropic',
     contextWindow: 200_000,
     maxOutput: 32_000,
-    inputPerToken: 0.000015,       // $15/M
-    outputPerToken: 0.000075,      // $75/M
-    cacheReadPerToken: 0.0000015,  // $1.50/M
-    cacheWritePerToken: 0.00001875, // $18.75/M
+    inputPerToken: 0.000005,       // $5/M
+    outputPerToken: 0.000025,      // $25/M
+    cacheReadPerToken: 0.0000005,  // $0.50/M
+    cacheWritePerToken: 0.00000625, // $6.25/M
     webSearchPer1K: 10.00,
     supportsImageInput: true,
     generatesImages: false,
@@ -135,6 +135,23 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     imageGenCost: 0,
     latencySeconds: 0.7,
     throughputTps: 67,
+  },
+
+  'anthropic/claude-sonnet-4.6': {
+    name: 'Claude Sonnet 4.6',
+    provider: 'anthropic',
+    contextWindow: 1_000_000,
+    maxOutput: 128_000,
+    inputPerToken: 0.000003,       // $3/M
+    outputPerToken: 0.000015,      // $15/M
+    cacheReadPerToken: 0.0000003,  // $0.30/M
+    cacheWritePerToken: 0.00000375, // $3.75/M
+    webSearchPer1K: 10.00,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 0.5,
+    throughputTps: 80,
   },
 
   'anthropic/claude-sonnet-4': {
@@ -292,6 +309,23 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     imageGenCost: 0,
     latencySeconds: 0.8,
     throughputTps: 59,
+  },
+
+  'openai/gpt-5.3-codex': {
+    name: 'GPT-5.3 Codex',
+    provider: 'openai',
+    contextWindow: 400_000,
+    maxOutput: 128_000,
+    inputPerToken: 0.00000175,     // $1.75/M
+    outputPerToken: 0.000014,      // $14/M
+    cacheReadPerToken: 0.00000017, // $0.17/M
+    cacheWritePerToken: 0,
+    webSearchPer1K: 10.00,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 1.5,
+    throughputTps: 350,
   },
 
   'openai/gpt-5.2-codex': {
@@ -823,6 +857,23 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
     imageGenCost: 0.120,
     latencySeconds: 11.5,
     throughputTps: 249,
+  },
+
+  'google/gemini-3.1-pro-preview': {
+    name: 'Gemini 3.1 Pro Preview',
+    provider: 'google',
+    contextWindow: 1_000_000,
+    maxOutput: 64_000,
+    inputPerToken: 0.000002,       // $2/M
+    outputPerToken: 0.000012,      // $12/M
+    cacheReadPerToken: 0.0000002,  // $0.20/M
+    cacheWritePerToken: 0,
+    webSearchPer1K: 14.00,
+    supportsImageInput: true,
+    generatesImages: false,
+    imageGenCost: 0,
+    latencySeconds: 2.8,
+    throughputTps: 140,
   },
 
   'google/gemini-2.5-flash': {
