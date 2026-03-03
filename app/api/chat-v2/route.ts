@@ -11427,6 +11427,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                         steps: 1,
                         status: 'success',
                         isByok: isByokMode,
+                        skipRequestIncrement: accumulatedSteps > 1, // Only first step counts as a request
                       },
                       billingSupabase
                     )
@@ -11437,6 +11438,11 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       if (!isByokMode) {
                         console.log(`[Chat-V2] 💰 Step ${accumulatedSteps} [${stepType}]: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
                       }
+                    } else if (!isByokMode && billingResult.errorCode === 'INSUFFICIENT_CREDITS') {
+                      // Balance depleted - update tracking and let the exhaustion guard below stop the agent
+                      perStepBillingActive = true
+                      currentBalance = billingResult.newBalance
+                      console.log(`[Chat-V2] 🛑 Step ${accumulatedSteps} [${stepType}]: insufficient credits (balance: ${currentBalance})`)
                     }
                   } catch (billingErr) {
                     console.warn(`[Chat-V2] Step billing failed (will retry in finally):`, billingErr)
@@ -11624,6 +11630,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                             steps: 1,
                             status: 'success',
                             isByok: isByokMode,
+                            skipRequestIncrement: accumulatedSteps > 1,
                           },
                           billingSupabase
                         )
@@ -11634,6 +11641,10 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                           if (!isByokMode) {
                             console.log(`[Chat-V2] 💰 [Fallback] Step ${accumulatedSteps} [${stepType}]: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
                           }
+                        } else if (!isByokMode && billingResult.errorCode === 'INSUFFICIENT_CREDITS') {
+                          perStepBillingActive = true
+                          currentBalance = billingResult.newBalance
+                          console.log(`[Chat-V2] 🛑 [Fallback] Step ${accumulatedSteps} [${stepType}]: insufficient credits (balance: ${currentBalance})`)
                         }
                       } catch (billingErr) {
                         console.warn(`[Chat-V2] [Fallback] Step billing failed:`, billingErr)
@@ -11654,7 +11665,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       remainingBalance: currentBalance,
                     }) + '\n'))
 
-                    if (perStepBillingActive && currentBalance <= 0) {
+                    if (!isByokMode && perStepBillingActive && currentBalance <= 0) {
                       console.log(`[Chat-V2] 🛑 [Fallback] Credits exhausted after step ${accumulatedSteps} - stopping agent`)
                       controller.enqueue(encoder.encode(JSON.stringify({
                         type: 'credits_exhausted',

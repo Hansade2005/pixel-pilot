@@ -359,7 +359,7 @@ export async function hasEnoughCredits(
 export async function deductCredits(
   userId: string,
   creditsToDeduct: number,
-  metadata: Partial<UsageLogEntry> = {},
+  metadata: Partial<UsageLogEntry> & { skipRequestIncrement?: boolean } = {},
   supabase: SupabaseClient
 ): Promise<CreditDeductionResult> {
   try {
@@ -376,26 +376,34 @@ export async function deductCredits(
       }
     }
 
-    // Check if user has enough credits
-    if (wallet.creditsBalance < creditsToDeduct) {
+    // If balance is 0 or negative, stop immediately
+    if (wallet.creditsBalance <= 0) {
       return {
         success: false,
         newBalance: wallet.creditsBalance,
         creditsUsed: 0,
-        error: `Insufficient credits. Required: ${creditsToDeduct}, Available: ${wallet.creditsBalance}`,
+        error: 'No credits remaining',
         errorCode: 'INSUFFICIENT_CREDITS'
       }
     }
 
-    // Deduct credits and increment request count (atomic operation)
+    // Partial deduction: if user can't afford the full cost, deduct what's available
+    const actualDeduction = Math.min(creditsToDeduct, wallet.creditsBalance)
+
+    // Build update object - only increment request count for full requests, not per-step
+    const updateData: Record<string, any> = {
+      credits_balance: wallet.creditsBalance - actualDeduction,
+      credits_used_this_month: wallet.creditsUsedThisMonth + actualDeduction,
+      credits_used_total: wallet.creditsUsedTotal + actualDeduction,
+    }
+    if (!metadata.skipRequestIncrement) {
+      updateData.requests_this_month = (wallet.requestsThisMonth || 0) + 1
+    }
+
+    // Deduct credits
     const { data: updatedWallet, error: updateError } = await supabase
       .from('wallet')
-      .update({
-        credits_balance: wallet.creditsBalance - creditsToDeduct,
-        credits_used_this_month: wallet.creditsUsedThisMonth + creditsToDeduct,
-        credits_used_total: wallet.creditsUsedTotal + creditsToDeduct,
-        requests_this_month: (wallet.requestsThisMonth || 0) + 1
-      })
+      .update(updateData)
       .eq('user_id', userId)
       .select()
       .single()
@@ -415,7 +423,7 @@ export async function deductCredits(
     await logUsage({
       userId,
       model: metadata.model || 'unknown',
-      creditsUsed: creditsToDeduct,
+      creditsUsed: actualDeduction,
       requestType: metadata.requestType || 'chat',
       endpoint: metadata.endpoint || '/api/chat-v2',
       tokensUsed: metadata.tokensUsed,
@@ -430,7 +438,7 @@ export async function deductCredits(
       .from('transactions')
       .insert({
         user_id: userId,
-        amount: -creditsToDeduct,
+        amount: -actualDeduction,
         type: 'usage',
         description: `${metadata.requestType || 'Chat'} request - ${metadata.model || 'unknown'} model`,
         credits_before: wallet.creditsBalance,
@@ -441,7 +449,7 @@ export async function deductCredits(
     return {
       success: true,
       newBalance: updatedWallet.credits_balance,
-      creditsUsed: creditsToDeduct
+      creditsUsed: actualDeduction
     }
   } catch (error) {
     console.error('[CreditManager] Exception in deductCredits:', error)
@@ -515,6 +523,7 @@ export async function deductCreditsFromUsage(
     status?: 'success' | 'error' | 'timeout' | 'aborted'
     errorMessage?: string
     isByok?: boolean  // BYOK mode - log usage but don't deduct credits
+    skipRequestIncrement?: boolean  // Per-step billing: don't count each step as a separate request
   },
   supabase: SupabaseClient
 ): Promise<CreditDeductionResult> {
@@ -577,6 +586,7 @@ export async function deductCreditsFromUsage(
       responseTimeMs: metadata.responseTimeMs,
       status: metadata.status || 'success',
       errorMessage: metadata.errorMessage,
+      skipRequestIncrement: metadata.skipRequestIncrement,
       metadata: {
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
