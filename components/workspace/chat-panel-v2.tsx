@@ -2994,6 +2994,7 @@ export function ChatPanelV2({
                   detail: {
                     step: parsed.step,
                     maxSteps: parsed.maxSteps,
+                    stepType: parsed.stepType,
                     stepTokens: parsed.stepTokens,
                     totalTokens: parsed.totalTokens,
                     creditsDeducted: parsed.creditsDeducted,
@@ -3687,6 +3688,7 @@ export function ChatPanelV2({
                   detail: {
                     step: parsed.step,
                     maxSteps: parsed.maxSteps,
+                    stepType: parsed.stepType,
                     stepTokens: parsed.stepTokens,
                     totalTokens: parsed.totalTokens,
                     creditsDeducted: parsed.creditsDeducted,
@@ -4157,6 +4159,7 @@ export function ChatPanelV2({
                   detail: {
                     step: parsed.step,
                     maxSteps: parsed.maxSteps,
+                    stepType: parsed.stepType,
                     stepTokens: parsed.stepTokens,
                     totalTokens: parsed.totalTokens,
                     creditsDeducted: parsed.creditsDeducted,
@@ -5556,6 +5559,7 @@ ${taggedComponent.textContent ? `Text Content: "${taggedComponent.textContent}"`
                   detail: {
                     step: parsed.step,
                     maxSteps: parsed.maxSteps,
+                    stepType: parsed.stepType,
                     stepTokens: parsed.stepTokens,
                     totalTokens: parsed.totalTokens,
                     creditsDeducted: parsed.creditsDeducted,
