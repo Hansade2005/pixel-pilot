@@ -138,12 +138,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     totalCreditsDeducted: number;
     remainingBalance: number | null;
     lastStep: number;
+    lastStepCredits: number;
+    stepType: string | null;
     creditsExhausted: boolean;
   }>({
     totalTokens: null,
     totalCreditsDeducted: 0,
     remainingBalance: null,
     lastStep: 0,
+    lastStepCredits: 0,
+    stepType: null,
     creditsExhausted: false,
   })
 
@@ -156,6 +160,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         totalCreditsDeducted: detail.totalCreditsDeducted || 0,
         remainingBalance: detail.remainingBalance ?? null,
         lastStep: detail.step || 0,
+        lastStepCredits: detail.creditsDeducted || 0,
+        stepType: detail.stepType || null,
         creditsExhausted: detail.creditsExhausted || false,
       })
     }
@@ -1890,7 +1896,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <>
                       <button
                         className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 transition-colors"
-                        title={`Tokens: ${(tokenUsage.totalTokens.input + tokenUsage.totalTokens.output).toLocaleString()} total (${tokenUsage.totalTokens.input.toLocaleString()} in / ${tokenUsage.totalTokens.output.toLocaleString()} out) | Step ${tokenUsage.lastStep}`}
+                        title={`Tokens: ${(tokenUsage.totalTokens.input + tokenUsage.totalTokens.output).toLocaleString()} total (${tokenUsage.totalTokens.input.toLocaleString()} in / ${tokenUsage.totalTokens.output.toLocaleString()} out) | Step ${tokenUsage.lastStep}${tokenUsage.stepType ? ` [${tokenUsage.stepType}]` : ''} | Last step: ${tokenUsage.lastStepCredits.toFixed(1)} credits`}
                         onClick={() => window.open('/workspace/usage', '_blank')}
                       >
                         <Zap className="h-3 w-3 text-orange-400" />
@@ -1905,7 +1911,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <>
                       <button
                         className="flex items-center gap-1 px-2 h-7 hover:bg-gray-800/60 transition-colors"
-                        title={`Credits: ${tokenUsage.remainingBalance.toFixed(2)} remaining | ${tokenUsage.totalCreditsDeducted.toFixed(2)} used this request`}
+                        title={`Credits: ${tokenUsage.remainingBalance.toFixed(2)} remaining | ${tokenUsage.totalCreditsDeducted.toFixed(2)} used this request (${tokenUsage.lastStep} steps)`}
                         onClick={() => window.open('/workspace/usage', '_blank')}
                       >
                         <span className={tokenUsage.creditsExhausted ? 'text-red-400' : tokenUsage.remainingBalance < 10 ? 'text-yellow-400' : 'text-green-400'}>
