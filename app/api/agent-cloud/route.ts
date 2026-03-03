@@ -973,6 +973,7 @@ async function handleCreate(
       name: string // The repo name to create on GitHub
     }
     initialPrompt?: string // Used to generate branch name from first 4 words
+    existingWorkingBranch?: string // Reuse this branch on reconnection instead of generating a new one
     connectors?: Array<{
       id: string
       type: 'mcp' | 'cli'
@@ -1462,18 +1463,44 @@ async function handleCreate(
           { timeoutMs: 5000 }
         )
 
-        // Create a new working branch for Claude's changes using the prompt
-        const workingBranch = generateBranchName(config?.initialPrompt || 'agent-task')
-        const branchResult = await sandbox.commands.run(
-          `cd ${repoDir} && git checkout -b ${workingBranch}`,
-          { timeoutMs: 10000 }
-        )
+        // Reuse existing branch on reconnection, or create a new one
+        const workingBranch = config?.existingWorkingBranch || generateBranchName(config?.initialPrompt || 'agent-task')
 
-        if (branchResult.exitCode === 0) {
-          console.log(`[Agent Cloud] Created working branch: ${workingBranch}`)
-          createdWorkingBranch = workingBranch
+        if (config?.existingWorkingBranch) {
+          // Reconnection: try to checkout existing remote branch first, fall back to creating it
+          console.log(`[Agent Cloud] Reusing existing branch: ${workingBranch}`)
+          const fetchResult = await sandbox.commands.run(
+            `cd ${repoDir} && git fetch origin ${workingBranch} 2>/dev/null && git checkout ${workingBranch} 2>/dev/null || git checkout -b ${workingBranch}`,
+            { timeoutMs: 15000 }
+          )
+          if (fetchResult.exitCode === 0) {
+            console.log(`[Agent Cloud] Checked out existing branch: ${workingBranch}`)
+            createdWorkingBranch = workingBranch
+          } else {
+            console.warn(`[Agent Cloud] Failed to checkout existing branch, creating new:`, fetchResult.stderr)
+            // Fall back to generating a new branch
+            const fallbackBranch = generateBranchName(config?.initialPrompt || 'agent-task')
+            const fallbackResult = await sandbox.commands.run(
+              `cd ${repoDir} && git checkout -b ${fallbackBranch}`,
+              { timeoutMs: 10000 }
+            )
+            if (fallbackResult.exitCode === 0) {
+              createdWorkingBranch = fallbackBranch
+              console.log(`[Agent Cloud] Created fallback branch: ${fallbackBranch}`)
+            }
+          }
         } else {
-          console.warn(`[Agent Cloud] Failed to create working branch:`, branchResult.stderr)
+          // New session: create fresh branch
+          const branchResult = await sandbox.commands.run(
+            `cd ${repoDir} && git checkout -b ${workingBranch}`,
+            { timeoutMs: 10000 }
+          )
+          if (branchResult.exitCode === 0) {
+            console.log(`[Agent Cloud] Created working branch: ${workingBranch}`)
+            createdWorkingBranch = workingBranch
+          } else {
+            console.warn(`[Agent Cloud] Failed to create working branch:`, branchResult.stderr)
+          }
         }
 
         // Install project dependencies if package.json exists
