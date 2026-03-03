@@ -11145,7 +11145,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
         onChunk,
         onStepFinish: ({ toolCalls, usage, finishReason }) => {
           const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
-          console.log(`[Chat-V2] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+          const providerTokens = (usage?.inputTokens || 0) + (usage?.outputTokens || 0)
+          console.log(`[Chat-V2] Step finished: tools=[${toolNames}], reason=${finishReason}, providerTokens=${providerTokens}${providerTokens === 0 ? ' (will estimate in billing)' : ''}`)
         },
         onFinish: async ({ response }: any) => {
           console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
@@ -11186,7 +11187,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
           onChunk,
           onStepFinish: ({ toolCalls, usage, finishReason }) => {
             const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
-            console.log(`[Chat-V2] [Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+            const providerTokens = (usage?.inputTokens || 0) + (usage?.outputTokens || 0)
+            console.log(`[Chat-V2] [Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, providerTokens=${providerTokens}${providerTokens === 0 ? ' (will estimate in billing)' : ''}`)
           },
           onFinish: async () => {
             console.log(`[Chat-V2] Fallback model finished`)
@@ -11527,7 +11529,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   onChunk,
                   onStepFinish: ({ toolCalls, usage, finishReason }) => {
                     const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
-                    console.log(`[Chat-V2] [Mid-stream Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, tokens=${(usage?.inputTokens || 0) + (usage?.outputTokens || 0)}`)
+                    const providerTokens = (usage?.inputTokens || 0) + (usage?.outputTokens || 0)
+                    console.log(`[Chat-V2] [Mid-stream Fallback] Step finished: tools=[${toolNames}], reason=${finishReason}, providerTokens=${providerTokens}${providerTokens === 0 ? ' (will estimate in billing)' : ''}`)
                   },
                   onFinish: async () => {
                     console.log('[Chat-V2] Fallback stream finished')
