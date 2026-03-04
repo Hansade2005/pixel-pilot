@@ -69,7 +69,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       canUseNetlify: false,
       canUseGitHub: true,
       unlimitedPrompts: false,
-      allowedModels: ['xai/grok-code-fast-1', 'mistral/devstral-2', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4.5'],
+      allowedModels: ['xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2', 'ollama/minimax-m2.5', 'ollama/minimax-m2.1'],
       canPurchaseCredits: false
     },
     prices: {
