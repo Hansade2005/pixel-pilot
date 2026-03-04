@@ -21,7 +21,7 @@ let _mistralGatewayProvider: ReturnType<typeof createMistral> | null = null;
 let _xaiProvider: ReturnType<typeof createXai> | null = null;
 let _anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
 let _openrouterProvider: ReturnType<typeof createOpenAICompatible> | null = null;
-let _kiloGateway: ReturnType<typeof createOpenAI> | null = null;
+let _kiloGateway: ReturnType<typeof createOpenAICompatible> | null = null;
 // Ollama API key rotation: supports comma-separated keys in OLLAMA_API_KEY
 let _ollamaKeyIndex = 0;
 // Bonsai API key rotation: supports comma-separated keys in BONSAI_API_KEY
@@ -120,7 +120,9 @@ function getOpenRouterProvider() {
 
 function getKiloGateway() {
   // Always create fresh to pick the next rotated key.
-  return createOpenAI({
+  // Use OpenAI-compatible (not createOpenAI) because Kilo only accepts /chat/completions
+  return createOpenAICompatible({
+    name: 'kilo-gateway',
     baseURL: 'https://api.kilo.ai/api/gateway',
     apiKey: getNextKiloKey(),
   });
@@ -591,7 +593,8 @@ export function createByokModel(modelId: string, byokKeys: ByokKeySet): any | nu
       return provider(bare)
     }
     case 'kilo': {
-      const provider = createOpenAI({
+      const provider = createOpenAICompatible({
+        name: 'byok-kilo',
         baseURL: 'https://api.kilo.ai/api/gateway',
         apiKey,
       })
