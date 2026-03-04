@@ -185,6 +185,39 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
 
+  // Kilo AI Gateway Models
+  {
+    id: 'kilo/auto-free',
+    name: 'Kilo Auto',
+    description: 'Auto-routes to the best model via Kilo',
+    provider: 'kilo',
+  },
+  {
+    id: 'kilo/minimax-m2.5-free',
+    name: 'MiniMax M2.5 via Kilo',
+    description: 'MiniMax M2.5 - 80.2% SWE-Bench via Kilo',
+    provider: 'kilo',
+  },
+  {
+    id: 'kilo/kimi-k2.5-free',
+    name: 'Kimi K2.5 via Kilo',
+    description: 'Kimi K2.5 multimodal coding via Kilo',
+    provider: 'kilo',
+    supportsVision: true,
+  },
+  {
+    id: 'kilo/giga-potato',
+    name: 'Giga Potato via Kilo',
+    description: 'Optimized for agentic programming via Kilo',
+    provider: 'kilo',
+  },
+  {
+    id: 'kilo/step-3.5-flash-free',
+    name: 'Step 3.5 Flash via Kilo',
+    description: 'Fast reasoning model (196B MoE) via Kilo',
+    provider: 'kilo',
+  },
+
   // Ollama Cloud Models
   {
     id: 'ollama/devstral-2:123b',

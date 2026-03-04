@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing, classifyStep, estimateStepTokens } from '@/lib/billing/credit-manager'
+import { deductCreditsFromUsage, calculateCreditsFromTokens, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing, classifyStep, estimateStepTokens, getFixedStepCredits, isPerStepPricingModel } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -11416,7 +11416,9 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
                   try {
                     if (!billingSupabase) billingSupabase = await createClient()
-                    stepCreditsDeducted = calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
+                    // Per-step models use fixed credit cost; token-based models calculate from usage
+                    const fixedCost = getFixedStepCredits(activeModelId)
+                    stepCreditsDeducted = fixedCost !== null ? fixedCost : calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
                     const billingResult = await deductCreditsFromUsage(
                       authContext.userId,
                       { promptTokens: stepInput, completionTokens: stepOutput },
@@ -11450,6 +11452,10 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                 }
 
                 // Emit step_progress event to frontend with real billing data
+                const stepPricingInfo = isPerStepPricingModel(activeModelId)
+                  ? { type: 'per-step' as const, tier: getFixedStepCredits(activeModelId), perStepCost: `$${((getFixedStepCredits(activeModelId) || 0) * 0.01).toFixed(2)}` }
+                  : { type: 'token-based' as const }
+
                 controller.enqueue(encoder.encode(JSON.stringify({
                   type: 'step_progress',
                   step: accumulatedSteps,
@@ -11462,6 +11468,7 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   creditsDeducted: stepCreditsDeducted,
                   totalCreditsDeducted,
                   remainingBalance: currentBalance,
+                  stepPricing: stepPricingInfo,
                 }) + '\n'))
 
                 // Credit exhaustion guard: stop the agent if balance is depleted (skip for BYOK)
@@ -11619,7 +11626,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                     if (authContext?.userId && (stepInput > 0 || stepOutput > 0)) {
                       try {
                         if (!billingSupabase) billingSupabase = await createClient()
-                        stepCreditsDeducted = calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
+                        const fixedCostFb = getFixedStepCredits(activeModelId)
+                        stepCreditsDeducted = fixedCostFb !== null ? fixedCostFb : calculateCreditsFromTokens(stepInput, stepOutput, activeModelId)
                         const billingResult = await deductCreditsFromUsage(
                           authContext.userId,
                           { promptTokens: stepInput, completionTokens: stepOutput },

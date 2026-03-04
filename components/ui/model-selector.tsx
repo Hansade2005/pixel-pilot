@@ -52,6 +52,12 @@ const shortNameMap = new Map<string, string>([
   ['ollama/minimax-m2.5', 'MiniMax M2.5'],
   ['ollama/minimax-m2.1', 'MiniMax M2.1 (O)'],
   ['ollama/kimi-k2:1t', 'Kimi K2 1T'],
+  // Kilo AI Gateway models
+  ['kilo/auto-free', 'Kilo Auto'],
+  ['kilo/minimax-m2.5-free', 'MiniMax M2.5'],
+  ['kilo/kimi-k2.5-free', 'Kimi K2.5'],
+  ['kilo/giga-potato', 'Giga Potato'],
+  ['kilo/step-3.5-flash-free', 'Step Flash'],
 ])
 
 // Descriptions for dropdown
@@ -87,6 +93,12 @@ const descriptionMap = new Map<string, string>([
   ['ollama/minimax-m2.5', 'MiniMax M2.5 via Ollama Cloud'],
   ['ollama/minimax-m2.1', 'MiniMax M2.1 via Ollama Cloud'],
   ['ollama/kimi-k2:1t', 'Kimi K2 1T params via Ollama'],
+  // Kilo AI Gateway models
+  ['kilo/auto-free', 'Auto-picks best model via Kilo'],
+  ['kilo/minimax-m2.5-free', 'MiniMax M2.5 via Kilo'],
+  ['kilo/kimi-k2.5-free', 'Kimi K2.5 multimodal via Kilo'],
+  ['kilo/giga-potato', 'Agentic programming via Kilo'],
+  ['kilo/step-3.5-flash-free', 'Fast reasoning via Kilo'],
 ])
 
 // Map BYOK provider IDs to model ID prefixes
@@ -97,6 +109,7 @@ const BYOK_PROVIDER_MODEL_PREFIXES: Record<string, string[]> = {
   xai: ['xai/'],
   google: ['google/'],
   ollama: ['ollama/'],
+  kilo: ['kilo/'],
   openrouter: [], // OpenRouter unlocks all models
   'vercel-gateway': [], // Vercel Gateway unlocks all models
 }
@@ -179,7 +192,9 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = [
       'xai/grok-code-fast-1', 'mistral/devstral-2', 'mistral/devstral-small-2',
-      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5'
+      'google/gemini-2.5-flash', 'zai/glm-4.7-flash', 'anthropic/claude-sonnet-4.5',
+      'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
+      'kilo/giga-potato', 'kilo/step-3.5-flash-free'
     ]
   } else if (isPremium && effectiveStatus === 'active') {
     allowedModels = [
@@ -193,7 +208,9 @@ export function ModelSelector({
       'openai/gpt-5.1-thinking', 'openai/gpt-5.2-codex', 'openai/o3',
       'ollama/devstral-2:123b', 'ollama/deepseek-v3.2', 'ollama/glm-4.6', 'ollama/glm-4.7',
       'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking', 'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
-      'ollama/kimi-k2:1t'
+      'ollama/kimi-k2:1t',
+      'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
+      'kilo/giga-potato', 'kilo/step-3.5-flash-free'
     ]
   } else {
     const userLimits = getLimits(userPlan)
@@ -249,6 +266,8 @@ export function ModelSelector({
     'ollama/devstral-2:123b', 'ollama/deepseek-v3.2', 'ollama/kimi-k2.5', 'ollama/kimi-k2-thinking',
     'ollama/kimi-k2:1t', 'ollama/glm-4.6', 'ollama/glm-4.7',
     'ollama/minimax-m2.5', 'ollama/minimax-m2.1',
+    'kilo/auto-free', 'kilo/minimax-m2.5-free', 'kilo/kimi-k2.5-free',
+    'kilo/giga-potato', 'kilo/step-3.5-flash-free',
     'auto',
   ]
   const orderedModels = modelOrder.filter(id => shortNameMap.has(id))

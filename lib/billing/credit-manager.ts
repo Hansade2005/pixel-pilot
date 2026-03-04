@@ -13,8 +13,8 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-data'
 
-// Credit constants - Token-based pricing system
-// 1 credit = $0.01 (with 4x markup on API costs for profit margin)
+// Credit constants - Hybrid pricing: per-step (fixed) + token-based (variable) billing
+// 1 credit = $0.01 USD
 export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
 
 // Monthly credits per plan
@@ -35,6 +35,107 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 
 // 4x markup for profit margin (covers infrastructure, Vercel hosting, support, development)
 const MARKUP_MULTIPLIER = 4
+
+// =============================================================================
+// PER-STEP PRICING TIERS
+// =============================================================================
+// Fixed per-step credit cost replaces variable token-based billing for predictability.
+// Each model is assigned a tier based on its API cost. Free models (Kilo) = pure profit.
+//
+// Tier       | Credits/Step | USD/Step | Target Models               | Margin
+// -----------|-------------|----------|-----------------------------|---------
+// free       | 10          | $0.10    | Kilo free models            | 100%
+// economy    | 10          | $0.10    | Devstral, Grok Fast, GLM    | ~90%
+// standard   | 15          | $0.15    | Gemini Flash, Haiku, Qwen   | ~75%
+// pro        | 25          | $0.25    | Sonnet, Codex, GPT-5        | ~65%
+// ultra      | 50          | $0.50    | Opus, O3, Gemini Pro        | ~70%
+
+export type StepPricingTier = 'free' | 'economy' | 'standard' | 'pro' | 'ultra'
+
+export const STEP_CREDITS_BY_TIER: Record<StepPricingTier, number> = {
+  free: 10,      // $0.10/step - Kilo free models (API cost: $0)
+  economy: 10,   // $0.10/step - Budget models (API cost: ~$0.01)
+  standard: 15,  // $0.15/step - Mid-range models (API cost: ~$0.03-0.05)
+  pro: 25,       // $0.25/step - Premium models (API cost: ~$0.08-0.12)
+  ultra: 50,     // $0.50/step - Top-tier models (API cost: ~$0.15-0.25)
+}
+
+// Model-to-tier mapping. Every model gets a tier for per-step billing.
+const MODEL_STEP_TIER: Record<string, StepPricingTier> = {
+  // Kilo free models (API cost: $0)
+  'kilo/auto-free': 'free',
+  'kilo/minimax-m2.5-free': 'free',
+  'kilo/kimi-k2.5-free': 'free',
+  'kilo/giga-potato': 'free',
+  'kilo/step-3.5-flash-free': 'free',
+
+  // Economy tier (cheap API models, ~$0.005-0.02 per step)
+  'auto': 'economy',
+  'a0-dev-llm': 'economy',
+  'pixtral-12b-2409': 'economy',
+  'mistral/devstral-2': 'economy',
+  'mistral/devstral-small-2': 'economy',
+  'xai/grok-code-fast-1': 'economy',
+  'zai/glm-4.7-flash': 'economy',
+  'zai/glm-4.6': 'economy',
+  'kwaipilot/kat-coder-pro-v1': 'economy',
+  'minimax/minimax-m2.1': 'economy',
+  'codestral-latest': 'economy',
+  'ollama/devstral-2:123b': 'economy',
+  'ollama/deepseek-v3.2': 'economy',
+  'ollama/glm-4.6': 'economy',
+  'ollama/glm-4.7': 'economy',
+  'ollama/kimi-k2.5': 'economy',
+  'ollama/kimi-k2-thinking': 'economy',
+  'ollama/minimax-m2.5': 'economy',
+  'ollama/minimax-m2.1': 'economy',
+  'ollama/kimi-k2:1t': 'economy',
+
+  // Standard tier (mid-range models, ~$0.03-0.05 per step)
+  'google/gemini-2.5-flash': 'standard',
+  'anthropic/claude-haiku-4.5': 'standard',
+  'alibaba/qwen3-max': 'standard',
+  'alibaba/qwen3-vl-thinking': 'standard',
+  'moonshotai/kimi-k2-thinking': 'standard',
+  'openai/gpt-oss-120b': 'standard',
+  'xai/grok-4.1-fast-reasoning': 'standard',
+  'xai/grok-4.1-fast-non-reasoning': 'standard',
+
+  // Pro tier (premium models, ~$0.08-0.12 per step)
+  'anthropic/claude-sonnet-4.5': 'pro',
+  'openai/gpt-5.1-thinking': 'pro',
+  'openai/gpt-5.2-codex': 'pro',
+
+  // Ultra tier (top-tier models, ~$0.15-0.25 per step)
+  'anthropic/claude-opus-4.5': 'ultra',
+  'openai/o3': 'ultra',
+  'google/gemini-2.5-pro': 'ultra',
+}
+
+/**
+ * Get the per-step pricing tier for a model.
+ * Returns null if the model uses token-based billing (fallback).
+ */
+export function getModelStepTier(modelId: string): StepPricingTier | null {
+  return MODEL_STEP_TIER[modelId] || null
+}
+
+/**
+ * Get the fixed per-step credit cost for a model.
+ * Returns null if the model should use token-based billing instead.
+ */
+export function getFixedStepCredits(modelId: string): number | null {
+  const tier = getModelStepTier(modelId)
+  if (!tier) return null
+  return STEP_CREDITS_BY_TIER[tier]
+}
+
+/**
+ * Check if a model uses per-step pricing (vs token-based).
+ */
+export function isPerStepPricingModel(modelId: string): boolean {
+  return modelId in MODEL_STEP_TIER
+}
 
 // Per-request credit budget per plan (max credits ONE request can consume)
 // Set high enough that the agent can actually finish tasks without being cut short.
@@ -70,13 +171,17 @@ export const MAX_STEPS_PER_PLAN: Record<string, number> = STEPS_BY_PLAN
 export const MAX_STEPS_PER_REQUEST = 100
 
 /**
- * Estimate the credit cost of one agent step for a given model
- * Based on typical token usage: ~35K input (context re-sent), ~400 output per step
- * Used for pre-request budget estimation
+ * Estimate the credit cost of one agent step for a given model.
+ * Per-step models return their fixed tier cost.
+ * Token-based models estimate from typical token usage (~35K input, ~400 output).
  */
 export function estimateCreditsPerStep(model: string): number {
+  // Per-step pricing: return the fixed credit cost
+  const fixedCost = getFixedStepCredits(model)
+  if (fixedCost !== null) return fixedCost
+
+  // Token-based fallback
   const pricing = getModelPricing(model)
-  // Typical agent step: ~35K input tokens (growing context), ~400 output tokens
   const typicalInputTokens = 35000
   const typicalOutputTokens = 400
   const apiCost = (typicalInputTokens * pricing.input) + (typicalOutputTokens * pricing.output)
@@ -562,14 +667,23 @@ export async function deductCreditsFromUsage(
     }
   }
 
-  // Calculate actual credits based on token usage with 4x markup
-  const creditsToDeduct = calculateCreditsFromTokens(
-    usage.promptTokens,
-    usage.completionTokens,
-    metadata.model
-  )
+  // Per-step pricing: fixed credit cost per step, ignoring token counts
+  const fixedStepCost = getFixedStepCredits(metadata.model)
+  const steps = metadata.steps || 1
 
-  console.log(`[CreditManager] Calculated ${creditsToDeduct} credits from ${usage.promptTokens} input + ${usage.completionTokens} output tokens (${metadata.steps || 1} steps)`)
+  let creditsToDeduct: number
+  if (fixedStepCost !== null) {
+    creditsToDeduct = fixedStepCost * steps
+    console.log(`[CreditManager] Per-step billing: ${fixedStepCost} credits x ${steps} steps = ${creditsToDeduct} credits (${metadata.model}, tier: ${getModelStepTier(metadata.model)})`)
+  } else {
+    // Token-based fallback with 4x markup
+    creditsToDeduct = calculateCreditsFromTokens(
+      usage.promptTokens,
+      usage.completionTokens,
+      metadata.model
+    )
+    console.log(`[CreditManager] Token-based billing: ${creditsToDeduct} credits from ${usage.promptTokens} input + ${usage.completionTokens} output tokens (${steps} steps)`)
+  }
 
   // Use existing deductCredits function with enhanced metadata
   return deductCredits(
