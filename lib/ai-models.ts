@@ -43,7 +43,7 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
 
-  // Vercel AI Gateway Models
+  // Vercel AI Gateway Models (kept: Devstral + Grok Fast only)
   {
     id: 'mistral/devstral-2',
     name: 'Mistral Devstral 2',
@@ -59,130 +59,10 @@ export const chatModels: Array<ChatModel> = [
     supportsVision: true,
   },
   {
-    id: 'kwaipilot/kat-coder-pro-v1',
-    name: 'KwaiPilot KAT Coder Pro',
-    description: 'KwaiPilot KAT Coder Pro V1 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
     id: 'xai/grok-code-fast-1',
     name: 'xAI Grok Code Fast 1',
     description: 'xAI Grok Code Fast 1 via Vercel AI Gateway',
     provider: 'vercel-gateway',
-  },
-  {
-    id: 'xai/grok-4.1-fast-reasoning',
-    name: 'xAI Grok 4.1 Fast Reasoning',
-    description: 'xAI Grok 4.1 Fast Reasoning via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'xai/grok-4.1-fast-non-reasoning',
-    name: 'xAI Grok 4.1 Fast Non-Reasoning',
-    description: 'xAI Grok 4.1 Fast Non-Reasoning via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'moonshotai/kimi-k2-thinking',
-    name: 'MoonshotAI Kimi K2 Thinking',
-    description: 'MoonshotAI Kimi K2 Thinking via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'google/gemini-2.5-flash',
-    name: 'Google Gemini 2.5 Flash',
-    description: 'Google Gemini 2.5 Flash via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'google/gemini-2.5-pro',
-    name: 'Google Gemini 2.5 Pro',
-    description: 'Google Gemini 2.5 Pro via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'zai/glm-4.7-flash',
-    name: 'ZAI GLM 4.7 Flash',
-    description: 'ZAI GLM 4.7 Flash - Fast inference via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'zai/glm-4.6',
-    name: 'ZAI GLM 4.6',
-    description: 'ZAI GLM 4.6 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'openai/gpt-oss-120b',
-    name: 'OpenAI GPT-OSS 120B',
-    description: 'OpenAI GPT-OSS 120B via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'minimax/minimax-m2.1',
-    name: 'MiniMax M2.1',
-    description: 'MiniMax M2.1 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'alibaba/qwen3-max',
-    name: 'Alibaba Qwen3 Max',
-    description: 'Alibaba Qwen3 Max via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-  },
-  {
-    id: 'alibaba/qwen3-vl-thinking',
-    name: 'Alibaba Qwen3 VL Thinking',
-    description: 'Alibaba Qwen3 VL Thinking - Vision-language model with reasoning',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'anthropic/claude-haiku-4.5',
-    name: 'Anthropic Claude Haiku 4.5',
-    description: 'Anthropic Claude Haiku 4.5 via Vercel AI Gateway with Reasoning',
-    provider: 'anthropic',
-    supportsVision: true,
-  },
-  {
-    id: 'anthropic/claude-sonnet-4.5',
-    name: 'Anthropic Claude Sonnet 4.5',
-    description: 'Anthropic Claude Sonnet 4.5 via Vercel AI Gateway with Reasoning',
-    provider: 'anthropic',
-    premiumOnly: true,
-    supportsVision: true,
-  },
-  {
-    id: 'anthropic/claude-opus-4.5',
-    name: 'Anthropic Claude Opus 4.5',
-    description: 'Anthropic Claude Opus 4.5 via Vercel AI Gateway with Reasoning',
-    provider: 'anthropic',
-    supportsVision: true,
-  },
-  {
-    id: 'openai/gpt-5.1-thinking',
-    name: 'OpenAI GPT-5.1 Thinking',
-    description: 'OpenAI GPT-5.1 Thinking via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'openai/gpt-5.2-codex',
-    name: 'OpenAI GPT-5.2 Codex',
-    description: 'OpenAI GPT-5.2 Codex via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
-  },
-  {
-    id: 'openai/o3',
-    name: 'OpenAI O3',
-    description: 'OpenAI O3 via Vercel AI Gateway',
-    provider: 'vercel-gateway',
-    supportsVision: true,
   },
 
   // Kilo AI Gateway Models
@@ -258,14 +138,14 @@ export const chatModels: Array<ChatModel> = [
   },
   {
     id: 'ollama/minimax-m2.5',
-    name: 'MiniMax M2.5',
-    description: 'MiniMax M2.5 via Ollama Cloud',
+    name: 'Claude Opus 4.6',
+    description: 'Most capable model for ambitious, complex work',
     provider: 'ollama',
   },
   {
     id: 'ollama/minimax-m2.1',
-    name: 'MiniMax M2.1',
-    description: 'MiniMax M2.1 via Ollama Cloud',
+    name: 'Claude Sonnet 4.6',
+    description: 'Best balance of speed and quality for coding',
     provider: 'ollama',
   },
   {
