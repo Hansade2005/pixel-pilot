@@ -12,7 +12,7 @@ import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 import { authenticateUser, processRequestBilling } from '@/lib/billing/auth-middleware'
-import { deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing, classifyStep, estimateStepTokens, getFixedStepCredits, isPerStepPricingModel } from '@/lib/billing/credit-manager'
+import { deductCredits, deductCreditsFromUsage, checkRequestLimits, checkMonthlyRequestLimit, MAX_STEPS_PER_REQUEST, MAX_STEPS_PER_PLAN, getMaxStepsForRequest, getAffordableSteps, estimateCreditsPerStep, getModelPricing, classifyStep, estimateStepTokens, getFixedStepCredits, isPerStepPricingModel, getStepCreditsByType } from '@/lib/billing/credit-manager'
 import { downloadLargePayload, cleanupLargePayload } from '@/lib/cloud-sync'
 
 // Disable Next.js body parser for binary data handling
@@ -11121,6 +11121,8 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
     let billingSupabase: any = null
     let accumulatedSteps = 0
     let creditExhausted = false // Flag: true when credits ran out mid-stream
+    let lastStepCreditsDeducted = 0 // How much the last step cost (for frontend)
+    let lastStepType: string = 'text-generation' // Step type of the last step
 
     // AbortController dedicated to credit exhaustion — aborting this stops AI generation
     // without conflicting with the request-level timeout controller
@@ -11130,10 +11132,15 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
 
     // onStepFinish: the SDK's reliable per-step callback. Deducts credits HERE,
     // not in the fullStream loop, so billing fires even when providers report 0 tokens.
+    // Step cost depends on what the AI did: read-only (2 credits), text (5), code gen (full tier).
     const handleStepFinish = async ({ stepNumber, usage, toolCalls, finishReason }: any) => {
       accumulatedSteps = (stepNumber ?? accumulatedSteps) + 1
-      const toolNames = toolCalls?.map((tc: any) => tc.toolName).join(', ') || 'none'
-      console.log(`[Chat-V2] Step ${accumulatedSteps} finished: tools=[${toolNames}], reason=${finishReason}`)
+      const toolNames = toolCalls?.map((tc: any) => tc.toolName) || []
+      const stepType = classifyStep(toolNames)
+      lastStepType = stepType
+
+      const stepCost = getStepCreditsByType(activeModelId, stepType)
+      console.log(`[Chat-V2] Step ${accumulatedSteps} finished: type=${stepType}, tools=[${toolNames.join(', ')}], cost=${stepCost} credits, reason=${finishReason}`)
 
       // Skip billing for BYOK or unauthenticated
       if (isByokMode || !authContext?.userId) return
@@ -11141,32 +11148,37 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
       try {
         if (!billingSupabase) billingSupabase = await createClient()
 
-        const fixedCost = getFixedStepCredits(activeModelId) ?? 10 // Default 10 credits/step
-        const billingResult = await deductCreditsFromUsage(
+        // Deduct step-type-aware cost (read-only=2, text=5, code gen=full tier)
+        const billingResult = await deductCredits(
           authContext.userId,
-          { promptTokens: usage?.inputTokens || 0, completionTokens: usage?.outputTokens || 0 },
+          stepCost,
           {
             model: activeModelId,
-            requestType: `chat-step`,
+            requestType: `chat-step-${stepType}`,
             endpoint: '/api/chat-v2',
-            steps: 1,
+            tokensUsed: (usage?.inputTokens || 0) + (usage?.outputTokens || 0),
+            promptTokens: usage?.inputTokens || 0,
+            completionTokens: usage?.outputTokens || 0,
+            stepsCount: 1,
             status: 'success',
-            isByok: false,
             skipRequestIncrement: accumulatedSteps > 1, // Only first step counts as a request
+            metadata: { stepType, tools: toolNames, stepCost }
           },
           billingSupabase
         )
 
         if (billingResult.success) {
           perStepBillingActive = true
+          lastStepCreditsDeducted = billingResult.creditsUsed
           totalCreditsDeducted += billingResult.creditsUsed
           currentBalance = billingResult.newBalance
-          console.log(`[Chat-V2] 💰 Step ${accumulatedSteps}: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
+          console.log(`[Chat-V2] 💰 Step ${accumulatedSteps} [${stepType}]: deducted ${billingResult.creditsUsed} credits (balance: ${currentBalance})`)
         } else if (billingResult.errorCode === 'INSUFFICIENT_CREDITS') {
           perStepBillingActive = true
+          lastStepCreditsDeducted = 0
           currentBalance = billingResult.newBalance
           creditExhausted = true
-          console.log(`[Chat-V2] 🛑 Step ${accumulatedSteps}: credits exhausted (balance: ${currentBalance}) - aborting generation`)
+          console.log(`[Chat-V2] 🛑 Step ${accumulatedSteps} [${stepType}]: credits exhausted (balance: ${currentBalance}) - aborting generation`)
           creditAbortController.abort('credits_exhausted')
         }
       } catch (billingErr) {
@@ -11451,22 +11463,20 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                   ? progressActions.join(', ')
                   : 'Thinking'
 
-                const perStepCost = getFixedStepCredits(activeModelId) ?? 10
-
                 // Emit step_progress event to frontend (billing data comes from shared onStepFinish state)
                 controller.enqueue(encoder.encode(JSON.stringify({
                   type: 'step_progress',
                   step: accumulatedSteps,
                   maxSteps: maxStepsAllowed,
-                  stepType,
+                  stepType: lastStepType,
                   toolsUsed: currentStepTools,
                   progressMessage,
                   stepTokens: { input: stepInput, output: stepOutput },
                   totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
-                  creditsDeducted: perStepCost,
+                  creditsDeducted: lastStepCreditsDeducted,
                   totalCreditsDeducted,
                   remainingBalance: currentBalance,
-                  stepPricing: { type: 'per-step', perStepCost: `$${(perStepCost * 0.01).toFixed(2)}` },
+                  stepPricing: { type: 'per-step', stepType: lastStepType, perStepCost: lastStepCreditsDeducted },
                 }) + '\n'))
 
                 // Credit exhaustion guard: onStepFinish already aborted the signal,
@@ -11612,22 +11622,20 @@ INSTRUCTIONS: The above JSON is a structured specification of a UI design. Use t
                       ? progressActions.join(', ')
                       : 'Thinking'
 
-                    const perStepCost = getFixedStepCredits(activeModelId) ?? 10
-
                     // Emit step_progress (billing data from shared onStepFinish state)
                     controller.enqueue(encoder.encode(JSON.stringify({
                       type: 'step_progress',
                       step: accumulatedSteps,
                       maxSteps: maxStepsAllowed,
-                      stepType,
+                      stepType: lastStepType,
                       toolsUsed: currentStepTools,
                       progressMessage,
                       stepTokens: { input: stepInput, output: stepOutput },
                       totalTokens: { input: accumulatedUsage.inputTokens, output: accumulatedUsage.outputTokens },
-                      creditsDeducted: perStepCost,
+                      creditsDeducted: lastStepCreditsDeducted,
                       totalCreditsDeducted,
                       remainingBalance: currentBalance,
-                      stepPricing: { type: 'per-step', perStepCost: `$${(perStepCost * 0.01).toFixed(2)}` },
+                      stepPricing: { type: 'per-step', stepType: lastStepType, perStepCost: lastStepCreditsDeducted },
                     }) + '\n'))
 
                     if (creditExhausted) {

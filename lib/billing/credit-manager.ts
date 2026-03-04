@@ -137,6 +137,39 @@ export function isPerStepPricingModel(modelId: string): boolean {
   return modelId in MODEL_STEP_TIER
 }
 
+// ─── Step-type-based pricing ─────────────────────────────────────────────
+// Not all steps cost the same. Read/explore steps are cheap context gathering,
+// while code generation steps produce real value and cost more API tokens.
+//
+// Step Type       | Credits | Rationale
+// ----------------|---------|------------------------------------------
+// read-only       | 2       | Just reading files / searching — tiny output
+// text-generation | 5       | AI text response, no tool use
+// tool-call-file  | full    | Write/edit/delete files — real code generation
+// tool-call-direct| full    | External APIs, install, web search, etc.
+// mixed           | full    | Both file + direct tools in one step
+
+const STEP_TYPE_CREDITS: Record<StepType, number | null> = {
+  'read-only': 2,         // Cheap: just reading/searching
+  'text-generation': 5,   // Mid: AI responds without tools
+  'tool-call-file': null,  // Full tier cost (write/edit/delete)
+  'tool-call-direct': null, // Full tier cost (external tools)
+  'mixed': null,           // Full tier cost
+}
+
+/**
+ * Get the credit cost for a step based on its type and model tier.
+ * Read-only and text-generation steps get discounted flat rates.
+ * Code generation / tool execution steps pay the full model tier cost.
+ */
+export function getStepCreditsByType(modelId: string, stepType: StepType): number {
+  const discountedCost = STEP_TYPE_CREDITS[stepType]
+  if (discountedCost !== null) return discountedCost
+
+  // Full tier cost for code generation steps
+  return getFixedStepCredits(modelId) ?? 10
+}
+
 // Per-request credit budget per plan (max credits ONE request can consume)
 // Set high enough that the agent can actually finish tasks without being cut short.
 // Users are already billed per-token - this just prevents a single runaway request
@@ -197,6 +230,12 @@ const CONSTRUCT_TOOL_RESULT_TOOLS = new Set([
   'continue_backend_implementation',
 ])
 
+// Read-only / exploration tools (very cheap — no code generation, just context gathering)
+const READ_ONLY_TOOLS = new Set([
+  'read_file', 'list_files', 'grep_search', 'semantic_code_navigator',
+  'check_dev_errors',
+])
+
 // Direct-execute tools that do real work (external APIs, search, etc.)
 const DIRECT_EXECUTE_TOOLS = new Set([
   'semantic_code_navigator', 'grep_search', 'list_files',
@@ -221,13 +260,17 @@ const DIRECT_EXECUTE_TOOLS = new Set([
   'stripe_list_customers', 'stripe_list_subscriptions',
 ])
 
-export type StepType = 'tool-call-file' | 'tool-call-direct' | 'text-generation' | 'mixed'
+export type StepType = 'tool-call-file' | 'tool-call-direct' | 'text-generation' | 'mixed' | 'read-only'
 
 /**
  * Classify a step based on the tools it used.
  */
 export function classifyStep(toolsUsed: string[]): StepType {
   if (toolsUsed.length === 0) return 'text-generation'
+
+  // If ALL tools in this step are read-only, classify as read-only (cheap)
+  const allReadOnly = toolsUsed.every(t => READ_ONLY_TOOLS.has(t))
+  if (allReadOnly) return 'read-only'
 
   const hasFileTools = toolsUsed.some(t => CONSTRUCT_TOOL_RESULT_TOOLS.has(t))
   const hasDirectTools = toolsUsed.some(t => DIRECT_EXECUTE_TOOLS.has(t) || !CONSTRUCT_TOOL_RESULT_TOOLS.has(t))
