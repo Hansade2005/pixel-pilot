@@ -104,9 +104,7 @@ export function generateSiteNotFoundHTML(slug: string): string {
 <body>
   <div class="container">
     <div class="logo-mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-      </svg>
+      <img src="https://pipilot.dev/logo.png" alt="PiPilot" style="width:36px;height:36px;object-fit:contain;border-radius:4px">
     </div>
     <div class="shimmer-bar"></div>
     <div class="slug-badge">
