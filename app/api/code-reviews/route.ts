@@ -1170,7 +1170,7 @@ export async function POST(request: NextRequest) {
         project_id: projectId,
         review_type: type,
         content,
-        score: analysis.score,
+        score: Math.round(analysis.score),
         issues_found: analysis.issues.length,
       })
       .select()

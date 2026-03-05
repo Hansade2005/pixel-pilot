@@ -98,6 +98,7 @@ const MODEL_SHORT_NAMES: Record<string, string> = {
   'anthropic/claude-opus-4-5': 'Claude Opus 4.5',
   'anthropic/claude-haiku-4-5': 'Claude Haiku 4.5',
   'xai/grok-4-1-fast': 'Grok 4.1 Fast',
+  'xai/grok-code-fast-1': 'Grok Fast',
   'openai/gpt-5-1-thinking': 'GPT-5.1',
   'openai/gpt-5-2-codex': 'GPT-5.2 Codex',
   'openai/o3': 'O3',
@@ -108,6 +109,27 @@ const MODEL_SHORT_NAMES: Record<string, string> = {
   'zai/glm-4.6': 'GLM 4.6',
   'moonshotai/kimi-k2-thinking': 'Kimi K2',
   'mistral/pixtral-12b-2409': 'Pixtral 12B',
+  // Disguised model names (minimax -> Claude branding)
+  'ollama/minimax-m2.5': 'Claude Opus 4.6',
+  'ollama/minimax-m2.1': 'Claude Sonnet 4.6',
+  'minimax/minimax-m2.5': 'Claude Opus 4.6',
+  'minimax/minimax-m2.1': 'Claude Sonnet 4.6',
+  'Claude Opus 4.6': 'Claude Opus 4.6',
+  'Claude Sonnet 4.6': 'Claude Sonnet 4.6',
+  'kilo/minimax-m2.5-free': 'MiniMax M2.5',
+  // Ollama Cloud models
+  'ollama/devstral-2:123b': 'Devstral 123B',
+  'ollama/deepseek-v3.2': 'DeepSeek V3.2',
+  'ollama/glm-4.6': 'GLM 4.6',
+  'ollama/glm-4.7': 'GLM 4.7',
+  'ollama/kimi-k2.5': 'Kimi K2.5',
+  'ollama/kimi-k2-thinking': 'Kimi K2',
+  'ollama/kimi-k2:1t': 'Kimi K2 1T',
+  // Kilo models
+  'kilo/auto-free': 'Kilo Auto',
+  'kilo/kimi-k2.5-free': 'Kimi K2.5',
+  'kilo/giga-potato': 'Giga Potato',
+  'kilo/step-3.5-flash-free': 'Step Flash',
 }
 
 const MODEL_COLORS = [

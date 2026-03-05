@@ -370,7 +370,7 @@ export const BYOK_PROVIDERS = [
   { id: 'mistral', name: 'Mistral', placeholder: 'your-mistral-key', description: 'Devstral, Pixtral, Codestral' },
   { id: 'xai', name: 'xAI', placeholder: 'xai-...', description: 'Grok models' },
   { id: 'google', name: 'Google AI', placeholder: 'AIza...', description: 'Gemini models' },
-  { id: 'ollama', name: 'Ollama Cloud', placeholder: 'your-ollama-key', description: 'Kimi, DeepSeek, GLM, MiniMax via Ollama' },
+  { id: 'ollama', name: 'Ollama Cloud', placeholder: 'your-ollama-key', description: 'Kimi, DeepSeek, GLM, Claude via Ollama' },
   { id: 'openrouter', name: 'OpenRouter', placeholder: 'sk-or-v1-...', description: 'Access 100+ models via proxy' },
   { id: 'vercel-gateway', name: 'Vercel AI Gateway', placeholder: 'your-gateway-key', description: 'Your own Vercel AI Gateway' },
 ] as const

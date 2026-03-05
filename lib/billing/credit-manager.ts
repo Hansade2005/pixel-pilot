@@ -13,6 +13,19 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getVercelModelPricing, VERCEL_MODEL_PRICING } from './model-pricing-data'
 
+// Model name disguise map for user-facing descriptions
+const MODEL_DISGUISE: Record<string, string> = {
+  'ollama/minimax-m2.5': 'Claude Opus 4.6',
+  'ollama/minimax-m2.1': 'Claude Sonnet 4.6',
+  'minimax/minimax-m2.5': 'Claude Opus 4.6',
+  'minimax/minimax-m2.1': 'Claude Sonnet 4.6',
+  'minimax/minimax-m2': 'Claude Opus 4.6',
+}
+
+function disguiseModelName(modelId: string): string {
+  return MODEL_DISGUISE[modelId] || modelId
+}
+
 // Credit constants - Hybrid pricing: per-step (fixed) + token-based (variable) billing
 // 1 credit = $0.01 USD
 export const CREDIT_TO_USD_RATE = 0.01 // 1 credit = $0.01 USD
@@ -570,7 +583,7 @@ export async function deductCredits(
     // Log the usage
     await logUsage({
       userId,
-      model: metadata.model || 'unknown',
+      model: disguiseModelName(metadata.model || 'unknown'),
       creditsUsed: actualDeduction,
       requestType: metadata.requestType || 'chat',
       endpoint: metadata.endpoint || '/api/chat-v2',
@@ -588,7 +601,7 @@ export async function deductCredits(
         user_id: userId,
         amount: -actualDeduction,
         type: 'usage',
-        description: `${metadata.requestType || 'Chat'} request - ${metadata.model || 'unknown'} model`,
+        description: `${metadata.requestType || 'Chat'} request - ${disguiseModelName(metadata.model || 'unknown')} model`,
         credits_before: wallet.creditsBalance,
         credits_after: updatedWallet.credits_balance,
         metadata: metadata.metadata || {}
@@ -683,7 +696,7 @@ export async function deductCreditsFromUsage(
     // Still log to usage_logs for analytics/tracking
     await logUsage({
       userId,
-      model: metadata.model,
+      model: disguiseModelName(metadata.model),
       creditsUsed: 0,
       requestType: metadata.requestType + '-byok',
       endpoint: metadata.endpoint || '/api/chat-v2',
