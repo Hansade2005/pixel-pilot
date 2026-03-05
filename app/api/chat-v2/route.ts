@@ -2134,7 +2134,7 @@ export async function POST(req: Request) {
     // ============================================================================
     // DAILY MESSAGE LIMIT CHECK
     // ============================================================================
-    const DAILY_LIMITS: Record<string, number> = { free: 10, creator: Infinity, collaborate: Infinity, scale: Infinity }
+    const DAILY_LIMITS: Record<string, number> = { free: Infinity, creator: Infinity, collaborate: Infinity, scale: Infinity }
 
     {
       const todayStart = new Date()
@@ -5310,9 +5310,9 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
       }),
 
       node_machine: tool({
-        description: '🧪 Node.js Test Machine - Execute any command in sandbox environment with full project context. Automatically writes all project files to sandbox (like check_dev_errors). Perfect for running test scripts, API tests, simulations, npm commands, or any helpful Node.js operations. Use write_file tool first to create test files in /test/ folder, then run commands here.',
+        description: '🧪 Node.js Test Machine - Execute test scripts ONLY in a sandbox environment with full project context. Automatically writes all project files to sandbox. ONLY use for: running .js/.cjs test scripts, API endpoint tests, data validation scripts, utility scripts. NEVER use for: installing packages (use install_packages tool instead), starting dev servers, running npm install, or any package management. To add dependencies, edit package.json directly with write_file. Use write_file tool first to create test files in /test/ folder, then run the test command here.',
         inputSchema: z.object({
-          command: z.string().describe('Command to execute (e.g., "node test/my-test.js", "npm test", "curl http://localhost:3000/api/test", custom commands)'),
+          command: z.string().describe('Test command to execute (e.g., "node test/my-test.js", "node scripts/validate.js"). NEVER use npm install, npx, or package installation commands here.'),
           timeoutSeconds: z.number().optional().describe('Execution timeout in seconds (default: 60)'),
           envVars: z.record(z.string()).optional().describe('Environment variables to set during execution'),
           workingDirectory: z.string().optional().describe('Working directory for command execution (default: /project)')
