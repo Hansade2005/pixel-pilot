@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valid credits amount is required" }, { status: 400 })
     }
 
+    // Enforce min/max credits
+    if (credits < 100) {
+      return NextResponse.json({ error: "Minimum purchase is 100 credits ($1.00)" }, { status: 400 })
+    }
+    if (credits > 100000) {
+      return NextResponse.json({ error: "Maximum purchase is 100,000 credits ($1,000.00)" }, { status: 400 })
+    }
+
     // Check if user can purchase credits (not free plan)
     const { data: wallet } = await supabase
       .from('wallet')
@@ -71,20 +79,30 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id)
     }
 
-    // Create checkout session for one-time payment
+    // Calculate total in cents: 1 credit = $0.01 = 1 cent
+    const totalCents = Math.round(credits * EXTRA_CREDITS_PRODUCT.pricePerCreditCents)
+
+    // Create checkout session with dynamic pricing (no hardcoded price ID needed)
     const stripeInstance = getStripe()
     const session = await stripeInstance.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [
         {
-          price: EXTRA_CREDITS_PRODUCT.stripePriceId,
-          quantity: credits,
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `${credits} PiPilot Credits`,
+              description: `${credits} credits at $0.01/credit`,
+            },
+            unit_amount: totalCents,
+          },
+          quantity: 1,
         },
       ],
-      mode: 'payment', // One-time payment, not subscription
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}&credits=${credits}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pricing?canceled=true`,
+      mode: 'payment',
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/workspace/account?success=true&session_id={CHECKOUT_SESSION_ID}&credits=${credits}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/workspace/account?canceled=true`,
       metadata: {
         user_id: user.id,
         credits: credits.toString(),

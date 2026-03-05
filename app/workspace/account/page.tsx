@@ -198,7 +198,7 @@ function AccountSettingsPageContent() {
   const [estimatedMessages, setEstimatedMessages] = useState<number>(0)
   const [loadingCredits, setLoadingCredits] = useState(true)
   const [showTopUpDialog, setShowTopUpDialog] = useState(false)
-  const [topUpAmount, setTopUpAmount] = useState('10')
+  const [topUpAmount, setTopUpAmount] = useState('1000')
   const [processingTopUp, setProcessingTopUp] = useState(false)
 
   // Delete account state
@@ -2558,7 +2558,7 @@ function AccountSettingsPageContent() {
               </p>
               <Button
                 onClick={() => window.location.href = '/pricing'}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white transition-colors"
               >
                 View Plans
               </Button>
@@ -2566,23 +2566,23 @@ function AccountSettingsPageContent() {
           ) : (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label className="text-white">Amount (USD)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={topUpAmount}
-                    onChange={(e) => setTopUpAmount(e.target.value)}
-                    className="bg-gray-800/50 border-white/10 text-white pl-7"
-                    placeholder="10.00"
-                  />
-                </div>
-                <p className="text-xs text-gray-400">Minimum: $1.00, Maximum: $1,000.00 (1 credit = $1)</p>
+                <Label className="text-white">Credits</Label>
+                <Input
+                  type="number"
+                  min="100"
+                  max="100000"
+                  step="100"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  className="bg-gray-800/50 border-white/10 text-white"
+                  placeholder="1000"
+                />
+                <p className="text-xs text-gray-400">
+                  Min: 100 credits ($1.00) | Max: 100,000 credits ($1,000.00) | 1 credit = $0.01
+                </p>
               </div>
               <div className="grid grid-cols-4 gap-2">
-                {[10, 25, 50, 100].map(amount => (
+                {[500, 1000, 2500, 5000].map(amount => (
                   <Button
                     key={amount}
                     variant="outline"
@@ -2590,11 +2590,16 @@ function AccountSettingsPageContent() {
                     onClick={() => setTopUpAmount(amount.toString())}
                     className="border-white/10 text-white hover:bg-white/5"
                   >
-                    ${amount}
+                    {amount} cr
                   </Button>
                 ))}
               </div>
-              {parseFloat(topUpAmount) > 0 && (
+              {parseFloat(topUpAmount) >= 100 && (
+                <p className="text-sm text-gray-300 text-center">
+                  {parseFloat(topUpAmount).toLocaleString()} credits = ${(parseFloat(topUpAmount) * 0.01).toFixed(2)} USD
+                </p>
+              )}
+              {parseFloat(topUpAmount) >= 100 && (
                 <div className="mt-4">
                   <CreditTopUpSelector
                     credits={parseFloat(topUpAmount)}
