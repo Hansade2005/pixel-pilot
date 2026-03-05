@@ -131,17 +131,17 @@ export function PaymentProviderSelector({ plan, onClose }: PaymentProviderSelect
   const planDetails = {
     creator: {
       name: "Creator Plan",
-      monthly: { price: "$22", yearlyTotal: "$211.20", savings: "Save 20% ($52.80/yr)" },
+      monthly: { price: "$25", yearlyTotal: "$240", savings: "Save 20% ($60/yr)" },
       credits: "1,000 credits/month (~50-100 messages)"
     },
     collaborate: {
       name: "Collaborate Plan",
-      monthly: { price: "$27.50", yearlyTotal: "$264", savings: "Save 20% ($66/yr)" },
+      monthly: { price: "$75", yearlyTotal: "$720", savings: "Save 20% ($180/yr)" },
       credits: "2,500 credits/month (~125-250 messages)"
     },
     scale: {
       name: "Scale Plan",
-      monthly: { price: "$70", yearlyTotal: "$672", savings: "Save 20% ($168/yr)" },
+      monthly: { price: "$150", yearlyTotal: "$1,440", savings: "Save 20% ($360/yr)" },
       credits: "5,000 credits/month (~250-500 messages)"
     },
   }
