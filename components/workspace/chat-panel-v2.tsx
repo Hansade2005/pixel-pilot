@@ -1132,7 +1132,7 @@ interface MCPServerConfig {
 
 // Daily message limits per plan
 const DAILY_MESSAGE_LIMITS: Record<string, number> = {
-  free: 10,
+  free: Infinity,
   creator: Infinity,
   collaborate: Infinity,
   scale: Infinity,

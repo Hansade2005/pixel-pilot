@@ -2134,7 +2134,7 @@ export async function POST(req: Request) {
     // ============================================================================
     // DAILY MESSAGE LIMIT CHECK
     // ============================================================================
-    const DAILY_LIMITS: Record<string, number> = { free: 10, creator: Infinity, collaborate: Infinity, scale: Infinity }
+    const DAILY_LIMITS: Record<string, number> = { free: Infinity, creator: Infinity, collaborate: Infinity, scale: Infinity }
 
     {
       const todayStart = new Date()
