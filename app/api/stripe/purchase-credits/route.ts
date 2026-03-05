@@ -79,25 +79,15 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id)
     }
 
-    // Calculate total in cents: 1 credit = $0.01 = 1 cent
-    const totalCents = Math.round(credits * EXTRA_CREDITS_PRODUCT.pricePerCreditCents)
-
-    // Create checkout session with dynamic pricing (no hardcoded price ID needed)
+    // Create checkout session using the Stripe price ID ($0.01/unit)
     const stripeInstance = getStripe()
     const session = await stripeInstance.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `${credits} PiPilot Credits`,
-              description: `${credits} credits at $0.01/credit`,
-            },
-            unit_amount: totalCents,
-          },
-          quantity: 1,
+          price: EXTRA_CREDITS_PRODUCT.stripePriceId,
+          quantity: credits,
         },
       ],
       mode: 'payment',
