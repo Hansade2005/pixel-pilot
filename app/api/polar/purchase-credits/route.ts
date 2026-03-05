@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { POLAR_CONFIG, getPolarCreditProductId, getPolarCreditPrice } from "@/lib/polar-config"
+import { POLAR_CONFIG, getPolarCreditProductId } from "@/lib/polar-config"
 import { canPurchaseCredits } from "@/lib/stripe-config"
 
 export async function POST(request: NextRequest) {
@@ -31,51 +31,33 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Get or create Polar customer ID
-    const { data: userSettings } = await supabase
-      .from('user_settings')
-      .select('polar_customer_id')
-      .eq('user_id', user.id)
-      .single()
-
-    let customerId = userSettings?.polar_customer_id
-
-    // If no customer ID, create one during checkout
-    if (!customerId) {
-      // Polar will create customer on first checkout
-      customerId = undefined
-    }
-
-    // Create Polar checkout for credit purchase
-    const polarResponse = await fetch('https://api.polar.sh/v1/checkouts/custom', {
+    // Create Polar checkout for credit purchase (using v1/checkouts like subscription route)
+    const polarResponse = await fetch('https://api.polar.sh/v1/checkouts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${POLAR_CONFIG.accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        product_price_id: getPolarCreditProductId(),
+        product_id: getPolarCreditProductId(),
         customer_email: user.email,
-        ...(customerId && { customer_id: customerId }),
         success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'}/polar/success?checkout_id={CHECKOUT_ID}`,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'}/pricing`,
         metadata: {
           user_id: user.id,
           credits: credits.toString(),
           purchase_type: 'credit_topup',
-          // 1 credit = $1 conversion
-          amount_usd: credits.toString(),
+          amount_usd: (credits * 0.01).toFixed(2),
         },
-        // Calculate amount: 1 credit = $1 = 100 cents
-        amount: getPolarCreditPrice(credits),
       }),
     })
 
     if (!polarResponse.ok) {
-      const error = await polarResponse.json()
-      console.error('Polar checkout creation failed:', error)
+      const errorData = await polarResponse.json().catch(() => ({}))
+      console.error('Polar checkout creation failed:', { status: polarResponse.status, error: errorData })
       return NextResponse.json({
-        error: error.message || 'Failed to create Polar checkout'
-      }, { status: polarResponse.status })
+        error: errorData.detail || errorData.message || 'Failed to create Polar checkout. The Polar payment service may be temporarily unavailable.'
+      }, { status: 502 })
     }
 
     const checkout = await polarResponse.json()
