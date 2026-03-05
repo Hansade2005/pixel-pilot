@@ -177,7 +177,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Get user subscription for model availability
   const { plan: userPlan, status: subscriptionStatus } = useSubscriptionCache(user?.id)
 
-  // Set default model: MiniMax M2.5 via Ollama for all users
+  // Set default model: Claude Opus 4.6 for all users
   useEffect(() => {
     setSelectedModel('ollama/minimax-m2.5')
   }, [userPlan])

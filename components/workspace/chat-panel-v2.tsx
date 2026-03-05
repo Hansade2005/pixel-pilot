@@ -4712,7 +4712,7 @@ export function ChatPanelV2({
       if (modelInfo?.premiumOnly) {
         toast({
           title: 'Pro Model',
-          description: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / MiniMax M2.5.`,
+          description: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / Claude Opus 4.6.`,
           variant: 'destructive',
         })
         return

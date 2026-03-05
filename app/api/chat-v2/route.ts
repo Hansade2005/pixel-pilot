@@ -2193,7 +2193,7 @@ export async function POST(req: Request) {
           return NextResponse.json(
             {
               error: {
-                message: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / MiniMax M2.5.`,
+                message: `${modelInfo.name} requires a paid plan. Upgrade to Pro or switch to Devstral / Claude Opus 4.6.`,
                 code: 'PREMIUM_MODEL_REQUIRED',
                 type: 'credit_error',
               }

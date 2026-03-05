@@ -2378,7 +2378,7 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
   },
 
   'ollama/minimax-m2.5': {
-    name: 'MiniMax M2.5 (Ollama)',
+    name: 'Claude Opus 4.6',
     provider: 'ollama',
     contextWindow: 205_000,
     maxOutput: 131_000,
@@ -2395,7 +2395,7 @@ export const VERCEL_MODEL_PRICING: Record<string, ModelPricingEntry> = {
   },
 
   'ollama/minimax-m2.1': {
-    name: 'MiniMax M2.1 (Ollama)',
+    name: 'Claude Sonnet 4.6',
     provider: 'ollama',
     contextWindow: 205_000,
     maxOutput: 131_000,

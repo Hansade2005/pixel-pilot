@@ -161,6 +161,19 @@ export function getModelById(modelId: string): ChatModel | undefined {
   return chatModels.find(model => model.id === modelId);
 }
 
+/**
+ * Get the user-facing display name for any model ID.
+ * Uses the chatModels registry first, then falls back to a short name extraction.
+ * This is the single source of truth for disguised model names everywhere:
+ * model selector, chat panel, usage logs, DB storage descriptions, analytics, etc.
+ */
+export function getDisplayModelName(modelId: string): string {
+  const model = getModelById(modelId)
+  if (model) return model.name
+  // Fallback: strip provider prefix and return the bare model name
+  return modelId.split('/').pop() || modelId
+}
+
 export function modelSupportsVision(modelId: string): boolean {
   const model = getModelById(modelId);
   return model?.supportsVision ?? false;
