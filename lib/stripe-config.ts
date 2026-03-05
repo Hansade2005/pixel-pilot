@@ -116,12 +116,12 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     prices: {
       monthly: {
         amount: 25,
-        stripePriceId: 'price_1Sr6F03G7U0M1bp10fMgtCRD'  // TODO: Create new Stripe price for $25
+        stripePriceId: 'price_1T7WAW3G7U0M1bp1O7nCecM6'
       },
       yearly: {
-        amount: 250,
-        stripePriceId: 'price_1Sr6Ha3G7U0M1bp1mUSdYWHL',  // TODO: Create new Stripe price for $250
-        savings: '🎁 Get 2 months FREE'
+        amount: 240,
+        stripePriceId: 'price_1T7WAZ3G7U0M1bp1glBFKEUN',
+        savings: 'Save 20% ($60/yr)'
       }
     }
   },
@@ -157,12 +157,12 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     prices: {
       monthly: {
         amount: 75,
-        stripePriceId: 'price_1Sr6Nh3G7U0M1bp1cYUiaelN'  // TODO: Create new Stripe price for $75
+        stripePriceId: 'price_1T7WAc3G7U0M1bp1Gpt1YiRJ'
       },
       yearly: {
         amount: 720,
-        stripePriceId: 'price_1Sr6P63G7U0M1bp1fNtth5X2',  // TODO: Create new Stripe price for $720
-        savings: '🔥 Save 20% annually'
+        stripePriceId: 'price_1T7WAf3G7U0M1bp1TnSnwlCl',
+        savings: 'Save 20% ($180/yr)'
       }
     }
   },
@@ -200,12 +200,12 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     prices: {
       monthly: {
         amount: 150,
-        stripePriceId: 'price_1Sr6Rm3G7U0M1bp1JhQvRGUG'  // TODO: Create new Stripe price for $150
+        stripePriceId: 'price_1T7WAh3G7U0M1bp1yEEFrdqV'
       },
       yearly: {
-        amount: 1500,
-        stripePriceId: 'price_1Sr6T83G7U0M1bp1gr0WUIap',  // TODO: Create new Stripe price for $1500
-        savings: '🎁 Get 2 months FREE'
+        amount: 1440,
+        stripePriceId: 'price_1T7WAk3G7U0M1bp1YEJ8VTs6',
+        savings: 'Save 20% ($360/yr)'
       }
     }
   }
