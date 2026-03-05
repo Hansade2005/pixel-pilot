@@ -106,7 +106,7 @@ Architect and deliver pixel-perfect, visually stunning frontend applications tha
 ## TOOLS
 - **File Operations**: \`read_file\`, \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`remove_package\` (PROJECT FILES in browser IndexedDB)
 - **Package Management**: Read \`package.json\` first. Edit it directly to add packages.
-  - **NEVER USE node_machine FOR PACKAGE INSTALLATION** - always edit package.json directly
+  - **NEVER USE node_machine FOR PACKAGE INSTALLATION OR DEV SERVER** - if you need a package, read package.json with read_file and add the dependency with its latest version using write_file. node_machine is for testing scripts ONLY (.js/.cjs).
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\`, \`grep_search\`, \`check_dev_errors\`, \`list_files\`, \`read_file\`, \`continue_backend_implementation\`
 
 **FILE READING RULE**: Never read files >150 lines without \`startLine\`/\`endLine\` or \`lineRange\`.
@@ -162,7 +162,7 @@ You are an expert mobile architect for Expo React Native SDK 54. Deliver clean, 
 ${PIPILOT_COMMON_INSTRUCTIONS}
 
 ## PACKAGE MANAGEMENT (CRITICAL)
-**NEVER USE node_machine FOR PACKAGE INSTALLATION** - always edit package.json directly.
+**NEVER USE node_machine FOR PACKAGE INSTALLATION OR DEV SERVER** - node_machine is for running test scripts ONLY (.js/.cjs files). If you need to add a package, read the current package.json with read_file, then use write_file to add the dependency with its latest version to the "dependencies" object. Never run npm install, npx, or any package management command in node_machine.
 
 **Preinstalled packages** (DO NOT reinstall):
 \`\`\`json
@@ -2866,7 +2866,7 @@ When implementing dark mode with \`dark:\` prefix, ALWAYS pair background and te
 
 ### Package Management
 Read \`package.json\` first. Edit it directly to add packages.
-- **NEVER USE node_machine FOR PACKAGE INSTALLATION** - always edit package.json directly
+- **NEVER USE node_machine FOR PACKAGE INSTALLATION OR DEV SERVER** - node_machine is for running test scripts ONLY. To add a package: read package.json, then write_file to add the dep with its latest version. Never run npm install/npx in node_machine.
 
 ### PiPilot DB (REST API Database - NOT IndexedDB)
 \`pipilotdb_create_database\`, \`pipilotdb_create_table\`, \`pipilotdb_list_tables\`, \`pipilotdb_read_table\`, \`pipilotdb_delete_table\`, \`pipilotdb_query_database\`, \`pipilotdb_manipulate_table_data\`, \`pipilotdb_manage_api_keys\`
@@ -5310,9 +5310,9 @@ ${hasModifiedFiles ? '✅ Re-read modified files to understand current state' : 
       }),
 
       node_machine: tool({
-        description: '🧪 Node.js Test Machine - Execute test scripts ONLY in a sandbox environment with full project context. Automatically writes all project files to sandbox. ONLY use for: running .js/.cjs test scripts, API endpoint tests, data validation scripts, utility scripts. NEVER use for: installing packages (use install_packages tool instead), starting dev servers, running npm install, or any package management. To add dependencies, edit package.json directly with write_file. Use write_file tool first to create test files in /test/ folder, then run the test command here.',
+        description: '🧪 Node.js Test Machine - Execute test scripts ONLY in a sandbox environment with full project context. Automatically writes all project files to sandbox. ONLY use for: running .js/.cjs test scripts, API endpoint tests, data validation scripts, utility scripts. NEVER use for: installing packages, starting dev servers, running npm install/npx, or any package management commands. If you need to add a package, read the current package.json with read_file, then use write_file to add the dependency with its latest version to the dependencies object — NEVER run npm install or npx in this tool. Use write_file tool first to create test files in /test/ folder, then run the test command here.',
         inputSchema: z.object({
-          command: z.string().describe('Test command to execute (e.g., "node test/my-test.js", "node scripts/validate.js"). NEVER use npm install, npx, or package installation commands here.'),
+          command: z.string().describe('Test command to execute (e.g., "node test/my-test.js", "node scripts/validate.js"). NEVER use npm install, npx, or any package installation commands here — to add a package, read package.json and add it there with write_file instead.'),
           timeoutSeconds: z.number().optional().describe('Execution timeout in seconds (default: 60)'),
           envVars: z.record(z.string()).optional().describe('Environment variables to set during execution'),
           workingDirectory: z.string().optional().describe('Working directory for command execution (default: /project)')
