@@ -1133,9 +1133,9 @@ interface MCPServerConfig {
 // Daily message limits per plan
 const DAILY_MESSAGE_LIMITS: Record<string, number> = {
   free: 10,
-  creator: 100,
-  collaborate: 300,
-  scale: 1000,
+  creator: Infinity,
+  collaborate: Infinity,
+  scale: Infinity,
 }
 
 interface ChatPanelV2Props {
