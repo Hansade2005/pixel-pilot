@@ -273,31 +273,26 @@ export async function POST(request: NextRequest) {
 
 // Helper function to handle one-time credit purchases
 async function handleOneTimePayment(invoice: any, supabase: any) {
-  // Check if this is a credit purchase by looking at line items
-  const lineItem = invoice.lines.data[0]
-  if (!lineItem) return
+  const userId = invoice.customer_metadata?.user_id || invoice.metadata?.user_id
+  if (!userId) return
 
-  // Check if it's the extra credits product
-  if (lineItem.price?.id === EXTRA_CREDITS_PRODUCT.stripePriceId) {
-    const userId = invoice.customer_metadata?.user_id || invoice.metadata?.user_id
-    if (!userId) return
+  // Calculate credits purchased: 1 credit = $0.01 = 1 cent
+  const amountPaidCents = invoice.amount_paid // amount in cents
+  const creditsPurchased = Math.floor(amountPaidCents / EXTRA_CREDITS_PRODUCT.pricePerCreditCents)
 
-    // Calculate credits purchased (price is in cents, 1 credit = $1)
-    const amountPaid = invoice.amount_paid / 100 // Convert cents to dollars
-    const creditsPurchased = Math.floor(amountPaid) // 1 credit per dollar
+  if (creditsPurchased <= 0) return
 
-    // Add credits using credit-manager
-    await addCredits(
-      userId,
-      creditsPurchased,
-      'purchase',
-      `Purchased ${creditsPurchased} extra credits`,
-      supabase,
-      invoice.payment_intent as string
-    )
+  // Add credits using credit-manager
+  await addCredits(
+    userId,
+    creditsPurchased,
+    'purchase',
+    `Purchased ${creditsPurchased} extra credits`,
+    supabase,
+    invoice.payment_intent as string
+  )
 
-    console.log(`Credits purchased for user ${userId}: +${creditsPurchased}`)
-  }
+  console.log(`Credits purchased for user ${userId}: +${creditsPurchased}`)
 }
 
 // Helper function to handle credit purchases from checkout sessions
@@ -305,15 +300,28 @@ async function handleCreditPurchase(session: Stripe.Checkout.Session, supabase: 
   const userId = session.metadata?.user_id
   if (!userId) return
 
-  // Get the line items to determine credits purchased
-  const lineItems = await stripe.checkout.sessions.listLineItems(session.id)
-  const lineItem = lineItems.data[0]
+  // Credits count is stored in session metadata by purchase-credits route
+  const creditsFromMetadata = parseInt(session.metadata?.credits || '0', 10)
 
-  if (lineItem?.price?.id === EXTRA_CREDITS_PRODUCT.stripePriceId) {
-    const quantity = lineItem.quantity || 1
-    const creditsPurchased = quantity // Assuming quantity represents credits
+  if (creditsFromMetadata > 0) {
+    // Use metadata credits (most reliable - set by our purchase-credits route)
+    await addCredits(
+      userId,
+      creditsFromMetadata,
+      'purchase',
+      `Purchased ${creditsFromMetadata} extra credits via checkout`,
+      supabase,
+      session.payment_intent as string
+    )
 
-    // Add credits using credit-manager
+    console.log(`Credits purchased via checkout for user ${userId}: +${creditsFromMetadata}`)
+  } else {
+    // Fallback: calculate from amount paid (1 credit = 1 cent)
+    const amountPaidCents = session.amount_total || 0
+    const creditsPurchased = Math.floor(amountPaidCents / EXTRA_CREDITS_PRODUCT.pricePerCreditCents)
+
+    if (creditsPurchased <= 0) return
+
     await addCredits(
       userId,
       creditsPurchased,

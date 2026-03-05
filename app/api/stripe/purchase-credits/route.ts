@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valid credits amount is required" }, { status: 400 })
     }
 
+    // Enforce min/max credits
+    if (credits < 100) {
+      return NextResponse.json({ error: "Minimum purchase is 100 credits ($1.00)" }, { status: 400 })
+    }
+    if (credits > 100000) {
+      return NextResponse.json({ error: "Maximum purchase is 100,000 credits ($1,000.00)" }, { status: 400 })
+    }
+
     // Check if user can purchase credits (not free plan)
     const { data: wallet } = await supabase
       .from('wallet')
@@ -71,7 +79,7 @@ export async function POST(request: NextRequest) {
         .eq('user_id', user.id)
     }
 
-    // Create checkout session for one-time payment
+    // Create checkout session using the Stripe price ID ($0.01/unit)
     const stripeInstance = getStripe()
     const session = await stripeInstance.checkout.sessions.create({
       customer: customer.id,
@@ -82,9 +90,9 @@ export async function POST(request: NextRequest) {
           quantity: credits,
         },
       ],
-      mode: 'payment', // One-time payment, not subscription
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}&credits=${credits}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pricing?canceled=true`,
+      mode: 'payment',
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/workspace/account?success=true&session_id={CHECKOUT_SESSION_ID}&credits=${credits}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/workspace/account?canceled=true`,
       metadata: {
         user_id: user.id,
         credits: credits.toString(),

@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react"
 import Script from "next/script"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Heart, Check, Info, ChevronDown, Star, Users, Loader2 } from "lucide-react"
+import { Check, ChevronDown, Star, Users, Loader2, Sparkles, Shield, Zap, Globe } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
@@ -35,13 +34,11 @@ export default function PricingPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Check authentication status
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
 
       if (user) {
-        // Fetch current subscription and credits from wallet table
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
 
@@ -55,12 +52,11 @@ export default function PricingPage() {
           setCurrentPlan(wallet.current_plan || 'free')
           setCreditBalance(wallet.credits_balance || 0)
 
-          // Check if user can purchase credits (paid plans only)
           const { canPurchaseCredits: canBuy } = await import('@/lib/stripe-config')
           setCanPurchaseCredits(canBuy(wallet.current_plan))
         } else {
           setCurrentPlan('free')
-          setCreditBalance(20) // Default free credits
+          setCreditBalance(20)
           setCanPurchaseCredits(false)
         }
       }
@@ -79,17 +75,13 @@ export default function PricingPage() {
     checkUser()
     fetchExchangeRate()
 
-    // Check for success/cancel parameters
     const urlParams = new URLSearchParams(window.location.search)
     const sessionId = urlParams.get('session_id')
 
     if (urlParams.get('success') === 'true' && sessionId) {
-      // Handle successful payment - verify the session
       handlePaymentSuccess(sessionId)
     } else if (urlParams.get('canceled') === 'true') {
-      // Handle canceled payment
       console.log('Payment canceled')
-      // You could show a toast notification here
     }
   }, [])
 
@@ -109,16 +101,13 @@ export default function PricingPage() {
         const result = await response.json()
         console.log('Payment verified successfully:', result)
 
-        // Update current plan state
         setCurrentPlan(result.plan)
 
-        // Clean up URL
         const url = new URL(window.location.href)
         url.searchParams.delete('success')
         url.searchParams.delete('session_id')
         window.history.replaceState({}, '', url.toString())
 
-        // You could show a success toast here
         alert(`Welcome to PiPilot ${result.plan}! Your subscription is now active.`)
       } else {
         console.error('Payment verification failed')
@@ -132,12 +121,10 @@ export default function PricingPage() {
 
   const handleSubscribe = async (planType: string) => {
     if (!user) {
-      // Redirect to login if not authenticated
       window.location.href = '/auth/login?redirect=/pricing'
       return
     }
 
-    // Map plan types to our plan names
     const planMap: Record<string, "creator" | "collaborate" | "scale"> = {
       'pro': 'creator',
       'teams': 'collaborate',
@@ -153,7 +140,6 @@ export default function PricingPage() {
       return
     }
 
-    // Show payment provider selection dialog
     setSelectedPlan(mappedPlan)
     setShowPaymentDialog(true)
   }
@@ -169,7 +155,6 @@ export default function PricingPage() {
       return
     }
 
-    // Show credit purchase dialog with payment provider options
     setSelectedCredits(credits)
     setShowCreditDialog(true)
   }
@@ -181,31 +166,23 @@ export default function PricingPage() {
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes 150 credits (~5-10 messages), access to Mistral Devstral 2, Google Gemini 2.5 Flash, and Claude Sonnet 4.5, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot."
-    },
-    {
-      question: "What deployment platforms are available?",
-      answer: "Free users can deploy to Vercel only. Creator and above get access to both Vercel and Netlify for maximum flexibility."
-    },
-    {
-      question: "What AI models are available?",
-      answer: "PiPilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Free users have basic access with limits, while paid plans get unlimited access to all premium models."
-    },
-    {
-      question: "What are the credit and message limits?",
-      answer: "Free: 150 credits, 20 requests/month. Creator: 1,000 credits, 250 requests/month. Collaborate: 2,500 credits, 600 requests/month. Scale: 5,000 credits, 2,000 requests/month. Credits control cost per request, while request limits prevent abuse. Costs vary by AI model and task complexity. Paid users can purchase extra credits."
+      answer: "The free plan includes 150 credits (~5-10 messages), access to select AI models, Vercel deployment, visual editing, GitHub sync, and 1 app/project. It's perfect for trying out PiPilot."
     },
     {
       question: "What does 'credits' mean?",
-      answer: "Credits are used for AI requests based on actual token usage (1 credit = $0.01). Costs vary by message complexity, AI model chosen, and number of agent steps. Cheaper models like Gemini Flash use fewer credits, while Claude Sonnet uses more. Free users cannot buy extra credits and must upgrade when exhausted."
+      answer: "Credits are used for AI requests based on actual token usage (1 credit = $0.01). Costs vary by message complexity and AI model chosen. Cheaper models like Gemini Flash use fewer credits, while Claude Sonnet uses more. Paid users can purchase extra credits anytime."
+    },
+    {
+      question: "What AI models are available?",
+      answer: "PiPilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Free users have access to select models, while paid plans unlock all premium models."
+    },
+    {
+      question: "What are browser testing, code review, and health check?",
+      answer: "Creator and above plans include AI-powered browser testing with screenshots, automated code review with security audits, and project health checks with diagnostics. These tools help you ship production-ready apps with confidence."
     },
     {
       question: "Who owns the projects and code?",
       answer: "You own 100% of your projects and code. All generated code is yours to use, modify, and distribute as you see fit. We don't claim any ownership over your creations."
-    },
-    {
-      question: "How much does it cost to use?",
-      answer: "PiPilot offers a free trial with 150 credits (~5-10 messages). Creator is $25/month (1,000 credits), Collaborate $75/month (2,500 credits), Scale $150/month (5,000 credits). Annual plans save ~17%. Costs vary by AI model and message complexity."
     },
     {
       question: "Can I upgrade or downgrade my plan?",
@@ -217,6 +194,26 @@ export default function PricingPage() {
     }
   ]
 
+  // Plan highlight features (shown as badges above features list)
+  const planHighlights: Record<string, { icon: React.ReactNode; label: string }[]> = {
+    free: [
+      { icon: <Zap className="w-3.5 h-3.5" />, label: "150 credits/mo" },
+    ],
+    creator: [
+      { icon: <Zap className="w-3.5 h-3.5" />, label: "1,000 credits/mo" },
+      { icon: <Shield className="w-3.5 h-3.5" />, label: "Code review" },
+      { icon: <Globe className="w-3.5 h-3.5" />, label: "Browser testing" },
+    ],
+    collaborate: [
+      { icon: <Zap className="w-3.5 h-3.5" />, label: "2,500 credits/mo" },
+      { icon: <Users className="w-3.5 h-3.5" />, label: "Team sharing" },
+    ],
+    scale: [
+      { icon: <Zap className="w-3.5 h-3.5" />, label: "5,000 credits/mo" },
+      { icon: <Sparkles className="w-3.5 h-3.5" />, label: "Priority access" },
+    ],
+  }
+
   // Generate pricing tiers from configuration
   const pricingTiers = Object.values(PRODUCT_CONFIGS).map(config => {
     const monthlyPrice = config.prices.monthly.amount
@@ -224,350 +221,293 @@ export default function PricingPage() {
     const currentPrice = isAnnual ? yearlyPrice : monthlyPrice
     const cadPrice = convertUsdToCad(currentPrice, exchangeRate)
     const cadPriceFormatted = formatPrice(cadPrice, 'CAD')
-    const originalPrice = isAnnual ? null : (yearlyPrice > 0 ? formatPrice(convertUsdToCad(yearlyPrice, exchangeRate), 'CAD') : null)
     const savings = getSavings(config.id, isAnnual)
 
     return {
       name: config.name,
       description: config.description,
-      price: config.id === 'enterprise' ? "Coming Soon" : (currentPrice === 0 ? "$0.00 CAD" : cadPriceFormatted),
-      priceAmount: config.id === 'enterprise' ? undefined : (config.id === 'enterprise' ? cadPriceFormatted : undefined),
-      originalPrice: originalPrice,
-      period: config.id === 'enterprise' ? undefined : (isAnnual ? "per user / year" : "per user / month"),
+      price: currentPrice === 0 ? "$0" : cadPriceFormatted,
+      period: isAnnual ? "/year" : "/month",
       savings: savings,
-      note: config.id === 'pro' ? "Most Popular" : (config.id === 'free' ? "Perfect for getting started" : (config.id === 'enterprise' ? "Coming Soon" : undefined)),
-      buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : "Select plan"),
-      buttonVariant: "default" as const,
-      isPopular: config.id === 'pro',
+      buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : "Select Plan"),
+      isPopular: config.id === 'creator',
+      isCurrent: currentPlan === config.id,
       planType: config.id,
       stripePriceId: isAnnual ? config.prices.yearly.stripePriceId : config.prices.monthly.stripePriceId,
-      features: config.features
+      features: config.features,
+      highlights: planHighlights[config.id] || [],
     }
   })
 
   return (
     <>
-      {/* Stripe.js script */}
       <Script
         src="https://js.stripe.com/v3/pricing.js"
         strategy="afterInteractive"
       />
 
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Enhanced Gradient Background */}
-      <div className="absolute inset-0 lovable-gradient" />
-      
-      {/* Noise Texture Overlay */}
-      <div className="absolute inset-0 noise-texture" />
-
-      {/* Navigation */}
+    <div className="min-h-screen bg-gray-950">
       <Navigation />
 
-      {/* Main Content */}
-      <main className="relative z-10 pt-16 pb-24">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Hero Section */}
-          <div className="text-center mb-16">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-6 h-6 rounded-full heart-gradient flex items-center justify-center">
-                <Heart className="w-3 h-3 text-white fill-current" />
-              </div>
-            </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 animate-fade-in">
-              Ship Faster. Build Smarter. Scale Further.
+      <main className="relative z-10 pt-20 pb-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+
+          {/* Hero */}
+          <div className="text-center mb-14">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-5 tracking-tight">
+              Simple, transparent pricing
             </h1>
-            <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
-              Join thousands of developers building production-ready apps with AI. 
-              <span className="block mt-2 text-orange-300 font-semibold">From prototype to deployment in minutes, not months.</span>
+            <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+              Start free. Upgrade when you need more power.
+              <span className="block mt-1 text-orange-400 font-medium">1 credit = $0.01 USD. Only pay for what you use.</span>
             </p>
-            
-            {/* Social Proof */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                <span className="font-medium">4.9/5 rating</span>
+
+            {/* Social proof */}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-5 text-sm text-gray-500">
+              <div className="flex items-center gap-1.5">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <span>4.9/5 rating</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-orange-400" />
-                <span className="font-medium">10,000+ developers</span>
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-orange-500" />
+                <span>10,000+ developers</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Check className="w-5 h-5 text-green-400" />
-                <span className="font-medium">50,000+ apps deployed</span>
+              <div className="flex items-center gap-1.5">
+                <Check className="w-4 h-4 text-green-500" />
+                <span>50,000+ apps deployed</span>
               </div>
-            </div>
-            
-            {/* Currency Indicator */}
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-white/60">
-              <span>💵 Prices in CAD • 1 USD = ${exchangeRate.toFixed(2)} CAD</span>
             </div>
 
-            {/* E2B Sponsor Badge */}
-            <div className="mt-6 flex items-center justify-center">
-              <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity">
-                <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
-              </a>
+            <div className="mt-3 text-xs text-gray-600">
+              Prices shown in CAD (1 USD = {exchangeRate.toFixed(2)} CAD)
             </div>
           </div>
 
-          {/* Value Proposition Banner */}
-          <div className="mb-12 max-w-4xl mx-auto">
-            <div className="bg-gradient-to-r from-orange-600/20 to-orange-500/20 border border-orange-500/30 rounded-2xl p-6 backdrop-blur-sm transform transition-all duration-300 hover:scale-105">
-              <div className="grid md:grid-cols-3 gap-6 text-center">
-                <div className="space-y-2">
-                  <div className="text-3xl font-bold text-white">10x</div>
-                  <div className="text-sm text-white/80">Faster Development</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-3xl font-bold text-white">90%</div>
-                  <div className="text-sm text-white/80">Less Code to Write</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-3xl font-bold text-white">$0</div>
-                  <div className="text-sm text-white/80">Setup Costs</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing Toggle */}
-          <div className="flex items-center justify-center mb-12">
-            <div className="flex items-center space-x-4 bg-gray-800/50 rounded-lg p-2 backdrop-blur-sm">
-              <span className={`text-sm ${!isAnnual ? 'text-white' : 'text-gray-400'}`}>Monthly</span>
+          {/* Billing Toggle */}
+          <div className="flex items-center justify-center mb-10">
+            <div className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-full px-5 py-2.5">
+              <span className={`text-sm font-medium transition-colors ${!isAnnual ? 'text-white' : 'text-gray-500'}`}>Monthly</span>
               <Switch
                 checked={isAnnual}
                 onCheckedChange={setIsAnnual}
                 className="data-[state=checked]:bg-orange-600"
               />
-              <span className={`text-sm ${isAnnual ? 'text-white' : 'text-gray-400'}`}>Annual</span>
+              <span className={`text-sm font-medium transition-colors ${isAnnual ? 'text-white' : 'text-gray-500'}`}>Annual</span>
               {isAnnual && (
-                <Badge className="bg-green-600 text-white text-xs">
-                  Save Big!
+                <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-xs font-medium">
+                  Save up to 20%
                 </Badge>
               )}
             </div>
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-20">
             {pricingTiers.map((tier, index) => (
-              <Card key={index} className={`bg-gradient-to-br from-gray-800/60 to-gray-900/60 border-gray-700/50 backdrop-blur-sm relative transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/20 ${tier.isPopular ? 'ring-2 ring-orange-500 shadow-lg shadow-orange-500/30 scale-105' : 'hover:border-orange-500/50'} animate-slide-up`} style={{animationDelay: `${index * 100}ms`}}>
+              <div
+                key={index}
+                className={`relative rounded-2xl border p-6 flex flex-col transition-all duration-200 ${
+                  tier.isPopular
+                    ? 'border-orange-500/50 bg-gradient-to-b from-orange-500/5 to-gray-900 shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/20'
+                    : tier.isCurrent
+                    ? 'border-orange-500/30 bg-gray-900'
+                    : 'border-gray-800 bg-gray-900 hover:border-gray-700'
+                }`}
+              >
+                {/* Popular badge */}
                 {tier.isPopular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                    <Badge className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-1.5 shadow-lg animate-pulse">
-                      ⭐ Most Popular
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-orange-600 text-white px-3 py-0.5 text-xs font-semibold shadow-lg shadow-orange-500/20">
+                      Most Popular
                     </Badge>
                   </div>
                 )}
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-white text-xl">{tier.name}</CardTitle>
-                  <CardDescription className="text-gray-300 text-sm">
-                    {tier.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <div className="flex items-baseline space-x-2">
-                      <span className="text-4xl font-bold bg-gradient-to-r from-white to-orange-200 bg-clip-text text-transparent">{tier.price}</span>
-                      {tier.priceAmount && (
-                        <span className="text-4xl font-bold bg-gradient-to-r from-white to-orange-200 bg-clip-text text-transparent">{tier.priceAmount}</span>
-                      )}
-                      {tier.period && (
-                        <span className="text-gray-400 text-sm">{tier.period}</span>
-                      )}
-                    </div>
 
-                    {/* Show crossed out yearly price when on monthly */}
-                    {tier.originalPrice && !isAnnual && (
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className="text-lg text-gray-500 line-through">{tier.originalPrice}/year</span>
-                        {tier.savings && (
-                          <span className="text-sm text-green-400 font-medium">{tier.savings}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Show savings badge when on yearly */}
-                    {tier.savings && isAnnual && (
-                      <div className="mt-2">
-                        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg animate-bounce-slow">
-                          {tier.savings}
-                        </span>
-                      </div>
-                    )}
-
-                    {tier.note && (
-                      <p className="text-sm text-gray-400 mt-1">{tier.note}</p>
+                {/* Header */}
+                <div className="mb-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold text-white">{tier.name}</h3>
+                    {tier.isCurrent && (
+                      <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-xs">
+                        Current
+                      </Badge>
                     )}
                   </div>
+                  <p className="text-sm text-gray-500">{tier.description}</p>
+                </div>
 
-                  <Button 
-                    className={`w-full font-semibold transition-all duration-300 ${tier.buttonVariant === 'default' ? 'bg-orange-600 hover:bg-orange-500 shadow-lg hover:shadow-orange-500/50 transform hover:-translate-y-0.5' : 'border-2 border-gray-600 hover:border-orange-500 hover:bg-orange-500/10'} ${tier.isPopular ? 'ring-2 ring-orange-400 ring-offset-2 ring-offset-gray-900' : ''}`}
-                    disabled={
-                      loadingPlan === tier.planType ||
-                      tier.buttonText === "Current Plan"
+                {/* Price */}
+                <div className="mb-5">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-white">{tier.price}</span>
+                    <span className="text-sm text-gray-500">{tier.period}</span>
+                  </div>
+                  {tier.savings && isAnnual && (
+                    <p className="text-xs text-green-400 font-medium mt-1">{tier.savings}</p>
+                  )}
+                </div>
+
+                {/* CTA Button */}
+                <Button
+                  className={`w-full mb-5 font-medium transition-all ${
+                    tier.isPopular
+                      ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                      : tier.isCurrent
+                      ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
+                      : tier.planType === 'free'
+                      ? 'bg-gray-800 hover:bg-gray-700 text-white'
+                      : 'bg-orange-600 hover:bg-orange-500 text-white'
+                  }`}
+                  disabled={
+                    loadingPlan === tier.planType ||
+                    tier.isCurrent
+                  }
+                  onClick={() => {
+                    if (tier.planType === 'free') {
+                      window.location.href = '/auth/signup'
+                    } else {
+                      handleSubscribe(tier.planType)
                     }
-                    onClick={() => {
-                      if (tier.planType === 'free') {
-                        window.location.href = '/auth/signup'
-                      } else if (tier.planType !== 'free') {
-                        handleSubscribe(tier.planType)
-                      }
-                    }}
-                  >
-                    {loadingPlan === tier.planType && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    {tier.buttonText}
-                  </Button>
+                  }}
+                >
+                  {loadingPlan === tier.planType && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {tier.buttonText}
+                </Button>
 
-                  <div className="space-y-3">
-                    {tier.features.map((feature, featureIndex) => (
-                      <div key={featureIndex} className="flex items-start space-x-3">
-                        <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-gray-300">{feature}</span>
-                      </div>
+                {/* Highlight badges */}
+                {tier.highlights.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {tier.highlights.map((h, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-orange-300 bg-orange-500/10 rounded-full px-2.5 py-1"
+                      >
+                        {h.icon}
+                        {h.label}
+                      </span>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                )}
+
+                {/* Features */}
+                <div className="space-y-2.5 flex-1">
+                  {tier.features.map((feature, featureIndex) => (
+                    <div key={featureIndex} className="flex items-start gap-2.5">
+                      <Check className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-300 leading-snug">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
 
-
-          {/* Extra Credits Section - Only show for paid users */}
+          {/* Extra Credits Section */}
           {user && canPurchaseCredits && (
-            <div className="mb-16">
+            <div className="mb-20">
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-4">Need More Credits?</h2>
-                <p className="text-xl text-white/80">
-                  Purchase additional credits for your {currentPlan} plan
+                <h2 className="text-2xl font-bold text-white mb-2">Need More Credits?</h2>
+                <p className="text-gray-400">
+                  Top up your {currentPlan} plan anytime at $0.01/credit
                 </p>
-                <div className="mt-4 p-4 bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50 inline-block">
-                  <p className="text-white">
-                    Current Balance: <span className="font-bold text-orange-400">{creditBalance} credits</span>
-                    <span className="text-gray-400 ml-2">(~{Math.floor(creditBalance / 20)} messages remaining)</span>
-                  </p>
+                <div className="mt-3 inline-flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-full px-4 py-2 text-sm">
+                  <span className="text-gray-400">Balance:</span>
+                  <span className="font-semibold text-orange-400">{creditBalance} credits</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
                 {[
-                  { credits: 1000, price: 10, messages: 50 },
-                  { credits: 2500, price: 25, messages: 125 },
-                  { credits: 5000, price: 50, messages: 250 }
-                ].map(({ credits, price, messages }) => (
-                  <Card key={credits} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
-                    <CardHeader className="text-center pb-4">
-                      <CardTitle className="text-white text-2xl">{credits.toLocaleString()} Credits</CardTitle>
-                      <CardDescription className="text-gray-300">
-                        ${price} • ~{messages} messages
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      <Button
-                        className="w-full bg-orange-600 hover:bg-orange-500"
-                        disabled={loadingPlan === 'credits'}
-                        onClick={() => handlePurchaseCredits(credits)}
-                      >
-                        {loadingPlan === 'credits' && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Purchase Credits
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  { credits: 1000, price: 10 },
+                  { credits: 2500, price: 25 },
+                  { credits: 5000, price: 50 }
+                ].map(({ credits, price }) => (
+                  <div key={credits} className="rounded-xl border border-gray-800 bg-gray-900 p-5 text-center hover:border-gray-700 transition-colors">
+                    <div className="text-2xl font-bold text-white mb-1">{credits.toLocaleString()}</div>
+                    <div className="text-sm text-gray-500 mb-4">credits for ${price}</div>
+                    <Button
+                      className="w-full bg-orange-600 hover:bg-orange-500 text-white"
+                      disabled={loadingPlan === 'credits'}
+                      onClick={() => handlePurchaseCredits(credits)}
+                    >
+                      {loadingPlan === 'credits' && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Purchase
+                    </Button>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* E2B Sponsor */}
+          <div className="flex items-center justify-center mb-16">
+            <a href="https://e2b.dev/startups" target="_blank" rel="noopener noreferrer" className="opacity-60 hover:opacity-100 transition-opacity">
+              <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 w-auto rounded" />
+            </a>
+          </div>
 
-          {/* Refund Policy Section */}
-          <div className="mb-16">
-            <div className="max-w-4xl mx-auto">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-4">Refund Policy</h2>
-                <p className="text-xl text-white/80">
-                  Clear terms to ensure a fair experience for everyone
-                </p>
+          {/* Refund Policy */}
+          <div className="mb-16 max-w-3xl mx-auto">
+            <h2 className="text-2xl font-bold text-white mb-6 text-center">Refund Policy</h2>
+            <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Shield className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-white text-sm mb-1">Non-Refundable After Use</h3>
+                  <p className="text-gray-400 text-sm">All subscriptions are non-refundable once credits have been used. Credits are consumed immediately upon AI interactions.</p>
+                </div>
               </div>
 
-              <div className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 rounded-2xl p-8 backdrop-blur-sm">
-                <div className="space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                      <Info className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-2">Non-Refundable After Use</h3>
-                      <p className="text-gray-300 text-sm">All subscriptions are <strong className="text-white">non-refundable once credits have been used</strong>. Credits are consumed immediately upon AI interactions.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-5 h-5 text-green-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-2">24-Hour Satisfaction Window</h3>
-                      <p className="text-gray-300 text-sm">If you're unsatisfied and <strong className="text-white">have not used any credits</strong>, contact <a href="mailto:support@pipilot.dev" className="text-orange-400 hover:underline">support@pipilot.dev</a> within <strong className="text-white">24 hours</strong> of purchase for a full refund.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                      <Info className="w-5 h-5 text-red-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-2">Chargeback Policy</h3>
-                      <p className="text-gray-300 text-sm"><strong className="text-white">Chargebacks on legitimate transactions will result in permanent account termination.</strong> Please contact support first to resolve any billing issues.</p>
-                    </div>
-                  </div>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-4 h-4 text-green-400" />
                 </div>
-
-                <div className="border-t border-gray-700/50 mt-6 pt-6">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="text-center sm:text-left">
-                      <p className="text-gray-400 text-sm">
-                        Questions? Contact <a href="mailto:support@pipilot.dev" className="text-orange-400 hover:underline">support@pipilot.dev</a>
-                      </p>
-                    </div>
-                    <a
-                      href="/refund-policy"
-                      className="inline-flex items-center text-orange-400 hover:text-orange-300 font-medium text-sm transition-colors"
-                    >
-                      View Full Refund Policy
-                      <ChevronDown className="w-4 h-4 ml-1 -rotate-90" />
-                    </a>
-                  </div>
+                <div>
+                  <h3 className="font-medium text-white text-sm mb-1">24-Hour Satisfaction Window</h3>
+                  <p className="text-gray-400 text-sm">If you haven't used any credits, contact <a href="mailto:support@pipilot.dev" className="text-orange-400 hover:underline">support@pipilot.dev</a> within 24 hours for a full refund.</p>
                 </div>
+              </div>
+
+              <div className="border-t border-gray-800 pt-4 flex items-center justify-between">
+                <p className="text-gray-500 text-xs">
+                  Questions? <a href="mailto:support@pipilot.dev" className="text-orange-400 hover:underline">support@pipilot.dev</a>
+                </p>
+                <a
+                  href="/refund-policy"
+                  className="text-orange-400 hover:text-orange-300 text-xs font-medium transition-colors"
+                >
+                  Full Policy
+                </a>
               </div>
             </div>
           </div>
 
-          {/* FAQ Section */}
-          <div className="mb-16">
-            <h2 className="text-3xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>
-            <div className="space-y-4 max-w-3xl mx-auto">
+          {/* FAQ */}
+          <div className="mb-16 max-w-3xl mx-auto">
+            <h2 className="text-2xl font-bold text-white mb-6 text-center">Frequently Asked Questions</h2>
+            <div className="space-y-2">
               {faqData.map((faq, index) => (
-                <div key={index} className="bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50 overflow-hidden">
-                  <div 
-                    className="flex items-center justify-between cursor-pointer p-4 hover:bg-gray-700/50 transition-colors"
+                <div key={index} className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
+                  <button
+                    className="flex items-center justify-between w-full cursor-pointer p-4 hover:bg-gray-800/50 transition-colors text-left"
                     onClick={() => setOpenFAQ(openFAQ === index ? null : index)}
                   >
-                    <span className="text-white font-medium pr-4">{faq.question}</span>
-                    <ChevronDown 
-                      className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                    <span className="text-sm font-medium text-white pr-4">{faq.question}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 flex-shrink-0 ${
                         openFAQ === index ? 'rotate-180' : ''
-                      }`} 
+                      }`}
                     />
-                  </div>
+                  </button>
                   {openFAQ === index && (
                     <div className="px-4 pb-4">
-                      <div className="text-gray-300 leading-relaxed">
-                        {faq.answer}
-                      </div>
+                      <p className="text-sm text-gray-400 leading-relaxed">{faq.answer}</p>
                     </div>
                   )}
                 </div>
@@ -577,7 +517,6 @@ export default function PricingPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <Footer />
 
       {/* Payment Provider Selection Dialog */}
@@ -588,8 +527,8 @@ export default function PricingPage() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto">
             {selectedPlan && (
-              <PaymentProviderSelector 
-                plan={selectedPlan} 
+              <PaymentProviderSelector
+                plan={selectedPlan}
                 onClose={() => setShowPaymentDialog(false)}
               />
             )}
@@ -603,8 +542,8 @@ export default function PricingPage() {
           <DialogHeader>
             <DialogTitle>Purchase Credits</DialogTitle>
           </DialogHeader>
-          <CreditTopUpSelector 
-            credits={selectedCredits} 
+          <CreditTopUpSelector
+            credits={selectedCredits}
             onClose={() => setShowCreditDialog(false)}
           />
         </DialogContent>

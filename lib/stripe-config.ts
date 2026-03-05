@@ -49,13 +49,11 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'Basic AI chat & code generation',
       '150 monthly credits (~5-10 AI messages)',
-      '20 requests per month',
       'Token-based billing (pay for what you use)',
       'Deploy to Vercel',
       'Visual editing with Design Mode',
       'GitHub sync',
       '1 app/project',
-      'Up to 15 agent steps per request',
       'Public/open-source unlimited'
     ],
     limits: {
@@ -91,13 +89,12 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Free features',
       '1,000 monthly credits (~50-100 messages)',
-      '250 requests per month',
       'Token-based billing - only pay for actual usage',
       'Access to all premium AI models (Claude, GPT, Gemini)',
-      'Up to 30 agent steps per request',
       '5x higher attachment size limits',
-      'Import from Figma',
-      'Custom domains',
+      'Browser testing & screenshots',
+      'Code review & security audit',
+      'Health check & diagnostics',
       'Remove PiPilot badge',
       '10% revenue share on monetized apps',
       'Purchase extra credits anytime ($0.01/credit)'
@@ -135,9 +132,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Creator features',
       '2,500 monthly credits (~125-250 messages)',
-      '600 requests per month',
       'Shared credit pool across unlimited users',
-      'Up to 40 agent steps per request',
       'Centralized billing on Vercel',
       'Share chats and collaborate in real-time',
       'User roles & permissions',
@@ -178,8 +173,6 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     features: [
       'All Collaborate features',
       '5,000 monthly credits (~250-500 messages)',
-      '2,000 requests per month',
-      'Up to 50 agent steps per request',
       'Priority AI model access',
       'Internal publish',
       'SSO integration',
@@ -224,7 +217,8 @@ export const EXTRA_CREDITS_PRODUCT = {
   name: 'Extra Credits',
   description: 'Purchase additional credits for paid plans',
   stripePriceId: 'price_1T6lsK3G7U0M1bp19R0ZutUh',
-  pricePerCredit: 1
+  pricePerCredit: 0.01, // 1 credit = $0.01 USD
+  pricePerCreditCents: 1, // 1 credit = 1 cent
 }
 
 // Helper functions
