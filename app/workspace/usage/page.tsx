@@ -114,6 +114,8 @@ const MODEL_SHORT_NAMES: Record<string, string> = {
   'ollama/minimax-m2.1': 'Claude Sonnet 4.6',
   'minimax/minimax-m2.5': 'Claude Opus 4.6',
   'minimax/minimax-m2.1': 'Claude Sonnet 4.6',
+  'Claude Opus 4.6': 'Claude Opus 4.6',
+  'Claude Sonnet 4.6': 'Claude Sonnet 4.6',
   'kilo/minimax-m2.5-free': 'MiniMax M2.5',
   // Ollama Cloud models
   'ollama/devstral-2:123b': 'Devstral 123B',
