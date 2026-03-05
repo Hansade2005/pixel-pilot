@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { generateSiteNotFoundHTML } from '@/lib/site-not-found-page';
 
 // Supabase configuration for sites storage
 const SUPABASE_CONFIG = {
@@ -171,8 +172,11 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
           });
         }
       }
-      // If even index.html is not found, return 404
-      return new NextResponse(`Site not found: ${siteId}`, { status: 404 });
+      // If even index.html is not found, return branded 404 page
+      return new NextResponse(generateSiteNotFoundHTML(siteId), {
+        status: 404,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
     }
 
     const arrayBuffer = await data.arrayBuffer();

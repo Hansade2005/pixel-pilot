@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createExternalClient } from '@supabase/supabase-js'
 import { trackSiteView } from '@/app/api/preview/route'
+import { generateSiteNotFoundHTML } from '@/lib/site-not-found-page';
 
 // Supabase configuration for sites storage
 const SUPABASE_CONFIG = {
@@ -110,7 +111,10 @@ export async function GET(request: NextRequest) {
           });
         }
       }
-      return new NextResponse(`Site not found: ${siteId}`, { status: 404 });
+      return new NextResponse(generateSiteNotFoundHTML(siteId), {
+        status: 404,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
     }
 
     const arrayBuffer = await data.arrayBuffer();
