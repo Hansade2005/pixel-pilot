@@ -91,21 +91,26 @@ export default function ApiDashboardPage() {
 
   const fetchUserSubscription = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('api_subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
+      // Fetch subscription from KV via API
+      const response = await fetch(`/api/subscription/current`)
+      const data = await response.json()
 
-      if (!error && data) {
+      if (data.tier) {
         setCurrentTier(data.tier)
         const planConfig = STRIPE_API_PLANS[data.tier as keyof typeof STRIPE_API_PLANS]
         if (planConfig) {
           setQuotaLimit(planConfig.requests)
         }
+      } else {
+        // Default to free tier
+        setCurrentTier('free')
+        setQuotaLimit(10000)
       }
     } catch (err) {
       console.error('Error fetching subscription:', err)
+      // Default to free tier on error
+      setCurrentTier('free')
+      setQuotaLimit(10000)
     }
   }
 
@@ -189,7 +194,7 @@ export default function ApiDashboardPage() {
     setVisibleKeys(newVisible)
   }
 
-  const revokeKey = async (keyId: string) => {
+  const revokeKey = async (apiKey: string) => {
     if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
       return
     }
@@ -198,7 +203,7 @@ export default function ApiDashboardPage() {
       await fetch(`/api/keys/revoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyId })
+        body: JSON.stringify({ keyId: apiKey }) // API expects keyId field
       })
 
       await fetchApiKeys(user.id)
@@ -391,7 +396,7 @@ export default function ApiDashboardPage() {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => revokeKey(key.id)}
+                      onClick={() => revokeKey(key.key)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

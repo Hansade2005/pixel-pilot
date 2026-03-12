@@ -11,26 +11,63 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { keyId } = body
+    const { keyId } = body // This is the actual API key, not an ID
 
     if (!keyId) {
-      return NextResponse.json({ error: 'Key ID is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Key is required' }, { status: 400 })
     }
 
-    // Mark key as revoked in Supabase
-    const { error: updateError } = await supabase
-      .from('api_keys_metadata')
-      .update({ revoked: true, revoked_at: new Date().toISOString() })
-      .eq('id', keyId)
-      .eq('user_id', user.id) // Ensure user owns this key
+    const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID
+    const cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN
+    const kvNamespaceId = 'e3b571cde10d48e38fdb107e0b9e2911' // API_KEYS namespace
 
-    if (updateError) {
-      console.error('Error revoking API key:', updateError)
+    if (!cloudflareAccountId || !cloudflareApiToken) {
+      return NextResponse.json({ error: 'Cloudflare credentials not configured' }, { status: 500 })
+    }
+
+    // Fetch the key data from KV
+    const keyUrl = `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/storage/kv/namespaces/${kvNamespaceId}/values/${encodeURIComponent(keyId)}`
+
+    const keyResponse = await fetch(keyUrl, {
+      headers: {
+        'Authorization': `Bearer ${cloudflareApiToken}`,
+      }
+    })
+
+    if (!keyResponse.ok) {
+      return NextResponse.json({ error: 'API key not found' }, { status: 404 })
+    }
+
+    const keyDataText = await keyResponse.text()
+    let keyData
+    try {
+      keyData = JSON.parse(keyDataText)
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid key data' }, { status: 500 })
+    }
+
+    // Verify ownership
+    if (keyData.userId !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Mark as revoked
+    keyData.revoked = true
+    keyData.revokedAt = new Date().toISOString()
+
+    // Update in KV
+    const updateResponse = await fetch(keyUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${cloudflareApiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(keyData)
+    })
+
+    if (!updateResponse.ok) {
       return NextResponse.json({ error: 'Failed to revoke API key' }, { status: 500 })
     }
-
-    // TODO: Also revoke in Cloudflare KV by updating the key's metadata
-    // This would require fetching the actual key from Supabase first
 
     return NextResponse.json({ success: true })
 
