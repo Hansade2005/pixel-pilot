@@ -129,6 +129,10 @@ const sectionGroups: SectionGroup[] = [
     items: ["Slash Commands System", "Conversation Branching", "AI Memory System", "Multi-Chat Session Support", "Browser Testing", "Codebase Search & Replace", "Project Plan", "Project Context", "BYOK (Bring Your Own Key)"]
   },
   {
+    label: "API Products",
+    items: ["Search API"]
+  },
+  {
     label: "Support",
     items: ["AI Support System"]
   }
@@ -156,6 +160,7 @@ const sectionIcons: Record<string, any> = {
   'Project Context': FolderOpen,
   'BYOK (Bring Your Own Key)': Key,
   'Developer Power Tools': Wrench,
+  'Search API': Globe,
 }
 
 // Extract headings from markdown content for TOC
