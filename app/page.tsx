@@ -76,6 +76,7 @@ export default function LandingPage() {
   const templatesPerPage = 8
 
   const badgeItems = [
+    { icon: <Rocket className="w-4 h-4 text-orange-400" />, text: "NEW: Search API - AI search for your apps!", link: "/api" },
     { icon: <Gamepad2 className="w-4 h-4 text-emerald-400" />, text: "PiPilot Game Kit Now Available! 🎮" },
     { icon: <Wand2 className="w-4 h-4 text-orange-400" />, text: "Visual Editor Now Live! 🎨" },
     { icon: <Database className="w-4 h-4 text-orange-400" />, text: "Introducing PiPilot DB 🎉" },
@@ -486,33 +487,27 @@ export default function LandingPage() {
         <div className="text-center mb-16">
            {/* Dynamic Badge */}
         <div className="mb-6 animate-fade-in">
-          {currentBadgeIndex === 1 ? (
-            <Link href="/features/visual-editor">
-              <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300 cursor-pointer">
+          {(() => {
+            const currentBadge = badgeItems[currentBadgeIndex]
+            const badgeLink = currentBadgeIndex === 1 ? "/features/visual-editor" : (currentBadge as any).link
+            const badgeContent = (
+              <Badge className={`bg-transparent backdrop-blur-[32px] text-white border px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden transition-all duration-300 ${
+                badgeLink ? 'hover:bg-white/10 cursor-pointer border-orange-500/40 hover:border-orange-400/60' : 'border-white/20 hover:bg-white/10'
+              } ${currentBadgeIndex === 0 ? 'border-orange-500/50 shadow-orange-500/10' : ''}`}>
                 <div className="flex items-center gap-2">
-                  {badgeItems[currentBadgeIndex].icon}
+                  {currentBadge.icon}
                   <span
                     className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
                     key={currentBadgeIndex}
                   >
-                    {badgeItems[currentBadgeIndex].text}
+                    {currentBadge.text}
                   </span>
+                  {badgeLink && <ChevronRight className="w-3.5 h-3.5 text-orange-400" />}
                 </div>
               </Badge>
-            </Link>
-          ) : (
-            <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
-              <div className="flex items-center gap-2">
-                {badgeItems[currentBadgeIndex].icon}
-                <span
-                  className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
-                  key={currentBadgeIndex}
-                >
-                  {badgeItems[currentBadgeIndex].text}
-                </span>
-              </div>
-            </Badge>
-          )}
+            )
+            return badgeLink ? <Link href={badgeLink}>{badgeContent}</Link> : badgeContent
+          })()}
         </div>
           <h1 className="mb-2 flex items-center justify-center gap-1 text-xl font-medium leading-none text-white sm:text-2xl md:mb-2.5 md:gap-0 md:text-5xl">
             <span className="pt-0.5 tracking-tight md:pt-0">Build something</span>
@@ -539,6 +534,20 @@ export default function LandingPage() {
             <img src="/e2b-badge.svg" alt="Sponsored by E2B for Startups" className="h-8 md:h-10 w-auto rounded" />
           </a>
         </div>
+
+        {/* Search API Promo */}
+        <Link href="/api" className="mt-8 group">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 backdrop-blur-sm hover:border-orange-500/40 hover:bg-orange-500/10 transition-all duration-300">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+              <Rocket className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">Search API</p>
+              <p className="text-xs text-gray-400">Add AI-powered search to your apps. Free 10k requests/mo</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-orange-400 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </Link>
       </main>
 
       {/* Projects Section - Right after hero so users can quickly access their work */}
