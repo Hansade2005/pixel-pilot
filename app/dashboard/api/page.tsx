@@ -294,7 +294,7 @@ export default function ApiDashboardPage() {
       <Navigation />
 
       {/* Header */}
-      <div className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm">
+      <div className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm pt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -385,9 +385,9 @@ export default function ApiDashboardPage() {
               <span className="text-2xl font-bold text-white">{quotaUsed.toLocaleString()}</span>
               <span className="text-sm text-gray-500">/ {quotaLimit.toLocaleString()}</span>
             </div>
-            <div className="w-full bg-gray-800 rounded-full h-1.5 mt-3 mb-1">
+            <div className="w-full bg-gray-700 rounded-full h-2 mt-3 mb-1">
               <div
-                className={`h-1.5 rounded-full transition-all duration-500 ${
+                className={`h-2 rounded-full transition-all duration-500 ${
                   quotaPercentage > 90 ? 'bg-red-500' :
                   quotaPercentage > 70 ? 'bg-yellow-500' :
                   'bg-orange-500'
@@ -434,9 +434,9 @@ export default function ApiDashboardPage() {
             </div>
             <p className="text-xs text-gray-500 mt-1">3 endpoints available</p>
             <div className="flex gap-1.5 mt-2">
-              <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0">/search</Badge>
-              <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0">/extract</Badge>
-              <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0">/smart-search</Badge>
+              <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0">/search</Badge>
+              <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0">/extract</Badge>
+              <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0">/smart-search</Badge>
             </div>
           </Card>
         </div>
@@ -685,7 +685,7 @@ export default function ApiDashboardPage() {
               <div className="p-5 space-y-3">
                 <div className="rounded-lg border border-gray-800/60 p-3 hover:border-orange-500/20 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge className="bg-green-500/15 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0 font-mono">POST</Badge>
+                    <Badge className="bg-orange-500/15 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0 font-mono">POST</Badge>
                     <code className="text-xs text-white font-mono">/search</code>
                   </div>
                   <p className="text-[11px] text-gray-500">Web search with AI reranking</p>
@@ -693,7 +693,7 @@ export default function ApiDashboardPage() {
 
                 <div className="rounded-lg border border-gray-800/60 p-3 hover:border-orange-500/20 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge className="bg-green-500/15 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0 font-mono">POST</Badge>
+                    <Badge className="bg-orange-500/15 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0 font-mono">POST</Badge>
                     <code className="text-xs text-white font-mono">/extract</code>
                   </div>
                   <p className="text-[11px] text-gray-500">Extract content from URLs</p>
@@ -701,7 +701,7 @@ export default function ApiDashboardPage() {
 
                 <div className="rounded-lg border border-gray-800/60 p-3 hover:border-orange-500/20 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/20 text-[10px] px-1.5 py-0 font-mono">POST</Badge>
+                    <Badge className="bg-orange-500/15 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0 font-mono">POST</Badge>
                     <code className="text-xs text-white font-mono">/smart-search</code>
                   </div>
                   <p className="text-[11px] text-gray-500">AI agent-powered deep research</p>
@@ -709,7 +709,7 @@ export default function ApiDashboardPage() {
 
                 <div className="rounded-lg border border-gray-800/60 p-3 hover:border-orange-500/20 transition-colors">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge className="bg-gray-500/15 text-gray-400 border-gray-500/20 text-[10px] px-1.5 py-0 font-mono">GET</Badge>
+                    <Badge className="bg-orange-500/15 text-orange-300 border-orange-500/20 text-[10px] px-1.5 py-0 font-mono">GET</Badge>
                     <code className="text-xs text-white font-mono">/health</code>
                   </div>
                   <p className="text-[11px] text-gray-500">API status and quota info</p>
