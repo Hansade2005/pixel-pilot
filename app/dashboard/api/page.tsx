@@ -36,6 +36,11 @@ import {
   ExternalLink,
   BookOpen,
   RefreshCw,
+  Play,
+  Search,
+  FileText,
+  Brain,
+  ChevronDown,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -129,6 +134,20 @@ export default function ApiDashboardPage() {
 
   // Copied state
   const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  // Playground state
+  type PlaygroundEndpoint = "search" | "extract" | "smart-search"
+  const [pgEndpoint, setPgEndpoint] = useState<PlaygroundEndpoint>("search")
+  const [pgQuery, setPgQuery] = useState("")
+  const [pgUrl, setPgUrl] = useState("")
+  const [pgMaxResults, setPgMaxResults] = useState("5")
+  const [pgRerank, setPgRerank] = useState(true)
+  const [pgDepth, setPgDepth] = useState<"quick" | "normal" | "deep">("normal")
+  const [pgRunning, setPgRunning] = useState(false)
+  const [pgResult, setPgResult] = useState<any>(null)
+  const [pgError, setPgError] = useState<string | null>(null)
+  const [pgLatency, setPgLatency] = useState<number | null>(null)
+  const [pgSelectedKey, setPgSelectedKey] = useState<string>("")
 
   useEffect(() => {
     checkUser()
@@ -272,6 +291,65 @@ export default function ApiDashboardPage() {
     } catch (err) {
       console.error('Error revoking key:', err)
       alert('Failed to revoke API key')
+    }
+  }
+
+  const runPlayground = async () => {
+    const keyToUse = pgSelectedKey || apiKeys[0]?.key
+    if (!keyToUse) {
+      setPgError("No API key available. Generate one first.")
+      return
+    }
+    if (pgEndpoint === "extract" && !pgUrl.trim()) {
+      setPgError("Please enter a URL to extract.")
+      return
+    }
+    if (pgEndpoint !== "extract" && !pgQuery.trim()) {
+      setPgError("Please enter a search query.")
+      return
+    }
+
+    setPgRunning(true)
+    setPgResult(null)
+    setPgError(null)
+    setPgLatency(null)
+
+    const start = performance.now()
+
+    try {
+      let body: any = {}
+      if (pgEndpoint === "search") {
+        body = { query: pgQuery.trim(), maxResults: parseInt(pgMaxResults) || 5, rerank: pgRerank }
+      } else if (pgEndpoint === "extract") {
+        body = { url: pgUrl.trim() }
+      } else {
+        body = { query: pgQuery.trim(), depth: pgDepth }
+      }
+
+      const res = await fetch(`${BASE_URL}/${pgEndpoint}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${keyToUse}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+
+      const elapsed = Math.round(performance.now() - start)
+      setPgLatency(elapsed)
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setPgError(data.error || `HTTP ${res.status}`)
+      } else {
+        setPgResult(data)
+      }
+    } catch (err: any) {
+      setPgLatency(Math.round(performance.now() - start))
+      setPgError(err.message || "Request failed")
+    } finally {
+      setPgRunning(false)
     }
   }
 
@@ -627,6 +705,251 @@ export default function ApiDashboardPage() {
                     </Link>
                   </Button>
                 </div>
+              </div>
+            </Card>
+
+            {/* API Playground */}
+            <Card className="bg-gray-900/80 border-gray-800/60 overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/60">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-5 bg-orange-500 rounded-sm" />
+                  <h2 className="text-lg font-semibold text-white">Playground</h2>
+                  <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] px-1.5 py-0">Live</Badge>
+                </div>
+                {pgLatency !== null && (
+                  <span className="text-xs text-gray-500">{pgLatency}ms</span>
+                )}
+              </div>
+
+              <div className="p-6">
+                {/* Endpoint Tabs */}
+                <div className="flex items-center gap-1 mb-5 p-1 rounded-xl bg-gray-800/50">
+                  {([
+                    { key: "search" as PlaygroundEndpoint, label: "Search", icon: <Search className="w-3.5 h-3.5" /> },
+                    { key: "extract" as PlaygroundEndpoint, label: "Extract", icon: <FileText className="w-3.5 h-3.5" /> },
+                    { key: "smart-search" as PlaygroundEndpoint, label: "Smart Search", icon: <Brain className="w-3.5 h-3.5" /> },
+                  ]).map((ep) => (
+                    <button
+                      key={ep.key}
+                      onClick={() => { setPgEndpoint(ep.key); setPgResult(null); setPgError(null); setPgLatency(null) }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                        pgEndpoint === ep.key
+                          ? "bg-orange-600/15 text-orange-400"
+                          : "text-gray-500 hover:text-gray-300"
+                      }`}
+                    >
+                      {ep.icon}
+                      {ep.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* API Key Selector */}
+                {apiKeys.length > 1 && (
+                  <div className="mb-4">
+                    <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 block">API Key</label>
+                    <div className="relative">
+                      <select
+                        value={pgSelectedKey}
+                        onChange={(e) => setPgSelectedKey(e.target.value)}
+                        className="w-full appearance-none bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 pr-8"
+                      >
+                        {apiKeys.map((k) => (
+                          <option key={k.id} value={k.key}>{k.name} ({k.key_prefix}...)</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Input Fields */}
+                <div className="space-y-3 mb-4">
+                  {pgEndpoint === "extract" ? (
+                    <div>
+                      <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 block">URL</label>
+                      <Input
+                        placeholder="https://example.com/article"
+                        value={pgUrl}
+                        onChange={(e) => setPgUrl(e.target.value)}
+                        className="bg-gray-950 border-gray-800 text-white text-sm focus:ring-orange-500/50 focus:border-orange-500/50"
+                        onKeyDown={(e) => e.key === 'Enter' && !pgRunning && runPlayground()}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 block">Query</label>
+                      <Input
+                        placeholder={pgEndpoint === "smart-search" ? "Who is the creator of PiPilot?" : "latest AI news 2024"}
+                        value={pgQuery}
+                        onChange={(e) => setPgQuery(e.target.value)}
+                        className="bg-gray-950 border-gray-800 text-white text-sm focus:ring-orange-500/50 focus:border-orange-500/50"
+                        onKeyDown={(e) => e.key === 'Enter' && !pgRunning && runPlayground()}
+                      />
+                    </div>
+                  )}
+
+                  {/* Endpoint-specific options */}
+                  {pgEndpoint === "search" && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 block">Max Results</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={pgMaxResults}
+                          onChange={(e) => setPgMaxResults(e.target.value)}
+                          className="bg-gray-950 border-gray-800 text-white text-sm focus:ring-orange-500/50 focus:border-orange-500/50"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 block">AI Rerank</label>
+                        <button
+                          onClick={() => setPgRerank(!pgRerank)}
+                          className={`w-full h-9 rounded-lg text-xs font-medium transition-all ${
+                            pgRerank
+                              ? "bg-orange-600 text-white"
+                              : "bg-gray-800 text-gray-400 border border-gray-700"
+                          }`}
+                        >
+                          {pgRerank ? "Enabled" : "Disabled"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {pgEndpoint === "smart-search" && (
+                    <div>
+                      <label className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 block">Depth</label>
+                      <div className="flex items-center gap-1 p-1 rounded-lg bg-gray-800/50">
+                        {(["quick", "normal", "deep"] as const).map((d) => (
+                          <button
+                            key={d}
+                            onClick={() => setPgDepth(d)}
+                            className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                              pgDepth === d
+                                ? "bg-orange-600/15 text-orange-400"
+                                : "text-gray-500 hover:text-gray-300"
+                            }`}
+                          >
+                            {d.charAt(0).toUpperCase() + d.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Run Button */}
+                <Button
+                  onClick={runPlayground}
+                  disabled={pgRunning || apiKeys.length === 0}
+                  className="w-full bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
+                >
+                  {pgRunning ? (
+                    <>
+                      <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                      {pgEndpoint === "smart-search" ? "Researching..." : "Running..."}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 w-4 h-4" />
+                      Send Request
+                    </>
+                  )}
+                </Button>
+
+                {apiKeys.length === 0 && (
+                  <p className="text-xs text-gray-500 text-center mt-2">Generate an API key first to use the playground.</p>
+                )}
+
+                {/* Error */}
+                {pgError && (
+                  <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-red-300">{pgError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Results */}
+                {pgResult && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] text-gray-500 uppercase tracking-wider">Response</span>
+                      <button
+                        onClick={() => copyToClipboard(JSON.stringify(pgResult, null, 2), 'pg-result')}
+                        className="text-gray-500 hover:text-orange-400 transition-colors p-1"
+                      >
+                        {copiedId === 'pg-result' ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    {/* Friendly result display */}
+                    {pgEndpoint === "search" && pgResult.results ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-400 mb-3">{pgResult.results.length} results {pgResult.reranked ? '(AI reranked)' : ''}</p>
+                        {pgResult.results.map((r: any, i: number) => (
+                          <div key={i} className="rounded-lg border border-gray-800/60 bg-gray-950 p-3">
+                            <div className="flex items-start gap-2">
+                              <span className="text-[10px] text-orange-400 font-bold bg-orange-500/10 rounded px-1.5 py-0.5 mt-0.5">{i + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-white hover:text-orange-400 transition-colors line-clamp-1">
+                                  {r.title}
+                                </a>
+                                <p className="text-[11px] text-gray-500 truncate mt-0.5">{r.url}</p>
+                                {r.snippet && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{r.snippet}</p>}
+                                {r.score !== undefined && (
+                                  <span className="text-[10px] text-orange-400/70 mt-1 inline-block">Score: {r.score.toFixed(2)}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : pgEndpoint === "extract" && pgResult.content ? (
+                      <div className="rounded-lg border border-gray-800/60 bg-gray-950 p-4">
+                        <h4 className="text-sm font-medium text-white mb-1">{pgResult.title || 'Extracted Content'}</h4>
+                        {pgResult.url && <p className="text-[11px] text-gray-500 mb-3">{pgResult.url}</p>}
+                        <div className="text-xs text-gray-300 leading-relaxed max-h-80 overflow-y-auto whitespace-pre-wrap">
+                          {pgResult.content.slice(0, 3000)}{pgResult.content.length > 3000 ? '...' : ''}
+                        </div>
+                        {pgResult.content.length > 3000 && (
+                          <p className="text-[10px] text-gray-500 mt-2">Showing first 3,000 chars of {pgResult.content.length.toLocaleString()}</p>
+                        )}
+                      </div>
+                    ) : pgEndpoint === "smart-search" && pgResult.answer ? (
+                      <div className="rounded-lg border border-gray-800/60 bg-gray-950 p-4">
+                        <div className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap mb-3">{pgResult.answer}</div>
+                        {pgResult.sources && pgResult.sources.length > 0 && (
+                          <div className="border-t border-gray-800/60 pt-3 mt-3">
+                            <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-2">Sources ({pgResult.sources.length})</p>
+                            <div className="space-y-1">
+                              {pgResult.sources.map((s: any, i: number) => (
+                                <a key={i} href={s.url || s} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 transition-colors truncate">
+                                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                  {s.title || s.url || s}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {pgResult.iterations && (
+                          <p className="text-[10px] text-gray-500 mt-2">{pgResult.iterations} research steps</p>
+                        )}
+                      </div>
+                    ) : (
+                      /* Raw JSON fallback */
+                      <div className="rounded-xl border border-gray-800/60 bg-gray-950 p-4 overflow-x-auto max-h-96 overflow-y-auto">
+                        <pre className="text-xs text-gray-300 font-mono whitespace-pre">
+                          {JSON.stringify(pgResult, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
           </div>
