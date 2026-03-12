@@ -57,12 +57,16 @@ export async function POST(request: NextRequest) {
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/api?canceled=true`,
       metadata: {
         user_id: userId,
+        user_email: userEmail,
         tier,
+        product: 'search-api',
       },
       subscription_data: {
         metadata: {
           user_id: userId,
+          user_email: userEmail,
           tier,
+          product: 'search-api',
         },
       },
     })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2, AlertCircle } from "lucide-react"
 import { STRIPE_API_PLANS } from "@/config/stripe-api-plans"
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -75,43 +75,58 @@ export default function CheckoutPage() {
   }
 
   return (
+    <Card className="bg-gray-800 border-gray-700 p-8 max-w-md w-full text-center">
+      {loading ? (
+        <>
+          <Loader2 className="w-12 h-12 text-orange-400 animate-spin mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">
+            Redirecting to Checkout...
+          </h2>
+          <p className="text-gray-400">
+            Please wait while we set up your subscription.
+          </p>
+        </>
+      ) : error ? (
+        <>
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">
+            Checkout Error
+          </h2>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <div className="space-y-3">
+            <Button
+              className="w-full bg-orange-500 hover:bg-orange-600"
+              onClick={() => router.push('/api')}
+            >
+              Back to Pricing
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-gray-600 text-white hover:bg-gray-700"
+              onClick={() => initiateCheckout()}
+            >
+              Try Again
+            </Button>
+          </div>
+        </>
+      ) : null}
+    </Card>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <Card className="bg-gray-800 border-gray-700 p-8 max-w-md w-full text-center">
-        {loading ? (
-          <>
+      <Suspense
+        fallback={
+          <Card className="bg-gray-800 border-gray-700 p-8 max-w-md w-full text-center">
             <Loader2 className="w-12 h-12 text-orange-400 animate-spin mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Redirecting to Checkout...
-            </h2>
-            <p className="text-gray-400">
-              Please wait while we set up your subscription.
-            </p>
-          </>
-        ) : error ? (
-          <>
-            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Checkout Error
-            </h2>
-            <p className="text-gray-400 mb-6">{error}</p>
-            <div className="space-y-3">
-              <Button
-                className="w-full bg-orange-500 hover:bg-orange-600"
-                onClick={() => router.push('/api')}
-              >
-                Back to Pricing
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full border-gray-600 text-white hover:bg-gray-700"
-                onClick={() => initiateCheckout()}
-              >
-                Try Again
-              </Button>
-            </div>
-          </>
-        ) : null}
-      </Card>
+            <h2 className="text-2xl font-bold text-white mb-2">Loading...</h2>
+          </Card>
+        }
+      >
+        <CheckoutContent />
+      </Suspense>
     </div>
   )
 }
