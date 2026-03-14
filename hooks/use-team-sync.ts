@@ -30,6 +30,48 @@ export function useTeamSync({
   const [syncError, setSyncError] = useState<string | null>(null)
   const changedRef = useRef<Set<string>>(new Set())
   const deletedRef = useRef<Set<string>>(new Set())
+  const needsScanRef = useRef(false)
+
+  // Scan all local files vs remote to find changes (used when path-level tracking isn't available)
+  const scanForChanges = useCallback(async () => {
+    if (!workspaceId || !teamWorkspaceId) return
+
+    try {
+      const localFiles = await storageManager.getFiles(workspaceId)
+      const supabase = (await import('@/lib/supabase/client')).createClient()
+
+      const { data: workspace } = await supabase
+        .from('team_workspaces')
+        .select('files')
+        .eq('id', teamWorkspaceId)
+        .single()
+
+      const remoteFiles: any[] = workspace?.files || []
+      const remoteByPath = new Map(remoteFiles.map((f: any) => [f.path, f]))
+
+      for (const localFile of localFiles) {
+        if (localFile.isDirectory) continue
+        const remote = remoteByPath.get(localFile.path)
+        if (!remote) {
+          changedRef.current.add(localFile.path)
+        } else if (remote.content !== localFile.content) {
+          changedRef.current.add(localFile.path)
+        }
+        remoteByPath.delete(localFile.path)
+      }
+
+      for (const [path, remote] of remoteByPath) {
+        if (remote.isDirectory) continue
+        deletedRef.current.add(path)
+      }
+
+      setChangedFiles(new Set(changedRef.current))
+      setDeletedFiles(new Set(deletedRef.current))
+      needsScanRef.current = false
+    } catch (err) {
+      console.error('[useTeamSync] Scan error:', err)
+    }
+  }, [workspaceId, teamWorkspaceId])
 
   // Listen to storage events for file changes
   useEffect(() => {
@@ -65,9 +107,16 @@ export function useTeamSync({
     // Also listen for the files-changed custom event (from visual editor, AI chat, etc.)
     const handleCustomEvent = (e: Event) => {
       const detail = (e as CustomEvent).detail
-      if (detail?.projectId === workspaceId && detail?.path) {
-        changedRef.current.add(detail.path)
-        setChangedFiles(new Set(changedRef.current))
+      if (detail?.projectId === workspaceId) {
+        if (detail?.path) {
+          // Path-level tracking: add this specific file
+          changedRef.current.add(detail.path)
+          setChangedFiles(new Set(changedRef.current))
+        } else {
+          // No path provided: mark for full scan
+          needsScanRef.current = true
+          scanForChanges()
+        }
         setSyncError(null)
       }
     }
@@ -78,14 +127,14 @@ export function useTeamSync({
       unsubscribe()
       window.removeEventListener('files-changed', handleCustomEvent)
     }
-  }, [isTeamWorkspace, workspaceId])
+  }, [isTeamWorkspace, workspaceId, scanForChanges])
 
   // Total pending changes count
   const pendingCount = changedFiles.size + deletedFiles.size
 
   // Sync changed files to team workspace
   const syncToTeam = useCallback(async (): Promise<SyncResult> => {
-    if (!teamWorkspaceId || !workspaceId || pendingCount === 0) {
+    if (!teamWorkspaceId || !workspaceId) {
       return { success: true, synced: 0, deleted: 0 }
     }
 
@@ -93,6 +142,14 @@ export function useTeamSync({
     setSyncError(null)
 
     try {
+      // If no tracked changes, do a full scan first
+      if (pendingCount === 0 || needsScanRef.current) {
+        await scanForChanges()
+        if (changedRef.current.size === 0 && deletedRef.current.size === 0) {
+          setIsSyncing(false)
+          return { success: true, synced: 0, deleted: 0 }
+        }
+      }
       // Get the actual file contents from IndexedDB for changed files
       const changedPaths = Array.from(changedRef.current)
       const deletedPaths = Array.from(deletedRef.current)
@@ -155,7 +212,7 @@ export function useTeamSync({
     } finally {
       setIsSyncing(false)
     }
-  }, [teamWorkspaceId, workspaceId, pendingCount])
+  }, [teamWorkspaceId, workspaceId, pendingCount, scanForChanges])
 
   // Clear all pending changes (e.g., if user discards)
   const clearPending = useCallback(() => {

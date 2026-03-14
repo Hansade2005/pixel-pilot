@@ -51,12 +51,22 @@ export function parseSearchReplaceBlock(blockText: string) {
 }
 
 /**
+ * Dispatch a files-changed event that both refreshes the file explorer
+ * and notifies team sync tracking of the specific changed file path.
+ */
+function dispatchFileChanged(projectId: string, path: string) {
+  window.dispatchEvent(new CustomEvent('files-changed', {
+    detail: { projectId, path, forceRefresh: true }
+  }));
+}
+
+/**
  * Handle client-side file operations following AI SDK pattern
  * @param toolCall The tool call from AI SDK (contains toolName, toolCallId, args)
  * @param projectId The current project ID
  * @param addToolResult Function to add the tool result back to the chat
  * @returns Promise<void>
- * 
+ *
  * CRITICAL: This function MUST NOT await addToolResult() - it causes deadlocks in AI SDK streaming.
  * The function can be async internally, but addToolResult is called synchronously without await.
  */
@@ -155,10 +165,8 @@ export async function handleClientFileOperation(
           });
         }
 
-        // Trigger file refresh event
-        window.dispatchEvent(new CustomEvent('files-changed', {
-          detail: { projectId, forceRefresh: true }
-        }));
+        // Trigger file refresh + team sync tracking
+        dispatchFileChanged(projectId, path);
         break;
       }
 
@@ -456,10 +464,8 @@ export async function handleClientFileOperation(
               }
             });
 
-            // Trigger file refresh event
-            window.dispatchEvent(new CustomEvent('files-changed', {
-              detail: { projectId, forceRefresh: true }
-            }));
+            // Trigger file refresh + team sync tracking
+            dispatchFileChanged(projectId, filePath);
           } else {
             addToolResult({
               tool: 'edit_file',
@@ -712,10 +718,8 @@ export async function handleClientFileOperation(
               }
             });
 
-            // Trigger file refresh event
-            window.dispatchEvent(new CustomEvent('files-changed', {
-              detail: { projectId, forceRefresh: true }
-            }));
+            // Trigger file refresh + team sync tracking
+            dispatchFileChanged(projectId, filePath);
           } else {
             addToolResult({
               tool: 'client_replace_string_in_file',
@@ -781,10 +785,8 @@ export async function handleClientFileOperation(
             }
           });
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          // Trigger file refresh + team sync tracking
+          dispatchFileChanged(projectId, path);
         } else {
           addToolResult({
             tool: 'delete_file',
@@ -860,10 +862,10 @@ export async function handleClientFileOperation(
             }
           });
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          // Trigger file refresh + team sync tracking for each deleted file
+          for (const file of filesToDelete) {
+            dispatchFileChanged(projectId, file.path);
+          }
         } catch (error) {
           console.error(`[ClientFileTool] delete_folder failed:`, error);
           addToolResult({
@@ -961,10 +963,8 @@ export async function handleClientFileOperation(
             }
           });
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          // Trigger file refresh + team sync tracking
+          dispatchFileChanged(projectId, 'package.json');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           addToolResult({
@@ -1053,9 +1053,7 @@ export async function handleClientFileOperation(
             detail: { database: result.database, projectId, name }
           }));
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, 'database');
 
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1133,9 +1131,7 @@ ${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
             }
           });
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, '.pipilot/plan.md');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`[ClientFileTool] generate_plan error:`, error);
@@ -1198,9 +1194,7 @@ ${steps.map((s: any, i: number) => `### Step ${i + 1}: ${s.title}
             }
           });
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, '.pipilot/plan.md');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           addToolResult({
@@ -1276,9 +1270,7 @@ ${roadmap.map((r: string) => `- [ ] ${r}`).join('\n')}
             }
           });
 
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
+          dispatchFileChanged(projectId, '.pipilot/project.md');
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           addToolResult({
