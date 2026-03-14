@@ -1838,6 +1838,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     ) : activeTab === "monitor" ? (
                       /* AppCare Monitor Tab */
                       <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center px-3 py-1.5 border-b border-gray-800/60 bg-gray-950">
+                          <button
+                            onClick={() => setActiveTab("code")}
+                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                          >
+                            <Code className="size-3.5" />
+                            <span>Back to Code</span>
+                          </button>
+                        </div>
                         <div className="flex-1 min-h-0">
                           <MonitorTab
                             projectId={selectedProject?.id}
@@ -1850,6 +1859,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     ) : activeTab === "team" ? (
                       /* Teams Tab */
                       <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center px-3 py-1.5 border-b border-gray-800/60 bg-gray-950">
+                          <button
+                            onClick={() => setActiveTab("code")}
+                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+                          >
+                            <Code className="size-3.5" />
+                            <span>Back to Code</span>
+                          </button>
+                        </div>
                         <div className="flex-1 min-h-0 overflow-y-auto">
                           <TeamPanel
                             userId={user.id}

@@ -142,48 +142,74 @@ export function LaunchWizard({ open, onOpenChange, onComplete }: LaunchWizardPro
     setIsGenerating(true)
 
     try {
-      // Build a structured prompt from the wizard answers
       const appTypeLabel = APP_TYPES.find(t => t.id === answers.appType)?.label || answers.appType
       const audienceLabel = AUDIENCE_OPTIONS.find(a => a.id === answers.audience)?.desc || answers.audience
       const featureLabels = answers.features
         .map(f => FEATURE_OPTIONS.find(o => o.id === f)?.label)
-        .filter(Boolean)
+        .filter(Boolean) as string[]
       const platformOption = PLATFORM_OPTIONS.find(p => p.id === answers.platform)
       const platformLabel = platformOption?.label || answers.platform
       const framework = platformOption?.framework || "vite-react"
 
-      // Try to use AI to generate a polished prompt
       let generatedPrompt = ""
 
       try {
-        const response = await fetch("/api/prompt-enhancement", {
+        // Use a0 LLM API for AI-powered prompt generation (free, no key needed)
+        const response = await fetch("https://api.a0.dev/ai/llm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: `Build a ${appTypeLabel.toLowerCase()} app. Target audience: ${audienceLabel}. Platform: ${platformLabel}. Key features needed: ${featureLabels.join(", ")}. User's description: "${answers.description}". Generate a detailed, actionable development prompt for an AI code generator. Include specific UI components, pages, and functionality. Be comprehensive but concise.`
+            messages: [
+              {
+                role: "system",
+                content: `You are PiPilot's Launch Wizard AI. Your job is to take a user's app idea and produce a comprehensive, actionable development prompt for an AI code generator. Output ONLY the prompt text, no preamble or explanation.
+
+The prompt you generate should:
+- Start with a clear one-line summary of what to build
+- List all pages/screens needed with their key UI components
+- Specify navigation structure and routing
+- Detail each feature's behavior and data model
+- Include design direction (modern, dark theme, responsive)
+- Mention loading states, error handling, and edge cases
+- Be specific about interactions (click, hover, submit flows)
+- Reference the target framework and platform
+
+Keep it concise but thorough - aim for a prompt that leaves no ambiguity for the AI builder.`
+              },
+              {
+                role: "user",
+                content: `Generate a detailed development prompt from these wizard answers:
+
+App Type: ${appTypeLabel}
+Target Audience: ${audienceLabel}
+Platform: ${platformLabel} (${framework})
+Key Features: ${featureLabels.join(", ")}
+
+User's Description:
+"${answers.description}"`
+              }
+            ]
           })
         })
 
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.enhancedPrompt) {
-            generatedPrompt = data.enhancedPrompt
+          if (data.completion) {
+            generatedPrompt = data.completion.trim()
           }
         }
       } catch {
-        // AI enhancement failed, fall back to manual prompt construction
+        // a0 API failed, fall back to manual prompt construction
       }
 
-      // Fallback: construct prompt manually if AI failed
       if (!generatedPrompt) {
-        generatedPrompt = buildFallbackPrompt(appTypeLabel, audienceLabel, featureLabels as string[], platformLabel, answers.description)
+        generatedPrompt = buildFallbackPrompt(appTypeLabel, audienceLabel, featureLabels, platformLabel, answers.description)
       }
 
       onComplete(generatedPrompt, framework)
       handleClose()
     } catch (error) {
       console.error("Launch Wizard error:", error)
-      // Still produce a usable prompt on error
       const appTypeLabel = APP_TYPES.find(t => t.id === answers.appType)?.label || answers.appType
       const featureLabels = answers.features
         .map(f => FEATURE_OPTIONS.find(o => o.id === f)?.label)
@@ -220,7 +246,7 @@ export function LaunchWizard({ open, onOpenChange, onComplete }: LaunchWizardPro
             Plan Your App
           </DialogTitle>
           <DialogDescription className="text-sm text-gray-400">
-            Answer a few questions and we'll generate the perfect prompt for you.
+            Answer a few questions and AI will craft the perfect prompt for you.
           </DialogDescription>
           {/* Progress bar */}
           <div className="flex gap-1.5 mt-3">
@@ -462,12 +488,12 @@ export function LaunchWizard({ open, onOpenChange, onComplete }: LaunchWizardPro
                 {isGenerating ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                    Generating...
+                    AI is thinking...
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-1.5" />
-                    Generate Prompt
+                    Generate with AI
                   </>
                 )}
               </Button>
