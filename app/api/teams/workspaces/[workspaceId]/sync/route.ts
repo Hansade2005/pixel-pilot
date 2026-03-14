@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/server'
 // Body: { files: Array<{ path, name, content, fileType, size, isDirectory }>, deletedPaths?: string[] }
 export async function POST(
   request: NextRequest,
-  { params }: { params: { workspaceId: string } }
+  { params }: { params: Promise<{ workspaceId: string }> }
 ) {
+  const { workspaceId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -26,7 +27,7 @@ export async function POST(
     const { data: workspace, error: fetchError } = await supabase
       .from('team_workspaces')
       .select('files, organization_id')
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
       .single()
 
     if (fetchError || !workspace) {
@@ -50,7 +51,7 @@ export async function POST(
     const { data: locks } = await supabase
       .from('team_file_locks')
       .select('file_path, locked_by')
-      .eq('workspace_id', params.workspaceId)
+      .eq('workspace_id', workspaceId)
       .in('file_path', filePaths)
       .gt('expires_at', new Date().toISOString())
 
@@ -95,7 +96,7 @@ export async function POST(
           type: file.fileType || 'text',
           size: file.size || 0,
           isDirectory: file.isDirectory || false,
-          workspaceId: params.workspaceId,
+          workspaceId: workspaceId,
           lastEditedBy: user.id,
           lastEditedAt: now,
           createdAt: now,
@@ -121,7 +122,7 @@ export async function POST(
         last_edited_by: user.id,
         last_edited_at: now
       })
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to sync files' }, { status: 500 })
@@ -130,7 +131,7 @@ export async function POST(
     // Log activity
     await supabase.from('team_activity').insert({
       organization_id: workspace.organization_id,
-      workspace_id: params.workspaceId,
+      workspace_id: workspaceId,
       action: 'files_synced',
       actor_id: user.id,
       metadata: {

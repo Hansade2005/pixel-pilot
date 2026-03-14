@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/server'
 // Update file content
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { workspaceId: string; fileId: string } }
+  { params }: { params: Promise<{ workspaceId: string; fileId: string }> }
 ) {
+  const { workspaceId, fileId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -21,7 +22,7 @@ export async function PATCH(
     const { data: workspace, error: fetchError } = await supabase
       .from('team_workspaces')
       .select('files, organization_id')
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
       .single()
 
     if (fetchError || !workspace) {
@@ -43,7 +44,7 @@ export async function PATCH(
 
     // Find and update file in array
     const files = workspace.files || []
-    const fileIndex = files.findIndex((f: any) => f.id === params.fileId)
+    const fileIndex = files.findIndex((f: any) => f.id === fileId)
 
     if (fileIndex === -1) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
@@ -74,7 +75,7 @@ export async function PATCH(
         last_edited_by: user.id,
         last_edited_at: new Date().toISOString()
       })
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
 
     if (updateError) {
       console.error('Error updating file:', updateError)
@@ -84,11 +85,11 @@ export async function PATCH(
     // Log activity
     await supabase.from('team_activity').insert({
       organization_id: workspace.organization_id,
-      workspace_id: params.workspaceId,
+      workspace_id: workspaceId,
       action: 'file_updated',
       actor_id: user.id,
       metadata: {
-        file_id: params.fileId,
+        file_id: fileId,
         file_path: files[fileIndex].path
       }
     })
@@ -110,8 +111,9 @@ export async function PATCH(
 // Delete file from team workspace
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { workspaceId: string; fileId: string } }
+  { params }: { params: Promise<{ workspaceId: string; fileId: string }> }
 ) {
+  const { workspaceId, fileId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -123,7 +125,7 @@ export async function DELETE(
     const { data: workspace, error: fetchError } = await supabase
       .from('team_workspaces')
       .select('files, organization_id')
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
       .single()
 
     if (fetchError || !workspace) {
@@ -145,14 +147,14 @@ export async function DELETE(
 
     // Find the file to log it before deletion
     const files = workspace.files || []
-    const fileToDelete = files.find((f: any) => f.id === params.fileId)
+    const fileToDelete = files.find((f: any) => f.id === fileId)
 
     if (!fileToDelete) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
     // Filter out the file
-    const updatedFiles = files.filter((f: any) => f.id !== params.fileId)
+    const updatedFiles = files.filter((f: any) => f.id !== fileId)
 
     // Save back
     const { error: updateError } = await supabase
@@ -162,7 +164,7 @@ export async function DELETE(
         last_edited_by: user.id,
         last_edited_at: new Date().toISOString()
       })
-      .eq('id', params.workspaceId)
+      .eq('id', workspaceId)
 
     if (updateError) {
       console.error('Error deleting file:', updateError)
@@ -172,11 +174,11 @@ export async function DELETE(
     // Log activity
     await supabase.from('team_activity').insert({
       organization_id: workspace.organization_id,
-      workspace_id: params.workspaceId,
+      workspace_id: workspaceId,
       action: 'file_deleted',
       actor_id: user.id,
       metadata: {
-        file_id: params.fileId,
+        file_id: fileId,
         file_path: fileToDelete.path,
         file_name: fileToDelete.name
       }
