@@ -71,19 +71,14 @@ export function TeamSyncButton({
 
   return (
     <Popover open={showDetails} onOpenChange={setShowDetails}>
-      <PopoverTrigger asChild>
+      <div className="flex items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              onClick={(e) => {
-                if (pendingCount <= 3 && !syncError) {
-                  e.preventDefault()
-                  handleSync()
-                }
-              }}
+              onClick={handleSync}
               disabled={isSyncing}
-              className={`h-7 gap-1.5 text-xs font-medium transition-all ${
+              className={`h-7 gap-1.5 text-xs font-medium transition-all rounded-r-none ${
                 syncError
                   ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30'
                   : 'bg-orange-600 hover:bg-orange-500 text-white shadow-sm shadow-orange-500/20'
@@ -115,7 +110,17 @@ export function TeamSyncButton({
             }
           </TooltipContent>
         </Tooltip>
-      </PopoverTrigger>
+        <PopoverTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-6 p-0 rounded-l-none bg-orange-700/50 hover:bg-orange-600/50 text-white/70 hover:text-white"
+            title="View pending changes"
+          >
+            <span className="text-[10px]">...</span>
+          </Button>
+        </PopoverTrigger>
+      </div>
       <PopoverContent
         side="bottom"
         align="end"
