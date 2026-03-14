@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import React, { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 import type { Workspace, File } from "@/lib/storage-manager"
 import { Sidebar } from "./sidebar"
 import { ModernSidebar } from "./modern-sidebar"
@@ -836,6 +837,82 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
   }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
+
+  // Handle team workspace loading from URL param (teamWorkspaceId)
+  useEffect(() => {
+    const teamWorkspaceId = searchParams.get('teamWorkspaceId')
+    if (!teamWorkspaceId || selectedProject?.teamWorkspaceId === teamWorkspaceId) return
+
+    const loadTeamWorkspace = async () => {
+      try {
+        const supabase = createClient()
+        const { data: tw, error } = await supabase
+          .from('team_workspaces')
+          .select('id, name, organization_id, files, created_at, created_by, visibility')
+          .eq('id', teamWorkspaceId)
+          .single()
+
+        if (error || !tw) {
+          toast({ title: 'Team workspace not found', variant: 'destructive' })
+          return
+        }
+
+        // Create a virtual workspace object for the team workspace
+        const teamWorkspace: Workspace = {
+          id: `team-${tw.id}`,
+          name: tw.name,
+          description: `Team workspace`,
+          slug: tw.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          userId: tw.created_by || user.id,
+          isPublic: tw.visibility === 'public',
+          isTemplate: false,
+          createdAt: tw.created_at,
+          updatedAt: tw.created_at,
+          lastActivity: tw.created_at,
+          deploymentStatus: 'not_deployed',
+          isTeamWorkspace: true,
+          teamWorkspaceId: tw.id,
+          organizationId: tw.organization_id,
+        }
+
+        // Add to client projects if not already there
+        setClientProjects(prev => {
+          if (prev.find(p => p.id === teamWorkspace.id)) return prev
+          return [...prev, teamWorkspace]
+        })
+
+        setSelectedProject(teamWorkspace)
+
+        // Load team workspace files into IndexedDB for the file explorer
+        await storageManager.init()
+
+        // Check if we already have files for this virtual workspace
+        const existingFiles = await storageManager.getFiles(teamWorkspace.id)
+        if (existingFiles.length === 0 && tw.files && Array.isArray(tw.files)) {
+          // Sync team files to local IndexedDB
+          for (const file of tw.files as any[]) {
+            await storageManager.createFile({
+              workspaceId: teamWorkspace.id,
+              name: file.name,
+              path: file.path,
+              content: file.content || '',
+              fileType: file.fileType || file.type || 'text',
+              type: file.type || 'file',
+              size: file.size || (file.content?.length || 0),
+              isDirectory: file.isDirectory || false,
+            })
+          }
+        }
+
+        // Refresh file explorer
+        setTimeout(() => setFileExplorerKey(prev => prev + 1), 200)
+      } catch (err) {
+        console.error('Error loading team workspace:', err)
+      }
+    }
+
+    loadTeamWorkspace()
+  }, [searchParams, user.id])
 
   // Update browser tab title based on selected project
   useEffect(() => {
