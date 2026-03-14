@@ -64,6 +64,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [isGenerating, setIsGenerating] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const autoSendRef = useRef(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -200,6 +201,19 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // Silently fail as this is just for convenience/persistence
         console.warn('Failed to save prompt to localStorage:', error)
       }
+    }
+  }, [prompt])
+
+  // Auto-send after Launch Wizard completes
+  useEffect(() => {
+    if (autoSendRef.current && prompt.trim()) {
+      autoSendRef.current = false
+      // Small delay so the user can briefly see the prompt loaded
+      const timer = setTimeout(() => {
+        const syntheticEvent = { preventDefault: () => {} } as React.FormEvent
+        handleSubmit(syntheticEvent)
+      }, 600)
+      return () => clearTimeout(timer)
     }
   }, [prompt])
 
@@ -1120,7 +1134,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   }
 
   const handleWizardComplete = (generatedPrompt: string, framework: string) => {
-    setPrompt(generatedPrompt)
     // Map framework to template
     const frameworkMap: Record<string, 'vite-react' | 'nextjs' | 'expo' | 'html'> = {
       'vite-react': 'vite-react',
@@ -1128,16 +1141,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       'expo': 'expo',
     }
     setSelectedTemplate(frameworkMap[framework] || 'vite-react')
-    // Focus the input so user can review and send
-    setTimeout(() => {
-      inputRef.current?.focus()
-      // Auto-resize textarea to fit content
-      if (inputRef.current) {
-        inputRef.current.style.height = 'auto'
-        inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px'
-      }
-    }, 100)
-    toast.success("Prompt generated! Review and hit send.")
+    // Set auto-send flag before updating prompt so the useEffect triggers submission
+    autoSendRef.current = true
+    setPrompt(generatedPrompt)
   }
 
   return (
