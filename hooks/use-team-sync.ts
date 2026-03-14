@@ -169,6 +169,15 @@ export function useTeamSync({
         }
       }
 
+      // If no files found in IndexedDB but we have tracked changes, skip empty sync
+      if (filesToSync.length === 0 && deletedPaths.length === 0) {
+        console.warn('[useTeamSync] No files found in IndexedDB for tracked changes:', changedPaths)
+        changedRef.current.clear()
+        setChangedFiles(new Set())
+        setIsSyncing(false)
+        return { success: true, synced: 0, deleted: 0 }
+      }
+
       // Call the bulk sync API
       const response = await fetch(`/api/teams/workspaces/${teamWorkspaceId}/sync`, {
         method: 'POST',
@@ -184,7 +193,7 @@ export function useTeamSync({
       if (!response.ok) {
         const errorMsg = data.blockedFiles
           ? `Locked by another user: ${data.blockedFiles.join(', ')}`
-          : data.error || 'Sync failed'
+          : data.details ? `${data.error}: ${data.details}` : data.error || 'Sync failed'
         setSyncError(errorMsg)
         return {
           success: false,

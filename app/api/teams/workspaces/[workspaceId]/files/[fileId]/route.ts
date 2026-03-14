@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // PATCH /api/teams/workspaces/[workspaceId]/files/[fileId]
 // Update file content
@@ -67,8 +68,10 @@ export async function PATCH(
       files[fileIndex].fileType = updates.type
     }
 
-    // Save back to database
-    const { error: updateError } = await supabase
+    // Save back to database using admin client (permissions already verified above)
+    const adminSupabase = createAdminClient()
+
+    const { error: updateError } = await adminSupabase
       .from('team_workspaces')
       .update({
         files: files,
@@ -83,7 +86,7 @@ export async function PATCH(
     }
 
     // Log activity
-    await supabase.from('team_activity').insert({
+    await adminSupabase.from('team_activity').insert({
       organization_id: workspace.organization_id,
       workspace_id: workspaceId,
       action: 'file_updated',
@@ -156,8 +159,10 @@ export async function DELETE(
     // Filter out the file
     const updatedFiles = files.filter((f: any) => f.id !== fileId)
 
-    // Save back
-    const { error: updateError } = await supabase
+    // Save back using admin client (permissions already verified above)
+    const adminSupabase = createAdminClient()
+
+    const { error: updateError } = await adminSupabase
       .from('team_workspaces')
       .update({
         files: updatedFiles,
@@ -172,7 +177,7 @@ export async function DELETE(
     }
 
     // Log activity
-    await supabase.from('team_activity').insert({
+    await adminSupabase.from('team_activity').insert({
       organization_id: workspace.organization_id,
       workspace_id: workspaceId,
       action: 'file_deleted',

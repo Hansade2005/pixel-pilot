@@ -146,7 +146,7 @@ export function TeamSyncButton({
           </div>
         </div>
 
-        <ScrollArea className="max-h-48">
+        <ScrollArea className="h-auto max-h-[200px]">
           <div className="p-1.5 space-y-0.5">
             {Array.from(changedFiles).map(path => (
               <div
