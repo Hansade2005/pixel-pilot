@@ -42,16 +42,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Team limit reached (${org.max_members || 5} members)` }, { status: 400 })
     }
 
-    // Check if already a member
-    const { data: existingMember } = await adminSupabase
-      .from('team_members')
+    // Check if already a member (look up user in profiles first)
+    const { data: profileCheck } = await adminSupabase
+      .from('profiles')
       .select('id')
-      .eq('organization_id', organizationId)
-      .eq('status', 'active')
-      .in('user_id', (
-        await adminSupabase.from('auth.users').select('id').eq('email', email.trim())
-      ).data?.map((u: any) => u.id) || [])
+      .eq('email', email.trim())
       .maybeSingle()
+
+    if (profileCheck) {
+      const { data: existingMember } = await adminSupabase
+        .from('team_members')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('user_id', profileCheck.id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (existingMember) {
+        return NextResponse.json({ error: 'This user is already a team member' }, { status: 409 })
+      }
+    }
 
     // Create invitation
     const token = crypto.randomUUID()
@@ -79,13 +89,12 @@ export async function POST(request: NextRequest) {
     const inviteUrl = `${request.nextUrl.origin}/invite/${token}`
     const inviterName = user.user_metadata?.full_name || user.email || 'A team member'
 
-    // Check if the invited user exists in our system
-    const { data: existingUsers } = await adminSupabase
-      .rpc('get_user_id_by_email', { lookup_email: email.trim() })
-
-    // Try a direct query on auth.users
-    const { data: authUser } = await adminSupabase.auth.admin.listUsers()
-    const invitedUser = authUser?.users?.find(u => u.email === email.trim())
+    // Check if the invited user exists in our system via profiles table
+    const { data: invitedUser } = await adminSupabase
+      .from('profiles')
+      .select('id, email, full_name')
+      .eq('email', email.trim())
+      .maybeSingle()
 
     // Always send invitation email (for both existing and new users)
     const emailHtml = buildInvitationEmail(inviterName, org.name, role, inviteUrl)
@@ -109,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     if (invitedUser) {
       // User exists — also send in-app notification
-      await adminSupabase
+      const { error: notifError } = await adminSupabase
         .from('user_notifications')
         .insert({
           user_id: invitedUser.id,
@@ -117,14 +126,19 @@ export async function POST(request: NextRequest) {
           message: `${inviterName} invited you to join "${org.name}" as ${role}. Click to accept the invitation.`,
           type: 'info',
           url: inviteUrl,
-          image_url: '/pipilot-icon.png',
+          image_url: 'https://pipilot.dev/icons/icon-192x192.png',
           priority: 4,
           is_read: false,
         })
 
+      if (notifError) {
+        console.error('Failed to insert notification:', notifError)
+      }
+
       return NextResponse.json({
         success: true,
         method: 'both',
+        notificationSent: !notifError,
         emailSent,
         token,
         inviteUrl,
@@ -165,7 +179,7 @@ function buildInvitationEmail(
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#ea580c 0%,#f97316 100%);padding:32px 40px;text-align:center;">
-              <img src="https://pipilot.dev/pipilot-icon.png" alt="PiPilot" width="48" height="48" style="border-radius:12px;margin-bottom:12px;" />
+              <img src="https://pipilot.dev/icons/icon-192x192.png" alt="PiPilot" width="48" height="48" style="border-radius:12px;margin-bottom:12px;" />
               <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">
                 You're Invited!
               </h1>
