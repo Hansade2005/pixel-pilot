@@ -24,6 +24,7 @@ import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
 import { getRandomSuggestions } from "@/lib/project-suggestions"
 import { ModelSelector } from "@/components/ui/model-selector"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
+import { LaunchWizard } from "@/components/launch-wizard"
 
 // Load JSZip from CDN (same as file explorer)
 if (typeof window !== 'undefined' && !window.JSZip) {
@@ -156,6 +157,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // Plan mode state - true for Plan mode (default), false for Agent mode
   const [isPlanMode, setIsPlanMode] = useState(true)
+
+  // Launch Wizard state
+  const [showLaunchWizard, setShowLaunchWizard] = useState(false)
 
   // Model selection state (default Grok Fast for free, updated to Haiku for premium via useEffect)
   const [selectedModel, setSelectedModel] = useState<string>('xai/grok-code-fast-1')
@@ -1115,6 +1119,26 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     toast.success("GitLab repository removed")
   }
 
+  const handleWizardComplete = (generatedPrompt: string, framework: string) => {
+    setPrompt(generatedPrompt)
+    // Map framework to template
+    const frameworkMap: Record<string, 'vite-react' | 'nextjs' | 'expo' | 'html'> = {
+      'vite-react': 'vite-react',
+      'nextjs': 'nextjs',
+      'expo': 'expo',
+    }
+    setSelectedTemplate(frameworkMap[framework] || 'vite-react')
+    // Focus the input so user can review and send
+    setTimeout(() => {
+      inputRef.current?.focus()
+      // Auto-resize textarea to fit content
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto'
+        inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px'
+      }
+    }, 100)
+    toast.success("Prompt generated! Review and hit send.")
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -1413,8 +1437,29 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         </div>
       </div>
 
-      {/* Import Badge Buttons */}
+      {/* Launch Wizard */}
+      <LaunchWizard
+        open={showLaunchWizard}
+        onOpenChange={setShowLaunchWizard}
+        onComplete={handleWizardComplete}
+      />
+
+      {/* Help Me Plan + Import Buttons */}
       <div className="flex justify-center gap-2 mt-4">
+        <button
+          type="button"
+          onClick={() => setShowLaunchWizard(true)}
+          disabled={isGenerating}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-600/20 to-orange-500/10 hover:from-orange-600/30 hover:to-orange-500/20 border border-orange-500/40 hover:border-orange-400/60 rounded-full text-orange-300 hover:text-orange-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+          title="Get help planning your app with a guided wizard"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span className="font-medium">Help me plan</span>
+        </button>
+      </div>
+
+      {/* Import Badge Buttons */}
+      <div className="flex justify-center gap-2 mt-2">
         <Popover open={showGithubPopover} onOpenChange={setShowGithubPopover}>
           <PopoverTrigger asChild>
             <button

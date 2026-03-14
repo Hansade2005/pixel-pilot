@@ -39,77 +39,56 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
       return
     }
 
-    const fetchTeamMembers = async () => {
-      try {
-        const supabase = createClient()
+    const supabase = createClient()
+    const onlineUserIds = new Set<string>()
 
+    const fetchAndEnrichMembers = async () => {
+      try {
         // Get current user
         const { data: { user } } = await supabase.auth.getUser()
         setCurrentUserId(user?.id || null)
 
-        // Fetch team members from team_members table
+        // Fetch team members
         const { data: members, error } = await supabase
           .from('team_members')
-          .select(`
-            user_id,
-            role
-          `)
+          .select('user_id, role')
           .eq('organization_id', organizationId)
           .eq('status', 'active')
 
-        if (error) {
-          console.error('[TeamPresence] Error fetching team members:', error)
+        if (error || !members || members.length === 0) {
           setTeamMembers([])
+          setLoading(false)
           return
         }
 
-        // If we have members, fetch user data separately
-        let transformedMembers: TeamMember[] = []
-        if (members && members.length > 0) {
-          // Get unique user IDs
-          const userIds = members.map((member: any) => member.user_id)
+        const userIds = members.map((m: any) => m.user_id)
 
-          // Fetch user data for all members
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id, email, raw_user_meta_data')
-            .in('id', userIds)
+        // Fetch profiles
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, avatar_url')
+          .in('id', userIds)
 
-          if (userError) {
-            console.error('[TeamPresence] Error fetching user data:', userError)
-          }
+        const profileMap = new Map(
+          (profiles || []).map((p: any) => [p.id, p])
+        )
 
-          // Create a map of user data
-          const userMap = new Map()
-          if (userData) {
-            userData.forEach((user: any) => {
-              userMap.set(user.id, user)
-            })
-          }
-
-          // Transform members with user data
-          transformedMembers = members.map((member: any) => {
-            const user = userMap.get(member.user_id)
+        const enriched: TeamMember[] = members
+          .map((m: any) => {
+            const profile = profileMap.get(m.user_id)
             return {
-              id: user?.id || '',
-              email: user?.email || '',
-              name: user?.raw_user_meta_data?.full_name || user?.email?.split('@')[0],
-              avatar_url: user?.raw_user_meta_data?.avatar_url,
-              isOnline: false, // Will be updated by presence system
+              id: m.user_id,
+              email: profile?.email || '',
+              name: profile?.full_name || profile?.email?.split('@')[0],
+              avatar_url: profile?.avatar_url,
+              isOnline: onlineUserIds.has(m.user_id),
               lastSeen: new Date().toISOString()
             }
-          }).filter(m => m.id) // Filter out any invalid members
+          })
+          .filter((m: TeamMember) => m.id)
 
-          setTeamMembers(transformedMembers)
-          setLoading(false)
-
-          // TODO: Implement real-time presence tracking
-          // For now, mark all as potentially online (mock data)
-          // In production, use Supabase Realtime presence
-        } else {
-          setTeamMembers([])
-          setLoading(false)
-        }
+        setTeamMembers(enriched)
+        setLoading(false)
       } catch (error) {
         console.error('[TeamPresence] Error:', error)
         setTeamMembers([])
@@ -117,7 +96,68 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
       }
     }
 
-    fetchTeamMembers()
+    // Set up Realtime presence channel
+    const channel = supabase.channel(`presence:${organizationId}:${workspaceId}`, {
+      config: { presence: { key: '' } } // Will be set on track
+    })
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        onlineUserIds.clear()
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((p: any) => {
+            if (p.user_id) onlineUserIds.add(p.user_id)
+          })
+        })
+        // Update online status on existing members
+        setTeamMembers(prev =>
+          prev.map(m => ({
+            ...m,
+            isOnline: onlineUserIds.has(m.id)
+          }))
+        )
+      })
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
+        newPresences.forEach((p: any) => {
+          if (p.user_id) onlineUserIds.add(p.user_id)
+        })
+        setTeamMembers(prev =>
+          prev.map(m => ({
+            ...m,
+            isOnline: onlineUserIds.has(m.id)
+          }))
+        )
+      })
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        leftPresences.forEach((p: any) => {
+          if (p.user_id) onlineUserIds.delete(p.user_id)
+        })
+        setTeamMembers(prev =>
+          prev.map(m => ({
+            ...m,
+            isOnline: onlineUserIds.has(m.id)
+          }))
+        )
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Track our own presence
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            await channel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString()
+            })
+          }
+        }
+      })
+
+    fetchAndEnrichMembers()
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [workspaceId, organizationId])
 
   if (!organizationId || loading) {
@@ -145,7 +185,7 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
                   <div className="relative">
                     <Avatar className="h-7 w-7 border-2 border-background hover:z-10 transition-transform hover:scale-110">
                       <AvatarImage src={member.avatar_url} alt={member.name || member.email} />
-                      <AvatarFallback className="text-xs bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                      <AvatarFallback className="text-xs bg-gradient-to-br from-orange-500 to-orange-600 text-white">
                         {(member.name || member.email).charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

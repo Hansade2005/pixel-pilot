@@ -25,9 +25,16 @@ import { DatabaseTab } from "./database-tab"
 import { AIPplatformTab } from "./ai-platform-tab"
 import { CloudTab } from "./cloud-tab"
 import { AuditTab } from "./audit-tab"
+import { MonitorTab } from "./monitor-tab"
+import { TeamPanel } from "./team-panel"
+import { ConvertToTeamDialog } from "./convert-to-team-dialog"
+import { TeamSyncButton } from "./team-sync-button"
+import { TeamPresence } from "./team-presence"
+import { TeamActivityFeed } from "./team-activity-feed"
+import { TeamSharedChats } from "./team-shared-chats"
 import { ActivitySearchPanel } from "./activity-search-panel"
 import { ActivityChatPanel } from "./activity-chat-panel"
-import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder, BarChart3, Bot, CalendarClock, GitPullRequestArrow, HeartPulse, Archive, KeyRound, LayoutGrid } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, PanelLeftClose, PanelLeftOpen, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, DatabaseBackup, Square, Monitor, Smartphone, Database, Cloud, Shield, Search, Folder, BarChart3, Bot, CalendarClock, GitPullRequestArrow, HeartPulse, Archive, KeyRound, LayoutGrid, Users } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -35,6 +42,9 @@ import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
+import { useAutoMonitor } from '@/hooks/use-auto-monitor'
+import { useTeamFileSync } from '@/hooks/use-team-file-sync'
+import { useTeamSync } from '@/hooks/use-team-sync'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
 
@@ -77,7 +87,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit" | "monitor" | "team">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
@@ -92,7 +102,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit" | "monitor" | "team">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -198,6 +208,47 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         console.error('Failed to reload workspace after cross-device sync:', error)
       }
     }
+  })
+
+  // Auto-monitor: creates a monitor when project is deployed
+  useAutoMonitor(
+    selectedProject?.id,
+    selectedProject?.name,
+    selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl
+  )
+
+  // Convert-to-team dialog state
+  const [showConvertToTeam, setShowConvertToTeam] = useState(false)
+
+  // Team file sync (locks + real-time file changes)
+  const {
+    fileLocks,
+    isLockedByOther,
+    acquireLock,
+    releaseLock,
+    broadcastFileChange
+  } = useTeamFileSync({
+    workspaceId: (selectedProject as any)?.teamWorkspaceId,
+    organizationId: (selectedProject as any)?.organizationId,
+    userId: user.id,
+    enabled: !!(selectedProject as any)?.isTeamWorkspace
+  })
+
+  // Team sync: tracks dirty files and provides sync-to-team functionality
+  const {
+    changedFiles: teamChangedFiles,
+    deletedFiles: teamDeletedFiles,
+    pendingCount: teamPendingCount,
+    isSyncing: isTeamSyncing,
+    lastSyncAt: teamLastSyncAt,
+    syncError: teamSyncError,
+    syncToTeam,
+    clearPending: clearTeamPending,
+  } = useTeamSync({
+    workspaceId: selectedProject?.id,
+    teamWorkspaceId: (selectedProject as any)?.teamWorkspaceId,
+    isTeamWorkspace: !!(selectedProject as any)?.isTeamWorkspace,
+    userId: user.id,
   })
 
   // GitHub push functionality
@@ -1301,7 +1352,32 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                 {/* Right Panel - VS Code Layout */}
                 <ResizablePanel defaultSize={chatPanelVisible ? 60 : 100} minSize={30}>
-                  <div className="h-full flex flex-col overflow-hidden">
+                  <div className="h-full flex flex-col overflow-hidden relative">
+                    {/* Team indicators - float top-right: presence avatars + sync button */}
+                    {(selectedProject as any)?.isTeamWorkspace && (
+                      <div className="absolute top-2 right-3 z-30 flex items-center gap-2">
+                        <TeamPresence
+                          workspaceId={selectedProject?.id || ''}
+                          organizationId={(selectedProject as any)?.organizationId}
+                        />
+                        <TeamActivityFeed
+                          workspaceId={selectedProject?.id || ''}
+                          organizationId={(selectedProject as any)?.organizationId}
+                        />
+                        {teamPendingCount > 0 && (
+                          <TeamSyncButton
+                            changedFiles={teamChangedFiles}
+                            deletedFiles={teamDeletedFiles}
+                            pendingCount={teamPendingCount}
+                            isSyncing={isTeamSyncing}
+                            lastSyncAt={teamLastSyncAt}
+                            syncError={teamSyncError}
+                            onSync={syncToTeam}
+                            onClearPending={clearTeamPending}
+                          />
+                        )}
+                      </div>
+                    )}
                     {/* Content Area */}
                     {activeTab === "code" ? (
                       /* VS Code-like Layout: Activity Bar + Sidebar + Editor */
@@ -1389,6 +1465,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             title="Code Audit"
                           >
                             <Shield className="size-5" />
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("monitor")}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              activeTab === 'monitor'
+                                ? 'text-orange-400 bg-orange-500/10'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="AppCare Monitor"
+                          >
+                            <HeartPulse className="size-5" />
+                            {activeTab === 'monitor' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setActiveTab("team")}
+                            className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
+                              activeTab === 'team'
+                                ? 'text-orange-400 bg-orange-500/10'
+                                : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title="Teams"
+                          >
+                            <Users className="size-5" />
+                            {activeTab === 'team' && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
+                            )}
                           </button>
                           <button
                             onClick={() => setCodeViewPanel(codeViewPanel === 'settings' ? null : 'settings')}
@@ -1729,6 +1833,49 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         </div>
                         <div className="flex-1 min-h-0">
                           <AuditTab user={user} selectedProject={selectedProject} />
+                        </div>
+                      </div>
+                    ) : activeTab === "monitor" ? (
+                      /* AppCare Monitor Tab */
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 min-h-0">
+                          <MonitorTab
+                            projectId={selectedProject?.id}
+                            projectName={selectedProject?.name}
+                            deploymentUrl={selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl}
+                            userId={user.id}
+                          />
+                        </div>
+                      </div>
+                    ) : activeTab === "team" ? (
+                      /* Teams Tab */
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 min-h-0 overflow-y-auto">
+                          <TeamPanel
+                            userId={user.id}
+                            projectId={selectedProject?.id}
+                            projectName={selectedProject?.name}
+                          />
+                          {/* Shared Chats Section */}
+                          <div className="border-t border-gray-800/60">
+                            <TeamSharedChats
+                              workspaceId={(selectedProject as any)?.teamWorkspaceId}
+                              organizationId={(selectedProject as any)?.organizationId}
+                              userId={user.id}
+                            />
+                          </div>
+                          {/* Convert to Team button for non-team workspaces */}
+                          {!(selectedProject as any)?.isTeamWorkspace && selectedProject && (
+                            <div className="border-t border-gray-800/60 p-4">
+                              <Button
+                                onClick={() => setShowConvertToTeam(true)}
+                                className="w-full bg-orange-600 hover:bg-orange-500 text-white"
+                              >
+                                <Users className="h-4 w-4 mr-2" />
+                                Convert to Team Workspace
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -2125,6 +2272,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             <div className="flex items-center space-x-1">
               {selectedProject ? (
                 <>
+                  {/* Team Sync Button (mobile) */}
+                  {(selectedProject as any)?.isTeamWorkspace && teamPendingCount > 0 && (
+                    <TeamSyncButton
+                      changedFiles={teamChangedFiles}
+                      deletedFiles={teamDeletedFiles}
+                      pendingCount={teamPendingCount}
+                      isSyncing={isTeamSyncing}
+                      lastSyncAt={teamLastSyncAt}
+                      syncError={teamSyncError}
+                      onSync={syncToTeam}
+                      onClearPending={clearTeamPending}
+                    />
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -2330,6 +2490,32 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     <AuditTab user={user} selectedProject={selectedProject} />
                   </div>
                 </TabsContent>
+                <TabsContent value="monitor" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <MonitorTab
+                      projectId={selectedProject?.id}
+                      projectName={selectedProject?.name}
+                      deploymentUrl={selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl}
+                      userId={user.id}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="team" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-y-auto">
+                    <TeamPanel
+                      userId={user.id}
+                      projectId={selectedProject?.id}
+                      projectName={selectedProject?.name}
+                    />
+                    <div className="border-t border-gray-800/60">
+                      <TeamSharedChats
+                        workspaceId={(selectedProject as any)?.teamWorkspaceId}
+                        organizationId={(selectedProject as any)?.organizationId}
+                        userId={user.id}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
             )}
           </div>
@@ -2382,6 +2568,24 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 >
                   <Shield className={`h-5 w-5 ${mobileTab === "audit" ? "stroke-[2.5]" : ""}`} />
                   <span className={`text-[10px] font-medium ${mobileTab === "audit" ? "text-orange-400" : ""}`}>Audit</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("monitor")}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "monitor" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <HeartPulse className={`h-5 w-5 ${mobileTab === "monitor" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "monitor" ? "text-orange-400" : ""}`}>Monitor</span>
+                </button>
+                <button
+                  onClick={() => setMobileTab("team")}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-3 rounded-xl transition-all ${
+                    mobileTab === "team" ? "text-orange-400" : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  <Users className={`h-5 w-5 ${mobileTab === "team" ? "stroke-[2.5]" : ""}`} />
+                  <span className={`text-[10px] font-medium ${mobileTab === "team" ? "text-orange-400" : ""}`}>Team</span>
                 </button>
               </div>
             </div>
@@ -2439,6 +2643,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Convert to Team Dialog */}
+      {selectedProject && (
+        <ConvertToTeamDialog
+          open={showConvertToTeam}
+          onOpenChange={setShowConvertToTeam}
+          workspaceId={selectedProject.id}
+          workspaceName={selectedProject.name}
+          onConversionComplete={() => {
+            setShowConvertToTeam(false)
+          }}
+        />
+      )}
 
     </div>
   );

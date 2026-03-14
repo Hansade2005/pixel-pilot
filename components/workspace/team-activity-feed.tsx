@@ -54,20 +54,47 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
       return
     }
 
+    const supabase = createClient()
+    // Cache user profiles to avoid re-fetching on every realtime event
+    const userCache = new Map<string, any>()
+
+    const enrichActivities = async (rawActivities: any[]): Promise<TeamActivity[]> => {
+      if (rawActivities.length === 0) return []
+
+      const actorIds = [...new Set(rawActivities.map(a => a.actor_id))]
+      const uncachedIds = actorIds.filter(id => !userCache.has(id))
+
+      if (uncachedIds.length > 0) {
+        const { data: userData } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, avatar_url')
+          .in('id', uncachedIds)
+
+        if (userData) {
+          userData.forEach((u: any) => userCache.set(u.id, u))
+        }
+      }
+
+      return rawActivities.map(activity => {
+        const profile = userCache.get(activity.actor_id)
+        return {
+          id: activity.id,
+          action: activity.action,
+          actor_id: activity.actor_id,
+          actor_email: profile?.email,
+          actor_name: profile?.full_name || profile?.email?.split('@')[0],
+          actor_avatar: profile?.avatar_url,
+          metadata: activity.metadata || {},
+          created_at: activity.created_at
+        }
+      })
+    }
+
     const fetchActivities = async () => {
       try {
-        const supabase = createClient()
-
-        // Fetch recent activities
         const { data, error } = await supabase
           .from('team_activity')
-          .select(`
-            id,
-            action,
-            actor_id,
-            metadata,
-            created_at
-          `)
+          .select('id, action, actor_id, metadata, created_at')
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .limit(20)
@@ -78,47 +105,8 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
           return
         }
 
-        // If we have activities, fetch user data separately
-        let transformedActivities: TeamActivity[] = []
-        if (data && data.length > 0) {
-          // Get unique actor IDs
-          const actorIds = [...new Set(data.map((activity: any) => activity.actor_id))]
-
-          // Fetch user data for all actors
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id, email, raw_user_meta_data')
-            .in('id', actorIds)
-
-          if (userError) {
-            console.error('[TeamActivityFeed] Error fetching user data:', userError)
-          }
-
-          // Create a map of user data
-          const userMap = new Map()
-          if (userData) {
-            userData.forEach((user: any) => {
-              userMap.set(user.id, user)
-            })
-          }
-
-          // Transform activities with user data
-          transformedActivities = data.map((activity: any) => {
-            const user = userMap.get(activity.actor_id)
-            return {
-              id: activity.id,
-              action: activity.action,
-              actor_id: activity.actor_id,
-              actor_email: user?.email,
-              actor_name: user?.raw_user_meta_data?.full_name || user?.email?.split('@')[0],
-              actor_avatar: user?.raw_user_meta_data?.avatar_url,
-              metadata: activity.metadata || {},
-              created_at: activity.created_at
-            }
-          })
-        }
-
-        setActivities(transformedActivities)
+        const enriched = await enrichActivities(data || [])
+        setActivities(enriched)
         setLoading(false)
       } catch (error) {
         console.error('[TeamActivityFeed] Error:', error)
@@ -129,12 +117,30 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
 
     fetchActivities()
 
-    // TODO: Subscribe to real-time updates
-    // const subscription = supabase
-    //   .channel(`activity:${workspaceId}`)
-    //   .on('postgres_changes', { ... }, () => fetchActivities())
-    //   .subscribe()
-    // return () => { subscription.unsubscribe() }
+    // Subscribe to real-time inserts on team_activity
+    const channel = supabase
+      .channel(`activity:${workspaceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'team_activity',
+          filter: `workspace_id=eq.${workspaceId}`
+        },
+        async (payload) => {
+          // Enrich the new activity with user profile
+          const enriched = await enrichActivities([payload.new])
+          if (enriched.length > 0) {
+            setActivities(prev => [enriched[0], ...prev].slice(0, 20))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [workspaceId, organizationId])
 
   const getActivityIcon = (action: string) => {
@@ -142,7 +148,7 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
       case 'file_created':
         return <FilePlus className="h-4 w-4 text-green-500" />
       case 'file_updated':
-        return <FileEdit className="h-4 w-4 text-blue-500" />
+        return <FileEdit className="h-4 w-4 text-orange-400" />
       case 'file_deleted':
         return <Trash2 className="h-4 w-4 text-red-500" />
       case 'member_joined':
@@ -184,7 +190,7 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
         >
           <Activity className="h-4 w-4" />
           {activities.length > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-blue-500 text-[10px] font-medium text-white flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-orange-500 text-[10px] font-medium text-white flex items-center justify-center">
               {activities.length > 9 ? '9+' : activities.length}
             </span>
           )}
@@ -222,7 +228,7 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
                   >
                     <Avatar className="h-8 w-8 mt-0.5">
                       <AvatarImage src={activity.actor_avatar} alt={activity.actor_name} />
-                      <AvatarFallback className="text-xs bg-gradient-to-br from-blue-400 to-purple-400 text-white">
+                      <AvatarFallback className="text-xs bg-gradient-to-br from-orange-500 to-orange-600 text-white">
                         {(activity.actor_name || activity.actor_email || 'U').charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
