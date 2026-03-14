@@ -1435,11 +1435,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     {selectedProject?.isTeamWorkspace && (
                       <div className="absolute top-2 right-3 z-30 flex items-center gap-2">
                         <TeamPresence
-                          workspaceId={selectedProject?.id || ''}
+                          workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
                           organizationId={selectedProject?.organizationId}
                         />
                         <TeamActivityFeed
-                          workspaceId={selectedProject?.id || ''}
+                          workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
                           organizationId={selectedProject?.organizationId}
                         />
                         {teamPendingCount > 0 && (
