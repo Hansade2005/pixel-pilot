@@ -351,40 +351,30 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
     setIsInviting(true)
 
     try {
-      // Check member limit
-      if (members.length >= (selectedOrg.max_members || 5)) {
-        toast.error(`Team limit reached (${selectedOrg.max_members || 5} members). Upgrade your plan.`)
-        setIsInviting(false)
-        return
-      }
-
-      // Check if already a member
-      const existingMember = members.find(m => m.email === inviteEmail.trim())
-      if (existingMember) {
-        toast.error("This user is already a team member")
-        setIsInviting(false)
-        return
-      }
-
-      // Create invitation token
-      const token = crypto.randomUUID()
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + 7)
-
-      const { error } = await supabase
-        .from('team_invitations')
-        .insert({
-          organization_id: selectedOrg.id,
+      const response = await fetch('/api/teams/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: selectedOrg.id,
           email: inviteEmail.trim(),
           role: inviteRole,
-          token,
-          invited_by: userId,
-          expires_at: expiresAt.toISOString(),
-        })
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
 
-      toast.success(`Invitation created for ${inviteEmail}`)
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send invitation')
+      }
+
+      if (data.method === 'both') {
+        toast.success(`Notification & email sent to ${inviteEmail}`)
+      } else if (data.method === 'email') {
+        toast.success(`Invitation email sent to ${inviteEmail}`)
+      } else if (data.method === 'email_failed') {
+        toast.success(`Invitation created. Share link: ${data.inviteUrl}`, { duration: 6000 })
+      }
+
       setShowInvite(false)
       setInviteEmail("")
       setInviteRole("editor")
@@ -421,7 +411,7 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
     try {
       const { error } = await supabase
         .from('team_invitations')
-        .update({ status: 'revoked' })
+        .delete()
         .eq('id', invitationId)
 
       if (error) throw error
@@ -429,7 +419,7 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
       toast.success("Invitation revoked")
       setInvitations(prev => prev.filter(i => i.id !== invitationId))
     } catch (error: any) {
-      toast.error("Failed to revoke invitation")
+      toast.error(error.message || "Failed to revoke invitation")
     }
   }
 

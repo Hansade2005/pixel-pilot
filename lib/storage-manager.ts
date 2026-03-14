@@ -33,6 +33,10 @@ export interface Workspace {
   supabaseServiceRoleKey?: string
   supabaseConnected?: boolean
   supabaseConnectionUpdatedAt?: string
+  // Team workspace properties
+  isTeamWorkspace?: boolean
+  teamWorkspaceId?: string
+  organizationId?: string
   createdAt: string
   updatedAt: string
 }

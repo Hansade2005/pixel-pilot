@@ -227,7 +227,7 @@ export function ConvertToTeamDialog({
         organizationId: orgId,
         isTeamWorkspace: true,
         teamWorkspaceId: teamWorkspace.id
-      } as any)
+      })
 
       setStep("success")
 
