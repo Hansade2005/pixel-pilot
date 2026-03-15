@@ -85,8 +85,9 @@ export async function fetchAllFiles(
     const cleanPath = prefix ? path.replace(prefix, '') : path
     if (!cleanPath) continue
 
-    // Skip hidden files and .git
-    if (cleanPath.startsWith('.') || cleanPath.includes('/.git/')) continue
+    // Skip .git internals and OS junk, but keep project dotfolders like .pipilot
+    if (cleanPath === '.git' || cleanPath.startsWith('.git/') || cleanPath.includes('/.git/')) continue
+    if (cleanPath === '.DS_Store' || cleanPath.endsWith('/.DS_Store')) continue
 
     // Normalize path to always have a leading /
     const normalizedPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`
