@@ -80,18 +80,20 @@ export async function GET(req: NextRequest) {
 
     // Fetch full repo as ZIP archive (same approach as /api/github/import-repo)
     if (full) {
-      // Use GitHub's zipball endpoint (authenticated, works for private repos)
-      const zipResponse = await octokit.request('GET /repos/{owner}/{repo}/zipball/{ref}', {
-        owner,
-        repo,
-        ref: branch,
-        request: {
-          // Get raw response for binary data
-          parseSuccessResponseBody: false,
+      // Use direct fetch with auth token (Octokit doesn't handle binary well)
+      const zipUrl = `https://api.github.com/repos/${owner}/${repo}/zipball/${branch}`
+      const zipResponse = await fetch(zipUrl, {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Accept': 'application/vnd.github+json',
         },
       })
 
-      const arrayBuffer = await (zipResponse.data as unknown as Response).arrayBuffer()
+      if (!zipResponse.ok) {
+        return Response.json({ error: `Failed to download repo ZIP: ${zipResponse.status}` }, { status: 502 })
+      }
+
+      const arrayBuffer = await zipResponse.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
 
       // Update last synced SHA
