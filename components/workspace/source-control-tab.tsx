@@ -763,9 +763,9 @@ export function SourceControlTab({
           </div>
 
           {/* File Lists */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col">
             {/* Staged Changes */}
-            <div>
+            <div className="flex-shrink-0">
               <button
                 onClick={() => setStagedExpanded(!stagedExpanded)}
                 className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800/50 transition-colors"
@@ -796,38 +796,41 @@ export function SourceControlTab({
                   </button>
                 )}
               </button>
-              {stagedExpanded &&
-                stagedFiles.map((file) => (
-                  <div
-                    key={file.path}
-                    className="flex items-center gap-2 px-4 py-1 hover:bg-gray-800/40 group cursor-pointer"
-                    onClick={() =>
-                      onOpenDiff?.(
-                        `${file.name} (staged)`,
-                        generateDiffMarkdown(file)
-                      )
-                    }
-                  >
-                    {statusIcon(file.status)}
-                    <span className="flex-1 text-xs text-gray-300 truncate">
-                      {file.path}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        unstageFile(file)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-300 transition-opacity"
-                      title="Unstage"
+              {stagedExpanded && (
+                <div className={stagedFiles.length > 8 ? "max-h-[208px] overflow-y-auto" : ""}>
+                  {stagedFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className="flex items-center gap-2 px-4 py-1 hover:bg-gray-800/40 group cursor-pointer"
+                      onClick={() =>
+                        onOpenDiff?.(
+                          `${file.name} (staged)`,
+                          generateDiffMarkdown(file)
+                        )
+                      }
                     >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                      {statusIcon(file.status)}
+                      <span className="flex-1 text-xs text-gray-300 truncate">
+                        {file.path}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          unstageFile(file)
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-300 transition-opacity"
+                        title="Unstage"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Unstaged Changes */}
-            <div>
+            <div className="flex-shrink-0">
               <button
                 onClick={() => setUnstagedExpanded(!unstagedExpanded)}
                 className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-800/50 transition-colors"
@@ -858,31 +861,32 @@ export function SourceControlTab({
                   </button>
                 )}
               </button>
-              {unstagedExpanded &&
-                unstagedFiles.map((file) => (
-                  <div
-                    key={file.path}
-                    className="flex items-center gap-2 px-4 py-1 hover:bg-gray-800/40 group cursor-pointer"
-                    onClick={() =>
-                      onOpenDiff?.(
-                        `${file.name} (changes)`,
-                        generateDiffMarkdown(file)
-                      )
-                    }
-                  >
-                    {statusIcon(file.status)}
-                    <span className="flex-1 text-xs text-gray-300 truncate">
-                      {file.path}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        stageFile(file)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-300 transition-opacity"
-                      title="Stage"
+              {unstagedExpanded && (
+                <div className={unstagedFiles.length > 8 ? "max-h-[208px] overflow-y-auto" : ""}>
+                  {unstagedFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className="flex items-center gap-2 px-4 py-1 hover:bg-gray-800/40 group cursor-pointer"
+                      onClick={() =>
+                        onOpenDiff?.(
+                          `${file.name} (changes)`,
+                          generateDiffMarkdown(file)
+                        )
+                      }
                     >
-                      <Plus className="w-3 h-3" />
+                      {statusIcon(file.status)}
+                      <span className="flex-1 text-xs text-gray-300 truncate">
+                        {file.path}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          stageFile(file)
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-gray-300 transition-opacity"
+                        title="Stage"
+                      >
+                        <Plus className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
