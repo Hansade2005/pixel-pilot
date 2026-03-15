@@ -14,13 +14,20 @@ import {
   ArrowDown,
   ExternalLink,
   Sparkles,
+  Eye,
+  FileText,
+  FilePlus,
+  FileMinus,
+  FileEdit,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   commitFiles as githubCommitFiles,
   fetchCommits as githubFetchCommits,
+  fetchCommitDetail,
   type GitHubCommitEntry,
+  type CommitDetail,
 } from "@/lib/github-client"
 
 interface SourceControlTabProps {
@@ -81,6 +88,8 @@ export function SourceControlTab({
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null)
   const [view, setView] = useState<"changes" | "history">("changes")
   const [isGeneratingMsg, setIsGeneratingMsg] = useState(false)
+  const [commitDetails, setCommitDetails] = useState<Record<string, CommitDetail>>({})
+  const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -197,6 +206,67 @@ export function SourceControlTab({
       supabase.removeChannel(channel)
     }
   }, [teamWorkspaceId, isGitHubBacked, supabase, loadCommits])
+
+  // Load commit detail from GitHub API
+  const loadCommitDetail = async (sha: string) => {
+    if (!teamWorkspaceId || !sha || commitDetails[sha]) return
+    setLoadingDetail(sha)
+    try {
+      const detail = await fetchCommitDetail(teamWorkspaceId, sha)
+      setCommitDetails(prev => ({ ...prev, [sha]: detail }))
+    } catch (err: any) {
+      console.error('[Source Control] Failed to load commit detail:', err)
+      toast.error('Failed to load commit details')
+    } finally {
+      setLoadingDetail(null)
+    }
+  }
+
+  // Toggle expand and auto-fetch details
+  const toggleCommitExpand = (commitId: string, sha?: string) => {
+    if (expandedCommit === commitId) {
+      setExpandedCommit(null)
+    } else {
+      setExpandedCommit(commitId)
+      if (sha && isGitHubBacked) {
+        loadCommitDetail(sha)
+      }
+    }
+  }
+
+  // Generate rich diff markdown for a commit
+  const generateCommitDiffMarkdown = (detail: CommitDetail): string => {
+    const lines: string[] = []
+    lines.push(`# Commit: ${detail.message}\n`)
+    lines.push(`**Author:** ${detail.author_name} <${detail.author_email}>`)
+    lines.push(`**Date:** ${new Date(detail.date).toLocaleString()}`)
+    lines.push(`**SHA:** \`${detail.sha}\`\n`)
+    lines.push(`**Stats:** +${detail.stats.additions} -${detail.stats.deletions} (${detail.files.length} file${detail.files.length !== 1 ? 's' : ''})\n`)
+    lines.push(`---\n`)
+
+    for (const file of detail.files) {
+      const icon = file.status === 'added' ? 'A' : file.status === 'removed' ? 'D' : 'M'
+      lines.push(`## ${icon} \`${file.filename}\` (+${file.additions} -${file.deletions})\n`)
+      if (file.patch) {
+        lines.push('```diff')
+        lines.push(file.patch)
+        lines.push('```\n')
+      }
+    }
+
+    return lines.join('\n')
+  }
+
+  // Generate commit markdown for file status icon
+  const fileStatusIcon = (status: string) => {
+    switch (status) {
+      case 'added': return <FilePlus className="w-3 h-3 text-green-400" />
+      case 'removed': return <FileMinus className="w-3 h-3 text-red-400" />
+      case 'modified': return <FileEdit className="w-3 h-3 text-orange-400" />
+      case 'renamed': return <FileText className="w-3 h-3 text-blue-400" />
+      default: return <FileText className="w-3 h-3 text-gray-400" />
+    }
+  }
 
   // Generate commit message using a0 LLM API with chat context
   const generateCommitMessage = async () => {
@@ -611,8 +681,7 @@ export function SourceControlTab({
             <div className="flex flex-col items-center justify-center py-12 text-center px-4">
               <GitCommit className="h-8 w-8 text-gray-600 mb-2" />
               <p className="text-xs text-gray-500">
-                No commits yet. Stage and commit changes to start tracking
-                history.
+                No commits yet. Commit your changes to start tracking history.
               </p>
             </div>
           ) : (
@@ -620,127 +689,154 @@ export function SourceControlTab({
               {/* Git tree line */}
               <div className="absolute left-[22px] top-0 bottom-0 w-px bg-gray-800" />
 
-              {commits.map((commit, index) => (
-                <div key={commit.id} className="relative">
-                  <button
-                    onClick={() =>
-                      setExpandedCommit(
-                        expandedCommit === commit.id ? null : commit.id
-                      )
-                    }
-                    className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-gray-800/40 transition-colors text-left"
-                  >
-                    {/* Tree dot */}
-                    <div className="relative z-10 w-[18px] h-[18px] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <div
-                        className={cn(
-                          "w-2.5 h-2.5 rounded-full border-2",
-                          index === 0
-                            ? "bg-orange-500 border-orange-500"
-                            : "bg-gray-950 border-gray-600"
-                        )}
-                      />
-                    </div>
+              {commits.map((commit, index) => {
+                const detail = commit.sha ? commitDetails[commit.sha] : null
+                const isExpanded = expandedCommit === commit.id
+                const isLoadingThis = loadingDetail === commit.sha
 
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-200 font-medium truncate">
-                        {commit.message}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                          <User className="w-2.5 h-2.5" />
-                          {commit.author_name}
-                        </span>
-                        {commit.sha && (
-                          <span className="text-[10px] text-gray-600 font-mono">
-                            {commit.sha.slice(0, 7)}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-gray-600">
-                          {formatTimeAgo(commit.created_at)}
-                        </span>
+                return (
+                  <div key={commit.id} className="relative">
+                    <button
+                      onClick={() => toggleCommitExpand(commit.id, commit.sha)}
+                      className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-gray-800/40 transition-colors text-left"
+                    >
+                      {/* Tree dot */}
+                      <div className="relative z-10 w-[18px] h-[18px] flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <div
+                          className={cn(
+                            "w-2.5 h-2.5 rounded-full border-2",
+                            index === 0
+                              ? "bg-orange-500 border-orange-500"
+                              : "bg-gray-950 border-gray-600"
+                          )}
+                        />
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onOpenDiff?.(
-                            `Commit: ${commit.message}`,
-                            generateCommitMarkdown(commit)
-                          )
-                        }}
-                        className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10"
-                        title="View commit details"
-                      >
-                        <Eye className="w-3 h-3" />
-                      </button>
-                      {commit.sha && githubRepoUrl && (
-                        <a
-                          href={`${githubRepoUrl}/commit/${commit.sha}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10"
-                          title="View on GitHub"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      {expandedCommit === commit.id ? (
-                        <ChevronDown className="w-3 h-3 text-gray-500" />
-                      ) : (
-                        <ChevronRight className="w-3 h-3 text-gray-500" />
-                      )}
-                    </div>
-                  </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-200 font-medium truncate">
+                          {commit.message}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                            <User className="w-2.5 h-2.5" />
+                            {commit.author_name}
+                          </span>
+                          {commit.sha && (
+                            <span className="text-[10px] text-gray-600 font-mono">
+                              {commit.sha.slice(0, 7)}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-600">
+                            {formatTimeAgo(commit.created_at)}
+                          </span>
+                        </div>
+                      </div>
 
-                  {/* Expanded file list */}
-                  {expandedCommit === commit.id &&
-                    commit.files.length > 0 && (
-                      <div className="pl-[34px] pb-1">
-                        {commit.files.map((file: any, fi: number) => {
-                          const filePath =
-                            typeof file === "string" ? file : file.path
-                          const fileStatus =
-                            typeof file === "string"
-                              ? "modified"
-                              : file.status || "modified"
-                          return (
-                            <div
-                              key={fi}
-                              className="flex items-center gap-2 px-2 py-0.5 hover:bg-gray-800/30 rounded cursor-pointer"
-                              onClick={() =>
-                                onOpenDiff?.(
-                                  filePath,
-                                  `# ${
-                                    fileStatus === "added"
-                                      ? "Added"
-                                      : fileStatus === "deleted"
-                                      ? "Deleted"
-                                      : "Modified"
-                                  }: \`${filePath}\`\n\nPart of commit: **${
-                                    commit.message
-                                  }**\nBy ${
-                                    commit.author_name
-                                  } at ${new Date(
-                                    commit.created_at
-                                  ).toLocaleString()}`
-                                )
-                              }
-                            >
-                              {statusIcon(fileStatus)}
-                              <span className="text-[11px] text-gray-400 truncate">
-                                {filePath}
-                              </span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {commit.sha && isGitHubBacked && detail && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onOpenDiff?.(
+                                `Commit: ${commit.message}`,
+                                generateCommitDiffMarkdown(detail)
+                              )
+                            }}
+                            className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10"
+                            title="View full diff in editor"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                        )}
+                        {commit.sha && githubRepoUrl && (
+                          <a
+                            href={`${githubRepoUrl}/commit/${commit.sha}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10"
+                            title="View on GitHub"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                        {isExpanded ? (
+                          <ChevronDown className="w-3 h-3 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3 text-gray-500" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Expanded commit detail */}
+                    {isExpanded && (
+                      <div className="pl-[34px] pb-2 pr-3">
+                        {isLoadingThis ? (
+                          <div className="flex items-center gap-2 py-2 px-2">
+                            <Loader2 className="w-3 h-3 animate-spin text-orange-400" />
+                            <span className="text-[11px] text-gray-500">Loading commit details...</span>
+                          </div>
+                        ) : detail ? (
+                          <>
+                            {/* Stats summary */}
+                            <div className="flex items-center gap-3 px-2 py-1.5 mb-1 rounded bg-gray-900/50 border border-gray-800/40">
+                              <span className="text-[10px] text-green-400">+{detail.stats.additions}</span>
+                              <span className="text-[10px] text-red-400">-{detail.stats.deletions}</span>
+                              <span className="text-[10px] text-gray-500">{detail.files.length} file{detail.files.length !== 1 ? 's' : ''}</span>
+                              <div className="flex-1" />
+                              <button
+                                onClick={() => onOpenDiff?.(
+                                  `Commit: ${commit.message}`,
+                                  generateCommitDiffMarkdown(detail)
+                                )}
+                                className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-1"
+                              >
+                                <Eye className="w-2.5 h-2.5" />
+                                View full diff
+                              </button>
                             </div>
-                          )
-                        })}
+                            {/* File list */}
+                            <div className={detail.files.length > 8 ? "max-h-[208px] overflow-y-auto" : ""}>
+                              {detail.files.map((file, fi) => (
+                                <div
+                                  key={fi}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800/30 rounded cursor-pointer group"
+                                  onClick={() => {
+                                    const fileDiff = `# ${file.status === 'added' ? 'Added' : file.status === 'removed' ? 'Deleted' : 'Modified'}: \`${file.filename}\`\n\n**Commit:** ${commit.message}\n**Author:** ${detail.author_name}\n**Date:** ${new Date(detail.date).toLocaleString()}\n\n**Changes:** +${file.additions} -${file.deletions}\n\n${file.patch ? '```diff\n' + file.patch + '\n```' : '*No patch available*'}`
+                                    onOpenDiff?.(file.filename, fileDiff)
+                                  }}
+                                >
+                                  {fileStatusIcon(file.status)}
+                                  <span className="flex-1 text-[11px] text-gray-400 truncate">{file.filename}</span>
+                                  <span className="text-[9px] text-green-400/70 opacity-0 group-hover:opacity-100">+{file.additions}</span>
+                                  <span className="text-[9px] text-red-400/70 opacity-0 group-hover:opacity-100">-{file.deletions}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : commit.files.length > 0 ? (
+                          /* Fallback: legacy commit files without detail */
+                          commit.files.map((file: any, fi: number) => {
+                            const filePath = typeof file === "string" ? file : file.path
+                            const fileStatus = typeof file === "string" ? "modified" : file.status || "modified"
+                            return (
+                              <div
+                                key={fi}
+                                className="flex items-center gap-2 px-2 py-0.5 hover:bg-gray-800/30 rounded cursor-pointer"
+                              >
+                                {statusIcon(fileStatus)}
+                                <span className="text-[11px] text-gray-400 truncate">{filePath}</span>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className="text-[11px] text-gray-600 px-2 py-1">No file details available</p>
+                        )}
                       </div>
                     )}
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

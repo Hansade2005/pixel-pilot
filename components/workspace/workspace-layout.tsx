@@ -1570,10 +1570,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             title="Source Control"
                           >
                             <GitBranch className="size-5" />
-                            {effectivePendingCount > 0 && (
-                              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-orange-600 text-[10px] font-medium text-white leading-none">
-                                {effectivePendingCount > 99 ? '99+' : effectivePendingCount}
-                              </span>
+                            {hasRemoteChanges && (
+                              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-orange-500" />
                             )}
                             {codeViewPanel === 'source' && (
                               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
@@ -2053,10 +2051,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           />
                           {/* Team Activity Section */}
                           {selectedProject?.isTeamWorkspace && (
-                            <div className="border-t border-gray-800/60 px-4 py-3">
+                            <div className="border-t border-gray-800/60 px-4 py-2">
                               <TeamActivityFeed
                                 workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
                                 organizationId={selectedProject?.organizationId}
+                                inline
                               />
                             </div>
                           )}

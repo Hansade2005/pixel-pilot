@@ -195,6 +195,38 @@ export async function fetchCommits(
   return data.commits || []
 }
 
+// Fetch detailed commit info (files changed, patches)
+export interface CommitDetailFile {
+  filename: string
+  status: string
+  additions: number
+  deletions: number
+  patch?: string
+}
+
+export interface CommitDetail {
+  sha: string
+  message: string
+  author_name: string
+  author_email: string
+  date: string
+  files: CommitDetailFile[]
+  stats: { additions: number; deletions: number; total: number }
+}
+
+export async function fetchCommitDetail(
+  teamWorkspaceId: string,
+  sha: string
+): Promise<CommitDetail> {
+  const params = new URLSearchParams({ teamWorkspaceId, sha })
+  const res = await fetch(`/api/teams/github/commits/detail?${params}`)
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Failed to fetch commit detail')
+  }
+  return res.json()
+}
+
 export class ConflictError extends Error {
   constructor(message: string) {
     super(message)
