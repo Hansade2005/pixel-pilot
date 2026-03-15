@@ -1492,37 +1492,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Right Panel - VS Code Layout */}
                 <ResizablePanel defaultSize={chatPanelVisible ? 60 : 100} minSize={30}>
                   <div className="h-full flex flex-col overflow-hidden relative">
-                    {/* Team indicators - non-overlapping top bar */}
-                    {selectedProject?.isTeamWorkspace && (
-                      <div className="flex items-center justify-end gap-2 px-3 py-1 border-b border-gray-800/60 bg-gray-950/80 flex-shrink-0">
-                        <TeamPresence
-                          workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
-                          organizationId={selectedProject?.organizationId}
-                        />
-                        <TeamActivityFeed
-                          workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
-                          organizationId={selectedProject?.organizationId}
-                        />
-                        {(effectivePendingCount > 0 || hasRemoteChanges) && (
-                          <TeamSyncButton
-                            changedFiles={effectiveChangedFiles}
-                            deletedFiles={effectiveDeletedFiles}
-                            pendingCount={effectivePendingCount}
-                            isSyncing={effectiveIsSyncing}
-                            lastSyncAt={teamLastSyncAt}
-                            syncError={effectiveSyncError}
-                            isGitHubBacked={isCurrentGitHub}
-                            hasRemoteChanges={hasRemoteChanges}
-                            onSync={syncToTeam}
-                            onClearPending={effectiveClearPending}
-                            onOpenSourceControl={() => {
-                              setCodeViewPanel('source')
-                              setActiveTab("code")
-                            }}
-                          />
-                        )}
-                      </div>
-                    )}
+                    {/* Team indicators moved to status bar */}
                     {/* Content Area */}
                     {activeTab === "code" ? (
                       /* VS Code-like Layout: Activity Bar + Sidebar + Editor */
@@ -2263,8 +2233,43 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   </button>
                 </div>
 
-                {/* Right side - token usage + action buttons */}
+                {/* Right side - team indicators + token usage + action buttons */}
                 <div className="flex items-center">
+                  {/* Team Indicators */}
+                  {selectedProject?.isTeamWorkspace && (
+                    <>
+                      <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+                      <TeamPresence
+                        workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
+                        organizationId={selectedProject?.organizationId}
+                        compact
+                      />
+                      <TeamActivityFeed
+                        workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
+                        organizationId={selectedProject?.organizationId}
+                      />
+                      {(effectivePendingCount > 0 || hasRemoteChanges) && (
+                        <TeamSyncButton
+                          changedFiles={effectiveChangedFiles}
+                          deletedFiles={effectiveDeletedFiles}
+                          pendingCount={effectivePendingCount}
+                          isSyncing={effectiveIsSyncing}
+                          lastSyncAt={teamLastSyncAt}
+                          syncError={effectiveSyncError}
+                          isGitHubBacked={isCurrentGitHub}
+                          hasRemoteChanges={hasRemoteChanges}
+                          compact
+                          onSync={syncToTeam}
+                          onClearPending={effectiveClearPending}
+                          onOpenSourceControl={() => {
+                            setCodeViewPanel('source')
+                            setActiveTab("code")
+                          }}
+                        />
+                      )}
+                      <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
+                    </>
+                  )}
                   {/* Token/Credit Usage */}
                   {tokenUsage.totalTokens && (
                     <>

@@ -12,7 +12,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   RefreshCw,
   Check,
@@ -35,6 +34,7 @@ interface TeamSyncButtonProps {
   syncError: string | null
   isGitHubBacked?: boolean
   hasRemoteChanges?: boolean
+  compact?: boolean
   onSync: () => Promise<{ success: boolean; synced?: number; deleted?: number; error?: string; blockedFiles?: string[] }>
   onClearPending: () => void
   onOpenSourceControl?: () => void
@@ -49,6 +49,7 @@ export function TeamSyncButton({
   syncError,
   isGitHubBacked,
   hasRemoteChanges,
+  compact = false,
   onSync,
   onClearPending,
   onOpenSourceControl,
@@ -92,7 +93,7 @@ export function TeamSyncButton({
               size="sm"
               onClick={handleClick}
               disabled={isSyncing}
-              className={`h-7 gap-1.5 text-xs font-medium transition-all rounded-r-none ${
+              className={`${compact ? 'h-5 gap-1 text-[10px]' : 'h-7 gap-1.5 text-xs'} font-medium transition-all rounded-r-none ${
                 syncError
                   ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30'
                   : hasRemoteChanges
@@ -138,7 +139,7 @@ export function TeamSyncButton({
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 w-6 p-0 rounded-l-none bg-orange-700/50 hover:bg-orange-600/50 text-white/70 hover:text-white"
+            className={`${compact ? 'h-5 w-5' : 'h-7 w-6'} p-0 rounded-l-none bg-orange-700/50 hover:bg-orange-600/50 text-white/70 hover:text-white`}
             title="View pending changes"
           >
             <span className="text-[10px]">...</span>
@@ -170,7 +171,7 @@ export function TeamSyncButton({
           </div>
         </div>
 
-        <ScrollArea className="h-auto max-h-[200px]">
+        <div className={pendingCount > 8 ? "max-h-[208px] overflow-y-auto" : ""}>
           <div className="p-1.5 space-y-0.5">
             {Array.from(changedFiles).map(path => (
               <div
@@ -197,7 +198,7 @@ export function TeamSyncButton({
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
 
         {syncError && (
           <div className="px-3 py-2 border-t border-gray-800/60 bg-red-500/5">
