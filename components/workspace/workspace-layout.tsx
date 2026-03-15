@@ -1890,8 +1890,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 lastKnownSha={lastKnownSha}
                                 hasRemoteChanges={hasRemoteChanges}
                                 isPulling={isGhPulling}
-                                trackedChangedFiles={effectiveChangedFiles}
-                                trackedDeletedFiles={effectiveDeletedFiles}
                                 onPull={pullFromGitHub}
                                 onOpenDiff={(title, content) => {
                                   const diffFile: File = {
@@ -2053,6 +2051,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                               window.location.href = '/workspace'
                             }}
                           />
+                          {/* Team Activity Section */}
+                          {selectedProject?.isTeamWorkspace && (
+                            <div className="border-t border-gray-800/60 px-4 py-3">
+                              <TeamActivityFeed
+                                workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
+                                organizationId={selectedProject?.organizationId}
+                              />
+                            </div>
+                          )}
                           {/* Shared Chats Section */}
                           <div className="border-t border-gray-800/60">
                             <TeamSharedChats
@@ -2233,43 +2240,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   </button>
                 </div>
 
-                {/* Right side - team indicators + token usage + action buttons */}
+                {/* Right side - token usage + action buttons */}
                 <div className="flex items-center">
-                  {/* Team Indicators */}
-                  {selectedProject?.isTeamWorkspace && (
-                    <>
-                      <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
-                      <TeamPresence
-                        workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
-                        organizationId={selectedProject?.organizationId}
-                        compact
-                      />
-                      <TeamActivityFeed
-                        workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
-                        organizationId={selectedProject?.organizationId}
-                      />
-                      {(effectivePendingCount > 0 || hasRemoteChanges) && (
-                        <TeamSyncButton
-                          changedFiles={effectiveChangedFiles}
-                          deletedFiles={effectiveDeletedFiles}
-                          pendingCount={effectivePendingCount}
-                          isSyncing={effectiveIsSyncing}
-                          lastSyncAt={teamLastSyncAt}
-                          syncError={effectiveSyncError}
-                          isGitHubBacked={isCurrentGitHub}
-                          hasRemoteChanges={hasRemoteChanges}
-                          compact
-                          onSync={syncToTeam}
-                          onClearPending={effectiveClearPending}
-                          onOpenSourceControl={() => {
-                            setCodeViewPanel('source')
-                            setActiveTab("code")
-                          }}
-                        />
-                      )}
-                      <div className="w-px h-3.5 bg-gray-700/60 mx-0.5" />
-                    </>
-                  )}
                   {/* Token/Credit Usage */}
                   {tokenUsage.totalTokens && (
                     <>
