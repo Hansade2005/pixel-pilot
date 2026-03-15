@@ -94,6 +94,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
+  const [aiFileChanges, setAiFileChanges] = useState(0)
   const [gitHubConnected, setGitHubConnected] = useState(false)
   const [clientProjects, setClientProjects] = useState<Workspace[]>(projects)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
@@ -1069,8 +1070,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
     }
 
+    // Also count AI file changes for the source control badge
+    const handleAiFileChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.projectId === selectedProject?.id) {
+        setAiFileChanges(prev => prev + 1)
+      }
+    }
+
     window.addEventListener('files-changed', handleFilesChanged as EventListener)
-    return () => window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+    window.addEventListener('files-changed', handleAiFileChange as EventListener)
+    return () => {
+      window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+      window.removeEventListener('files-changed', handleAiFileChange as EventListener)
+    }
   }, [selectedProject])
 
   // Handle modal close - reset form fields
@@ -1561,6 +1574,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             onClick={() => {
                               setCodeViewPanel(codeViewPanel === 'source' ? null : 'source')
                               setActiveTab("code")
+                              // Clear the AI file changes counter when opening source control
+                              if (codeViewPanel !== 'source') setAiFileChanges(0)
                             }}
                             className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
                               codeViewPanel === 'source'
@@ -1570,9 +1585,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             title="Source Control"
                           >
                             <GitBranch className="size-5" />
-                            {hasRemoteChanges && (
-                              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-orange-500" />
-                            )}
+                            {aiFileChanges > 0 ? (
+                              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-orange-600 text-[10px] font-medium text-white leading-none">
+                                {aiFileChanges > 99 ? '99+' : aiFileChanges}
+                              </span>
+                            ) : hasRemoteChanges ? (
+                              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            ) : null}
                             {codeViewPanel === 'source' && (
                               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
                             )}
