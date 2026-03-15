@@ -90,7 +90,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit" | "monitor" | "team" | "source">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "cloud" | "audit" | "monitor" | "team">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
@@ -105,7 +105,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit" | "monitor" | "team" | "source">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "cloud" | "audit" | "monitor" | "team">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -120,7 +120,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const sidebarRef = useRef<HTMLDivElement>(null)
 
   // VS Code-like code view state
-  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | null>('files')
+  const [codeViewPanel, setCodeViewPanel] = useState<'files' | 'search' | 'chat' | 'settings' | 'source' | null>('files')
   const [openFiles, setOpenFiles] = useState<File[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [editorSettings, setEditorSettings] = useState<EditorSettings>(defaultEditorSettings)
@@ -1492,9 +1492,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Right Panel - VS Code Layout */}
                 <ResizablePanel defaultSize={chatPanelVisible ? 60 : 100} minSize={30}>
                   <div className="h-full flex flex-col overflow-hidden relative">
-                    {/* Team indicators - float top-right: presence avatars + sync button */}
+                    {/* Team indicators - non-overlapping top bar */}
                     {selectedProject?.isTeamWorkspace && (
-                      <div className="absolute top-2 right-3 z-30 flex items-center gap-2">
+                      <div className="flex items-center justify-end gap-2 px-3 py-1 border-b border-gray-800/60 bg-gray-950/80 flex-shrink-0">
                         <TeamPresence
                           workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
                           organizationId={selectedProject?.organizationId}
@@ -1516,7 +1516,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             onSync={syncToTeam}
                             onClearPending={effectiveClearPending}
                             onOpenSourceControl={() => {
-                              setActiveTab("source")
+                              setCodeViewPanel('source')
+                              setActiveTab("code")
                             }}
                           />
                         )}
@@ -1587,16 +1588,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           </button>
 
                           <button
-                            onClick={() => setActiveTab("source")}
+                            onClick={() => {
+                              setCodeViewPanel(codeViewPanel === 'source' ? null : 'source')
+                              setActiveTab("code")
+                            }}
                             className={`w-10 h-10 flex items-center justify-center rounded-lg mb-0.5 transition-colors relative ${
-                              activeTab === 'source'
+                              codeViewPanel === 'source'
                                 ? 'text-orange-400 bg-orange-500/10'
                                 : 'text-gray-500 hover:text-gray-300'
                             }`}
                             title="Source Control"
                           >
                             <GitBranch className="size-5" />
-                            {activeTab === 'source' && (
+                            {codeViewPanel === 'source' && (
                               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
                             )}
                           </button>
@@ -1899,6 +1903,37 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 </div>
                               </div>
                             )}
+                            {codeViewPanel === 'source' && (
+                              <SourceControlTab
+                                projectId={selectedProject?.id}
+                                teamWorkspaceId={selectedProject?.teamWorkspaceId}
+                                organizationId={selectedProject?.organizationId}
+                                isTeamWorkspace={!!selectedProject?.isTeamWorkspace}
+                                isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                                githubRepoUrl={selectedProject?.githubRepoUrl}
+                                userId={user.id}
+                                lastKnownSha={lastKnownSha}
+                                hasRemoteChanges={hasRemoteChanges}
+                                isPulling={isGhPulling}
+                                onPull={pullFromGitHub}
+                                onOpenDiff={(title, content) => {
+                                  const diffFile: File = {
+                                    id: `diff-${Date.now()}`,
+                                    workspaceId: selectedProject?.id || "",
+                                    name: title,
+                                    path: `/.diffs/${title.replace(/[^a-zA-Z0-9.-]/g, '_')}.md`,
+                                    content,
+                                    fileType: "markdown",
+                                    type: "markdown",
+                                    size: content.length,
+                                    isDirectory: false,
+                                    createdAt: new Date().toISOString(),
+                                    updatedAt: new Date().toISOString(),
+                                  }
+                                  setSelectedFile(diffFile)
+                                }}
+                              />
+                            )}
                           </div>
                         )}
 
@@ -2061,52 +2096,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                               </Button>
                             </div>
                           )}
-                        </div>
-                      </div>
-                    ) : activeTab === "source" ? (
-                      /* Source Control Tab */
-                      <div className="flex-1 flex flex-col min-h-0">
-                        <div className="flex items-center px-3 py-1.5 border-b border-gray-800/60 bg-gray-950">
-                          <button
-                            onClick={() => setActiveTab("code")}
-                            className="h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-                          >
-                            <Code className="size-3.5" />
-                            <span>Back to Code</span>
-                          </button>
-                        </div>
-                        <div className="flex-1 min-h-0">
-                          <SourceControlTab
-                            projectId={selectedProject?.id}
-                            teamWorkspaceId={selectedProject?.teamWorkspaceId}
-                            organizationId={selectedProject?.organizationId}
-                            isTeamWorkspace={!!selectedProject?.isTeamWorkspace}
-                            isGitHubBacked={!!selectedProject?.isGitHubBacked}
-                            githubRepoUrl={selectedProject?.githubRepoUrl}
-                            userId={user.id}
-                            lastKnownSha={lastKnownSha}
-                            hasRemoteChanges={hasRemoteChanges}
-                            isPulling={isGhPulling}
-                            onPull={pullFromGitHub}
-                            onOpenDiff={(title, content) => {
-                              // Create a virtual file for the diff view and open it in the editor
-                              const diffFile: File = {
-                                id: `diff-${Date.now()}`,
-                                workspaceId: selectedProject?.id || "",
-                                name: title,
-                                path: `/.diffs/${title.replace(/[^a-zA-Z0-9.-]/g, '_')}.md`,
-                                content,
-                                fileType: "markdown",
-                                type: "markdown",
-                                size: content.length,
-                                isDirectory: false,
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString(),
-                              }
-                              setSelectedFile(diffFile)
-                              setActiveTab("code")
-                            }}
-                          />
                         </div>
                       </div>
                     ) : (
@@ -2517,7 +2506,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onSync={syncToTeam}
                       onClearPending={effectiveClearPending}
                       onOpenSourceControl={() => {
-                        setActiveTab("source")
+                        setCodeViewPanel('source')
+                        setActiveTab("code")
                       }}
                     />
                   )}
