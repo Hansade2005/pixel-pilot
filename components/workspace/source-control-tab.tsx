@@ -39,6 +39,8 @@ interface SourceControlTabProps {
   lastKnownSha?: string | null
   hasRemoteChanges?: boolean
   isPulling?: boolean
+  trackedChangedFiles?: Set<string>
+  trackedDeletedFiles?: Set<string>
   onPull?: () => Promise<any>
   onOpenDiff?: (title: string, content: string) => void
 }
@@ -75,6 +77,8 @@ export function SourceControlTab({
   lastKnownSha,
   hasRemoteChanges,
   isPulling,
+  trackedChangedFiles,
+  trackedDeletedFiles,
   onPull,
   onOpenDiff,
 }: SourceControlTabProps) {
@@ -104,25 +108,52 @@ export function SourceControlTab({
       const localFiles = await storageManager.getFiles(projectId)
 
       if (isGitHubBacked) {
-        // For GitHub-backed workspaces, compare against what was last pulled
-        // Deduplicate files that exist with both /path and path formats
-        const seen = new Set<string>()
-        const changes: FileChange[] = localFiles
-          .filter((f) => !f.isDirectory)
-          .filter((f) => {
-            const normalized = f.path.startsWith('/') ? f.path : `/${f.path}`
-            if (seen.has(normalized)) return false
-            seen.add(normalized)
-            return true
-          })
-          .map((f) => ({
-            path: f.path,
-            name: f.name,
-            status: "modified" as const,
-            content: f.content,
-          }))
+        // For GitHub-backed workspaces, only show files tracked as changed by the sync hook
+        const hasTracked = (trackedChangedFiles && trackedChangedFiles.size > 0) || (trackedDeletedFiles && trackedDeletedFiles.size > 0)
 
-        setUnstagedFiles(changes)
+        if (hasTracked) {
+          const seen = new Set<string>()
+          const changes: FileChange[] = []
+
+          // Add changed files (modified/added)
+          if (trackedChangedFiles) {
+            for (const trackedPath of trackedChangedFiles) {
+              const normalized = trackedPath.startsWith('/') ? trackedPath : `/${trackedPath}`
+              if (seen.has(normalized)) continue
+              seen.add(normalized)
+
+              const localFile = localFiles.find(f => {
+                const fp = f.path.startsWith('/') ? f.path : `/${f.path}`
+                return fp === normalized
+              })
+              changes.push({
+                path: localFile?.path || trackedPath,
+                name: trackedPath.split('/').pop() || trackedPath,
+                status: "modified",
+                content: localFile?.content,
+              })
+            }
+          }
+
+          // Add deleted files
+          if (trackedDeletedFiles) {
+            for (const delPath of trackedDeletedFiles) {
+              const normalized = delPath.startsWith('/') ? delPath : `/${delPath}`
+              if (seen.has(normalized)) continue
+              seen.add(normalized)
+
+              changes.push({
+                path: delPath,
+                name: delPath.split('/').pop() || delPath,
+                status: "deleted",
+              })
+            }
+          }
+
+          setUnstagedFiles(changes)
+        } else {
+          setUnstagedFiles([])
+        }
         setStagedFiles([])
       } else {
         // Legacy: compare with Supabase JSONB
@@ -177,7 +208,7 @@ export function SourceControlTab({
     } finally {
       setIsScanning(false)
     }
-  }, [projectId, teamWorkspaceId, isTeamWorkspace, isGitHubBacked, supabase])
+  }, [projectId, teamWorkspaceId, isTeamWorkspace, isGitHubBacked, supabase, trackedChangedFiles, trackedDeletedFiles])
 
   // Load commit history
   const loadCommits = useCallback(async () => {

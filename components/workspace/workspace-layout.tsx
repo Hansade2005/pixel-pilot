@@ -1920,6 +1920,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 lastKnownSha={lastKnownSha}
                                 hasRemoteChanges={hasRemoteChanges}
                                 isPulling={isGhPulling}
+                                trackedChangedFiles={effectiveChangedFiles}
+                                trackedDeletedFiles={effectiveDeletedFiles}
                                 onPull={pullFromGitHub}
                                 onOpenDiff={(title, content) => {
                                   const diffFile: File = {

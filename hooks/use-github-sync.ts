@@ -46,6 +46,7 @@ export function useGitHubSync({
   const changedRef = useRef<Set<string>>(new Set())
   const deletedRef = useRef<Set<string>>(new Set())
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isPullingRef = useRef(false)
 
   const isActive = isTeamWorkspace && isGitHubBacked && !!teamWorkspaceId
 
@@ -71,6 +72,9 @@ export function useGitHubSync({
     if (!isActive || !workspaceId) return
 
     const handleEvent = (event: StorageEventData) => {
+      // Ignore storage events triggered by pull operations
+      if (isPullingRef.current) return
+
       if (event.tableName !== 'files') return
       if (event.record?.workspaceId && event.record.workspaceId !== workspaceId) return
 
@@ -163,15 +167,11 @@ export function useGitHubSync({
       setLastKnownSha(result.sha)
       setHasRemoteChanges(false)
 
-      // Clear tracked changes for committed files
-      for (const f of filesToCommit) {
-        changedRef.current.delete(f.path)
-      }
-      for (const p of pathsToDelete) {
-        deletedRef.current.delete(p)
-      }
-      setChangedFiles(new Set(changedRef.current))
-      setDeletedFiles(new Set(deletedRef.current))
+      // Clear ALL tracked changes after successful commit
+      changedRef.current.clear()
+      deletedRef.current.clear()
+      setChangedFiles(new Set())
+      setDeletedFiles(new Set())
 
       // Persist SHA in workspace metadata
       try {
@@ -209,6 +209,7 @@ export function useGitHubSync({
     }
 
     setIsPulling(true)
+    isPullingRef.current = true
     setSyncError(null)
 
     try {
@@ -259,6 +260,12 @@ export function useGitHubSync({
         }
       }
 
+      // Clear all tracked changes — local state is now in sync with remote
+      changedRef.current.clear()
+      deletedRef.current.clear()
+      setChangedFiles(new Set())
+      setDeletedFiles(new Set())
+
       // Update SHA
       setLastKnownSha(result.sha)
       setHasRemoteChanges(false)
@@ -275,6 +282,9 @@ export function useGitHubSync({
         }
       } catch {}
 
+      // Re-enable change tracking before triggering refresh
+      isPullingRef.current = false
+
       // Trigger file explorer refresh
       window.dispatchEvent(new CustomEvent('files-changed', {
         detail: { projectId: workspaceId },
@@ -286,6 +296,7 @@ export function useGitHubSync({
       setSyncError(errorMsg)
       return { success: false, error: errorMsg }
     } finally {
+      isPullingRef.current = false
       setIsPulling(false)
     }
   }, [teamWorkspaceId, workspaceId])
