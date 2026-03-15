@@ -31,11 +31,14 @@ import {
   ArrowRight,
   RefreshCw,
   GitBranch,
-  AlertTriangle
+  AlertTriangle,
+  Key,
+  Link as LinkIcon
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { getDeploymentTokens } from "@/lib/cloud-sync"
 
 interface Organization {
   id: string
@@ -106,6 +109,9 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, team
   const [wsMode, setWsMode] = useState<"create" | "link">("create")
   const [wsExistingRepo, setWsExistingRepo] = useState("")
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
+  const [cloudTokenLoaded, setCloudTokenLoaded] = useState(false)
+  const [loadingCloudToken, setLoadingCloudToken] = useState(false)
+  const [showManualToken, setShowManualToken] = useState(false)
 
   // GitHub collaborator dialog
   const [showAddCollaborator, setShowAddCollaborator] = useState(false)
@@ -455,6 +461,32 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, team
       toast.error(error.message || "Failed to revoke invitation")
     }
   }
+
+  // Auto-load GitHub token from cloud sync when dialog opens
+  useEffect(() => {
+    if (!showCreateWorkspace) {
+      setCloudTokenLoaded(false)
+      setShowManualToken(false)
+      return
+    }
+
+    const loadCloudToken = async () => {
+      setLoadingCloudToken(true)
+      try {
+        const tokens = await getDeploymentTokens(userId)
+        if (tokens?.github) {
+          setWsGithubToken(tokens.github)
+          setCloudTokenLoaded(true)
+        }
+      } catch (err) {
+        console.error('[TeamPanel] Error loading cloud token:', err)
+      } finally {
+        setLoadingCloudToken(false)
+      }
+    }
+
+    loadCloudToken()
+  }, [showCreateWorkspace, userId])
 
   const handleChangeRole = async (memberId: string, newRole: string) => {
     if (!selectedOrg) return
@@ -1257,18 +1289,84 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, team
               </div>
             )}
 
+            {/* GitHub Token Section */}
             <div className="space-y-2">
-              <Label className="text-sm text-gray-300">GitHub Personal Access Token</Label>
-              <Input
-                type="password"
-                placeholder="ghp_..."
-                value={wsGithubToken}
-                onChange={(e) => setWsGithubToken(e.target.value)}
-                className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
-              />
-              <p className="text-[11px] text-gray-500">
-                Needs <code className="text-orange-400/70">repo</code> scope. Used for all team member operations.
-              </p>
+              <Label className="text-sm text-gray-300">GitHub Connection</Label>
+
+              {loadingCloudToken ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border border-gray-800 bg-gray-900/50">
+                  <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+                  <span className="text-xs text-gray-400">Checking GitHub connection...</span>
+                </div>
+              ) : cloudTokenLoaded ? (
+                <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs text-emerald-300 font-medium">GitHub connected via your account settings</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCloudTokenLoaded(false)
+                      setWsGithubToken("")
+                      setShowManualToken(true)
+                    }}
+                    className="text-[11px] text-gray-500 hover:text-orange-400 mt-1.5 transition-colors"
+                  >
+                    Use a different token instead
+                  </button>
+                </div>
+              ) : showManualToken ? (
+                <>
+                  <Input
+                    type="password"
+                    placeholder="ghp_..."
+                    value={wsGithubToken}
+                    onChange={(e) => setWsGithubToken(e.target.value)}
+                    className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
+                  />
+                  <p className="text-[11px] text-gray-500">
+                    Needs <code className="text-orange-400/70">repo</code>, <code className="text-orange-400/70">workflow</code>, <code className="text-orange-400/70">delete_repo</code> scopes.
+                  </p>
+                  <a
+                    href="https://github.com/settings/tokens/new?description=PiPilot%20(repo%20workflow)&scopes=repo,workflow,user,delete_repo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-orange-400 hover:text-orange-300 transition-colors"
+                  >
+                    <Key className="w-3 h-3" />
+                    Generate a new token on GitHub
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </>
+              ) : (
+                <div className="p-3 rounded-lg border border-orange-500/20 bg-orange-500/5 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs font-medium text-orange-300">No GitHub token found</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">
+                        Connect GitHub in your account settings, or enter a token manually.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href="/workspace?tab=account"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-600 hover:bg-orange-500 text-white transition-colors"
+                    >
+                      <Settings className="w-3 h-3" />
+                      Account Settings
+                    </a>
+                    <button
+                      onClick={() => setShowManualToken(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-300 border border-gray-700 hover:border-gray-600 hover:text-white transition-colors"
+                    >
+                      <Key className="w-3 h-3" />
+                      Enter Token
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
