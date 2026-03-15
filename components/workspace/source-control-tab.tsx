@@ -17,6 +17,7 @@ import {
   ArrowDown,
   Eye,
   ExternalLink,
+  Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -88,6 +89,7 @@ export function SourceControlTab({
   const [stagedExpanded, setStagedExpanded] = useState(true)
   const [unstagedExpanded, setUnstagedExpanded] = useState(true)
   const [isScanning, setIsScanning] = useState(false)
+  const [isGeneratingMsg, setIsGeneratingMsg] = useState(false)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -302,6 +304,89 @@ export function SourceControlTab({
   const unstageAll = () => {
     setUnstagedFiles((prev) => [...prev, ...stagedFiles])
     setStagedFiles([])
+  }
+
+  // Generate commit message using a0 LLM API
+  const generateCommitMessage = async () => {
+    const allChanges = [...stagedFiles, ...unstagedFiles]
+    if (allChanges.length === 0) {
+      toast.error("No changes to describe")
+      return
+    }
+
+    setIsGeneratingMsg(true)
+    try {
+      // Build a summary of changed files
+      const changeSummary = allChanges.slice(0, 20).map(f => {
+        const status = f.status === 'added' ? 'A' : f.status === 'deleted' ? 'D' : 'M'
+        const snippet = f.content ? f.content.slice(0, 200) : ''
+        return `${status} ${f.path}${snippet ? `\n${snippet}...` : ''}`
+      }).join('\n\n')
+
+      // Get last user/assistant message pair for context
+      let chatContext = ''
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        const sessions = await storageManager.getChatSessions(userId)
+        const activeSession = sessions
+          .filter(s => s.workspaceId === projectId && s.isActive)
+          .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())[0]
+
+        if (activeSession) {
+          const msgs = await storageManager.getMessages(activeSession.id)
+          // Get the last user message and last assistant message
+          const lastUser = [...msgs].reverse().find(m => m.role === 'user')
+          const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant')
+          if (lastUser || lastAssistant) {
+            chatContext = '\n\nChat context (what the user asked and AI did):'
+            if (lastUser) {
+              const userText = typeof lastUser.content === 'string' ? lastUser.content : JSON.stringify(lastUser.content)
+              chatContext += `\nUser: ${userText.slice(0, 300)}`
+            }
+            if (lastAssistant) {
+              const aiText = typeof lastAssistant.content === 'string' ? lastAssistant.content : JSON.stringify(lastAssistant.content)
+              chatContext += `\nAI: ${aiText.slice(0, 300)}`
+            }
+          }
+        }
+      } catch {
+        // Chat context is optional, continue without it
+      }
+
+      const res = await fetch('https://api.a0.dev/ai/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a commit message generator. Given file changes and optional chat context about what the user asked the AI to do, write a concise, conventional commit message (1 line, max 72 chars). Use prefixes like feat:, fix:, refactor:, docs:, style:, chore: when appropriate. Focus on the "why" from the chat context, not just the "what" from the file list. Only output the commit message text, nothing else.'
+            },
+            {
+              role: 'user',
+              content: `Generate a commit message for these changes:\n\n${changeSummary}${chatContext}`
+            }
+          ]
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to generate commit message')
+
+      const data = await res.json()
+      const message = (data.completion || '').trim().replace(/^["']|["']$/g, '')
+
+      if (message) {
+        setCommitMessage(message)
+      } else {
+        toast.error("Could not generate a message")
+      }
+    } catch (err: any) {
+      console.error('[Source Control] Commit message generation error:', err)
+      toast.error("Failed to generate commit message")
+    } finally {
+      setIsGeneratingMsg(false)
+    }
   }
 
   // Commit staged changes
@@ -630,16 +715,30 @@ export function SourceControlTab({
         <div className="flex-1 flex flex-col min-h-0">
           {/* Commit Message Input */}
           <div className="px-3 py-2 border-b border-gray-800/60 flex-shrink-0">
-            <textarea
-              value={commitMessage}
-              onChange={(e) => setCommitMessage(e.target.value)}
-              placeholder={
-                isGitHubBacked
-                  ? "Commit message (pushes to GitHub)..."
-                  : "Commit message..."
-              }
-              className="w-full h-16 resize-none rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2 text-xs text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-colors"
-            />
+            <div className="relative">
+              <textarea
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                placeholder={
+                  isGitHubBacked
+                    ? "Commit message (pushes to GitHub)..."
+                    : "Commit message..."
+                }
+                className="w-full h-16 resize-none rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2 pr-8 text-xs text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-colors"
+              />
+              <button
+                onClick={generateCommitMessage}
+                disabled={isGeneratingMsg || (stagedFiles.length === 0 && unstagedFiles.length === 0)}
+                className="absolute right-2 top-2 h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Generate commit message with AI"
+              >
+                {isGeneratingMsg ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
             <div className="flex gap-1.5 mt-1.5">
               <Button
                 size="sm"
