@@ -219,13 +219,32 @@ export function useGitHubSync({
 
       for (const file of result.files) {
         const path = file.path.startsWith('/') ? file.path : `/${file.path}`
+        const pathWithout = path.replace(/^\//, '')
         const name = path.split('/').pop() || file.path
+
+        // Check both path formats to avoid duplicates
         const existing = await storageManager.getFile(workspaceId, path)
+          || await storageManager.getFile(workspaceId, pathWithout)
 
         if (existing) {
-          await storageManager.updateFile(workspaceId, path, {
-            content: file.content,
-          })
+          // If the existing file has a different path format, delete it and recreate
+          if (existing.path !== path) {
+            await storageManager.deleteFile(workspaceId, existing.path)
+            await storageManager.createFile({
+              workspaceId,
+              name,
+              path,
+              content: file.content,
+              fileType: path.split('.').pop() || 'text',
+              type: 'file',
+              size: file.content.length,
+              isDirectory: false,
+            })
+          } else {
+            await storageManager.updateFile(workspaceId, path, {
+              content: file.content,
+            })
+          }
         } else {
           await storageManager.createFile({
             workspaceId,

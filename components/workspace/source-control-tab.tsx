@@ -103,12 +103,16 @@ export function SourceControlTab({
 
       if (isGitHubBacked) {
         // For GitHub-backed workspaces, compare against what was last pulled
-        // All local files that differ from the initial pull state are "changed"
-        // We track this via the github sync hook's changedFiles/deletedFiles,
-        // but for the scan we do a simple "all non-directory files are potentially changed"
-        // since we don't have the GitHub content cached locally for comparison
+        // Deduplicate files that exist with both /path and path formats
+        const seen = new Set<string>()
         const changes: FileChange[] = localFiles
           .filter((f) => !f.isDirectory)
+          .filter((f) => {
+            const normalized = f.path.startsWith('/') ? f.path : `/${f.path}`
+            if (seen.has(normalized)) return false
+            seen.add(normalized)
+            return true
+          })
           .map((f) => ({
             path: f.path,
             name: f.name,
@@ -312,13 +316,13 @@ export function SourceControlTab({
         const filesToCommit = stagedFiles
           .filter((f) => f.status !== "deleted")
           .map((f) => ({
-            path: f.path,
+            path: f.path.replace(/^\//, ''),
             content: f.content || "",
           }))
 
         const deletedPaths = stagedFiles
           .filter((f) => f.status === "deleted")
-          .map((f) => f.path)
+          .map((f) => f.path.replace(/^\//, ''))
 
         const result = await githubCommitFiles(
           teamWorkspaceId,

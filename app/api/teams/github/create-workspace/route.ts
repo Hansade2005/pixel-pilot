@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { organizationId, workspaceName, githubToken, repoName, repoDescription, isPrivate } = await req.json()
+    const { organizationId, workspaceName, githubToken, repoName, repoDescription, isPrivate, initialFiles } = await req.json()
 
     if (!organizationId || !workspaceName || !githubToken || !repoName) {
       return Response.json({ error: 'Missing required fields: organizationId, workspaceName, githubToken, repoName' }, { status: 400 })
@@ -34,11 +34,13 @@ export async function POST(req: NextRequest) {
     const octokit = new Octokit({ auth: githubToken })
     const { data: githubUser } = await octokit.rest.users.getAuthenticated()
 
+    const hasInitialFiles = Array.isArray(initialFiles) && initialFiles.length > 0
+
     const { data: repo } = await octokit.rest.repos.createForAuthenticatedUser({
       name: repoName,
       description: repoDescription || `Team workspace: ${workspaceName}`,
       private: isPrivate !== false,
-      auto_init: true,
+      auto_init: true, // Always init with README so we have a base commit
     })
 
     // Get initial commit SHA
@@ -47,6 +49,65 @@ export async function POST(req: NextRequest) {
       repo: repo.name,
       ref: 'heads/main',
     })
+
+    let headSha = ref.object.sha
+
+    // If we have project files, push them as the initial commit
+    if (hasInitialFiles) {
+      try {
+        // Create blobs for each file
+        const treeEntries = await Promise.all(
+          initialFiles.map(async (file: { path: string; content: string }) => {
+            const { data: blob } = await octokit.rest.git.createBlob({
+              owner: githubUser.login,
+              repo: repo.name,
+              content: Buffer.from(file.content).toString('base64'),
+              encoding: 'base64',
+            })
+            return {
+              path: file.path,
+              mode: '100644' as const,
+              type: 'blob' as const,
+              sha: blob.sha,
+            }
+          })
+        )
+
+        // Create tree with base_tree to keep the README
+        const { data: tree } = await octokit.rest.git.createTree({
+          owner: githubUser.login,
+          repo: repo.name,
+          base_tree: headSha,
+          tree: treeEntries,
+        })
+
+        // Create commit
+        const { data: commit } = await octokit.rest.git.createCommit({
+          owner: githubUser.login,
+          repo: repo.name,
+          message: `Initial commit: ${workspaceName} project files`,
+          tree: tree.sha,
+          parents: [headSha],
+          author: {
+            name: githubUser.name || githubUser.login,
+            email: githubUser.email || `${githubUser.login}@users.noreply.github.com`,
+          },
+        })
+
+        // Update ref
+        await octokit.rest.git.updateRef({
+          owner: githubUser.login,
+          repo: repo.name,
+          ref: 'heads/main',
+          sha: commit.sha,
+        })
+
+        headSha = commit.sha
+      } catch (pushError: any) {
+        console.error('[GitHub Create Workspace] Error pushing initial files:', pushError.message)
+        // Don't fail workspace creation if file push fails
+      }
+    }
 
     // Create team_workspaces row with GitHub columns
     const admin = createAdminClient()
@@ -61,7 +122,7 @@ export async function POST(req: NextRequest) {
         github_repo_name: repo.name,
         github_repo_url: repo.html_url,
         github_default_branch: 'main',
-        github_last_synced_sha: ref.object.sha,
+        github_last_synced_sha: headSha,
         files: [],
       })
       .select()

@@ -88,10 +88,13 @@ export async function fetchAllFiles(
     // Skip hidden files and .git
     if (cleanPath.startsWith('.') || cleanPath.includes('/.git/')) continue
 
+    // Normalize path to always have a leading /
+    const normalizedPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`
+
     try {
       const content = await entry.async('text')
       files.push({
-        path: cleanPath,
+        path: normalizedPath,
         content,
         sha: '', // Individual file SHAs not available from ZIP
       })

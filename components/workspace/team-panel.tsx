@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { storageManager } from "@/lib/storage-manager"
 
 interface Organization {
   id: string
@@ -602,6 +603,24 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, team
           toast.error("Repository name is required")
           return
         }
+
+        // Collect current project files from IndexedDB to push as initial commit
+        let initialFiles: Array<{ path: string; content: string }> = []
+        if (projectId) {
+          try {
+            await storageManager.init()
+            const files = await storageManager.getFiles(projectId)
+            initialFiles = files
+              .filter((f: any) => !f.isDirectory && f.content)
+              .map((f: any) => ({
+                path: (f.path || f.name).replace(/^\//, ''),
+                content: f.content,
+              }))
+          } catch (err) {
+            console.warn('[TeamPanel] Could not load project files:', err)
+          }
+        }
+
         const response = await fetch('/api/teams/github/create-workspace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -610,6 +629,7 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, team
             workspaceName: wsName.trim(),
             githubToken: wsGithubToken.trim(),
             repoName: wsRepoName.trim(),
+            initialFiles: initialFiles.length > 0 ? initialFiles : undefined,
           }),
         })
         const data = await response.json()
