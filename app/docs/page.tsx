@@ -961,6 +961,19 @@ export default function DocsPage() {
         )}
       </div>
 
+      {/* ===== DOCS FOOTER ===== */}
+      <div className="hidden lg:block border-t border-gray-800/60 bg-gray-900/30 px-6 py-4">
+        <div className="max-w-3xl mx-auto flex items-center justify-between text-xs text-gray-500">
+          <span>&copy; {new Date().getFullYear()} PiPilot. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <a href="https://status.pipilot.dev/" target="_blank" rel="noopener noreferrer" className="hover:text-orange-400 transition-colors">Status</a>
+            <a href="/support" className="hover:text-orange-400 transition-colors">Support</a>
+            <a href="/privacy" className="hover:text-orange-400 transition-colors">Privacy</a>
+            <a href="/terms" className="hover:text-orange-400 transition-colors">Terms</a>
+          </div>
+        </div>
+      </div>
+
       {/* ===== MOBILE BOTTOM NAVIGATION ===== */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#030305]/95 backdrop-blur-xl border-t border-gray-800/60" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex items-center justify-around px-2 py-2">

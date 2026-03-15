@@ -45,6 +45,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li><Link href="/community" className="text-gray-400 hover:text-orange-400 transition-colors">Community</Link></li>
               <li><Link href="/support" className="text-gray-400 hover:text-orange-400 transition-colors">Support</Link></li>
+              <li><a href="https://status.pipilot.dev/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-orange-400 transition-colors">Status</a></li>
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Discord</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Reddit</Link></li> */}
               {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>X/Twitter</Link></li> */}
