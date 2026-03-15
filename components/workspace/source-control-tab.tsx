@@ -237,21 +237,27 @@ export function SourceControlTab({
   // Generate rich diff markdown for a commit
   const generateCommitDiffMarkdown = (detail: CommitDetail): string => {
     const lines: string[] = []
-    lines.push(`# Commit: ${detail.message}\n`)
-    lines.push(`**Author:** ${detail.author_name} <${detail.author_email}>`)
-    lines.push(`**Date:** ${new Date(detail.date).toLocaleString()}`)
-    lines.push(`**SHA:** \`${detail.sha}\`\n`)
-    lines.push(`**Stats:** +${detail.stats.additions} -${detail.stats.deletions} (${detail.files.length} file${detail.files.length !== 1 ? 's' : ''})\n`)
-    lines.push(`---\n`)
+    // Use unified diff format that Monaco's diff language mode highlights natively
+    lines.push(`# Commit: ${detail.message}`)
+    lines.push(`# Author: ${detail.author_name} <${detail.author_email}>`)
+    lines.push(`# Date: ${new Date(detail.date).toLocaleString()}`)
+    lines.push(`# SHA: ${detail.sha}`)
+    lines.push(`# Stats: +${detail.stats.additions} -${detail.stats.deletions} (${detail.files.length} file${detail.files.length !== 1 ? 's' : ''})`)
+    lines.push('')
 
     for (const file of detail.files) {
-      const icon = file.status === 'added' ? 'A' : file.status === 'removed' ? 'D' : 'M'
-      lines.push(`## ${icon} \`${file.filename}\` (+${file.additions} -${file.deletions})\n`)
-      if (file.patch) {
-        lines.push('```diff')
-        lines.push(file.patch)
-        lines.push('```\n')
+      lines.push(`diff --git a/${file.filename} b/${file.filename}`)
+      if (file.status === 'added') {
+        lines.push('new file mode 100644')
+      } else if (file.status === 'removed') {
+        lines.push('deleted file mode 100644')
       }
+      lines.push(`--- ${file.status === 'added' ? '/dev/null' : `a/${file.filename}`}`)
+      lines.push(`+++ ${file.status === 'removed' ? '/dev/null' : `b/${file.filename}`}`)
+      if (file.patch) {
+        lines.push(file.patch)
+      }
+      lines.push('')
     }
 
     return lines.join('\n')
@@ -802,7 +808,17 @@ export function SourceControlTab({
                                   key={fi}
                                   className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800/30 rounded cursor-pointer group"
                                   onClick={() => {
-                                    const fileDiff = `# ${file.status === 'added' ? 'Added' : file.status === 'removed' ? 'Deleted' : 'Modified'}: \`${file.filename}\`\n\n**Commit:** ${commit.message}\n**Author:** ${detail.author_name}\n**Date:** ${new Date(detail.date).toLocaleString()}\n\n**Changes:** +${file.additions} -${file.deletions}\n\n${file.patch ? '```diff\n' + file.patch + '\n```' : '*No patch available*'}`
+                                    const fileDiff = [
+                                      `# ${file.status === 'added' ? 'Added' : file.status === 'removed' ? 'Deleted' : 'Modified'}: ${file.filename}`,
+                                      `# Commit: ${commit.message}`,
+                                      `# Author: ${detail.author_name} | Date: ${new Date(detail.date).toLocaleString()}`,
+                                      `# Changes: +${file.additions} -${file.deletions}`,
+                                      '',
+                                      `diff --git a/${file.filename} b/${file.filename}`,
+                                      `--- ${file.status === 'added' ? '/dev/null' : `a/${file.filename}`}`,
+                                      `+++ ${file.status === 'removed' ? '/dev/null' : `b/${file.filename}`}`,
+                                      file.patch || '# No patch available',
+                                    ].join('\n')
                                     onOpenDiff?.(file.filename, fileDiff)
                                   }}
                                 >
