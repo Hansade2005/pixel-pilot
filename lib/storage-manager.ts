@@ -37,6 +37,9 @@ export interface Workspace {
   isTeamWorkspace?: boolean
   teamWorkspaceId?: string
   organizationId?: string
+  // GitHub-backed team workspace
+  isGitHubBacked?: boolean
+  githubLastSyncedSha?: string
   createdAt: string
   updatedAt: string
 }

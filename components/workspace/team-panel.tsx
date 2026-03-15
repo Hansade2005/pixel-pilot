@@ -28,7 +28,10 @@ import {
   Clock,
   LogOut,
   Building2,
-  ArrowRight
+  ArrowRight,
+  RefreshCw,
+  GitBranch,
+  AlertTriangle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -70,10 +73,15 @@ interface TeamPanelProps {
   projectId?: string
   projectName?: string
   organizationId?: string | null
+  teamWorkspaceId?: string
+  isGitHubBacked?: boolean
+  githubRepoUrl?: string
   onOrganizationChange?: (orgId: string | null) => void
+  onCreateTeamWorkspace?: (workspace: any) => void
+  onWorkspaceDeleted?: () => void
 }
 
-export function TeamPanel({ userId, projectId, projectName, organizationId, onOrganizationChange }: TeamPanelProps) {
+export function TeamPanel({ userId, projectId, projectName, organizationId, teamWorkspaceId, isGitHubBacked, githubRepoUrl, onOrganizationChange, onCreateTeamWorkspace, onWorkspaceDeleted }: TeamPanelProps) {
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -89,6 +97,31 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
   const [isCreating, setIsCreating] = useState(false)
   const [isInviting, setIsInviting] = useState(false)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
+
+  // Team workspace creation
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false)
+  const [wsName, setWsName] = useState("")
+  const [wsRepoName, setWsRepoName] = useState("")
+  const [wsGithubToken, setWsGithubToken] = useState("")
+  const [wsMode, setWsMode] = useState<"create" | "link">("create")
+  const [wsExistingRepo, setWsExistingRepo] = useState("")
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false)
+
+  // GitHub collaborator dialog
+  const [showAddCollaborator, setShowAddCollaborator] = useState(false)
+  const [collabUsername, setCollabUsername] = useState("")
+  const [isAddingCollab, setIsAddingCollab] = useState(false)
+
+  // Delete workspace dialog
+  const [showDeleteWorkspace, setShowDeleteWorkspace] = useState(false)
+  const [deleteRepoToo, setDeleteRepoToo] = useState(false)
+  const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false)
+
+  // Role change
+  const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null)
+
+  // Resend invitation
+  const [resendingInvite, setResendingInvite] = useState<string | null>(null)
 
   // Presence state
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
@@ -423,6 +456,171 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
     }
   }
 
+  const handleChangeRole = async (memberId: string, newRole: string) => {
+    if (!selectedOrg) return
+    setChangingRoleFor(memberId)
+
+    try {
+      const response = await fetch('/api/teams/members/update-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: selectedOrg.id,
+          memberId,
+          newRole,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to update role')
+
+      toast.success(`Role updated to ${newRole}`)
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update role")
+    } finally {
+      setChangingRoleFor(null)
+    }
+  }
+
+  const handleAddCollaborator = async () => {
+    if (!collabUsername.trim() || !teamWorkspaceId) return
+    setIsAddingCollab(true)
+
+    try {
+      const response = await fetch('/api/teams/github/add-collaborator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamWorkspaceId,
+          githubUsername: collabUsername.trim(),
+          permission: 'push',
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to add collaborator')
+
+      toast.success(`Invited ${collabUsername} to the GitHub repository`)
+      setShowAddCollaborator(false)
+      setCollabUsername("")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add collaborator")
+    } finally {
+      setIsAddingCollab(false)
+    }
+  }
+
+  const handleDeleteWorkspace = async () => {
+    if (!teamWorkspaceId) return
+    setIsDeletingWorkspace(true)
+
+    try {
+      const params = new URLSearchParams({ teamWorkspaceId })
+      if (deleteRepoToo) params.set('deleteRepo', 'true')
+
+      const response = await fetch(`/api/teams/github/delete-workspace?${params}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to delete workspace')
+
+      toast.success("Team workspace deleted")
+      setShowDeleteWorkspace(false)
+      onWorkspaceDeleted?.()
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete workspace")
+    } finally {
+      setIsDeletingWorkspace(false)
+    }
+  }
+
+  const handleResendInvitation = async (invitationId: string) => {
+    setResendingInvite(invitationId)
+
+    try {
+      const response = await fetch('/api/teams/invite/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitationId }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to resend invitation')
+
+      toast.success("Invitation extended for 7 more days")
+      if (selectedOrg) await fetchInvitations(selectedOrg.id)
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend invitation")
+    } finally {
+      setResendingInvite(null)
+    }
+  }
+
+  const currentUserRole = members.find(m => m.user_id === userId)?.role
+
+  const handleCreateWorkspace = async () => {
+    if (!selectedOrg || !wsName.trim() || !wsGithubToken.trim()) return
+    setIsCreatingWorkspace(true)
+
+    try {
+      if (wsMode === "create") {
+        if (!wsRepoName.trim()) {
+          toast.error("Repository name is required")
+          return
+        }
+        const response = await fetch('/api/teams/github/create-workspace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: selectedOrg.id,
+            workspaceName: wsName.trim(),
+            githubToken: wsGithubToken.trim(),
+            repoName: wsRepoName.trim(),
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Failed to create workspace')
+
+        toast.success(`Workspace created with repo ${data.repoFullName}`)
+        setShowCreateWorkspace(false)
+        setWsName("")
+        setWsRepoName("")
+        setWsGithubToken("")
+        onCreateTeamWorkspace?.(data.workspace)
+      } else {
+        if (!wsExistingRepo.trim()) {
+          toast.error("Repository name is required (owner/repo)")
+          return
+        }
+        const response = await fetch('/api/teams/github/link-workspace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: selectedOrg.id,
+            workspaceName: wsName.trim(),
+            githubToken: wsGithubToken.trim(),
+            repoFullName: wsExistingRepo.trim(),
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Failed to link workspace')
+
+        toast.success(`Workspace linked to ${data.repoFullName}`)
+        setShowCreateWorkspace(false)
+        setWsName("")
+        setWsExistingRepo("")
+        setWsGithubToken("")
+        onCreateTeamWorkspace?.(data.workspace)
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create workspace")
+    } finally {
+      setIsCreatingWorkspace(false)
+    }
+  }
+
   const copyInviteLink = async (token: string) => {
     const link = `${window.location.origin}/invite/${token}`
     await navigator.clipboard.writeText(link)
@@ -653,12 +851,55 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0.5 border", getRoleBadge(member.role))}>
-                      <span className="flex items-center gap-1">
-                        {getRoleIcon(member.role)}
-                        {member.role}
-                      </span>
-                    </Badge>
+                    {/* Role selector for owners/admins, badge for others */}
+                    {!isCurrentUser && member.role !== 'owner' && (currentUserRole === 'owner' || currentUserRole === 'admin') ? (
+                      <Select
+                        value={member.role}
+                        onValueChange={(val) => handleChangeRole(member.id, val)}
+                        disabled={changingRoleFor === member.id}
+                      >
+                        <SelectTrigger className={cn(
+                          "h-6 w-auto min-w-[80px] text-[10px] px-1.5 py-0.5 border bg-transparent gap-1",
+                          getRoleBadge(member.role),
+                          changingRoleFor === member.id && "opacity-50"
+                        )}>
+                          <span className="flex items-center gap-1">
+                            {changingRoleFor === member.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              getRoleIcon(member.role)
+                            )}
+                            {member.role}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {currentUserRole === 'owner' && (
+                            <SelectItem value="admin">
+                              <div className="flex items-center gap-2 text-xs">
+                                <Shield className="w-3 h-3 text-orange-300" /> Admin
+                              </div>
+                            </SelectItem>
+                          )}
+                          <SelectItem value="editor">
+                            <div className="flex items-center gap-2 text-xs">
+                              <Pencil className="w-3 h-3 text-gray-400" /> Editor
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="viewer">
+                            <div className="flex items-center gap-2 text-xs">
+                              <Eye className="w-3 h-3 text-gray-500" /> Viewer
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0.5 border", getRoleBadge(member.role))}>
+                        <span className="flex items-center gap-1">
+                          {getRoleIcon(member.role)}
+                          {member.role}
+                        </span>
+                      </Badge>
+                    )}
                     {!isCurrentUser && selectedOrg.owner_id === userId && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -712,6 +953,24 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => handleResendInvitation(inv.id)}
+                        disabled={resendingInvite === inv.id}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-orange-400 hover:bg-orange-500/10"
+                      >
+                        {resendingInvite === inv.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Extend invitation (7 days)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => copyInviteLink(inv.token)}
                         className="h-6 w-6 p-0 text-gray-400 hover:text-orange-400 hover:bg-orange-500/10"
                       >
@@ -739,8 +998,63 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
           </div>
         )}
 
+        {/* GitHub Repo Info */}
+        {selectedOrg && isGitHubBacked && githubRepoUrl && (
+          <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 bg-orange-500 rounded-sm" />
+                <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">GitHub Repository</h3>
+              </div>
+              {(currentUserRole === 'owner' || currentUserRole === 'admin') && teamWorkspaceId && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowAddCollaborator(true)}
+                  className="h-6 text-[10px] text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 px-2"
+                >
+                  <GitBranch className="w-3 h-3 mr-1" />
+                  Add Collaborator
+                </Button>
+              )}
+            </div>
+            <a
+              href={githubRepoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-orange-400 hover:text-orange-300 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {githubRepoUrl.replace('https://github.com/', '')}
+            </a>
+            {currentUserRole === 'owner' && teamWorkspaceId && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowDeleteWorkspace(true)}
+                className="w-full h-7 text-[11px] text-red-400/70 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/30"
+              >
+                <Trash2 className="w-3 h-3 mr-1.5" />
+                Delete Workspace
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Create Team Workspace */}
+        {selectedOrg && (
+          <Button
+            size="sm"
+            onClick={() => setShowCreateWorkspace(true)}
+            className="w-full h-8 text-xs bg-orange-600 hover:bg-orange-500 text-white"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Create Team Workspace
+          </Button>
+        )}
+
         {/* Convert current project to team */}
-        {selectedOrg && projectId && (
+        {selectedOrg && projectId && !isGitHubBacked && (
           <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3">
             <div className="flex items-start gap-2">
               <Activity className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
@@ -865,6 +1179,208 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, onOr
                 <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Sending...</>
               ) : (
                 <><Mail className="w-4 h-4 mr-1.5" /> Send Invite</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Team Workspace Dialog */}
+      <Dialog open={showCreateWorkspace} onOpenChange={setShowCreateWorkspace}>
+        <DialogContent className="sm:max-w-[480px] bg-gray-950 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-orange-400" />
+              Create Team Workspace
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Create a GitHub-backed workspace for your team. All files will be stored in a GitHub repository.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Mode selector */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setWsMode("create")}
+                className={cn(
+                  "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors border",
+                  wsMode === "create"
+                    ? "bg-orange-600/15 text-orange-400 border-orange-500/30"
+                    : "text-gray-400 border-gray-700 hover:border-gray-600"
+                )}
+              >
+                New Repository
+              </button>
+              <button
+                onClick={() => setWsMode("link")}
+                className={cn(
+                  "flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors border",
+                  wsMode === "link"
+                    ? "bg-orange-600/15 text-orange-400 border-orange-500/30"
+                    : "text-gray-400 border-gray-700 hover:border-gray-600"
+                )}
+              >
+                Link Existing
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-300">Workspace Name</Label>
+              <Input
+                placeholder="e.g., Landing Page"
+                value={wsName}
+                onChange={(e) => setWsName(e.target.value)}
+                className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
+              />
+            </div>
+
+            {wsMode === "create" ? (
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-300">Repository Name</Label>
+                <Input
+                  placeholder="e.g., landing-page"
+                  value={wsRepoName}
+                  onChange={(e) => setWsRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, '-'))}
+                  className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
+                />
+                <p className="text-[11px] text-gray-500">A new private repo will be created on your GitHub account</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-300">Repository (owner/name)</Label>
+                <Input
+                  placeholder="e.g., username/my-project"
+                  value={wsExistingRepo}
+                  onChange={(e) => setWsExistingRepo(e.target.value)}
+                  className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-300">GitHub Personal Access Token</Label>
+              <Input
+                type="password"
+                placeholder="ghp_..."
+                value={wsGithubToken}
+                onChange={(e) => setWsGithubToken(e.target.value)}
+                className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
+              />
+              <p className="text-[11px] text-gray-500">
+                Needs <code className="text-orange-400/70">repo</code> scope. Used for all team member operations.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowCreateWorkspace(false)} className="text-gray-400 hover:text-white">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateWorkspace}
+              disabled={!wsName.trim() || !wsGithubToken.trim() || isCreatingWorkspace || (wsMode === "create" ? !wsRepoName.trim() : !wsExistingRepo.trim())}
+              className="bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30"
+            >
+              {isCreatingWorkspace ? (
+                <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Creating...</>
+              ) : (
+                <><Plus className="w-4 h-4 mr-1.5" /> {wsMode === "create" ? "Create Workspace" : "Link Workspace"}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add GitHub Collaborator Dialog */}
+      <Dialog open={showAddCollaborator} onOpenChange={setShowAddCollaborator}>
+        <DialogContent className="sm:max-w-[420px] bg-gray-950 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-orange-400" />
+              Add GitHub Collaborator
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Invite a GitHub user to the repository with push access.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-300">GitHub Username</Label>
+              <Input
+                placeholder="e.g., octocat"
+                value={collabUsername}
+                onChange={(e) => setCollabUsername(e.target.value)}
+                className="bg-gray-900 border-gray-700 text-white focus:ring-orange-500/50 focus:border-orange-500/50"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddCollaborator()
+                }}
+              />
+              <p className="text-[11px] text-gray-500">
+                They'll receive a GitHub invitation to collaborate on the repo.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowAddCollaborator(false)} className="text-gray-400 hover:text-white">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddCollaborator}
+              disabled={!collabUsername.trim() || isAddingCollab}
+              className="bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30"
+            >
+              {isAddingCollab ? (
+                <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Inviting...</>
+              ) : (
+                <><UserPlus className="w-4 h-4 mr-1.5" /> Add Collaborator</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Workspace Confirmation Dialog */}
+      <Dialog open={showDeleteWorkspace} onOpenChange={setShowDeleteWorkspace}>
+        <DialogContent className="sm:max-w-[420px] bg-gray-950 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              Delete Team Workspace
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              This will permanently remove this workspace from PiPilot. Team members will lose access.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {isGitHubBacked && (
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-800 bg-gray-900/50 cursor-pointer hover:border-gray-700 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={deleteRepoToo}
+                  onChange={(e) => setDeleteRepoToo(e.target.checked)}
+                  className="mt-0.5 rounded border-gray-600 bg-gray-800 text-orange-600 focus:ring-orange-500/50"
+                />
+                <div>
+                  <div className="text-sm text-white">Also delete the GitHub repository</div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    This cannot be undone. The repo and all its history will be permanently deleted.
+                  </div>
+                </div>
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDeleteWorkspace(false)} className="text-gray-400 hover:text-white">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteWorkspace}
+              disabled={isDeletingWorkspace}
+              className="bg-red-500 hover:bg-red-600 text-white disabled:opacity-30"
+            >
+              {isDeletingWorkspace ? (
+                <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Deleting...</>
+              ) : (
+                <><Trash2 className="w-4 h-4 mr-1.5" /> Delete Workspace</>
               )}
             </Button>
           </DialogFooter>

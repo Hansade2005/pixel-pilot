@@ -3,33 +3,42 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Response } from "@/components/ai-elements/response"
 import {
   GitCommit,
   GitBranch,
   Plus,
   Minus,
-  FileText,
-  Upload,
   Check,
   ChevronRight,
   ChevronDown,
-  Clock,
   User,
   RefreshCw,
   Loader2,
-  ArrowUp,
+  ArrowDown,
   Eye,
+  ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import {
+  commitFiles as githubCommitFiles,
+  fetchCommits as githubFetchCommits,
+  type GitHubCommitEntry,
+} from "@/lib/github-client"
 
 interface SourceControlTabProps {
   projectId: string | undefined
   teamWorkspaceId: string | undefined
   organizationId: string | undefined
   isTeamWorkspace: boolean
+  isGitHubBacked?: boolean
+  githubRepoUrl?: string
   userId: string
+  // GitHub sync hook state (passed from parent)
+  lastKnownSha?: string | null
+  hasRemoteChanges?: boolean
+  isPulling?: boolean
+  onPull?: () => Promise<any>
   onOpenDiff?: (title: string, content: string) => void
 }
 
@@ -43,12 +52,14 @@ interface FileChange {
 
 interface CommitEntry {
   id: string
+  sha?: string
   message: string
-  author_id: string
+  author_id?: string
   author_name: string
   author_email?: string
+  author_avatar?: string
   file_count: number
-  files: string[]
+  files: any[]
   created_at: string
 }
 
@@ -57,14 +68,19 @@ export function SourceControlTab({
   teamWorkspaceId,
   organizationId,
   isTeamWorkspace,
+  isGitHubBacked = false,
+  githubRepoUrl,
   userId,
+  lastKnownSha,
+  hasRemoteChanges,
+  isPulling,
+  onPull,
   onOpenDiff,
 }: SourceControlTabProps) {
   const [stagedFiles, setStagedFiles] = useState<FileChange[]>([])
   const [unstagedFiles, setUnstagedFiles] = useState<FileChange[]>([])
   const [commitMessage, setCommitMessage] = useState("")
   const [isCommitting, setIsCommitting] = useState(false)
-  const [isPushing, setIsPushing] = useState(false)
   const [commits, setCommits] = useState<CommitEntry[]>([])
   const [isLoadingCommits, setIsLoadingCommits] = useState(false)
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null)
@@ -75,7 +91,7 @@ export function SourceControlTab({
 
   const supabase = useMemo(() => createClient(), [])
 
-  // Scan for local changes by comparing IndexedDB files with team workspace files
+  // Scan for local changes by comparing IndexedDB files with remote
   const scanForChanges = useCallback(async () => {
     if (!projectId || !teamWorkspaceId || !isTeamWorkspace) return
 
@@ -85,109 +101,148 @@ export function SourceControlTab({
       await storageManager.init()
       const localFiles = await storageManager.getFiles(projectId)
 
-      // Get team workspace files from Supabase
-      const { data: workspace } = await supabase
-        .from("team_workspaces")
-        .select("files")
-        .eq("id", teamWorkspaceId)
-        .single()
+      if (isGitHubBacked) {
+        // For GitHub-backed workspaces, compare against what was last pulled
+        // All local files that differ from the initial pull state are "changed"
+        // We track this via the github sync hook's changedFiles/deletedFiles,
+        // but for the scan we do a simple "all non-directory files are potentially changed"
+        // since we don't have the GitHub content cached locally for comparison
+        const changes: FileChange[] = localFiles
+          .filter((f) => !f.isDirectory)
+          .map((f) => ({
+            path: f.path,
+            name: f.name,
+            status: "modified" as const,
+            content: f.content,
+          }))
 
-      const remoteFiles: any[] = workspace?.files || []
-      const remoteByPath = new Map(remoteFiles.map((f: any) => [f.path, f]))
+        setUnstagedFiles(changes)
+        setStagedFiles([])
+      } else {
+        // Legacy: compare with Supabase JSONB
+        const { data: workspace } = await supabase
+          .from("team_workspaces")
+          .select("files")
+          .eq("id", teamWorkspaceId)
+          .single()
 
-      const changes: FileChange[] = []
+        const remoteFiles: any[] = workspace?.files || []
+        const remoteByPath = new Map(remoteFiles.map((f: any) => [f.path, f]))
 
-      // Check local files against remote
-      for (const localFile of localFiles) {
-        if (localFile.isDirectory) continue
-        const remote = remoteByPath.get(localFile.path)
-        if (!remote) {
+        const changes: FileChange[] = []
+
+        for (const localFile of localFiles) {
+          if (localFile.isDirectory) continue
+          const remote = remoteByPath.get(localFile.path)
+          if (!remote) {
+            changes.push({
+              path: localFile.path,
+              name: localFile.name,
+              status: "added",
+              content: localFile.content,
+            })
+          } else if (remote.content !== localFile.content) {
+            changes.push({
+              path: localFile.path,
+              name: localFile.name,
+              status: "modified",
+              content: localFile.content,
+              previousContent: remote.content,
+            })
+          }
+          remoteByPath.delete(localFile.path)
+        }
+
+        for (const [path, remote] of remoteByPath) {
+          if (remote.isDirectory) continue
           changes.push({
-            path: localFile.path,
-            name: localFile.name,
-            status: "added",
-            content: localFile.content,
-          })
-        } else if (remote.content !== localFile.content) {
-          changes.push({
-            path: localFile.path,
-            name: localFile.name,
-            status: "modified",
-            content: localFile.content,
+            path,
+            name: remote.name,
+            status: "deleted",
             previousContent: remote.content,
           })
         }
-        remoteByPath.delete(localFile.path)
-      }
 
-      // Remaining remote files are deleted locally
-      for (const [path, remote] of remoteByPath) {
-        if (remote.isDirectory) continue
-        changes.push({
-          path,
-          name: remote.name,
-          status: "deleted",
-          previousContent: remote.content,
-        })
+        setUnstagedFiles(changes)
+        setStagedFiles([])
       }
-
-      setUnstagedFiles(changes)
-      setStagedFiles([])
     } catch (error) {
       console.error("Error scanning for changes:", error)
     } finally {
       setIsScanning(false)
     }
-  }, [projectId, teamWorkspaceId, isTeamWorkspace, supabase])
+  }, [projectId, teamWorkspaceId, isTeamWorkspace, isGitHubBacked, supabase])
 
-  // Load commit history from team_activity
+  // Load commit history
   const loadCommits = useCallback(async () => {
-    if (!teamWorkspaceId || !organizationId) return
+    if (!teamWorkspaceId) return
 
     setIsLoadingCommits(true)
     try {
-      const { data, error } = await supabase
-        .from("team_activity")
-        .select("*")
-        .eq("workspace_id", teamWorkspaceId)
-        .eq("action", "commit")
-        .order("created_at", { ascending: false })
-        .limit(50)
+      if (isGitHubBacked) {
+        // Fetch real git commits from GitHub
+        const gitCommits = await githubFetchCommits(teamWorkspaceId)
+        const entries: CommitEntry[] = gitCommits.map((c) => ({
+          id: c.sha,
+          sha: c.sha,
+          message: c.message,
+          author_name: c.author_name,
+          author_email: c.author_email,
+          author_avatar: (c as any).author_avatar,
+          file_count: c.files_changed || 0,
+          files: [],
+          created_at: c.date,
+        }))
+        setCommits(entries)
+      } else {
+        // Legacy: load from team_activity
+        if (!organizationId) return
 
-      if (error) throw error
+        const { data, error } = await supabase
+          .from("team_activity")
+          .select("*")
+          .eq("workspace_id", teamWorkspaceId)
+          .eq("action", "commit")
+          .order("created_at", { ascending: false })
+          .limit(50)
 
-      // Fetch author profiles
-      const authorIds = [...new Set((data || []).map((d: any) => d.actor_id))]
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", authorIds)
+        if (error) throw error
 
-      const profileMap = new Map(
-        (profiles || []).map((p: any) => [p.id, p])
-      )
+        const authorIds = [
+          ...new Set((data || []).map((d: any) => d.actor_id)),
+        ]
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", authorIds)
 
-      const commitEntries: CommitEntry[] = (data || []).map((d: any) => {
-        const profile = profileMap.get(d.actor_id)
-        return {
-          id: d.id,
-          message: d.metadata?.message || "No message",
-          author_id: d.actor_id,
-          author_name: profile?.full_name || d.metadata?.author_name || "Unknown",
-          author_email: profile?.email,
-          file_count: d.metadata?.file_count || 0,
-          files: d.metadata?.files || [],
-          created_at: d.created_at,
-        }
-      })
+        const profileMap = new Map(
+          (profiles || []).map((p: any) => [p.id, p])
+        )
 
-      setCommits(commitEntries)
+        const commitEntries: CommitEntry[] = (data || []).map((d: any) => {
+          const profile = profileMap.get(d.actor_id)
+          return {
+            id: d.id,
+            message: d.metadata?.message || "No message",
+            author_id: d.actor_id,
+            author_name:
+              profile?.full_name || d.metadata?.author_name || "Unknown",
+            author_email: profile?.email,
+            file_count: d.metadata?.file_count || 0,
+            files: d.metadata?.files || [],
+            created_at: d.created_at,
+          }
+        })
+
+        setCommits(commitEntries)
+      }
     } catch (error) {
       console.error("Error loading commits:", error)
     } finally {
       setIsLoadingCommits(false)
     }
-  }, [teamWorkspaceId, organizationId, supabase])
+  }, [teamWorkspaceId, organizationId, isGitHubBacked, supabase])
 
   // Initial load
   useEffect(() => {
@@ -197,9 +252,9 @@ export function SourceControlTab({
     }
   }, [isTeamWorkspace, scanForChanges, loadCommits])
 
-  // Realtime subscription for new commits
+  // Realtime subscription for new commits (legacy mode only)
   useEffect(() => {
-    if (!teamWorkspaceId) return
+    if (!teamWorkspaceId || isGitHubBacked) return
 
     const channel = supabase
       .channel(`commits:${teamWorkspaceId}`)
@@ -222,9 +277,9 @@ export function SourceControlTab({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [teamWorkspaceId, supabase, loadCommits])
+  }, [teamWorkspaceId, isGitHubBacked, supabase, loadCommits])
 
-  // Stage / unstage files
+  // Stage / unstage
   const stageFile = (file: FileChange) => {
     setUnstagedFiles((prev) => prev.filter((f) => f.path !== file.path))
     setStagedFiles((prev) => [...prev, file])
@@ -252,103 +307,117 @@ export function SourceControlTab({
 
     setIsCommitting(true)
     try {
-      // Sync the staged files to the team workspace
-      const filesToSync = stagedFiles
-        .filter((f) => f.status !== "deleted")
-        .map((f) => ({
-          path: f.path,
-          name: f.name,
-          content: f.content || "",
-          fileType: f.path.split(".").pop() || "text",
-          size: (f.content || "").length,
-          isDirectory: false,
-        }))
-
-      const deletedPaths = stagedFiles
-        .filter((f) => f.status === "deleted")
-        .map((f) => f.path)
-
-      const response = await fetch(
-        `/api/teams/workspaces/${teamWorkspaceId}/sync`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            files: filesToSync,
-            deletedPaths: deletedPaths.length > 0 ? deletedPaths : undefined,
-          }),
-        }
-      )
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Sync failed")
-      }
-
-      // Log the commit in team_activity
-      await supabase.from("team_activity").insert({
-        organization_id: organizationId,
-        workspace_id: teamWorkspaceId,
-        action: "commit",
-        actor_id: userId,
-        metadata: {
-          message: commitMessage.trim(),
-          file_count: stagedFiles.length,
-          files: stagedFiles.map((f) => ({
+      if (isGitHubBacked) {
+        // GitHub commit: real git commit + push
+        const filesToCommit = stagedFiles
+          .filter((f) => f.status !== "deleted")
+          .map((f) => ({
             path: f.path,
-            status: f.status,
-          })),
-          author_name:
-            (await supabase.auth.getUser()).data.user?.user_metadata
-              ?.full_name || "Unknown",
-        },
-      })
+            content: f.content || "",
+          }))
 
-      toast.success(`Committed ${stagedFiles.length} file(s)`)
-      setStagedFiles([])
-      setCommitMessage("")
-      loadCommits()
-      scanForChanges()
+        const deletedPaths = stagedFiles
+          .filter((f) => f.status === "deleted")
+          .map((f) => f.path)
+
+        const result = await githubCommitFiles(
+          teamWorkspaceId,
+          filesToCommit,
+          deletedPaths,
+          commitMessage.trim(),
+          lastKnownSha || ""
+        )
+
+        toast.success(`Committed ${stagedFiles.length} file(s) to GitHub`)
+        setStagedFiles([])
+        setCommitMessage("")
+        loadCommits()
+      } else {
+        // Legacy: sync to Supabase JSONB + log activity
+        const filesToSync = stagedFiles
+          .filter((f) => f.status !== "deleted")
+          .map((f) => ({
+            path: f.path,
+            name: f.name,
+            content: f.content || "",
+            fileType: f.path.split(".").pop() || "text",
+            size: (f.content || "").length,
+            isDirectory: false,
+          }))
+
+        const deletedPaths = stagedFiles
+          .filter((f) => f.status === "deleted")
+          .map((f) => f.path)
+
+        const response = await fetch(
+          `/api/teams/workspaces/${teamWorkspaceId}/sync`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              files: filesToSync,
+              deletedPaths: deletedPaths.length > 0 ? deletedPaths : undefined,
+            }),
+          }
+        )
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || "Sync failed")
+        }
+
+        await supabase.from("team_activity").insert({
+          organization_id: organizationId,
+          workspace_id: teamWorkspaceId,
+          action: "commit",
+          actor_id: userId,
+          metadata: {
+            message: commitMessage.trim(),
+            file_count: stagedFiles.length,
+            files: stagedFiles.map((f) => ({
+              path: f.path,
+              status: f.status,
+            })),
+            author_name:
+              (await supabase.auth.getUser()).data.user?.user_metadata
+                ?.full_name || "Unknown",
+          },
+        })
+
+        toast.success(`Committed ${stagedFiles.length} file(s)`)
+        setStagedFiles([])
+        setCommitMessage("")
+        loadCommits()
+        scanForChanges()
+      }
     } catch (error: any) {
-      toast.error(error.message || "Commit failed")
+      if (error.name === "ConflictError") {
+        toast.error("Remote has changed. Pull latest changes first.")
+      } else {
+        toast.error(error.message || "Commit failed")
+      }
     } finally {
       setIsCommitting(false)
-    }
-  }
-
-  // Push (same as commit but also refreshes)
-  const handlePush = async () => {
-    if (stagedFiles.length === 0 && unstagedFiles.length === 0) {
-      toast.info("Nothing to push - workspace is up to date")
-      return
-    }
-
-    // If there are unstaged files but no staged, stage all first
-    if (stagedFiles.length === 0 && unstagedFiles.length > 0) {
-      stageAll()
-      toast.info("All changes staged. Enter a commit message and commit first.")
-      return
-    }
-
-    if (!commitMessage.trim()) {
-      toast.error("Enter a commit message before pushing")
-      return
-    }
-
-    setIsPushing(true)
-    try {
-      await handleCommit()
-      toast.success("Changes pushed to team workspace")
-    } finally {
-      setIsPushing(false)
     }
   }
 
   // Generate diff markdown for a file
   const generateDiffMarkdown = (file: FileChange): string => {
     const lines: string[] = []
-    lines.push(`# ${file.status === "added" ? "New File" : file.status === "deleted" ? "Deleted File" : "Modified File"}: \`${file.path}\`\n`)
-    lines.push(`**Status:** ${file.status.charAt(0).toUpperCase() + file.status.slice(1)}\n`)
+    lines.push(
+      `# ${
+        file.status === "added"
+          ? "New File"
+          : file.status === "deleted"
+          ? "Deleted File"
+          : "Modified File"
+      }: \`${file.path}\`\n`
+    )
+    lines.push(
+      `**Status:** ${
+        file.status.charAt(0).toUpperCase() + file.status.slice(1)
+      }\n`
+    )
 
     if (file.status === "added" && file.content) {
       lines.push("## Added Content\n")
@@ -382,10 +451,12 @@ export function SourceControlTab({
     return lines.join("\n")
   }
 
-  // Generate commit detail markdown
   const generateCommitMarkdown = (commit: CommitEntry): string => {
     const lines: string[] = []
     lines.push(`# Commit: ${commit.message}\n`)
+    if (commit.sha) {
+      lines.push(`**SHA:** \`${commit.sha.slice(0, 7)}\``)
+    }
     lines.push(`**Author:** ${commit.author_name}`)
     lines.push(`**Date:** ${new Date(commit.created_at).toLocaleString()}`)
     lines.push(`**Files changed:** ${commit.file_count}\n`)
@@ -393,7 +464,10 @@ export function SourceControlTab({
     if (commit.files.length > 0) {
       lines.push("## Changed Files\n")
       for (const file of commit.files) {
-        const f = typeof file === "string" ? { path: file, status: "modified" } : file
+        const f =
+          typeof file === "string"
+            ? { path: file, status: "modified" }
+            : file
         const icon =
           (f as any).status === "added"
             ? "+"
@@ -451,7 +525,7 @@ export function SourceControlTab({
 
   return (
     <div className="flex flex-col h-full bg-gray-950">
-      {/* Tab Switcher */}
+      {/* Header */}
       <div className="flex items-center border-b border-gray-800/60 px-3 py-1.5 gap-1 flex-shrink-0">
         <button
           onClick={() => setView("changes")}
@@ -484,6 +558,58 @@ export function SourceControlTab({
           History
         </button>
         <div className="flex-1" />
+
+        {/* Pull button for GitHub-backed workspaces */}
+        {isGitHubBacked && onPull && (
+          <button
+            onClick={async () => {
+              const result = await onPull()
+              if (result?.success) {
+                toast.success(
+                  `Pulled ${result.filesUpdated || 0} file(s) from GitHub`
+                )
+                scanForChanges()
+              } else if (result?.error) {
+                toast.error(result.error)
+              }
+            }}
+            disabled={isPulling}
+            className={cn(
+              "h-6 px-2 flex items-center gap-1 rounded text-xs transition-colors",
+              hasRemoteChanges
+                ? "text-orange-400 bg-orange-500/10 hover:bg-orange-500/20"
+                : "text-gray-500 hover:text-orange-400 hover:bg-orange-500/10"
+            )}
+            title={
+              hasRemoteChanges
+                ? "Remote changes available - click to pull"
+                : "Pull latest from GitHub"
+            }
+          >
+            {isPulling ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <ArrowDown className="w-3 h-3" />
+            )}
+            {hasRemoteChanges && (
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+            )}
+          </button>
+        )}
+
+        {/* GitHub repo link */}
+        {isGitHubBacked && githubRepoUrl && (
+          <a
+            href={githubRepoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-6 w-6 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+            title="Open on GitHub"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+
         <button
           onClick={scanForChanges}
           disabled={isScanning}
@@ -503,7 +629,11 @@ export function SourceControlTab({
             <textarea
               value={commitMessage}
               onChange={(e) => setCommitMessage(e.target.value)}
-              placeholder="Commit message..."
+              placeholder={
+                isGitHubBacked
+                  ? "Commit message (pushes to GitHub)..."
+                  : "Commit message..."
+              }
               className="w-full h-16 resize-none rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2 text-xs text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-colors"
             />
             <div className="flex gap-1.5 mt-1.5">
@@ -522,21 +652,9 @@ export function SourceControlTab({
                 ) : (
                   <Check className="w-3 h-3 mr-1" />
                 )}
-                Commit ({stagedFiles.length})
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handlePush}
-                disabled={isPushing || totalChanges === 0}
-                className="h-7 text-xs border-gray-700 text-gray-300 hover:text-orange-400 hover:border-orange-500/50 disabled:opacity-30"
-              >
-                {isPushing ? (
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                ) : (
-                  <ArrowUp className="w-3 h-3 mr-1" />
-                )}
-                Push
+                {isGitHubBacked
+                  ? `Commit & Push (${stagedFiles.length})`
+                  : `Commit (${stagedFiles.length})`}
               </Button>
             </div>
           </div>
@@ -711,7 +829,6 @@ export function SourceControlTab({
 
               {commits.map((commit, index) => (
                 <div key={commit.id} className="relative">
-                  {/* Commit node */}
                   <button
                     onClick={() =>
                       setExpandedCommit(
@@ -741,12 +858,13 @@ export function SourceControlTab({
                           <User className="w-2.5 h-2.5" />
                           {commit.author_name}
                         </span>
+                        {commit.sha && (
+                          <span className="text-[10px] text-gray-600 font-mono">
+                            {commit.sha.slice(0, 7)}
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-600">
                           {formatTimeAgo(commit.created_at)}
-                        </span>
-                        <span className="text-[10px] text-gray-600">
-                          {commit.file_count} file
-                          {commit.file_count !== 1 ? "s" : ""}
                         </span>
                       </div>
                     </div>
@@ -765,6 +883,18 @@ export function SourceControlTab({
                       >
                         <Eye className="w-3 h-3" />
                       </button>
+                      {commit.sha && githubRepoUrl && (
+                        <a
+                          href={`${githubRepoUrl}/commit/${commit.sha}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10"
+                          title="View on GitHub"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                       {expandedCommit === commit.id ? (
                         <ChevronDown className="w-3 h-3 text-gray-500" />
                       ) : (
@@ -774,35 +904,48 @@ export function SourceControlTab({
                   </button>
 
                   {/* Expanded file list */}
-                  {expandedCommit === commit.id && commit.files.length > 0 && (
-                    <div className="pl-[34px] pb-1">
-                      {commit.files.map((file: any, fi: number) => {
-                        const filePath =
-                          typeof file === "string" ? file : file.path
-                        const fileStatus =
-                          typeof file === "string"
-                            ? "modified"
-                            : file.status || "modified"
-                        return (
-                          <div
-                            key={fi}
-                            className="flex items-center gap-2 px-2 py-0.5 hover:bg-gray-800/30 rounded cursor-pointer"
-                            onClick={() =>
-                              onOpenDiff?.(
-                                filePath,
-                                `# ${fileStatus === "added" ? "Added" : fileStatus === "deleted" ? "Deleted" : "Modified"}: \`${filePath}\`\n\nPart of commit: **${commit.message}**\nBy ${commit.author_name} at ${new Date(commit.created_at).toLocaleString()}`
-                              )
-                            }
-                          >
-                            {statusIcon(fileStatus)}
-                            <span className="text-[11px] text-gray-400 truncate">
-                              {filePath}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                  {expandedCommit === commit.id &&
+                    commit.files.length > 0 && (
+                      <div className="pl-[34px] pb-1">
+                        {commit.files.map((file: any, fi: number) => {
+                          const filePath =
+                            typeof file === "string" ? file : file.path
+                          const fileStatus =
+                            typeof file === "string"
+                              ? "modified"
+                              : file.status || "modified"
+                          return (
+                            <div
+                              key={fi}
+                              className="flex items-center gap-2 px-2 py-0.5 hover:bg-gray-800/30 rounded cursor-pointer"
+                              onClick={() =>
+                                onOpenDiff?.(
+                                  filePath,
+                                  `# ${
+                                    fileStatus === "added"
+                                      ? "Added"
+                                      : fileStatus === "deleted"
+                                      ? "Deleted"
+                                      : "Modified"
+                                  }: \`${filePath}\`\n\nPart of commit: **${
+                                    commit.message
+                                  }**\nBy ${
+                                    commit.author_name
+                                  } at ${new Date(
+                                    commit.created_at
+                                  ).toLocaleString()}`
+                                )
+                              }
+                            >
+                              {statusIcon(fileStatus)}
+                              <span className="text-[11px] text-gray-400 truncate">
+                                {filePath}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                 </div>
               ))}
             </div>

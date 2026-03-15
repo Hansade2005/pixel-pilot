@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Trash2, Upload, Share2, Copy, Users } from "lucide-react"
+import { ExternalLink, Trash2, Upload, Share2, Copy, Users, GitBranch } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -39,6 +39,8 @@ interface Project {
   category: string
   createdAt: string
   isTeamProject?: boolean
+  isGitHubBacked?: boolean
+  githubRepoUrl?: string
   organizationName?: string
   teamWorkspaceId?: string
 }
@@ -516,7 +518,7 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
 
             const { data: teamWorkspaces } = await supabase
               .from('team_workspaces')
-              .select('id, name, created_at, organization_id, visibility')
+              .select('id, name, created_at, organization_id, visibility, github_repo_owner, github_repo_name, github_repo_url')
               .in('organization_id', orgIds)
               .order('created_at', { ascending: false })
 
@@ -525,10 +527,14 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                 id: tw.id,
                 name: tw.name,
                 thumbnail: generateThumbnailUrl(tw.name, 'Team workspace', tw.id.slice(-3)),
-                description: `Shared by ${orgMap.get(tw.organization_id) || 'Team'}`,
+                description: tw.github_repo_url
+                  ? `${orgMap.get(tw.organization_id) || 'Team'} · ${tw.github_repo_owner}/${tw.github_repo_name}`
+                  : `Shared by ${orgMap.get(tw.organization_id) || 'Team'}`,
                 category: 'Team',
                 createdAt: tw.created_at,
                 isTeamProject: true,
+                isGitHubBacked: !!(tw.github_repo_owner && tw.github_repo_name),
+                githubRepoUrl: tw.github_repo_url || undefined,
                 organizationName: orgMap.get(tw.organization_id) || 'Team',
                 teamWorkspaceId: tw.id,
               }))
@@ -731,6 +737,12 @@ export function ProjectGrid({ filterBy = 'all', sortBy = 'activity', sortOrder =
                       <Badge variant="secondary" className="bg-orange-500/90 backdrop-blur-sm text-white border-orange-400/30 font-medium shadow-lg">
                         <Users className="w-3 h-3 mr-1" />
                         {project.organizationName}
+                      </Badge>
+                    )}
+                    {project.isGitHubBacked && (
+                      <Badge variant="secondary" className="bg-gray-900/90 backdrop-blur-sm text-white border-gray-700/50 font-medium shadow-lg">
+                        <GitBranch className="w-3 h-3 mr-1" />
+                        GitHub
                       </Badge>
                     )}
                     <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-gray-900 border-white/30 font-medium shadow-lg">

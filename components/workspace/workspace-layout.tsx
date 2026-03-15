@@ -47,6 +47,7 @@ import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { useAutoMonitor } from '@/hooks/use-auto-monitor'
 import { useTeamFileSync } from '@/hooks/use-team-file-sync'
 import { useTeamSync } from '@/hooks/use-team-sync'
+import { useGitHubSync } from '@/hooks/use-github-sync'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { generateFileUpdate, type StyleChange } from '@/lib/visual-editor'
 
@@ -252,6 +253,36 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     isTeamWorkspace: !!selectedProject?.isTeamWorkspace,
     userId: user.id,
   })
+
+  // GitHub-backed team workspace sync
+  const {
+    changedFiles: ghChangedFiles,
+    deletedFiles: ghDeletedFiles,
+    pendingCount: ghPendingCount,
+    isSyncing: isGhSyncing,
+    isPulling: isGhPulling,
+    lastKnownSha,
+    hasRemoteChanges,
+    syncError: ghSyncError,
+    commitToGitHub,
+    pullFromGitHub,
+    clearPending: clearGhPending,
+    setLastKnownSha,
+  } = useGitHubSync({
+    workspaceId: selectedProject?.id,
+    teamWorkspaceId: selectedProject?.teamWorkspaceId,
+    isTeamWorkspace: !!selectedProject?.isTeamWorkspace,
+    isGitHubBacked: !!selectedProject?.isGitHubBacked,
+  })
+
+  // Use GitHub sync values when GitHub-backed, otherwise legacy team sync
+  const isCurrentGitHub = !!selectedProject?.isGitHubBacked
+  const effectiveChangedFiles = isCurrentGitHub ? ghChangedFiles : teamChangedFiles
+  const effectiveDeletedFiles = isCurrentGitHub ? ghDeletedFiles : teamDeletedFiles
+  const effectivePendingCount = isCurrentGitHub ? ghPendingCount : teamPendingCount
+  const effectiveIsSyncing = isCurrentGitHub ? isGhSyncing : isTeamSyncing
+  const effectiveSyncError = isCurrentGitHub ? ghSyncError : teamSyncError
+  const effectiveClearPending = isCurrentGitHub ? clearGhPending : clearTeamPending
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
@@ -848,7 +879,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         const supabase = createClient()
         const { data: tw, error } = await supabase
           .from('team_workspaces')
-          .select('id, name, organization_id, files, created_at, created_by, visibility')
+          .select('id, name, organization_id, files, created_at, created_by, visibility, github_repo_owner, github_repo_name, github_repo_url, github_default_branch, github_last_synced_sha')
           .eq('id', teamWorkspaceId)
           .single()
 
@@ -856,6 +887,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           toast({ title: 'Team workspace not found', variant: 'destructive' })
           return
         }
+
+        const isGitHubBacked = !!(tw as any).github_repo_owner && !!(tw as any).github_repo_name
 
         // Create a virtual workspace object for the team workspace
         const teamWorkspace: Workspace = {
@@ -873,6 +906,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           isTeamWorkspace: true,
           teamWorkspaceId: tw.id,
           organizationId: tw.organization_id,
+          isGitHubBacked,
+          githubRepoUrl: (tw as any).github_repo_url || undefined,
+          githubLastSyncedSha: (tw as any).github_last_synced_sha || undefined,
         }
 
         // Add to client projects if not already there
@@ -888,19 +924,44 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
         // Check if we already have files for this virtual workspace
         const existingFiles = await storageManager.getFiles(teamWorkspace.id)
-        if (existingFiles.length === 0 && tw.files && Array.isArray(tw.files)) {
-          // Sync team files to local IndexedDB
-          for (const file of tw.files as any[]) {
-            await storageManager.createFile({
-              workspaceId: teamWorkspace.id,
-              name: file.name,
-              path: file.path,
-              content: file.content || '',
-              fileType: file.fileType || file.type || 'text',
-              type: file.type || 'file',
-              size: file.size || (file.content?.length || 0),
-              isDirectory: file.isDirectory || false,
-            })
+        if (existingFiles.length === 0) {
+          if (isGitHubBacked) {
+            // Fetch files from GitHub via API route
+            try {
+              const { fetchAllFiles } = await import('@/lib/github-client')
+              const { files: githubFiles } = await fetchAllFiles(tw.id)
+              for (const file of githubFiles) {
+                const path = file.path.startsWith('/') ? file.path : `/${file.path}`
+                const name = path.split('/').pop() || file.path
+                await storageManager.createFile({
+                  workspaceId: teamWorkspace.id,
+                  name,
+                  path,
+                  content: file.content || '',
+                  fileType: path.split('.').pop() || 'text',
+                  type: 'file',
+                  size: file.content?.length || 0,
+                  isDirectory: false,
+                })
+              }
+            } catch (err) {
+              console.error('Error loading files from GitHub:', err)
+              toast({ title: 'Failed to load files from GitHub', variant: 'destructive' })
+            }
+          } else if (tw.files && Array.isArray(tw.files)) {
+            // Legacy: Sync team files from JSONB to local IndexedDB
+            for (const file of tw.files as any[]) {
+              await storageManager.createFile({
+                workspaceId: teamWorkspace.id,
+                name: file.name,
+                path: file.path,
+                content: file.content || '',
+                fileType: file.fileType || file.type || 'text',
+                type: file.type || 'file',
+                size: file.size || (file.content?.length || 0),
+                isDirectory: file.isDirectory || false,
+              })
+            }
           }
         }
 
@@ -1442,16 +1503,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           workspaceId={selectedProject?.teamWorkspaceId || selectedProject?.id || ''}
                           organizationId={selectedProject?.organizationId}
                         />
-                        {teamPendingCount > 0 && (
+                        {(effectivePendingCount > 0 || hasRemoteChanges) && (
                           <TeamSyncButton
-                            changedFiles={teamChangedFiles}
-                            deletedFiles={teamDeletedFiles}
-                            pendingCount={teamPendingCount}
-                            isSyncing={isTeamSyncing}
+                            changedFiles={effectiveChangedFiles}
+                            deletedFiles={effectiveDeletedFiles}
+                            pendingCount={effectivePendingCount}
+                            isSyncing={effectiveIsSyncing}
                             lastSyncAt={teamLastSyncAt}
-                            syncError={teamSyncError}
+                            syncError={effectiveSyncError}
+                            isGitHubBacked={isCurrentGitHub}
+                            hasRemoteChanges={hasRemoteChanges}
                             onSync={syncToTeam}
-                            onClearPending={clearTeamPending}
+                            onClearPending={effectiveClearPending}
+                            onOpenSourceControl={() => {
+                              setActiveTab("source")
+                            }}
                           />
                         )}
                       </div>
@@ -1966,6 +2032,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             userId={user.id}
                             projectId={selectedProject?.id}
                             projectName={selectedProject?.name}
+                            organizationId={selectedProject?.organizationId}
+                            teamWorkspaceId={selectedProject?.teamWorkspaceId}
+                            isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                            githubRepoUrl={selectedProject?.githubRepoUrl}
+                            onWorkspaceDeleted={() => {
+                              setSelectedProject(null)
+                              window.location.href = '/workspace'
+                            }}
                           />
                           {/* Shared Chats Section */}
                           <div className="border-t border-gray-800/60">
@@ -2007,7 +2081,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             teamWorkspaceId={selectedProject?.teamWorkspaceId}
                             organizationId={selectedProject?.organizationId}
                             isTeamWorkspace={!!selectedProject?.isTeamWorkspace}
+                            isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                            githubRepoUrl={selectedProject?.githubRepoUrl}
                             userId={user.id}
+                            lastKnownSha={lastKnownSha}
+                            hasRemoteChanges={hasRemoteChanges}
+                            isPulling={isGhPulling}
+                            onPull={pullFromGitHub}
                             onOpenDiff={(title, content) => {
                               // Create a virtual file for the diff view and open it in the editor
                               const diffFile: File = {
@@ -2424,16 +2504,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               {selectedProject ? (
                 <>
                   {/* Team Sync Button (mobile) */}
-                  {selectedProject?.isTeamWorkspace && teamPendingCount > 0 && (
+                  {selectedProject?.isTeamWorkspace && (effectivePendingCount > 0 || hasRemoteChanges) && (
                     <TeamSyncButton
-                      changedFiles={teamChangedFiles}
-                      deletedFiles={teamDeletedFiles}
-                      pendingCount={teamPendingCount}
-                      isSyncing={isTeamSyncing}
+                      changedFiles={effectiveChangedFiles}
+                      deletedFiles={effectiveDeletedFiles}
+                      pendingCount={effectivePendingCount}
+                      isSyncing={effectiveIsSyncing}
                       lastSyncAt={teamLastSyncAt}
-                      syncError={teamSyncError}
+                      syncError={effectiveSyncError}
+                      isGitHubBacked={isCurrentGitHub}
+                      hasRemoteChanges={hasRemoteChanges}
                       onSync={syncToTeam}
-                      onClearPending={clearTeamPending}
+                      onClearPending={effectiveClearPending}
+                      onOpenSourceControl={() => {
+                        setActiveTab("source")
+                      }}
                     />
                   )}
                   <Button
@@ -2657,6 +2742,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       userId={user.id}
                       projectId={selectedProject?.id}
                       projectName={selectedProject?.name}
+                      organizationId={selectedProject?.organizationId}
+                      teamWorkspaceId={selectedProject?.teamWorkspaceId}
+                      isGitHubBacked={!!selectedProject?.isGitHubBacked}
+                      githubRepoUrl={selectedProject?.githubRepoUrl}
+                      onWorkspaceDeleted={() => {
+                        setSelectedProject(null)
+                        window.location.href = '/workspace'
+                      }}
                     />
                     <div className="border-t border-gray-800/60">
                       <TeamSharedChats

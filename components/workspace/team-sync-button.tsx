@@ -19,9 +19,10 @@ import {
   AlertTriangle,
   FileText,
   Trash2,
-  Lock,
   X,
-  Upload
+  Upload,
+  GitCommit,
+  ArrowDown,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -32,8 +33,11 @@ interface TeamSyncButtonProps {
   isSyncing: boolean
   lastSyncAt: string | null
   syncError: string | null
+  isGitHubBacked?: boolean
+  hasRemoteChanges?: boolean
   onSync: () => Promise<{ success: boolean; synced?: number; deleted?: number; error?: string; blockedFiles?: string[] }>
   onClearPending: () => void
+  onOpenSourceControl?: () => void
 }
 
 export function TeamSyncButton({
@@ -43,14 +47,24 @@ export function TeamSyncButton({
   isSyncing,
   lastSyncAt,
   syncError,
+  isGitHubBacked,
+  hasRemoteChanges,
   onSync,
   onClearPending,
+  onOpenSourceControl,
 }: TeamSyncButtonProps) {
   const [showDetails, setShowDetails] = useState(false)
 
-  if (pendingCount === 0 && !syncError) return null
+  if (pendingCount === 0 && !syncError && !hasRemoteChanges) return null
 
-  const handleSync = async () => {
+  const handleClick = async () => {
+    if (isGitHubBacked && onOpenSourceControl) {
+      // For GitHub-backed workspaces, open the source control tab
+      onOpenSourceControl()
+      return
+    }
+
+    // Legacy: direct sync
     const result = await onSync()
     if (result.success) {
       toast.success(`Synced ${result.synced || 0} file${(result.synced || 0) !== 1 ? 's' : ''} to team`)
@@ -76,18 +90,22 @@ export function TeamSyncButton({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              onClick={handleSync}
+              onClick={handleClick}
               disabled={isSyncing}
               className={`h-7 gap-1.5 text-xs font-medium transition-all rounded-r-none ${
                 syncError
                   ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30'
-                  : 'bg-orange-600 hover:bg-orange-500 text-white shadow-sm shadow-orange-500/20'
+                  : hasRemoteChanges
+                    ? 'bg-orange-600/80 hover:bg-orange-500 text-white shadow-sm shadow-orange-500/20'
+                    : 'bg-orange-600 hover:bg-orange-500 text-white shadow-sm shadow-orange-500/20'
               }`}
             >
               {isSyncing ? (
                 <RefreshCw className="h-3 w-3 animate-spin" />
               ) : syncError ? (
                 <AlertTriangle className="h-3 w-3" />
+              ) : isGitHubBacked ? (
+                <GitCommit className="h-3 w-3" />
               ) : (
                 <Upload className="h-3 w-3" />
               )}
@@ -95,18 +113,24 @@ export function TeamSyncButton({
                 {isSyncing
                   ? 'Syncing...'
                   : syncError
-                    ? 'Sync failed'
-                    : `Sync ${pendingCount}`
+                    ? 'Error'
+                    : hasRemoteChanges
+                      ? 'Pull available'
+                      : isGitHubBacked
+                        ? `${pendingCount} changes`
+                        : `Sync ${pendingCount}`
                 }
               </span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">
             {isSyncing
-              ? 'Syncing files to team workspace...'
+              ? 'Syncing files...'
               : syncError
                 ? syncError
-                : `${pendingCount} file change${pendingCount !== 1 ? 's' : ''} ready to sync`
+                : isGitHubBacked
+                  ? `${pendingCount} uncommitted change${pendingCount !== 1 ? 's' : ''}. Click to open source control.`
+                  : `${pendingCount} file change${pendingCount !== 1 ? 's' : ''} ready to sync`
             }
           </TooltipContent>
         </Tooltip>
@@ -128,7 +152,7 @@ export function TeamSyncButton({
       >
         <div className="px-3 py-2.5 border-b border-gray-800/60 flex items-center justify-between">
           <span className="text-sm font-medium text-gray-200">
-            Pending Changes ({pendingCount})
+            {isGitHubBacked ? 'Uncommitted Changes' : 'Pending Changes'} ({pendingCount})
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -194,14 +218,19 @@ export function TeamSyncButton({
           <div className="flex-1" />
           <Button
             size="sm"
-            onClick={handleSync}
-            disabled={isSyncing || pendingCount === 0}
+            onClick={handleClick}
+            disabled={isSyncing || (pendingCount === 0 && !hasRemoteChanges)}
             className="h-7 text-xs bg-orange-600 hover:bg-orange-500 text-white"
           >
             {isSyncing ? (
               <>
                 <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
                 Syncing...
+              </>
+            ) : isGitHubBacked ? (
+              <>
+                <GitCommit className="h-3 w-3 mr-1.5" />
+                Open Source Control
               </>
             ) : (
               <>
