@@ -1351,7 +1351,7 @@ export function TeamPanel({ userId, projectId, projectName, organizationId, team
                   </div>
                   <div className="flex gap-2">
                     <a
-                      href="/workspace?tab=account"
+                      href="/workspace/account"
                       className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-600 hover:bg-orange-500 text-white transition-colors"
                     >
                       <Settings className="w-3 h-3" />
