@@ -569,15 +569,70 @@ export function SourceControlTab({
     }
   }
 
-  // Personal project: push to GitHub via parent's pushToGitHub handler
+  // Personal project GitHub deploy state
+  const [personalMode, setPersonalMode] = useState<'new' | 'existing'>('new')
+  const [personalRepoName, setPersonalRepoName] = useState('')
+  const [personalSelectedRepo, setPersonalSelectedRepo] = useState('')
+  const [personalRepos, setPersonalRepos] = useState<Array<{ name: string; full_name: string }>>([])
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false)
+  const [commitMessage, setPersonalCommitMsg] = useState('')
+
+  // Fetch user's GitHub repos when switching to existing mode
+  useEffect(() => {
+    if (!githubToken || personalMode !== 'existing' || personalRepos.length > 0) return
+    setIsLoadingRepos(true)
+    fetch('https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner', {
+      headers: { Authorization: `token ${githubToken}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setPersonalRepos(data.map((r: any) => ({ name: r.name, full_name: r.full_name })))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingRepos(false))
+  }, [githubToken, personalMode, personalRepos.length])
+
+  // Personal project: push to GitHub via deploy API
   const handlePersonalGitHubPush = async () => {
-    if (!onPushToGitHub) return
+    if (!projectId || !githubToken) return
     setIsPushingPersonal(true)
 
     try {
-      await onPushToGitHub()
-      toast.success("Pushed to GitHub")
-      setCommitMessage("")
+      const allFiles = await gatherProjectFiles()
+      if (allFiles.length === 0) {
+        toast.error("No files to push")
+        return
+      }
+
+      const { filterUnwantedFiles } = await import('@/lib/utils')
+      const filteredFiles = filterUnwantedFiles(allFiles as any)
+
+      const response = await fetch('/api/deploy/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files: filteredFiles.map((f: any) => ({
+            path: (f.path || f.name).replace(/^\//, ''),
+            content: f.content || '',
+          })),
+          mode: personalMode === 'new' ? 'create' : 'existing',
+          repoName: personalMode === 'new' ? personalRepoName : undefined,
+          existingRepo: personalMode === 'existing' ? personalSelectedRepo : undefined,
+          commitMessage: commitMessage.trim() || 'Update project files',
+          githubToken,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Push failed')
+      }
+
+      const data = await response.json()
+      toast.success(`Pushed to ${data.repoName || data.repoUrl}`)
+      setPersonalCommitMsg('')
     } catch (err: any) {
       toast.error(err.message || "Failed to push to GitHub")
     } finally {
@@ -601,6 +656,137 @@ export function SourceControlTab({
         >
           Connect GitHub
         </a>
+      </div>
+    )
+  }
+
+  // Personal project with GitHub connected but no team workspace
+  if (!isTeamWorkspace && githubConnected) {
+    return (
+      <div className="flex flex-col h-full bg-gray-950">
+        <div className="px-3 py-2 border-b border-gray-800/60">
+          <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+            <GitBranch className="w-3.5 h-3.5 text-orange-400" />
+            Push to GitHub
+          </h3>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {/* Mode selector */}
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setPersonalMode('new')}
+              className={cn(
+                "flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors border",
+                personalMode === 'new'
+                  ? "bg-orange-600/15 text-orange-400 border-orange-500/30"
+                  : "text-gray-400 border-gray-700 hover:border-gray-600"
+              )}
+            >
+              New Repository
+            </button>
+            <button
+              onClick={() => setPersonalMode('existing')}
+              className={cn(
+                "flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors border",
+                personalMode === 'existing'
+                  ? "bg-orange-600/15 text-orange-400 border-orange-500/30"
+                  : "text-gray-400 border-gray-700 hover:border-gray-600"
+              )}
+            >
+              Existing Repository
+            </button>
+          </div>
+
+          {personalMode === 'new' ? (
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-gray-400 font-medium">Repository Name</label>
+              <input
+                value={personalRepoName}
+                onChange={(e) => setPersonalRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, '-'))}
+                placeholder="e.g., my-project"
+                className="w-full h-8 px-2.5 rounded-lg border border-gray-800 bg-gray-900/50 text-xs text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+              />
+              <p className="text-[10px] text-gray-600">A new private repo will be created</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-gray-400 font-medium">Select Repository</label>
+              {isLoadingRepos ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="w-3 h-3 animate-spin text-orange-400" />
+                  <span className="text-[11px] text-gray-500">Loading repos...</span>
+                </div>
+              ) : (
+                <select
+                  value={personalSelectedRepo}
+                  onChange={(e) => setPersonalSelectedRepo(e.target.value)}
+                  className="w-full h-8 px-2 rounded-lg border border-gray-800 bg-gray-900/50 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                >
+                  <option value="">Select a repository...</option>
+                  {personalRepos.map(r => (
+                    <option key={r.full_name} value={r.full_name}>{r.full_name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Commit message */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-gray-400 font-medium">Commit Message</label>
+            <div className="relative">
+              <input
+                value={commitMessage}
+                onChange={(e) => setPersonalCommitMsg(e.target.value)}
+                placeholder="Update project files"
+                className="w-full h-8 px-2.5 pr-7 rounded-lg border border-gray-800 bg-gray-900/50 text-xs text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50"
+              />
+              <button
+                onClick={generateCommitMessage}
+                disabled={isGeneratingMsg}
+                className="absolute right-1.5 top-1.5 h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 disabled:opacity-30 transition-colors"
+                title="Generate commit message with AI"
+              >
+                {isGeneratingMsg ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-orange-400" />
+                ) : (
+                  <Sparkles className="w-3 h-3" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Push button */}
+          <Button
+            size="sm"
+            onClick={handlePersonalGitHubPush}
+            disabled={
+              isPushingPersonal ||
+              (personalMode === 'new' && !personalRepoName.trim()) ||
+              (personalMode === 'existing' && !personalSelectedRepo)
+            }
+            className="w-full h-8 text-xs bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-30"
+          >
+            {isPushingPersonal ? (
+              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+            ) : (
+              <GitCommit className="w-3 h-3 mr-1.5" />
+            )}
+            {personalMode === 'new' ? 'Create & Push' : 'Push to Repository'}
+          </Button>
+
+          {githubRepoUrl && (
+            <a
+              href={githubRepoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[11px] text-orange-400 hover:text-orange-300 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {githubRepoUrl.replace('https://github.com/', '')}
+            </a>
+          )}
+        </div>
       </div>
     )
   }

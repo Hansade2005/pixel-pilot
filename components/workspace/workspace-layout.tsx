@@ -1221,15 +1221,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       }
 
       const connectionStatus = await checkGitHubConnection(selectedProject)
-      setGitHubConnected(connectionStatus.connected)
+      setGitHubConnected(connectionStatus.hasToken)
 
-      // Load token for source control
-      if (connectionStatus.connected) {
+      // Load token for source control (check hasToken, not connected — repo may not exist yet)
+      if (connectionStatus.hasToken) {
         try {
           const { getDeploymentTokens } = await import('@/lib/cloud-sync')
           const tokens = await getDeploymentTokens(user.id)
           setGitHubToken(tokens?.github || undefined)
         } catch {}
+      } else {
+        setGitHubToken(undefined)
       }
     }
 
