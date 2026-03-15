@@ -96,6 +96,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { toast } = useToast()
   const [aiFileChanges, setAiFileChanges] = useState(0)
   const [gitHubConnected, setGitHubConnected] = useState(false)
+  const [gitHubToken, setGitHubToken] = useState<string | undefined>(undefined)
   const [clientProjects, setClientProjects] = useState<Workspace[]>(projects)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [fileExplorerKey, setFileExplorerKey] = useState<number>(0) // Force file explorer refresh
@@ -1215,15 +1216,25 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const checkConnection = async () => {
       if (!selectedProject) {
         setGitHubConnected(false)
+        setGitHubToken(undefined)
         return
       }
 
       const connectionStatus = await checkGitHubConnection(selectedProject)
       setGitHubConnected(connectionStatus.connected)
+
+      // Load token for source control
+      if (connectionStatus.connected) {
+        try {
+          const { getDeploymentTokens } = await import('@/lib/cloud-sync')
+          const tokens = await getDeploymentTokens(user.id)
+          setGitHubToken(tokens?.github || undefined)
+        } catch {}
+      }
     }
 
     checkConnection()
-  }, [selectedProject, checkGitHubConnection])
+  }, [selectedProject, checkGitHubConnection, user.id])
 
   // Auto-switch to editor tab when file is selected on mobile
   React.useEffect(() => {
@@ -1908,21 +1919,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 hasRemoteChanges={hasRemoteChanges}
                                 isPulling={isGhPulling}
                                 onPull={pullFromGitHub}
-                                onOpenDiff={(title, content) => {
-                                  const diffFile: File = {
-                                    id: `diff-${Date.now()}`,
-                                    workspaceId: selectedProject?.id || "",
-                                    name: title,
-                                    path: `/.diffs/${title.replace(/[^a-zA-Z0-9.-]/g, '_')}.diff`,
-                                    content,
-                                    fileType: "diff",
-                                    type: "diff",
-                                    size: content.length,
-                                    isDirectory: false,
-                                    createdAt: new Date().toISOString(),
-                                    updatedAt: new Date().toISOString(),
-                                  }
-                                  setSelectedFile(diffFile)
+                                githubConnected={gitHubConnected}
+                                githubToken={gitHubToken}
+                                onPushToGitHub={async () => {
+                                  if (!selectedProject) return
+                                  await pushToGitHub(selectedProject as any)
                                 }}
                               />
                             )}

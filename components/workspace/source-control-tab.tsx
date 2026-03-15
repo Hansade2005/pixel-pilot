@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { Streamdown } from "streamdown"
 import {
   commitFiles as githubCommitFiles,
   fetchCommits as githubFetchCommits,
@@ -43,7 +44,10 @@ interface SourceControlTabProps {
   hasRemoteChanges?: boolean
   isPulling?: boolean
   onPull?: () => Promise<any>
-  onOpenDiff?: (title: string, content: string) => void
+  // Personal project GitHub support
+  githubConnected?: boolean
+  githubToken?: string
+  onPushToGitHub?: () => Promise<any>
 }
 
 interface FileChange {
@@ -79,7 +83,9 @@ export function SourceControlTab({
   hasRemoteChanges,
   isPulling,
   onPull,
-  onOpenDiff,
+  githubConnected = false,
+  githubToken,
+  onPushToGitHub,
 }: SourceControlTabProps) {
   const [commitMessage, setCommitMessage] = useState("")
   const [isCommitting, setIsCommitting] = useState(false)
@@ -90,6 +96,9 @@ export function SourceControlTab({
   const [isGeneratingMsg, setIsGeneratingMsg] = useState(false)
   const [commitDetails, setCommitDetails] = useState<Record<string, CommitDetail>>({})
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
+  const [diffView, setDiffView] = useState<{ title: string; content: string } | null>(null)
+  // Personal project GitHub state
+  const [isPushingPersonal, setIsPushingPersonal] = useState(false)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -235,31 +244,56 @@ export function SourceControlTab({
   }
 
   // Generate rich diff markdown for a commit
+  // Show diff inline using Streamdown
+  const showDiff = (title: string, content: string) => {
+    setDiffView({ title, content })
+  }
+
   const generateCommitDiffMarkdown = (detail: CommitDetail): string => {
     const lines: string[] = []
-    // Use unified diff format that Monaco's diff language mode highlights natively
-    lines.push(`# Commit: ${detail.message}`)
-    lines.push(`# Author: ${detail.author_name} <${detail.author_email}>`)
-    lines.push(`# Date: ${new Date(detail.date).toLocaleString()}`)
-    lines.push(`# SHA: ${detail.sha}`)
-    lines.push(`# Stats: +${detail.stats.additions} -${detail.stats.deletions} (${detail.files.length} file${detail.files.length !== 1 ? 's' : ''})`)
+    lines.push(`# ${detail.message}`)
+    lines.push('')
+    lines.push(`**Author:** ${detail.author_name} &lt;${detail.author_email}&gt;  `)
+    lines.push(`**Date:** ${new Date(detail.date).toLocaleString()}  `)
+    lines.push(`**SHA:** \`${detail.sha.slice(0, 12)}\`  `)
+    lines.push(`**Stats:** \`+${detail.stats.additions}\` \`-${detail.stats.deletions}\` across ${detail.files.length} file${detail.files.length !== 1 ? 's' : ''}`)
+    lines.push('')
+    lines.push('---')
     lines.push('')
 
     for (const file of detail.files) {
-      lines.push(`diff --git a/${file.filename} b/${file.filename}`)
-      if (file.status === 'added') {
-        lines.push('new file mode 100644')
-      } else if (file.status === 'removed') {
-        lines.push('deleted file mode 100644')
-      }
-      lines.push(`--- ${file.status === 'added' ? '/dev/null' : `a/${file.filename}`}`)
-      lines.push(`+++ ${file.status === 'removed' ? '/dev/null' : `b/${file.filename}`}`)
-      if (file.patch) {
-        lines.push(file.patch)
-      }
+      const statusLabel = file.status === 'added' ? 'Added' : file.status === 'removed' ? 'Deleted' : 'Modified'
+      lines.push(`### ${statusLabel}: \`${file.filename}\` (+${file.additions} -${file.deletions})`)
       lines.push('')
+      if (file.patch) {
+        lines.push('```diff')
+        lines.push(file.patch)
+        lines.push('```')
+        lines.push('')
+      }
     }
 
+    return lines.join('\n')
+  }
+
+  const generateFileDiffMarkdown = (file: CommitDetail['files'][0], commit: CommitEntry, detail: CommitDetail): string => {
+    const statusLabel = file.status === 'added' ? 'Added' : file.status === 'removed' ? 'Deleted' : 'Modified'
+    const lines = [
+      `# ${statusLabel}: \`${file.filename}\``,
+      '',
+      `**Commit:** ${commit.message}  `,
+      `**Author:** ${detail.author_name}  `,
+      `**Date:** ${new Date(detail.date).toLocaleString()}  `,
+      `**Changes:** \`+${file.additions}\` \`-${file.deletions}\``,
+      '',
+    ]
+    if (file.patch) {
+      lines.push('```diff')
+      lines.push(file.patch)
+      lines.push('```')
+    } else {
+      lines.push('*No patch available*')
+    }
     return lines.join('\n')
   }
 
@@ -346,6 +380,13 @@ export function SourceControlTab({
   // Commit all project files to GitHub (no staging)
   const handleCommit = async () => {
     if (!commitMessage.trim()) return
+
+    // Personal project GitHub push
+    if (!isTeamWorkspace && githubConnected && onPushToGitHub) {
+      await handlePersonalGitHubPush()
+      return
+    }
+
     if (!teamWorkspaceId || !organizationId) return
 
     setIsCommitting(true)
@@ -528,7 +569,23 @@ export function SourceControlTab({
     }
   }
 
-  if (!isTeamWorkspace) {
+  // Personal project: push to GitHub via parent's pushToGitHub handler
+  const handlePersonalGitHubPush = async () => {
+    if (!onPushToGitHub) return
+    setIsPushingPersonal(true)
+
+    try {
+      await onPushToGitHub()
+      toast.success("Pushed to GitHub")
+      setCommitMessage("")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to push to GitHub")
+    } finally {
+      setIsPushingPersonal(false)
+    }
+  }
+
+  if (!isTeamWorkspace && !githubConnected) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
         <GitBranch className="h-12 w-12 text-gray-600 mb-4" />
@@ -536,15 +593,20 @@ export function SourceControlTab({
           Source Control
         </h3>
         <p className="text-xs text-gray-500 mb-4 max-w-[240px]">
-          Convert this workspace to a team workspace to enable source control
-          with staging, commits, and push.
+          Connect GitHub in your account settings to push code and track commits.
         </p>
+        <a
+          href="/workspace/account"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-600 hover:bg-orange-500 text-white transition-colors"
+        >
+          Connect GitHub
+        </a>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-950">
+    <div className="flex flex-col h-full bg-gray-950 relative">
       {/* Header */}
       <div className="flex items-center border-b border-gray-800/60 px-3 py-1.5 gap-1 flex-shrink-0">
         <button
@@ -743,7 +805,7 @@ export function SourceControlTab({
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              onOpenDiff?.(
+                              showDiff(
                                 `Commit: ${commit.message}`,
                                 generateCommitDiffMarkdown(detail)
                               )
@@ -791,7 +853,7 @@ export function SourceControlTab({
                               <span className="text-[10px] text-gray-500">{detail.files.length} file{detail.files.length !== 1 ? 's' : ''}</span>
                               <div className="flex-1" />
                               <button
-                                onClick={() => onOpenDiff?.(
+                                onClick={() => showDiff(
                                   `Commit: ${commit.message}`,
                                   generateCommitDiffMarkdown(detail)
                                 )}
@@ -808,18 +870,7 @@ export function SourceControlTab({
                                   key={fi}
                                   className="flex items-center gap-2 px-2 py-1 hover:bg-gray-800/30 rounded cursor-pointer group"
                                   onClick={() => {
-                                    const fileDiff = [
-                                      `# ${file.status === 'added' ? 'Added' : file.status === 'removed' ? 'Deleted' : 'Modified'}: ${file.filename}`,
-                                      `# Commit: ${commit.message}`,
-                                      `# Author: ${detail.author_name} | Date: ${new Date(detail.date).toLocaleString()}`,
-                                      `# Changes: +${file.additions} -${file.deletions}`,
-                                      '',
-                                      `diff --git a/${file.filename} b/${file.filename}`,
-                                      `--- ${file.status === 'added' ? '/dev/null' : `a/${file.filename}`}`,
-                                      `+++ ${file.status === 'removed' ? '/dev/null' : `b/${file.filename}`}`,
-                                      file.patch || '# No patch available',
-                                    ].join('\n')
-                                    onOpenDiff?.(file.filename, fileDiff)
+                                    showDiff(file.filename, generateFileDiffMarkdown(file, commit, detail))
                                   }}
                                 >
                                   {fileStatusIcon(file.status)}
@@ -855,6 +906,41 @@ export function SourceControlTab({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Inline Diff Viewer */}
+      {diffView && (
+        <div className="absolute inset-0 z-20 bg-gray-950 flex flex-col">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-800/60 flex-shrink-0">
+            <button
+              onClick={() => setDiffView(null)}
+              className="h-6 px-2 flex items-center gap-1 rounded text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            >
+              <ChevronRight className="w-3 h-3 rotate-180" />
+              Back
+            </button>
+            <span className="text-xs text-gray-300 font-medium truncate flex-1">{diffView.title}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <Streamdown
+              shikiTheme={['github-light', 'github-dark-dimmed']}
+              className={cn(
+                "text-sm leading-relaxed break-words [overflow-wrap:anywhere]",
+                "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+                "[&>p]:mb-3 [&>p]:text-gray-300",
+                "[&>h1]:mb-3 [&>h1]:text-base [&>h1]:font-bold [&>h1]:text-gray-100",
+                "[&>h2]:mb-2 [&>h2]:text-sm [&>h2]:font-semibold [&>h2]:text-gray-200",
+                "[&>h3]:mb-2 [&>h3]:text-xs [&>h3]:font-semibold [&>h3]:text-gray-200",
+                "[&>hr]:my-3 [&>hr]:border-gray-800",
+                "[&>pre]:mb-3 [&>pre]:overflow-x-auto [&>pre]:rounded-lg [&>pre]:border [&>pre]:border-gray-700/50 [&>pre]:text-xs",
+                "[&_code]:text-xs",
+                "[&>blockquote]:mb-3 [&>blockquote]:border-l-4 [&>blockquote]:border-gray-700 [&>blockquote]:pl-3 [&>blockquote]:text-gray-400",
+              )}
+            >
+              {diffView.content}
+            </Streamdown>
+          </div>
         </div>
       )}
     </div>
