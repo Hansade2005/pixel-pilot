@@ -1600,6 +1600,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             title="Source Control"
                           >
                             <GitBranch className="size-5" />
+                            {effectivePendingCount > 0 && (
+                              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-orange-600 text-[10px] font-medium text-white leading-none">
+                                {effectivePendingCount > 99 ? '99+' : effectivePendingCount}
+                              </span>
+                            )}
                             {codeViewPanel === 'source' && (
                               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-orange-500 rounded-r" />
                             )}
